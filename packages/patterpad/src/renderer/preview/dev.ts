@@ -10,6 +10,12 @@ import enGbDic from "../../../resources/dictionaries/en-GB/index.dic?raw";
 import enUsAff from "../../../resources/dictionaries/en-US/index.aff?raw";
 import enUsDic from "../../../resources/dictionaries/en-US/index.dic?raw";
 import { createFlowFollower } from "../../shared/debug-follow.js";
+// Patter extensions: the conformance suite's probe manifest, taken by the preview project, with data on the
+// tavern's nodes, so the inspector and Project Settings draw every field type an extension can declare.
+import probeManifestText from "../../../../conformance/fixtures/probe.extension.json?raw";
+import { parseManifest } from "@wildwinter/toolkit/extensions";
+import { extensionDtos } from "../../shared/extensions.js";
+import type { ProjectFile } from "@patterkit/model";
 const DICT_BYTES: Record<string, { aff: string; dic: string }> = {
   "en-GB": { aff: enGbAff, dic: enGbDic },
   "en-US": { aff: enUsAff, dic: enUsDic },
@@ -17,7 +23,45 @@ const DICT_BYTES: Record<string, { aff: string; dic: string }> = {
 
 // The fixture with one speaker qualifier on a line, so the preview shows the cue's BARKEEP (O.S.), the
 // inspector's Qualifier dropdown, and the run rule (a new BARKEEP line after it takes O.S. too).
-const flowSource = tavernFlow.replace('direction: "wiping a glass" }', 'direction: "wiping a glass", qualifier: "os" }');
+// Its mood is one the probe's claim on the field doesn't allow, so the claimed Delivery row shows a problem.
+const flowSource = tavernFlow.replace('direction: "wiping a glass" }', 'direction: "wiping a glass", qualifier: "os", gameData: { mood: "hostile" } }');
+
+// The probe, taken at an older version than its manifest (so the problems bar has a project-level extension
+// problem, which opens its Settings section), with its delivery claim naming the line's `mood` field.
+const PROBE_TAKEN = { probe: { version: "1.0.0", settings: { deliveryField: "mood" } } };
+const probeProject = { values: { studio: "Wildwinter" } as Record<string, unknown> };
+const probeDtos = (): ReturnType<typeof extensionDtos> => extensionDtos(
+  { project: { id: "proj_tavern", name: "The Tavern" }, extensions: PROBE_TAKEN } as unknown as ProjectFile,
+  new Map([["probe", parseManifest(probeManifestText)]]),
+  new Map([["probe", { entries: { project: { proj_tavern: probeProject.values } } }]]),
+);
+// The tavern's probe shard: every type on the greeting (its cue missing the sound it requires, its act a
+// stage since renamed, its next line in another scene), a key the probe no longer declares on the second
+// line, and a value for each other kind of node.
+const probeShard = JSON.stringify({
+  schema: "patter/extension@0", extension: "probe", scene: "scn_tavern",
+  entries: {
+    scene: { scn_tavern: { theme: "smoke and ale" } },
+    block: { intro: { pace: 2 } },
+    snippet: { sn_intro_greet: { weight: 3 } },
+    text: { T_scene: { style: "far" } },
+    gameEvent: { A_focus: { cue: "camera" } },
+    option: { opt_work: { icon: "coin" } },
+    line: {
+      L_greet: {
+        note: "Ring the bell twice.", draft: "Maybe three times.", weight: 4, loud: true, tone: "tense", marks: ["night"],
+        act: "opening", next: "L_street_call", cue: { gain: 0.5 },
+        perf: { ANNA: { expression: "frown", look: "at the door" } },
+        beats: [{ id: "b1", at: 1 }, { id: "b2", at: 3 }], words: ["salt", "rope"],
+      },
+      L_greet2: { colour: "red" },
+    },
+  },
+}, null, 2);
+// ?view=ext opens the tavern writable (it's locked by bo@studio otherwise), so the rows can be edited;
+// ?view=extlock does too, with the probe's data for the scene and the project held by bob.
+const extView = ["ext", "extlock"].includes(new URLSearchParams(location.search).get("view") ?? "");
+const extLock = new URLSearchParams(location.search).get("view") === "extlock";
 
 // The project's speaker qualifiers (the defaults, as a project that never edited them reads).
 const QUALIFIERS = [
@@ -63,6 +107,9 @@ const project = {
   // Scratch recording (#224): in folder mode, the "scratch" rung receives in-app takes - so the inspector
   // offers "● Record" on any line at/below it (missing / scratch).
   scratchStatus: new URLSearchParams(location.search).get("view") === "audiofolders" ? "scratch" : null,
+  // Patter extensions (OpenedProject.extensions): the probe, and a node in another scene its references name.
+  extensions: probeDtos(),
+  extensionNodes: { line: [{ id: "L_street_call", label: "ANNA: Over here!", scene: "scn_street" }] },
 };
 // A fake folder-derived index for the preview: a couple of resolved dialogue lines, the rest implicitly missing.
 const FAKE_AUDIO_INDEX: Record<string, { status: string; path: string; textHash?: string }> = {
@@ -130,6 +177,7 @@ const stub = {
   readScene: async () => ({
     flowSource, locSource, sceneName: "The Tavern",
     hostScopes: ["world"], // the project's host-scope tokens (ReadSceneResult.hostScopes)
+    extensions: [{ id: "probe", name: "Probe", source: probeShard, live: true }], // the scene's Patter extension shards (SceneSource.extensions)
     properties: [
       { scope: "patter", name: "gold", type: "number" },
       { scope: "patter", name: "met_anna", type: "boolean" },
@@ -140,13 +188,18 @@ const stub = {
       { scope: "scene", name: "asked_about_work", type: "boolean" },
     ],
   }),
-  saveScene: async () => ({ ok: true }),
+  saveScene: async (_id: string, _flow: string, _loc: string, extensions?: Record<string, string | null>) => {
+    if (extensions && Object.keys(extensions).length) console.log("[preview] saveScene extension shards", extensions);
+    return { ok: true };
+  },
   // VC snapshot (#145): the tavern is locked by another author (read-only + chip), the street has
   // uncommitted local changes (the "modified" ● badge, simple-vc-lib 0.1.1 `dirty`).
   vcStatus: async () => ({ vcs: "perforce", system: "perforce", scenes: [
-    { sceneId: "scn_tavern", writable: false, lockedBy: ["bo@studio"] },
+    extView
+      ? { sceneId: "scn_tavern", writable: true, ...(extLock ? { extensions: { probe: { writable: false, lockedBy: ["bob"] } } } : {}) }
+      : { sceneId: "scn_tavern", writable: false, lockedBy: ["bo@studio"] },
     { sceneId: "scn_street", writable: true, dirty: true },
-  ] }),
+  ], ...(extLock ? { projectExtensions: { probe: { writable: false, lockedBy: ["bob"] } } } : {}) }),
   // In-memory documentation map so the Notes popover round-trips within a preview session.
   readDocs: async () => (window as unknown as { __docs?: Record<string, unknown> }).__docs ?? {},
   saveDocs: async (_sceneId: string, map: Record<string, unknown>) => { (window as unknown as { __docs?: unknown }).__docs = map; return { ok: true }; },
@@ -324,7 +377,12 @@ const stub = {
     audioFolders: project.audioFolders, audioRoot: project.audioRoot, scratchStatus: project.scratchStatus,
     dictionaryLanguage: "en-GB", dictionaryWords: ["Patterpad", "Eldoria"], dictionaryIgnore: [], dictionaryEnabled: true,
     closedCaptions: { open: "[", close: "]", character: "SFX" } }),
-  saveSettings: async (s: { name: string }) => ({ ok: true, project: { ...project, name: s.name } }),
+  saveSettings: async (s: { name: string; extensionValues?: Record<string, Record<string, unknown>> }) => {
+    // The probe's project values, as its Settings section saved them: kept, so reopening shows them.
+    if (s.extensionValues) { console.log("[preview] saveSettings extension values", s.extensionValues); if (s.extensionValues["probe"]) probeProject.values = s.extensionValues["probe"]; }
+    project.extensions = probeDtos();
+    return { ok: true, project: { ...project, name: s.name } };
+  },
   // Spell-check (#177): the built-ins plus a fake imported dictionary; readDictionary serves the REAL
   // vendored en-GB/en-US bytes so the live squiggle engine works in the preview.
   // The character and qualifier pairs the lines use (the Cast tab's "Shown with" fields).
@@ -366,6 +424,10 @@ const stub = {
       // add a prompt to a prompt-less option. Static here - the real validator drives them in Electron.
       { category: "condition", severity: "error", detail: "condition", message: "'angry' is not a valid value for this property - expected one of: calm, tense, hostile", nodeId: "opt_intimidate", fix: { kind: "pick-enum-value", bad: "angry", options: ["calm", "tense", "hostile"], src: "@mood == \"angry\"" } },
       { category: "structure", severity: "error", detail: "missing-prompt", message: "choice option 'opt_leave' has no prompt", nodeId: "opt_leave", fix: { kind: "add-prompt", optionId: "opt_leave" } },
+      // Patter extensions: a value the probe requires on the greeting (Go to issue reveals it), and the
+      // project taking an older probe than its manifest, which Go to issue opens the probe's Settings for.
+      { category: "extensions", severity: "error", detail: "required", message: "entries.line.L_greet.cue.sound: \"cue.sound\" is required and not set", nodeId: "L_greet", sceneId: "scn_tavern", file: "extensions/probe/tavern.patterextension", extension: "probe" },
+      { category: "extensions", severity: "warning", message: "the project takes \"probe\" at version 1.0.0, but its manifest is version 1.1.0; run `patter format` to take it (renamed stages are renamed in the data as it does)", file: "the-tavern.patterproj", extension: "probe" },
       // An advisory warning (amber): a stale compiled bundle. No quick-fix - `patter export` repairs it.
       { category: "stale-bundle", severity: "warning", message: "compiled bundle is stale (does not match current source) - run `patter export`", file: "scenes/the-tavern.patterc" },
     ],

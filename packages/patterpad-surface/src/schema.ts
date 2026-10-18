@@ -20,6 +20,12 @@
 // and bridge to LineBeat.character/.direction (flow); say-zone text bridges to
 // the locale string keyed by beat id. Groups are real nodes (`group`); only a
 // chunk kind the surface does not model rides opaque as `rawnode`.
+//
+// Patter extension data (patterkit design/patterpad-undo.md, half A) rides in its
+// own attr, `ext`, on every node that has an id (doc, block, snippet, group, line,
+// prose, gameEvent): a JSON string `{ <extension id>: <the node's entry> }`, or ""
+// for none. Never inside `raw`, so it can't leak into the flow shard; and whatever
+// copies attrs (Duplicate) carries it. An optionprompt and a rawnode have none.
 // ---------------------------------------------------------------------------
 
 import { Schema } from "prosemirror-model";
@@ -28,20 +34,20 @@ import { iconNode } from "@wildwinter/app-shell"; // the family's drawn set: the
 export const patterSchema = new Schema({
   nodes: {
     // The scene. `raw` = the scene minus `blocks`.
-    doc: { content: "block+", attrs: { raw: { default: "{}" } } },
+    doc: { content: "block+", attrs: { raw: { default: "{}" }, ext: { default: "" } } },
 
     // A block. `raw` = the block minus `children`. `chunk*` (not `chunk+`): a block may
     // be genuinely EMPTY - the surface then shows a ghost-snippet placeholder (a faint
     // dashed bubble + a "+") so there is always somewhere to start, without forcing a
     // real bubble into the model (groups §1 / D1).
-    block: { content: "chunk*", attrs: { raw: { default: "{}" } }, toDOM: () => ["div", { class: "block" }, 0] },
+    block: { content: "chunk*", attrs: { raw: { default: "{}" }, ext: { default: "" } }, toDOM: () => ["div", { class: "block" }, 0] },
 
     // A snippet = a bubble: zero or more beats. Its terminal jump is a snippet-
     // level value (`jump` attr: a JSON Jump object, or "" for none), not a beat,
     // so it never sits in the editable flow. `raw` = the snippet minus `beats` and
     // `jump`. (Zero beats + a jump = a pure-jump bubble.)
     snippet: {
-      group: "chunk", content: "beat*", attrs: { raw: { default: "{}" }, jump: { default: "" } },
+      group: "chunk", content: "beat*", attrs: { raw: { default: "{}" }, jump: { default: "" }, ext: { default: "" } },
       toDOM: () => ["div", { class: "bubble" }, 0],
     },
 
@@ -52,7 +58,7 @@ export const patterSchema = new Schema({
     // `optionprompt` (the choice text, spec §5 / groups §13.10). Rendered as a
     // rail container (web/views.ts).
     group: {
-      group: "chunk", content: "optionprompt? chunk*", attrs: { raw: { default: "{}" } },
+      group: "chunk", content: "optionprompt? chunk*", attrs: { raw: { default: "{}" }, ext: { default: "" } },
       toDOM: () => ["div", { class: "group-rail" }, 0],
     },
 
@@ -77,17 +83,17 @@ export const patterSchema = new Schema({
     // --- beats (the line types) ---------------------------------------------
     // Dialogue: a character cue, an optional direction, and the spoken content.
     line: {
-      group: "beat", content: "cue paren? say", attrs: { id: {}, raw: { default: "{}" } },
+      group: "beat", content: "cue paren? say", attrs: { id: {}, raw: { default: "{}" }, ext: { default: "" } },
       toDOM: () => ["div", { class: "beat kind-line" }, 0],
     },
     // Free text / narration: content only.
     prose: {
-      group: "beat", content: "say", attrs: { id: {}, raw: { default: "{}" } },
+      group: "beat", content: "say", attrs: { id: {}, raw: { default: "{}" }, ext: { default: "" } },
       toDOM: () => ["div", { class: "beat kind-prose" }, 0],
     },
     // Game event: an opaque engine instruction (details via a separate UI). No cursor.
     gameEvent: {
-      group: "beat", atom: true, attrs: { id: {}, raw: { default: "{}" } },
+      group: "beat", atom: true, attrs: { id: {}, raw: { default: "{}" }, ext: { default: "" } },
       toDOM: () => ["div", { class: "beat kind-gameEvent", contenteditable: "false" },
         ["span", { class: "atom-glyph" }, iconNode("settings", 15)]],
     },

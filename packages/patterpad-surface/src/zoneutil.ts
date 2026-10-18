@@ -20,6 +20,9 @@ export const BEAT_TYPES: ReadonlySet<string> = new Set(["line", "prose", "gameEv
 export interface BeatParts {
   id?: string;
   raw?: string;
+  /** The beat's extension data (`ext`, schema.ts): kept by anything that rebuilds a beat it keeps the id
+   *  of (a toggle, a fold), "" for a new one. */
+  ext?: string;
   speaker?: string;
   direction?: string;
   say?: Fragment | string;
@@ -36,12 +39,13 @@ const sayFragment = (say: Fragment | string | undefined): Fragment =>
 export function beatNode(kind: "line" | "prose", parts: BeatParts = {}): PMNode {
   const id = parts.id ?? newId("L");
   const raw = parts.raw ?? "{}";
+  const ext = parts.ext ?? "";
   const say = S.node("say", null, sayFragment(parts.say));
-  if (kind === "prose") return S.node("prose", { id, raw }, [say]);
+  if (kind === "prose") return S.node("prose", { id, raw, ext }, [say]);
   const kids = [S.node("cue", null, parts.speaker ? [S.text(parts.speaker)] : [])];
   if (parts.direction) kids.push(S.node("paren", null, [S.text(parts.direction)]));
   kids.push(say);
-  return S.node("line", { id, raw }, kids);
+  return S.node("line", { id, raw, ext }, kids);
 }
 
 /**
@@ -63,7 +67,7 @@ export const freshSnippet = (beats: PMNode[] = [], jump = ""): PMNode => S.node(
 
 /**
  * Is this beat BLANK - a line or text beat with nothing in it that would be lost by removing it? No
- * typed text in any zone (character, direction, or words) and no game data or tags. A game event is
+ * typed text in any zone (character, direction, or words) and no game data, tags, or extension data. A game event is
  * never blank: it is an atom with no text, and its whole content is what it is. The one emptiness rule,
  * shared by the blur sweep and by a jump collapsing an empty bubble, so neither deletes what the other
  * would keep.
@@ -74,7 +78,7 @@ export function isBlankBeat(node: PMNode): boolean {
   const raw = rawAttr(node);
   const hasGameData = !!raw.gameData && typeof raw.gameData === "object" && Object.keys(raw.gameData as object).length > 0;
   const hasTags = Array.isArray(raw.tags) && raw.tags.length > 0;
-  return !hasGameData && !hasTags;
+  return !hasGameData && !hasTags && !node.attrs.ext;
 }
 
 export interface ZoneRef { node: PMNode; pos: number }

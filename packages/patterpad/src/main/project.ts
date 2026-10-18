@@ -19,7 +19,7 @@ import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./sce
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
 import { projectQualifiers, usedSpeakerPairs, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
 import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQualifiersInAuthoring, renameQualifiersInHandoff, renameQualifierLabels, moveQualifierKeys, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
-import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD } from "@patterkit/model";
+import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD, PROJECT_EXTENSION_STEM } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
 import type { ReviewItem, ProjectStep, ProjectHistoryOutcome } from "../shared/api.js";
@@ -28,9 +28,14 @@ import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync, prepareToWr
 import { fileSafeName } from "../shared/file-name.js";
 import type { EditableExportRequest, EditableImportRequest, EditableImportSummary, OpenSuggestionDto } from "../shared/api.js";
 import type { ImportPlan } from "@patterkit/ops";
-import { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, renameCastKeys } from "@patterkit/ops";
+import { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, renameCastKeys, readProjectManifest } from "@patterkit/ops";
 import { createHash, randomUUID } from "node:crypto";
 import type { StageRenameDto } from "../shared/api.js";
+import type { SceneExtensionShards, LiveSceneSource, SceneExtensionSourceDto } from "../shared/api.js";
+import type { ExtensionShard } from "@patterkit/model";
+import { EXTENSION_SCHEMA } from "@patterkit/model";
+import type { Manifest } from "@wildwinter/toolkit/extensions";
+import { extensionDtos, extensionNodeIndex } from "../shared/extensions.js";
 import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult, PackMergeSummary } from "../shared/api.js";
 import type { CoverageDriver } from "@patterkit/model";
 import { editorScopes } from "../shared/host-scopes.js";
@@ -81,7 +86,7 @@ let hydrateError: Error | null = null;
  *  without corrupting the cached `loaded` truth. The scene / locale OBJECTS are shared - callers only
  *  read them or replace whole array slots, never mutate in place. */
 function workingCopy(p: LoadedProject): LoadedProject {
-  return { ...p, scenes: [...p.scenes], locales: [...p.locales] };
+  return { ...p, scenes: [...p.scenes], locales: [...p.locales], extensionShards: [...p.extensionShards], extensionShardFiles: [...p.extensionShardFiles] };
 }
 
 function buildShards(p: LoadedProject): Map<string, SceneShards> {
@@ -118,7 +123,8 @@ const authoringCache = new Map<string, { mtimeMs: number; af: AuthoringFile }>()
 // both shards and a save doesn't sync-read them just to diff. Refreshed on every read + successful save;
 // dropped whenever the shard map is rebuilt (open / hydrate / loc-import). External edits to a scene's
 // source are picked up on reopen, matching how the parsed `loaded` model already behaves.
-const sourceMirror = new Map<string, { flow: string; loc: string }>();
+// `ext` holds the scene's extension shards the same way, by extension id ("" for a shard not on disk).
+const sourceMirror = new Map<string, { flow: string; loc: string; ext: Record<string, string> }>();
 // vcStatus's per-shard path list (+ which scene each path belongs to). Rebuilt only when the shard set
 // changes (buildShards) or a write may have created a new shard (commitWrites) - not on every poll.
 let vcShardsMemo: ShardRef[] | null = null;
@@ -286,7 +292,31 @@ function summarise(p: LoadedProject): OpenedProject {
     audioFolders: p.project.audioFolders ?? false,
     audioRoot: p.project.audioRoot ?? null,
     scratchStatus: p.project.scratchStatus ?? null,
+    ...extensionSummary(p),
   };
+}
+
+/** The project's Patter extensions for the editor, read from the project file and the disk (so the landing
+ *  summary has them before the rest of the project is read): each sound manifest, the project's own values,
+ *  and the nodes the project has read that a reference may name. Empty when it takes none. */
+function extensionSummary(p: LoadedProject): Pick<OpenedProject, "extensions" | "extensionNodes"> {
+  const ids = Object.keys(p.project.extensions ?? {}).filter((id) => EXTENSION_ID.test(id));
+  if (!ids.length) return {};
+  const manifests = new Map<string, Manifest>();
+  const projectShards = new Map<string, unknown>();
+  for (const id of ids) {
+    const manifest = readProjectManifest(p.root, id);
+    if (manifest) manifests.set(id, manifest);
+    const path = projectExtensionPath(p, id);
+    try { if (path && existsSync(path)) projectShards.set(id, parseSource(readFileSync(path, "utf8"))); }
+    catch { /* won't parse: validation says so, and the section shows no values */ }
+  }
+  const extensions = extensionDtos(p.project, manifests, projectShards);
+  if (!extensions) return {};
+  const def = p.project.locales.default;
+  const strings = new Map<string, Record<string, string>>();
+  for (const loc of p.locales) if (loc && (loc.locale === def || loc.default) && !strings.has(loc.scene)) strings.set(loc.scene, loc.strings ?? {});
+  return { extensions, extensionNodes: extensionNodeIndex(p.scenes, (scene, id) => strings.get(scene)?.[id]) };
 }
 
 // --- the game's shared scopes (patterkit/design/shared-scopes.md) -----------------------------------
@@ -483,8 +513,8 @@ async function writeStates(all: StepWrite[], opts: { writeLocalThroughVc?: boole
   return { ok: true };
 }
 
-/** The scenes a set of paths belongs to: by their script (flow, or strings in any language) and by their
- *  authoring shard. Read from the shard map as it stands, so call it before and after a write that adds
+/** The scenes a set of paths belongs to: by their script (flow, strings in any language, or extension data)
+ *  and by their authoring shard. Read from the shard map as it stands, so call it before and after a write that adds
  *  or removes a scene. */
 function scenesOfPaths(paths: string[]): { scenes: Set<string>; authoring: Set<string> } {
   const scenes = new Set<string>(), authoring = new Set<string>();
@@ -495,6 +525,15 @@ function scenesOfPaths(paths: string[]): { scenes: Set<string>; authoring: Set<s
     if (want.has(resolve(s.authoringPath))) authoring.add(id);
   }
   loaded.localeFiles.forEach((f, i) => { const sc = loaded!.locales[i]?.scene; if (sc && want.has(resolve(f)) && shards.has(sc)) scenes.add(sc); });
+  // A scene's extension shards are the open scene's files too (its document holds their data): a step that
+  // rewrites one (a cast rename) reloads the scene, as one that rewrites its flow does.
+  const dir = extensionsDir();
+  const extPaths = [...want].filter((p) => p.endsWith(EXTENSION_SHARD) && dir && resolve(dirname(dirname(p))) === resolve(dir));
+  if (extPaths.length) {
+    const byStem = new Map<string, string>();
+    for (const [id, s] of shards) if (s.flowPath) byStem.set(basename(s.flowPath).replace(/\.patterflow$/, ""), id);
+    for (const p of extPaths) { const sc = byStem.get(basename(p).slice(0, -EXTENSION_SHARD.length)); if (sc) scenes.add(sc); }
+  }
   return { scenes, authoring };
 }
 
@@ -1161,7 +1200,12 @@ export function readScene(sceneId: string): SceneSource {
   if (!s) throw new Error(`unknown scene: ${sceneId}`);
   let src = sourceMirror.get(sceneId);
   if (!src) { // first read of this scene this session - hit disk once, then serve from the mirror
-    src = { flow: readFileSync(s.flowPath, "utf8"), loc: s.locPath && existsSync(s.locPath) ? readFileSync(s.locPath, "utf8") : "" };
+    const ext: Record<string, string> = {};
+    for (const id of sceneExtensionIds(s.flowPath)) {
+      const path = sceneExtensionPath(s.flowPath, id);
+      ext[id] = path && existsSync(path) ? readFileSync(path, "utf8") : "";
+    }
+    src = { flow: readFileSync(s.flowPath, "utf8"), loc: s.locPath && existsSync(s.locPath) ? readFileSync(s.locPath, "utf8") : "", ext };
     sourceMirror.set(sceneId, src);
   }
   return {
@@ -1170,10 +1214,135 @@ export function readScene(sceneId: string): SceneSource {
     sceneName: s.name,
     properties: sceneProperties(sceneId),
     hostScopes: projectEditorScopes().tokens,
+    extensions: sceneExtensionSources(sceneId, src.ext),
   };
 }
 
-export function saveScene(sceneId: string, flowSource: string, locSource: string, author?: string): Promise<SaveResult> {
+// --- a scene's Patter extension data (patterkit design/patterpad-undo.md, half A) -------------------------
+// The editor holds a scene's extension data in its document and hands back the shards it changed. These
+// work from the project file and the disk, not the loaded project's extension lists, so they serve the
+// landing scene before the rest of the project has been read.
+
+/** The version-control key of an extension shard: its owner (a scene id, or "@project") and the extension. */
+const extensionVcKey = (owner: string, id: string): string => `ext\0${owner}\0${id}`;
+
+/** An extension id as a folder may be named: anything else is never turned into a path. */
+const EXTENSION_ID = /^[a-z][a-z0-9-]*$/;
+
+/** The project's extensions folder (its layout's `extensions`). */
+function extensionsDir(): string | null {
+  return loaded ? join(loaded.root, projectLayout(loaded.project).extensions) : null;
+}
+
+/** Where the project keeps its own data for an extension: `<layout.extensions>/<extension id>/_project.patterextension`. */
+function projectExtensionPath(p: LoadedProject, id: string): string | null {
+  if (!EXTENSION_ID.test(id)) return null;
+  return join(p.root, projectLayout(p.project).extensions, id, `${PROJECT_EXTENSION_STEM}${EXTENSION_SHARD}`);
+}
+
+/**
+ * The writes the Settings dialog's extension sections make: each extension's `_project.patterextension` with
+ * the project's entry replaced by the one given (`{}` clears it), the rest of the shard (other entries, a
+ * merge's mark) kept. A shard left with no data is deleted, and one that is already so is not written. A shard
+ * that won't parse is left alone (validation says why). `base` holds writes already planned in the batch.
+ */
+function projectExtensionWrites(values: Record<string, Record<string, unknown>> | undefined, base: { path: string; content: string }[] = []): { path: string; content: string | null }[] {
+  if (!loaded || !values) return [];
+  const taken = loaded.project.extensions ?? {};
+  const node = loaded.project.project.id;
+  const out: { path: string; content: string | null }[] = [];
+  for (const [id, entry] of Object.entries(values)) {
+    if (!taken[id]) continue;
+    const path = projectExtensionPath(loaded, id);
+    if (!path) continue;
+    let disk: string | null;
+    try { disk = readFileSync(path, "utf8"); } catch { disk = null; }
+    const from = base.find((w) => w.path === path)?.content ?? disk;
+    let shard: Record<string, unknown> = { schema: EXTENSION_SCHEMA, extension: id, scene: PROJECT_LOCALE_SCENE, entries: {} };
+    if (from !== null && from.trim()) {
+      try { const parsed = parseSource(from); if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue; shard = parsed as Record<string, unknown>; }
+      catch { continue; }
+    }
+    const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+    const entries: Record<string, unknown> = isObj(shard["entries"]) ? { ...shard["entries"] } : {};
+    const byNode: Record<string, unknown> = isObj(entries["project"]) ? { ...entries["project"] } : {};
+    const clean = Object.fromEntries(Object.entries(entry ?? {}).filter(([, v]) => v !== undefined));
+    if (Object.keys(clean).length) byNode[node] = clean; else delete byNode[node];
+    if (Object.keys(byNode).length) entries["project"] = byNode; else delete entries["project"];
+    const next: Record<string, unknown> = { ...shard, entries };
+    const content = Object.keys(entries).length || next["unresolved"] !== undefined ? withDiskMark(path, canonicalStringify(next)) : null;
+    if (content === from) continue;
+    if (content === null && disk === null) continue;
+    out.push({ path, content });
+  }
+  return out;
+}
+
+/** Where a scene keeps its data for an extension: `<layout.extensions>/<extension id>/<flow stem>.patterextension`. */
+function sceneExtensionPath(flowPath: string, id: string): string | null {
+  const dir = extensionsDir();
+  if (!dir || !flowPath || !EXTENSION_ID.test(id)) return null;
+  return join(dir, id, `${basename(flowPath).replace(/\.patterflow$/, "")}${EXTENSION_SHARD}`);
+}
+
+/** The extensions a scene opens with: every one the project takes, and every other folder holding data
+ *  for the scene (held as it is), sorted. */
+function sceneExtensionIds(flowPath: string): string[] {
+  const ids = new Set(Object.keys(loaded?.project.extensions ?? {}).filter((id) => EXTENSION_ID.test(id)));
+  const dir = extensionsDir();
+  if (dir) {
+    let folders: string[] = [];
+    try { folders = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && EXTENSION_ID.test(e.name)).map((e) => e.name); }
+    catch { /* no extensions folder */ }
+    for (const f of folders) { const path = sceneExtensionPath(flowPath, f); if (path && existsSync(path)) ids.add(f); }
+  }
+  return [...ids].sort();
+}
+
+/** The scene's extension shards for the editor: each one live when the project takes the extension and its
+ *  manifest is sound, and the shard (if any) says it is this scene's. */
+function sceneExtensionSources(sceneId: string, sources: Record<string, string>): SceneExtensionSourceDto[] {
+  if (!loaded) return [];
+  const taken = loaded.project.extensions ?? {};
+  return Object.keys(sources).sort().map((id) => {
+    const manifest = readProjectManifest(loaded!.root, id);
+    const source = sources[id] ?? "";
+    let ours = true;
+    if (source.trim()) {
+      try { const scene = (parseSource(source) as { scene?: unknown }).scene; ours = typeof scene !== "string" || scene === "" || scene === sceneId; }
+      catch { ours = false; } // won't parse: validation says so, and it is left alone
+    }
+    return { id, name: manifest?.name ?? id, source, live: !!taken[id] && !!manifest && ours };
+  });
+}
+
+/** Swap a scene's changed extension shards into a project's loaded lists (`null`: the shard is gone). */
+function applyExtensionShards(p: LoadedProject, flowPath: string, shardsById: SceneExtensionShards): void {
+  for (const [id, content] of Object.entries(shardsById)) {
+    const path = sceneExtensionPath(flowPath, id);
+    if (path) applyExtensionShardAt(p, path, content);
+  }
+}
+
+/** Swap one extension shard's new text into a project's loaded lists (`null`: the shard is gone). */
+function applyExtensionShardAt(p: LoadedProject, path: string, content: string | null): void {
+  const at = p.extensionShardFiles.findIndex((f) => resolve(f) === resolve(path));
+  if (content === null) {
+    if (at >= 0) { p.extensionShards.splice(at, 1); p.extensionShardFiles.splice(at, 1); }
+    return;
+  }
+  let shard: ExtensionShard;
+  try { shard = parseSource(content) as ExtensionShard; } catch { return; }
+  if (!shard || typeof shard !== "object") return;
+  if (at >= 0) { p.extensionShards[at] = shard; return; }
+  // A new shard: in path order, as the loader lists them.
+  let i = p.extensionShardFiles.findIndex((f) => f > path);
+  if (i < 0) i = p.extensionShardFiles.length;
+  p.extensionShards.splice(i, 0, shard);
+  p.extensionShardFiles.splice(i, 0, path);
+}
+
+export function saveScene(sceneId: string, flowSource: string, locSource: string, author?: string, extensions: SceneExtensionShards = {}): Promise<SaveResult> {
   return enqueueForProject(async () => {
     const s = shards.get(sceneId);
     if (!s) return { ok: false, error: `unknown scene: ${sceneId}` };
@@ -1194,7 +1363,23 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
     if (s.locPath) locSource = keepUnresolvedMark(current(s.locPath, prev?.loc), locSource);
     const prevFlow = prev ? prev.flow : onDisk(s.flowPath);
     const prevLoc = prev ? prev.loc : (s.locPath ? onDisk(s.locPath) : "");
-    const writes: { path: string; content: string }[] = [];
+    const writes: { path: string; content: string | null }[] = [];
+    // The extension shards the editor changed: each written when its bytes differ from what's on disk,
+    // deleted when it has no data left. Whoever holds a shard refuses the whole save, as for the flow.
+    const extAfter: Record<string, string> = { ...(prev?.ext ?? {}) };
+    for (const [id, content] of Object.entries(extensions)) {
+      const path = sceneExtensionPath(s.flowPath, id);
+      if (!path) continue;
+      const before = prev?.ext[id] !== undefined ? current(path, prev.ext[id] || undefined) ?? "" : onDisk(path) ?? "";
+      if (content === null) {
+        if (existsSync(path)) writes.push({ path, content: null });
+        extAfter[id] = "";
+        continue;
+      }
+      const next = keepUnresolvedMark(before || null, content);
+      if (next !== before) writes.push({ path, content: next });
+      extAfter[id] = next;
+    }
     if (prevFlow !== flowSource) writes.push({ path: s.flowPath, content: flowSource });
     const locChanged = !!s.locPath && prevLoc !== locSource;
     if (locChanged) writes.push({ path: s.locPath!, content: locSource });
@@ -1203,11 +1388,22 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
     const changedStringIds = locChanged ? changedSourceStringIds(prevLoc, locSource) : [];
     const trail = author || changedStringIds.length ? editTrailWrite(s, sceneId, author, changedStringIds) : null;
     if (trail) writes.push(trail);
-    const res = await commitWrites(writes);
+    // All or nothing (the ruled note): a shard somebody else holds refuses the whole save, so the scene's
+    // files never disagree. An emptied extension shard goes in the same batch.
+    const applied = await writeStates(writes);
+    const res: SaveResult = applied.ok ? { ok: true } : { ok: false, error: applied.error };
     if (res.ok) {
-      sourceMirror.set(sceneId, { flow: flowSource, loc: locSource }); // the mirror now matches what we wrote
+      // A scene never read this session (or whose mirror was dropped) has the rest of its extension shards
+      // read now, so the mirror never serves a partial set to the next readScene.
+      if (!prev) {
+        for (const id of sceneExtensionIds(s.flowPath)) {
+          const path = sceneExtensionPath(s.flowPath, id);
+          if (extAfter[id] === undefined && path) extAfter[id] = onDisk(path) ?? "";
+        }
+      }
+      sourceMirror.set(sceneId, { flow: flowSource, loc: locSource, ext: extAfter }); // the mirror now matches what we wrote
       // Keep the in-memory project current with the save, so validate / play don't re-read disk.
-      try { if (loaded) applyLiveSource(loaded, { sceneId, flow: flowSource, loc: locSource }); }
+      try { if (loaded) applyLiveSource(loaded, { sceneId, flow: flowSource, loc: locSource, extensions }); }
       catch (e) { console.warn(`patterpad: saved scene ${sceneId} but couldn't refresh the in-memory copy (reloads on reopen):`, e); }
       // The edit trail is an authoring-shard write like any other, and on a scene's FIRST save it CREATES
       // the shard: left out of the model, that new file read as "not in project" to a check that compared
@@ -1247,20 +1443,45 @@ export async function vcStatus(): Promise<VcStatusDto | null> {
       for (const p of [s.locPath, s.authoringPath]) {
         if (p && existsSync(p)) refs.push({ key: sceneId, path: p });
       }
+      // Each extension shard is its own key: somebody holding one locks that extension's data in the scene
+      // (the editor refuses edits to it), never the scene.
+      for (const id of sceneExtensionIds(s.flowPath)) {
+        const path = sceneExtensionPath(s.flowPath, id);
+        if (path && existsSync(path)) refs.push({ key: extensionVcKey(sceneId, id), path, primary: true });
+      }
+    }
+    const dir = extensionsDir();
+    let folders: string[] = [];
+    try { if (dir) folders = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && EXTENSION_ID.test(e.name)).map((e) => e.name).sort(); }
+    catch { /* no extensions folder */ }
+    for (const id of folders) {
+      const path = join(dir!, id, `${PROJECT_EXTENSION_STEM}${EXTENSION_SHARD}`);
+      if (existsSync(path)) refs.push({ key: extensionVcKey(PROJECT_LOCALE_SCENE, id), path, primary: true });
     }
     vcShardsMemo = refs;
   }
   const { system, states } = await shardStatus(vcShardsMemo);
-  const scenes: SceneVcStatus[] = [...shards.keys()].map((sceneId) => ({
-    sceneId,
-    ...(states.get(sceneId) ?? { writable: true }),
-  }));
+  // The extension shards' states, by owner (a scene id, or "@project") and then extension id.
+  const extStates = new Map<string, Record<string, Omit<SceneVcStatus, "sceneId" | "extensions">>>();
+  for (const [key, st] of states) {
+    const m = /^ext\0([^\0]+)\0(.+)$/.exec(key);
+    if (!m) continue;
+    const of = extStates.get(m[1]!) ?? {};
+    of[m[2]!] = st;
+    extStates.set(m[1]!, of);
+  }
+  const scenes: SceneVcStatus[] = [...shards.keys()].map((sceneId) => {
+    const ext = extStates.get(sceneId);
+    return { sceneId, ...(states.get(sceneId) ?? { writable: true }), ...(ext ? { extensions: ext } : {}) };
+  });
   // The shell reports what it DETECTED; fall back to what the project is configured for when it detected
   // nothing (an empty project has no paths to detect from).
   const project = states.get(PROJECT_SHARD_KEY);
+  const projectExtensions = extStates.get(PROJECT_LOCALE_SCENE);
   return {
     vcs, system: system === "filesystem" && vcs !== "none" ? vcs : system, scenes,
     ...(project ? { project } : {}),
+    ...(projectExtensions ? { projectExtensions } : {}),
   };
 }
 
@@ -1554,10 +1775,10 @@ let playLocale: string | null = null;
 let playCaptionsOn = true;
 // The editor's latest UNSAVED source for the scene being played, so Rewind / restart reflect in-progress
 // edits (not just the last save). Pushed from the renderer on edit; applied by startPlay when it matches.
-let playLiveSource: { sceneId: string; flow: string; loc: string } | null = null;
+let playLiveSource: LiveSceneSource | null = null;
 
 /** Stash the editor's current in-memory source (so the next play (re)start plays the latest edits). */
-export function setPlaySource(src: { sceneId: string; flow: string; loc: string } | null): void { playLiveSource = src; }
+export function setPlaySource(src: LiveSceneSource | null): void { playLiveSource = src; }
 
 /** Clear the interactive play session, so opening a DIFFERENT project can't replay the previous one's flow
  *  / stashed source / error (the play state is keyed by the old project's scene ids). Called by openProject. */
@@ -1779,7 +2000,7 @@ function inferPropType(src: string, name: string): "boolean" | "number" | "strin
 
 /** Swap a scene's UNSAVED in-memory source into a freshly-loaded project, so validation tracks edits
  *  before they are saved (the `live` path). Malformed source throws - the caller surfaces it. */
-function applyLiveSource(p: LoadedProject, live: { sceneId: string; flow: string; loc: string }): void {
+function applyLiveSource(p: LoadedProject, live: LiveSceneSource): void {
   const flowFile = parseSource(live.flow) as FlowFile;
   if (flowFile?.scene) {
     const i = p.scenes.findIndex((s) => s.id === live.sceneId);
@@ -1792,9 +2013,29 @@ function applyLiveSource(p: LoadedProject, live: { sceneId: string; flow: string
       if (li >= 0) p.locales[li] = locFile;
     }
   } catch { /* loc is optional / may be empty - keep the disk copy */ }
+  // The extension shards the editor changed (the rest are as on disk, which the project already holds).
+  const flowPath = shards.get(live.sceneId)?.flowPath ?? p.sceneFiles[live.sceneId];
+  if (live.extensions && flowPath) applyExtensionShards(p, flowPath, live.extensions);
 }
 
-/** Every node id in the project (scene, block, group, snippet, beat) mapped to its scene's id. */
+/** The Patter extension a problem from the extension pass is about: the folder its data is in, the manifest
+ *  it names, or (for one in the project file, a claim or a pin) the extension its message names. */
+function extensionOfIssue(file: string | undefined, message: string): string | undefined {
+  const dir = extensionsDir();
+  if (file && dir) {
+    const rel = relative(dir, resolve(loaded!.root, file)).split(sep);
+    if (rel.length && rel[0] !== ".." && !isAbsolute(rel.join(sep))) {
+      if (rel.length >= 2 && EXTENSION_ID.test(rel[0]!)) return rel[0];
+      const m = /^([a-z][a-z0-9-]*)\.extension\.json$/.exec(rel[0] ?? "");
+      if (m) return m[1];
+    }
+  }
+  const named = /(?:Patter extension|takes) "([a-z][a-z0-9-]*)"/.exec(message);
+  return named?.[1];
+}
+
+/** Every node id in the project (scene, block, group (an option included), snippet, beat, an option's
+ *  prompt) mapped to its scene's id. */
 function sceneIndex(p: LoadedProject): Map<string, string> {
   const map = new Map<string, string>();
   for (const scene of p.scenes) {
@@ -1804,6 +2045,7 @@ function sceneIndex(p: LoadedProject): Map<string, string> {
       walkNodes<Group | Snippet>(block.children, (n) => {
         map.set(n.id, scene.id);
         if (n.type === "snippet") for (const b of n.beats ?? []) map.set(b.id, scene.id);
+        if (n.type === "group" && n.prompt) map.set(n.prompt.id, scene.id); // an option's prompt beat
       });
     }
   }
@@ -1813,7 +2055,7 @@ function sceneIndex(p: LoadedProject): Map<string, string> {
 /** Validate the whole project (the CLI's checks), flattened for the problems panel. Reflects disk,
  *  unless `live` is given: that scene's unsaved in-memory source is validated instead (so problems
  *  track edits live, not just on save). */
-export function validate(live?: { sceneId: string; flow: string; loc: string }): ProblemsDto {
+export function validate(live?: LiveSceneSource): ProblemsDto {
   if (!loaded) return { ok: true, problems: [] };
   try {
     // Inside the try: a project that will not load whole (two files claiming one scene) is a problem to
@@ -1886,9 +2128,13 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
       // The project's extensions: a value its manifest refuses, a claim on a gameData field declared with
       // another type, or a file that won't load is an error (export refuses it); a missing manifest, an
       // entry for a node that has gone, or a .gitattributes with no merge rule for the data, a warning.
-      ...r.extensions.map((i): Problem => ({
-        category: "extensions", severity: i.severity, message: i.message, file: i.file, ...(i.node ? { nodeId: i.node } : {}), ...(i.code ? { detail: i.code } : {}),
-      })),
+      ...r.extensions.map((i): Problem => {
+        const extension = extensionOfIssue(i.file, i.message);
+        return {
+          category: "extensions", severity: i.severity, message: i.message, file: i.file, ...(i.node ? { nodeId: i.node } : {}), ...(i.code ? { detail: i.code } : {}),
+          ...(extension ? { extension } : {}),
+        };
+      }),
     ];
     // Which scene each node-bearing problem is in, so the renderer can switch to it before revealing.
     const sceneOf = sceneIndex(fresh);
@@ -2604,6 +2850,16 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
       const at = writes.findIndex((x) => x.path === w.path);
       if (at >= 0) writes[at] = w; else writes.push(w);
     }
+    // The project's own values for its Patter extensions, edited in their Settings sections: each
+    // `_project.patterextension`, in the same batch, so one undo puts the settings and the values back. A
+    // shard left with no data goes in the batch as a delete, after anything below that rewrites it.
+    const extensionWrites = projectExtensionWrites(s.extensionValues, writes);
+    const extensionDeletes: { path: string; content: null }[] = [];
+    for (const w of extensionWrites) {
+      if (w.content === null) { extensionDeletes.push({ path: w.path, content: null }); continue; }
+      const at = writes.findIndex((x) => x.path === w.path);
+      if (at >= 0) writes[at] = { path: w.path, content: w.content }; else writes.push({ path: w.path, content: w.content });
+    }
     // A cast member renamed: every line they speak, their translated names and labels, and the extension data
     // keyed by the name or naming it follow, in the same batch (built on the writes above, where they share
     // a shard).
@@ -2625,7 +2881,7 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
     if (s.vcs !== prevVcs && s.vcs !== "none") writes.push(...vcsConfigWrites(loaded.root, s.vcs, currentBundlePosture(loaded.root, prevVcs === "none" ? undefined : prevVcs)));
     // One step of the project history, with its renames: the Properties page keys its saves, so a run of
     // edits there is one step.
-    const res = await projectCommit(undo.label ?? "Project Settings", undo.key ?? freshKey("settings"), writes);
+    const res = await projectCommit(undo.label ?? "Project Settings", undo.key ?? freshKey("settings"), [...writes, ...extensionDeletes]);
     if (!res.ok) return res;
     // Remove the PREVIOUS system's now-orphaned config files (e.g. git's .gitattributes / .gitignore when
     // moving to Perforce), so a switched project never carries stale VCS hygiene. The shared vcs-setup.md is
@@ -2646,6 +2902,7 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
     loaded.project = next; // reflect in the cached project
     const reload = !!renames || stages.writes.length > 0 || casts.length > 0;
     if (stamp && !reload) syncAuthoringAt(stamp.path, stamp.af); // a rename reloads everything below
+    if (!reload) for (const w of extensionWrites) applyExtensionShardAt(loaded, w.path, w.content); // validation sees the new values
     if (reload) reloadFromDisk(); // the rewritten scenes, strings, and extension data, read back whole
     if (loaded.gameScopes) refreshGameScopes(); // the folder may have just changed under us: read it back
     if (s.vcs !== prevVcs) pinVcProvider(next.vcs); // re-pin simple-vc-lib to the newly chosen system (#26)

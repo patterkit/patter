@@ -11,6 +11,8 @@ import type { GameData, GameDataField, GameDataNodeKind, PropertyDecl, DocLine, 
 import { RERECORD_STATUS_DECL, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import { colourIndex } from "@patterkit/patterpad-surface/colour";
 import { el } from "./dom.js";
+import { claimOn, claimProblem, extensionSections, sweepExtensionRows, type ExtensionHandlers } from "./extension-rows.js";
+import type { ExtensionDto, ExtensionFieldDto } from "../../shared/api.js";
 
 type Reveal = (id: string) => void;
 /** Open the visual condition editor for the node `id`, seeded with `src`, anchored to `anchor`. */
@@ -66,7 +68,10 @@ function gameDataFieldRows(kind: GameDataNodeKind, id: string | null, gd: GameDa
   const fields = h.gameDataFields(kind);
   const rows: HTMLElement[] = [];
   const defined = new Set<string>();
-  for (const f of fields) { defined.add(f.name); rows.push(gameDataFieldRow(f, id, gd?.[f.name], h, kind)); }
+  // A field a Patter extension claims keeps its own value and type, drawn with the extension's label, help
+  // and values (the proposal's "Claims on host fields").
+  const extensions = h.extensions();
+  for (const f of fields) { defined.add(f.name); rows.push(gameDataFieldRow(f, id, gd?.[f.name], h, kind, claimOn(extensions, kind, f.name))); }
   for (const [k, v] of Object.entries(gd ?? {})) {
     if (!defined.has(k)) { const r = el("div", "insp-row"); r.append(el("span", "insp-key insp-gd", k), el("span", "insp-val insp-mono", typeof v === "string" ? v : JSON.stringify(v))); rows.push(r); }
   }
@@ -93,9 +98,22 @@ const fieldRowCache = fieldRows();
  *  node's override (undefined = falls back to the field default); clearing it removes the override (sparse
  *  storage). A value commits as it is typed, and Esc puts back what the field held, as everywhere in the
  *  family. Read-only when there is no node to write to. */
-export function gameDataFieldRow(f: GameDataField, id: string | null, current: unknown, h: Pick<InspectorHandlers, "setGameData">, kind = ""): HTMLElement {
+export function gameDataFieldRow(
+  f: GameDataField, id: string | null, current: unknown, h: Pick<InspectorHandlers, "setGameData">, kind = "",
+  claim?: { extension: ExtensionDto; decl: ExtensionFieldDto },
+): HTMLElement {
+  const c = claim?.decl;
+  const decl: GameDataField = !c ? f : {
+    ...f,
+    ...(c.help !== undefined ? { purpose: c.help } : {}),
+    ...(c.values !== undefined && f.values === undefined ? { values: c.values } : {}),
+    ...(c.valueHelp !== undefined ? { valueHelp: c.valueHelp } : {}),
+  } as GameDataField;
+  const problem = claim ? claimProblem(claim, current ?? undefined) : "";
   return fieldRowCache.row(`${kind}\u0000${id ?? ""}\u0000${f.name}`, {
-    decl: f, value: current ?? undefined, disabled: id === null,
+    decl, value: current ?? undefined, disabled: id === null,
+    ...(c?.label !== undefined ? { label: c.label } : {}),
+    ...(problem ? { problem } : {}),
     onCommit: (v) => { if (id) h.setGameData(id, f.name, v); },
     className: "insp-row insp-gd-row", labelClassName: "insp-key", controlClassName: "insp-gd-input",
   });
@@ -128,6 +146,7 @@ function leafBody(lv: LeafLevel, h: InspectorHandlers): HTMLElement[] {
   if (lv.beat !== "gameEvent") rows.push(leafPadRow(lv, h));
   rows.push(tagsRow(lv.id, lv.tags, h));
   rows.push(gameDataSection(leafNodeKind(lv.beat), lv.id, lv.gameData, h));
+  rows.push(...extensionSections(leafNodeKind(lv.beat), lv.id, lv.ext, h));
   return rows.filter((r): r is HTMLElement => r != null);
 }
 
@@ -535,6 +554,7 @@ function snippetBody(lv: SnippetLevel, h: InspectorHandlers): HTMLElement[] {
   rows.push(defaultPadRow(lv, h));
   rows.push(tagsRow(lv.id, lv.tags, h));
   rows.push(gameDataSection("snippet", lv.id, lv.gameData, h));
+  rows.push(...extensionSections("snippet", lv.id, lv.ext, h));
   return rows.filter((r): r is HTMLElement => r != null);
 }
 
@@ -613,7 +633,7 @@ function groupBody(lv: GroupLevel, h: InspectorHandlers): HTMLElement[] {
   rows.push(tagsRow(lv.id, lv.tags, h));
   // An option's fields are declared (the `option` node kind) and edit here; any other group's gameData has no
   // declared fields, so it shows as it stands.
-  if (lv.role === "option") rows.push(gameDataSection("option", lv.id, lv.gameData, h));
+  if (lv.role === "option") rows.push(gameDataSection("option", lv.id, lv.gameData, h), ...extensionSections("option", lv.id, lv.ext, h));
   else rows.push(...gameDataRows(lv.gameData));
   return rows.filter((r): r is HTMLElement => r != null);
 }
@@ -657,6 +677,7 @@ function addressBody(lv: SceneLevel | BlockLevel, h: InspectorHandlers): HTMLEle
   rows.push(defaultPadRow(lv, h));
   rows.push(tagsRow(lv.id, lv.tags, h));
   rows.push(gameDataSection(lv.kind, lv.id, lv.gameData, h));
+  rows.push(...extensionSections(lv.kind, lv.id, lv.ext, h));
   return rows.filter((r): r is HTMLElement => r != null);
 }
 
@@ -716,7 +737,7 @@ function levelView(lv: InspectLevel, h: InspectorHandlers): HTMLElement {
   return section;
 }
 
-export interface InspectorHandlers {
+export interface InspectorHandlers extends ExtensionHandlers {
   reveal: Reveal;
   /** Open the documentation-notes modal for this node (the title-bar note icon); `kind` narrows the classes. */
   editNote: (id: string, anchor: HTMLElement, kind?: string) => void;
@@ -797,4 +818,5 @@ export function renderInspector(host: HTMLElement, ctx: InspectorContext, h: Ins
     for (const lv of ctx.levels) host.append(levelView(lv, h));
   }
   fieldRowCache.sweep();
+  sweepExtensionRows();
 }

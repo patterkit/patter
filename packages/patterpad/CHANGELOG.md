@@ -20,6 +20,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **Renaming a cast member renames them everywhere.** Change a name in Project Settings ▸ Cast, and every line
   they speak, their translated name and labels, and any extension data keyed by them or naming them follow it,
   in the same save. Before, their lines kept the old name and showed as a speaker who isn't in the cast.
+- **Patter extensions in the inspector and Project Settings.** When a project takes an extension, its fields
+  show in the inspector under the extension's name, after Game Data, for a line, text, game event, snippet,
+  option, block, and scene: text, numbers, choices, flags, stages, references to other lines or scenes, and
+  records, maps, and lists. Each shows its help, and a choice says what the picked value means. The project's
+  own values have a section of their own in Project Settings, saved and undone with the rest of the settings,
+  and it says which version the project takes and which game data field each setting names. A game data
+  field an extension claims shows the extension's label and help, and says when its value isn't one the
+  extension knows. Where someone else has an extension's data locked, its fields say who and can't be edited.
+  Problems show under the field they're about, and Go to issue opens the extension's settings for a problem
+  with the project's own values. A bubble whose extension data would be lost by merging it into the one above
+  isn't merged, as one with a condition isn't: move or clear its data first.
 - **The problems bar shows a project's extension problems**, under Extensions: a value an extension's manifest
   won't take, a claim on a game data field of another type, an entry for something that's gone, or a missing
   manifest.

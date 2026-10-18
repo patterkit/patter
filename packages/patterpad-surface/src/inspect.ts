@@ -26,6 +26,10 @@ import { padOf, padDefaultOf, endsSnippet } from "./pad.js";
 
 export type LeafKind = "line" | "prose" | "gameEvent";
 
+/** A node's Patter extension data, by extension id: its entry (field name -> raw value) in each extension
+ *  that has one (the node's `ext` attr, schema.ts). Absent on a level whose node carries none. */
+export type ExtensionValues = Record<string, Record<string, unknown>>;
+
 /** Where an inherited pause comes from (line padding): the nearest container above that sets a
  *  `padAfterDefault`, named as the inspector heads it ("snippet", a group's role, "block", "scene"), with
  *  its value. Absent on a level = nothing above sets one, so the project's default applies. */
@@ -57,6 +61,8 @@ export interface LeafLevel {
   endsSnippet?: boolean;
   /** The beat is a choice option's prompt (its pause times the reply, and is never clamped). */
   prompt?: boolean;
+  /** The node's Patter extension data (its entry in each extension), absent for none. */
+  ext?: ExtensionValues;
 }
 
 /** The snippet (bubble) holding the leaf: its routing + eligibility + effects. */
@@ -77,6 +83,8 @@ export interface SnippetLevel {
   padAfterDefault?: number;
   /** What those lines take when this sets none, from the nearest container above. */
   padInherited?: PadSource;
+  /** The node's Patter extension data (its entry in each extension), absent for none. */
+  ext?: ExtensionValues;
 }
 
 /** One option of a choice (for the consolidated choice editor): its prompt text + eligibility. */
@@ -125,6 +133,8 @@ export interface GroupLevel {
   padAfterDefault?: number;
   /** What those lines take when this sets none, from the nearest container above. */
   padInherited?: PadSource;
+  /** The node's Patter extension data (its entry in each extension), absent for none. */
+  ext?: ExtensionValues;
 }
 
 /** The block the caret is in. */
@@ -143,6 +153,8 @@ export interface BlockLevel {
   padAfterDefault?: number;
   /** What those lines take when this sets none: the scene's default, when it sets one. */
   padInherited?: PadSource;
+  /** The node's Patter extension data (its entry in each extension), absent for none. */
+  ext?: ExtensionValues;
 }
 
 /** The scene the caret is in (the outermost level shown). */
@@ -158,6 +170,8 @@ export interface SceneLevel {
   /** The default pause for the lines inside that set none (line padding), absent for none. Above it
    *  there is only the project's. */
   padAfterDefault?: number;
+  /** The node's Patter extension data (its entry in each extension), absent for none. */
+  ext?: ExtensionValues;
 }
 
 /** Several whole chunks are selected at once (a shift-click run, groups §6) - the inspector shows a
@@ -185,6 +199,15 @@ const idAttr = (node: PMNode): string | null => (typeof node.attrs.id === "strin
 const rawId = (raw: Record<string, unknown>): string | null => (typeof raw.id === "string" ? raw.id : null);
 const gd = (raw: Record<string, unknown>): GameData | undefined =>
   raw.gameData && typeof raw.gameData === "object" ? (raw.gameData as GameData) : undefined;
+/** A node's extension data from its `ext` attr, or undefined when none (or it won't parse). */
+function extOf(node: PMNode): ExtensionValues | undefined {
+  const v = node.attrs.ext;
+  if (typeof v !== "string" || !v) return undefined;
+  try {
+    const parsed = JSON.parse(v) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length ? (parsed as ExtensionValues) : undefined;
+  } catch { return undefined; }
+}
 /** Author tags (#215) from a node's raw, or undefined when none. */
 const tagsOf = (raw: Record<string, unknown>): string[] | undefined =>
   Array.isArray(raw.tags) && raw.tags.length ? (raw.tags as string[]) : undefined;
@@ -203,6 +226,7 @@ function leafLevel(beat: PMNode): LeafLevel {
   }
   const pad = padOf(beat);
   if (pad !== undefined) base.padAfter = pad;
+  const ext = extOf(beat); if (ext) base.ext = ext;
   return base;
 }
 
@@ -219,6 +243,7 @@ function snippetLevel(node: PMNode): SnippetLevel {
   // The jump is a snippet ATTR (a JSON Jump, or "" for none), not part of `raw`.
   const jumpAttr = node.attrs.jump as string;
   if (jumpAttr) { try { level.jump = JSON.parse(jumpAttr) as Jump; } catch { /* ignore */ } }
+  const ext = extOf(node); if (ext) level.ext = ext;
   return level;
 }
 
@@ -255,6 +280,7 @@ function groupLevel(node: PMNode, parent: PMNode | null): GroupLevel {
     });
     level.conditionedChildren = conditioned;
   }
+  const ext = extOf(node); if (ext) level.ext = ext;
   return level;
 }
 
@@ -289,6 +315,7 @@ function blockLevel(node: PMNode): BlockLevel {
   const gameId = gameIdOf(raw);
   const level: BlockLevel = { kind: "block", id: rawId(raw) ?? idAttr(node), name, gameId, address: effectiveGameId({ gameId, name }), gameData: gd(raw), tags: tagsOf(raw) };
   const pad = padDefaultOf(node); if (pad !== undefined) level.padAfterDefault = pad;
+  const ext = extOf(node); if (ext) level.ext = ext;
   return level;
 }
 
@@ -298,6 +325,7 @@ function sceneLevel(doc: PMNode): SceneLevel {
   const gameId = gameIdOf(raw);
   const level: SceneLevel = { kind: "scene", id: rawId(raw), name, gameId, address: effectiveGameId({ gameId, name }), gameData: gd(raw), tags: tagsOf(raw) };
   const pad = padDefaultOf(doc); if (pad !== undefined) level.padAfterDefault = pad;
+  const ext = extOf(doc); if (ext) level.ext = ext;
   return level;
 }
 

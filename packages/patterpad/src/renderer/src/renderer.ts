@@ -50,7 +50,8 @@ import { openEditableExport, openEditableReimport, type EditableDialogContext } 
 import { applyTheme } from "./apply-theme.js";
 import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
   paintVcBadges, lockControls, createNavHistory, historyNav, mountPaneShell, mountSettingsDialog, revealRowWhenReady,
-  askIdentity, confirmDialog, dialogFrame, openContextMenu, type ShardVc, type SettingsSectionHandle } from "@wildwinter/app-shell";
+  askIdentity, confirmDialog, dialogFrame, openContextMenu, type ShardVc, type SettingsSectionHandle, type SettingsSection, type SettingsDialog } from "@wildwinter/app-shell";
+import { extensionAdapter, mountProjectSection, problemSettingsSection, settingsExtensions, settingsSectionId } from "./extension-rows.js";
 import "@wildwinter/app-shell/vc.css"; // the badge + locked-document chrome
 import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
@@ -68,7 +69,7 @@ import "@wildwinter/app-shell/keys.css"; // the keycaps every hint in this windo
 // Key hints come from ONE helper that writes "⌘" on a Mac and "Ctrl" elsewhere, and metadata is a drawn
 // line, never joined with a typed dot (design-language §4): no "⌘" and no " · " in a string in this file.
 import { keyHint, tipWithKey, metaLine, labelled, labelledToggle } from "@wildwinter/app-shell";
-import { problemLineFor } from "./problem-copy.js";
+import { problemLineFor, type ExtensionProblemContext } from "./problem-copy.js";
 import { PATTERKIT_WORDMARK } from "./wordmark.js";
 import { gameIdify, isValidGameId } from "@patterkit/core";
 import { PANEL_KEEP_CLEAR } from "./panel.js";
@@ -91,7 +92,7 @@ import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from 
 import type { PropertyDecl, DocLine, Comment, Suggestion } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES, DEFAULT_PAD_AFTER, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import { openValuePicker, qualifierRows } from "./value-picker.js";
-import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt } from "../../shared/api.js";
+import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt, SceneVcStatus, VcStatusDto } from "../../shared/api.js";
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
 import { textHash } from "./wav.js";
 import { mountDebugLink } from "./debug-panel.js";
@@ -848,7 +849,9 @@ async function commitSceneReorder(movedId: string, targetId: string, before: boo
 // externally - someone else grabs a lock, a newer revision lands).
 // Keyed by scene id, in the shell's `ShardVc` shape. The DTO crossing the preload boundary keeps
 // saying `sceneId`, which is this app's word for the key; the adaptation is one line below.
-let vcMap: Map<string, ShardVc> = new Map();
+// A scene's entry also carries its extension shards' states (SceneVcStatus.extensions).
+type SceneVc = ShardVc & { extensions?: SceneVcStatus["extensions"] };
+let vcMap: Map<string, SceneVc> = new Map();
 
 /** What keeps working in an inspector for a scene somebody else holds: the section disclosures, and
  *  the copy buttons that put an id on the clipboard. Both are reading, and reading is never locked. */
@@ -869,10 +872,39 @@ function paintNavBadges(): void {
 /** The open project's version control by name, for the chip's tip. */
 let vcSystemName = "version control";
 
+/** Each extension's project-level shard state (`_project.patterextension`), by extension id: one somebody
+ *  else holds locks that extension's section of Project Settings. */
+let projectExtensionVc: NonNullable<VcStatusDto["projectExtensions"]> = {};
+
+/** "Locked by bob.", for a shard somebody else holds; null when nobody does. */
+const lockedLine = (by: string[] | undefined): string | null => (by?.length ? `Locked by ${by.join(", ")}.` : null);
+
+/** The open scene's extensions' names, by id, from its read (for the lock sentence). */
+let sceneExtensionNames = new Map<string, string>();
+/** The extension locks last handed to the surface, so a poll that changes nothing redraws nothing. */
+let lastExtensionLocks = "";
+
+/** The open scene's extensions whose shard somebody else holds: their data refuses edits (the scene
+ *  itself stays editable). */
+function extensionLocksOf(st: SceneVc | undefined): Record<string, { name: string; by: string[] }> {
+  const out: Record<string, { name: string; by: string[] }> = {};
+  for (const [id, ext] of Object.entries(st?.extensions ?? {})) {
+    if (ext.lockedBy?.length) out[id] = { name: sceneExtensionNames.get(id) ?? id, by: ext.lockedBy };
+  }
+  return out;
+}
+
 function applySceneVc(): void {
   const st = currentSceneId ? vcMap.get(currentSceneId) : undefined;
   const ro = isReadOnly(st);
   surface?.setEditable(!ro);
+  const locks = extensionLocksOf(st);
+  surface?.setLockedExtensions(locks);
+  const sig = JSON.stringify(locks);
+  if (sig !== lastExtensionLocks) {
+    lastExtensionLocks = sig;
+    lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // the extension fields lock with it
+  }
   // The shell's per-control lock, in place of the blanket `pointer-events: none` this used to drop over
   // the whole inspector. Reading a scene somebody else holds has to stay fully possible, and the old
   // version killed that too: you could not expand a section or copy an address to go and ask them about
@@ -904,6 +936,7 @@ async function refreshVcStatus(): Promise<void> {
   // The project shard rides in the same map: the Properties row is badged from it, because the
   // declarations that page edits live in the project file.
   if (dto.project) vcMap.set(PROJECT_SHARD_KEY, { key: PROJECT_SHARD_KEY, ...dto.project });
+  projectExtensionVc = dto.projectExtensions ?? {};
   paintNavBadges();
   applySceneVc();
 }
@@ -1035,6 +1068,7 @@ function paintProblems(): void {
     chip.addEventListener("click", () => void applyCurrentFix());
     problemFixEl = chip;
   }
+  const ext = extensionProblemContext();
   renderStepperBar(problembarEl, {
     items: problems.map((p) => {
       const tag = PROBLEM_CATEGORY[p.category] ?? "Problem";
@@ -1044,7 +1078,7 @@ function paintProblems(): void {
       // segment, drawn beside the sentence, not joined into it.
       const elsewhere = p.sceneId && p.sceneId !== currentSceneId ? project?.scenes.find((s) => s.id === p.sceneId)?.name : undefined;
       // `kindClass` is how severity colour stays app-side: the bar paints nothing itself.
-      return { kind: tag, kindClass: `sev-${p.severity}`, ...(elsewhere ? { where: elsewhere } : {}), text: problemLineFor(p, relToProject(p.file)) };
+      return { kind: tag, kindClass: `sev-${p.severity}`, ...(elsewhere ? { where: elsewhere } : {}), text: problemLineFor(p, relToProject(p.file), ext) };
     }),
     at: problemAt,
     // The tone follows the CURRENT problem, not the worst one, which is what the old `.warning` class on
@@ -1142,6 +1176,9 @@ async function applyJournalEntry(entry: JournalEntry, way: "undo" | "redo"): Pro
       return "refused";
     }
     if ((way === "undo" ? surface.undoDepth() : surface.redoDepth()) === 0) return "skip"; // past the history's depth
+    // An extension's data somebody else holds: the step stays, for when they let it go.
+    const locked = surface.historyRefusal(way);
+    if (locked) { toast(`Couldn't ${way} that edit\n${locked}`, "error"); return "refused"; }
     return (way === "undo" ? surface.undo() : surface.redo()) ? "done" : "skip";
   }
   const r = await (way === "undo" ? window.patter.projectUndo(entry.id) : window.patter.projectRedo(entry.id));
@@ -1222,6 +1259,10 @@ async function refreshSceneAuthoring(): Promise<void> {
  *  reveals only within the open scene, so a problem in another scene used to answer "Go to issue" with
  *  nothing, 2026-09-03), then reveal it. A problem with no node (a file-level one) has nowhere to go. */
 async function goToProblem(p: Problem | undefined): Promise<void> {
+  // A Patter extension's project-level problem (its project values, its manifest, its entry in the project
+  // file) is fixed in its section of Project Settings.
+  const section = p ? problemSettingsSection(p, project?.extensions) : null;
+  if (section) { await openProjectSettings(section); return; }
   if (!p?.nodeId) return;
   if (p.sceneId && p.sceneId !== currentSceneId) await loadScene(p.sceneId);
   surface?.revealNode(p.nodeId);
@@ -1368,7 +1409,7 @@ async function refreshProblems(): Promise<void> {
 const scheduleValidate = debounce(() => {
   void refreshProblems();
   // Only a genuine user edit tells the play session the scene changed - never a programmatic load.
-  if (sceneEdited && surface && currentSceneId) { const s = surface.getSource(); window.patter.playEdited(currentSceneId, s.flow, s.loc); }
+  if (sceneEdited && surface && currentSceneId) { const s = surface.getSource(); window.patter.playEdited(currentSceneId, s.flow, s.loc, s.extensions); }
 }, 350);
 
 // --- the detail inspector (right pane) ---------------------------------------
@@ -2034,14 +2075,49 @@ onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e
     },
     sceneProps: () => surface?.sceneProps() ?? [],
     editSceneProps: () => openSceneProps(),
+    // Patter extensions: their fields after Game Data, one transaction each on the node's `ext`.
+    extensions: () => project?.extensions ?? [],
+    setExtensionValue: (id, extension, field, value) => { surface?.setExtensionValue(id, extension, field, value); },
+    extensionLock: (extension) => lockedLine(extensionLocksOf(currentSceneId ? vcMap.get(currentSceneId) : undefined)[extension]?.by),
+    extensionAdapter: () => currentExtensionAdapter(),
+  });
+}
+
+/** What the problems bar needs to word an extension's problem: the extensions, and every node by id with the
+ *  label the editor shows (the open scene's as they stand, the rest from the project's index), built only
+ *  when a problem asks. */
+function extensionProblemContext(): ExtensionProblemContext {
+  let nodes: Map<string, { kind: string; label: string }> | null = null;
+  const build = (): Map<string, { kind: string; label: string }> => {
+    const m = new Map<string, { kind: string; label: string }>();
+    for (const [kind, list] of Object.entries(project?.extensionNodes ?? {})) for (const n of list) m.set(n.id, { kind, label: n.label });
+    for (const sc of project?.scenes ?? []) { m.set(sc.id, { kind: "scene", label: sc.name }); for (const b of sc.blocks) m.set(b.id, { kind: "block", label: b.name }); }
+    for (const kind of ["snippet", "option", "line", "text", "gameEvent"]) for (const n of surface?.nodesOfKind(kind) ?? []) m.set(n.id, { kind, label: n.label });
+    return m;
+  };
+  return {
+    extension: (id) => project?.extensions?.find((x) => x.id === id),
+    node: (id) => (nodes ??= build()).get(id),
+  };
+}
+
+/** What an extension's references and map keys offer: the cast, every scene and block, the open scene's
+ *  nodes as they stand, and the rest of the project's by name. */
+function currentExtensionAdapter(): ReturnType<typeof extensionAdapter> {
+  return extensionAdapter({
+    cast: [...new Set([...(project?.cast ?? []), ...(surface?.getCast() ?? [])])],
+    scenes: project?.scenes ?? [],
+    openScene: currentSceneId,
+    openNodes: (kind) => surface?.nodesOfKind(kind) ?? [],
+    ...(project?.extensionNodes ? { index: project.extensionNodes } : {}),
   });
 }
 
 /** The write itself. The controller decides WHEN; this only decides what. */
 async function writeScene(): Promise<boolean> {
   if (!surface || !currentSceneId) return true; // no scene open: nothing to write, and not a failure
-  const { flow, loc } = surface.getSource({ prune: true }); // a real save tidies stray blank text lines
-  const res = await window.patter.saveScene(currentSceneId, flow, loc);
+  const { flow, loc, extensions } = surface.getSource({ prune: true }); // a real save tidies stray blank text lines
+  const res = await window.patter.saveScene(currentSceneId, flow, loc, extensions);
   if (res.ok) { void refreshProblems(); void refreshVcStatus(); return true; } // re-validate + re-badge what's on disk
   toast(res.error ? `Save refused: ${res.error}` : "Save failed", "error");
   void refreshVcStatus();
@@ -2127,6 +2203,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     project.audioFolders ? window.patter.audioCurrent() : Promise.resolve(undefined), // folder-derived status (#206)
   ]);
   const { flowSource, locSource, properties, hostScopes } = scene;
+  sceneExtensionNames = new Map(scene.extensions.map((e) => [e.id, e.name]));
   sceneProps = properties; // referenceable properties for this scene's condition editor
   setHostScopeTokens(hostScopes); // the editors' parser knows @world, an imported @story, and the rest
   docMap = docs; docsDirty = false;
@@ -2144,6 +2221,8 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     projectPadAfterDefault: () => project?.padAfterDefault, // so a moved line is pinned to the pause it was playing
     flowSource,
     locSource,
+    extensions: scene.extensions,
+    lockedExtensions: extensionLocksOf(vcMap.get(sceneId)),
     formatting: project.formatting,
     castSeed: project.cast,
     qualifiers: project.qualifiers ?? [], // the cue's (O.S.), the keyboard cycle
@@ -3006,7 +3085,34 @@ const bundlePathHint = (): (string | HTMLElement)[] => [
 ];
 const DUP_MESSAGE = "Two entries share a name. Names must be unique.";
 
-const settingsDlg = mountSettingsDialog({
+/** The project's own values for its Patter extensions, edited in their Settings sections since the dialog
+ *  opened, by extension id: each the whole entry, carried at Save. */
+let settingsExtensionEdits: Record<string, Record<string, unknown>> = {};
+
+/** A section of Project Settings for each Patter extension declaring project fields, in the Project group
+ *  after Version control: what the project takes it at, then the project's own values. */
+function extensionSettingsSections(): SettingsSection[] {
+  return settingsExtensions(project?.extensions).map((extension): SettingsSection => ({
+    id: settingsSectionId(extension.id), label: extension.name, mount: (host): SettingsSectionHandle => {
+      // Mounted fresh on every open, from the project as it now stands (its values may have been saved since
+      // the dialog was built).
+      mountProjectSection(host, {
+        extension: project?.extensions?.find((x) => x.id === extension.id) ?? extension, adapter: currentExtensionAdapter(),
+        locked: lockedLine(projectExtensionVc[extension.id]?.lockedBy),
+        onChange: (entry) => { settingsExtensionEdits[extension.id] = entry; },
+      });
+      return {};
+    },
+  }));
+}
+
+/** The extensions the dialog was built with: a project taking others rebuilds it. */
+let settingsDlgShape = "";
+const extensionShape = (): string => settingsExtensions(project?.extensions).map((x) => `${x.id}:${x.name}`).join(",");
+
+function buildSettingsDialog(): SettingsDialog {
+  settingsDlgShape = extensionShape();
+  return mountSettingsDialog({
   title: "Project settings",
   sections: [
     { id: "general", label: "General", group: "Project", mount: (host): SettingsSectionHandle => {
@@ -3058,6 +3164,7 @@ const settingsDlg = mountSettingsDialog({
       live.vcs = vcs;
       return {};
     } },
+    ...extensionSettingsSections(),
     { id: "world", label: "World properties", group: "Story data", mount: (host): SettingsSectionHandle => {
       const { s } = settingsRead!;
       const worldHost = el("div"); host.append(worldHost);
@@ -3158,7 +3265,9 @@ const settingsDlg = mountSettingsDialog({
     } },
   ],
   onSave: () => saveSettingsFromDialog(), // false (a refused write) keeps the dialog open with the edits in it
-});
+  });
+}
+let settingsDlg = buildSettingsDialog();
 
 /** File > Project Settings: read the project-level settings, open the dialog on a tab (General by default;
  *  the coverage window's "World Properties…" and a `@world` pill's "Go to definition" open "world"). */
@@ -3168,6 +3277,9 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
   if (!s) return;
   settingsRead = { s, dictionaries: await window.patter.listDictionaries(), speakerPairs: await window.patter.speakerPairs() };
   live = {};
+  settingsExtensionEdits = {};
+  // The extension set decides the dialog's sections: rebuilt when it has changed since it was built.
+  if (extensionShape() !== settingsDlgShape) { settingsDlg.destroy(); settingsDlg = buildSettingsDialog(); }
   settingsDlg.open(initialTab);
   if (initialTab === "general") setTimeout(() => live.name?.focus(), 0);
 }
@@ -3202,6 +3314,7 @@ async function saveSettingsFromDialog(): Promise<boolean> {
     qualifiers: l.qualifiers.value(), qualifierRenames: l.qualifiers.renames(), speakerPattern: l.qualifiers.pattern(),
     writingStatuses: l.writingStatus.value(), estimating: l.estimating.value(), ...l.audio.value(),
     ...l.dictionary.value(),
+    ...(Object.keys(settingsExtensionEdits).length ? { extensionValues: { ...settingsExtensionEdits } } : {}),
   });
 }
 

@@ -31,7 +31,7 @@ import { SCRIPT_FONT_FILES, useScriptFontFiles } from "@patterkit/ops";
 import { PROPERTIES_PLACE } from "../shared/api.js";
 import { EXAMPLES } from "../shared/examples.js";
 import type { SearchEntry, SearchFocus, SearchMode, EditableExportRequest, EditableImportRequest } from "../shared/api.js";
-import type { AppPrompt, SceneKitId, StageRenameDto } from "../shared/api.js";
+import type { AppPrompt, SceneKitId, StageRenameDto, SceneExtensionShards, LiveSceneSource } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, RecentProject, ThemePrefs, VcsKind } from "../shared/api.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -1149,8 +1149,8 @@ function registerIpc(): void {
   ipcMain.handle("dict:addIgnore", (_e, word: string) => project.addIgnoreWord(word));
   // Review ▸ Spelling toggle / dictionary pick: persist, then rebuild the menu so its check / tick updates.
   ipcMain.handle("dict:set", async (_e, patch: { enabled?: boolean; language?: string }) => { const r = await project.setDictionary(patch); refreshMenu(); return r; });
-  ipcMain.handle("scene:save", async (_e, id: string, flow: string, loc: string) => {
-    const r = await project.saveScene(id, flow, loc, store.read().identity?.name);
+  ipcMain.handle("scene:save", async (_e, id: string, flow: string, loc: string, extensions?: SceneExtensionShards) => {
+    const r = await project.saveScene(id, flow, loc, store.read().identity?.name, extensions ?? {});
     if (r.ok) scheduleDebugPush(); // live bundle refresh: a saved scene reaches a connected game
     return r;
   });
@@ -1185,8 +1185,8 @@ function registerIpc(): void {
   // swap is impossible (the in-flight edit doesn't compile) does the old freeze-until-restart path
   // take over. Editor marks stay: beat ids are stable, so the visited trail still points at real
   // positions (a deleted beat's mark simply has nothing to decorate).
-  ipcMain.handle("play:edited", (_e, sceneId: string, flow: string, loc: string) => {
-    project.setPlaySource({ sceneId, flow, loc });
+  ipcMain.handle("play:edited", (_e, sceneId: string, flow: string, loc: string, extensions?: SceneExtensionShards) => {
+    project.setPlaySource({ sceneId, flow, loc, ...(extensions ? { extensions } : {}) });
     const playWin = windows.get("play");
     if (!playWin) return;
     const r = project.refreshPlay();
@@ -1256,7 +1256,7 @@ function registerIpc(): void {
   ipcMain.handle("debug:stop", () => { ensureDebugServer().stop(); refreshMenu(); return ensureDebugServer().status(); });
   ipcMain.handle("debug:status", () => ensureDebugServer().status());
   ipcMain.handle("debug:follow", (_e, flowId: string | null) => { ensureDebugServer().follow(typeof flowId === "string" ? flowId : null); });
-  ipcMain.handle("project:validate", (_e, live?: { sceneId: string; flow: string; loc: string }) => project.validate(live));
+  ipcMain.handle("project:validate", (_e, live?: LiveSceneSource) => project.validate(live));
   // The detached search window (#205): open/focus it, and serve its index queries + jump back to the editor.
   ipcMain.handle("search:open", (_e, mode: SearchMode, focus?: SearchFocus, query?: string) => openSearchWindow(mode, focus, query));
   // `voiced` here gates ONLY the search window's Recording tab, so it reflects audio-status TRACKING (voiced +

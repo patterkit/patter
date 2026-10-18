@@ -36,6 +36,7 @@
     "@wildwinter/game-subtitles": "^0.3.2",
     "@wildwinter/scoperegistry": ">=0.9.0 <1.0.0",
     "@wildwinter/simple-vc-lib": "^0.5.2",
+    "@wildwinter/toolkit": "^0.2.0",
     "electron-updater": "^6.3.9",
     "exceljs": "^4.4.0",
     "json5": "^2.2.3",

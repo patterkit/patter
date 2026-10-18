@@ -277,7 +277,7 @@ function prevLineOf(state: EditorStateLike, c: Ctx): { node: PMNode; pos: number
  *   - P is text (prose): keep it text, inline L's direction into the text;
  *   - P is dialogue WITH content: keep P's direction, DROP L's, concatenate the say;
  *   - P is dialogue with NO content: take everything from L (its say, its direction, and its qualifier).
- *  P keeps its id and raw, except for the pause after it: when L adds words, the merged line ends where L
+ *  P keeps its id, raw, and extension data, except for the pause after it: when L adds words, the merged line ends where L
  *  did, so it takes L's (line padding); when L adds none, P keeps its own. The say moves as content, so
  *  bold / italic survive the fold. */
 function foldInto(P: PMNode, L: PMNode): PMNode {
@@ -288,7 +288,7 @@ function foldInto(P: PMNode, L: PMNode): PMNode {
 function fold(P: PMNode, L: PMNode): PMNode {
   const lSay = sayContent(L);
   const lDir = zoneText(L, "paren");
-  const keep = { id: P.attrs.id as string, raw: P.attrs.raw as string };
+  const keep = { id: P.attrs.id as string, raw: P.attrs.raw as string, ext: P.attrs.ext as string };
   if (P.type.name === "prose") {
     const dir = lDir ? Fragment.from(S.text(`(${lDir}) `)) : Fragment.empty;
     return beatNode("prose", { ...keep, say: sayContent(P).append(dir).append(lSay) });
@@ -296,7 +296,7 @@ function fold(P: PMNode, L: PMNode): PMNode {
   const pSay = sayContent(P);
   if (pSay.size > 0) return beatNode("line", { ...keep, speaker: cueText(P), direction: zoneText(P, "paren"), say: pSay.append(lSay) });
   // An empty P takes L's delivery whole: its words, its direction, and its speaker qualifier.
-  return beatNode("line", { id: keep.id, raw: L.type.name === "line" ? rawWithQualifier(keep.raw, qualifierOf(L)) : keep.raw, speaker: cueText(P), direction: lDir || zoneText(P, "paren"), say: lSay });
+  return beatNode("line", { id: keep.id, ext: keep.ext, raw: L.type.name === "line" ? rawWithQualifier(keep.raw, qualifierOf(L)) : keep.raw, speaker: cueText(P), direction: lDir || zoneText(P, "paren"), say: lSay });
 }
 
 /** Dissolve this dialogue line into the previous line: delete the (highlighted) name,

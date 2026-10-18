@@ -26,6 +26,8 @@ const handlers: InspectorHandlers = {
   needsRerecord: () => false, setNeedsRerecord: noop,
   qualifiers: () => [], setQualifier: noop,
   projectPadAfter: () => 0.6, setPadAfter: noop, setPadAfterDefault: noop,
+  // Patter extensions (extension-rows.test.ts draws them): a project taking none.
+  extensions: () => [], setExtensionValue: noop, extensionLock: () => null, extensionAdapter: () => ({ nodes: () => [] }),
 };
 const ctx = (level: unknown): InspectorContext => ({ levels: [level] }) as InspectorContext;
 

@@ -71,7 +71,9 @@ function groupNoun(node: PMNode, parent: PMNode | null): string {
 /** The sentence for a snippet whose logic an edit would drop. `subject` is "This bubble", "The next
  *  bubble" and so on. Null when the snippet carries no logic (nothing to protect). */
 export function snippetLossMessage(subject: string, node: PMNode): string | null {
-  const logic = snippetLogic(node);
+  // Its extension data would go too (a merged bubble keeps only the leading one's), so it's named as its logic
+  // is. Delete on the bubble's menu (an allowed structural edit) still takes the data with it.
+  const logic = [...snippetLogic(node), ...(node.type.name === "snippet" && node.attrs.ext ? ["extension data"] : [])];
   if (!logic.length) return null;
   const pronoun = logic.length > 1 || logic[0] === "effects" ? "them" : "it";
   return `${subject} has ${listOf(logic)}. Move or clear ${pronoun} first.`;

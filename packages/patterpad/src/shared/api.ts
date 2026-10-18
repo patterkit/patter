@@ -118,6 +118,77 @@ export interface OpenedProject {
   /** Scratch recording (#224): the rung whose derived folder receives in-app scratch takes, or null when
    *  off. The inspector offers "Record scratch" for any line at or below this rung. */
   scratchStatus: string | null;
+  /** The Patter extensions the project takes and has a sound manifest for, in id order, each with its
+   *  declarations by node kind and the project's own values (shared/extensions.ts). Absent when it takes
+   *  none. */
+  extensions?: ExtensionDto[];
+  /** What an extension's references and map keys may name outside the open scene, by node kind (`scene`,
+   *  `block`, `snippet`, `option`, `line`, `text`, `gameEvent`): every such node the project has read, each
+   *  with a name to show and its scene. The open scene's own come from the editor, as it stands. Present
+   *  only with `extensions`. */
+  extensionNodes?: Record<string, ExtensionNodeDto[]>;
+}
+
+/** A node an extension's reference may name, with the name the author knows it by. */
+export interface ExtensionNodeDto {
+  id: string;
+  label: string;
+  /** The scene it is in (absent for a scene itself). */
+  scene?: string;
+}
+
+/**
+ * One Patter extension as the editor draws it (patterkit design/proposals/patter-storylet-extensions.md,
+ * "Tier 1: fields"): its declarations for each node kind it targets, its claims on gameData fields resolved
+ * through the project's settings, what the project takes it at, and the project's own values.
+ */
+export interface ExtensionDto {
+  id: string;
+  name: string;
+  /** The manifest's version. */
+  version: string;
+  docs?: string;
+  /** The version the project takes it at (`extensions.<id>.version`). */
+  taken: string;
+  /** Each of the manifest's settings, with the gameData field the project's choice (or its default) names. */
+  settings: { name: string; label: string; value: string }[];
+  /** By node kind: `scene`, `block`, `snippet`, `option`, `line`, `text`, `gameEvent`, `project`. */
+  targets: Record<string, ExtensionTargetDto>;
+  /** The project's own node id, which its project-level values are keyed by. */
+  projectNode: string;
+  /** The project's own values (`_project.patterextension`), raw. Absent when it sets none. */
+  projectValues?: Record<string, unknown>;
+}
+
+export interface ExtensionTargetDto {
+  /** The extension's own fields, in the manifest's order (shaped as the shell's value-rows ValueDecl). */
+  fields: ExtensionFieldDto[];
+  /** gameData fields this extension presents with its own label, help and values, by the field's name. */
+  claims: { field: string; decl: ExtensionFieldDto }[];
+}
+
+/** An extension field's declaration, as the manifest writes it. */
+export interface ExtensionFieldDto {
+  name: string;
+  type: string;
+  label?: string;
+  help?: string;
+  group?: string;
+  default?: unknown;
+  values?: string[];
+  /** A sentence per enum value, flag or stage: the chosen one's is shown under the control. */
+  valueHelp?: Record<string, string>;
+  stages?: string[];
+  renamedStages?: Record<string, string>;
+  to?: string;
+  fields?: ExtensionFieldDto[];
+  key?: { type: string; to?: string };
+  of?: Omit<ExtensionFieldDto, "name"> & { name?: string };
+  id?: string;
+  min?: number;
+  max?: number;
+  required?: boolean;
+  editorOnly?: boolean;
 }
 
 /** The project-level settings the Project Settings modal edits (General section, v1). Project-wide
@@ -217,6 +288,11 @@ export interface ProjectSettingsDto {
    *  and the caption character whose whole lines are captions (default `SFX`). Always populated for the UI;
    *  saveSettings drops the whole block back to undefined when it still matches the defaults. */
   closedCaptions: { open: string; close: string; character: string };
+  /** The project's own values for each Patter extension edited in its Settings section, by extension id: the
+   *  whole entry, as it should now stand (`{}` clears it). Written to the extension's
+   *  `_project.patterextension` in the same batch as the settings, so one undo puts both back. Absent: none
+   *  edited. */
+  extensionValues?: Record<string, Record<string, unknown>>;
 }
 
 /** An opened project plus the scene to land on (open-where-you-left-off). */
@@ -334,6 +410,37 @@ export interface SceneSource {
   properties: ConditionProperty[];
   /** The project's host-scope tokens, declared or opaque, which the editors' parser must know. */
   hostScopes: string[];
+  /** The scene's Patter extension shards: one for each extension the project takes, and one for each other
+   *  extension folder holding data for this scene. The editor puts a live one's entries on their nodes and
+   *  hands the shards back changed (`SceneExtensionShards`). */
+  extensions: SceneExtensionSourceDto[];
+}
+
+/** One extension's shard for a scene, as the editor opens it (the surface's `SceneExtensionSource`). */
+export interface SceneExtensionSourceDto {
+  /** The extension's id (its folder under the project's extensions layout). */
+  id: string;
+  /** The extension's name from its manifest, or its id when there's no sound manifest: what the editor
+   *  calls it ("Probe's data here is locked by bob."). */
+  name: string;
+  /** The shard's source text, "" when the scene has none yet. */
+  source: string;
+  /** The project takes the extension and its manifest is sound: its data is edited. Otherwise the shard is
+   *  left as it is. */
+  live: boolean;
+}
+
+/** A scene's extension shards as the editor hands them back, by extension id: the shard's new text, or null
+ *  when it has no data left (the file is deleted). Only the shards it changed (see the surface's
+ *  `SavedScene.extensions`): any other is as it is on disk. */
+export type SceneExtensionShards = Record<string, string | null>;
+
+/** The open scene's unsaved source, for live validation and the play window. */
+export interface LiveSceneSource {
+  sceneId: string;
+  flow: string;
+  loc: string;
+  extensions?: SceneExtensionShards;
 }
 
 export interface SaveResult {
@@ -402,6 +509,10 @@ export interface SceneVcStatus {
   dirty?: boolean;
   /** Not yet known to the VCS (a new, uncommitted scene). */
   untracked?: boolean;
+  /** The scene's extension shards, by extension id, each its own file: one somebody else holds locks that
+   *  extension's data in the scene (the editor refuses edits to it), never the scene itself. Absent when
+   *  the scene has none on disk. */
+  extensions?: Record<string, Omit<SceneVcStatus, "sceneId" | "extensions">>;
 }
 
 /** The key the PROJECT shard is badged under, beside the scene ids. Safe as a shared key space
@@ -418,7 +529,10 @@ export interface VcStatusDto {
   scenes: SceneVcStatus[];
   /** The project file's own state, keyed by `PROJECT_SHARD_KEY`. Same shape as a scene's, minus the
    *  id: it is one file rather than a set, so nothing folds. */
-  project?: Omit<SceneVcStatus, "sceneId">;
+  project?: Omit<SceneVcStatus, "sceneId" | "extensions">;
+  /** Each extension's project-level shard (`_project.patterextension`), by extension id. Absent when
+   *  there are none. */
+  projectExtensions?: Record<string, Omit<SceneVcStatus, "sceneId" | "extensions">>;
 }
 
 /** The outcome of a file export through a native Save dialog. `canceled` (no error) when the author
@@ -864,6 +978,9 @@ export interface Problem {
   file?: string;
   /** A one-click fix offered for this problem, when one applies. */
   fix?: QuickFix;
+  /** The Patter extension the problem is about (its data, its manifest, or a claim of its), by id: a
+   *  project-level one opens the extension's section of Project Settings. */
+  extension?: string;
 }
 
 export interface ProblemsDto {
@@ -1100,7 +1217,9 @@ export interface PatterApi {
    *  tab); returns the refreshed dictionary so the renderer rebuilds the engine. */
   setDictionary(patch: { enabled?: boolean; language?: string }): Promise<SaveResult & { dictionary?: { language: string; words: string[]; ignore: string[]; enabled: boolean } }>;
   /** Persist edited flow + loc source back to the scene's shards (lock-aware). */
-  saveScene(sceneId: string, flowSource: string, locSource: string): Promise<SaveResult>;
+  /** Save the open scene: its flow and loc shards, and the extension shards the editor changed, in one
+   *  all-or-nothing batch. */
+  saveScene(sceneId: string, flowSource: string, locSource: string, extensions?: SceneExtensionShards): Promise<SaveResult>;
   /** A version-control snapshot for every scene (#145): lock / checkout / out-of-date, so the nav can
    *  badge each scene and the editor can go read-only on a scene held by another. Null if no project
    *  open. Cheap (one batched spawn per backend); the renderer polls it + refreshes on focus / save. */
@@ -1116,7 +1235,7 @@ export interface PatterApi {
   resetWindows(): Promise<void>;
   /** Tell the play session the scene's source changed (unsaved edits): a live run rebuilds from this
    *  on its next restart, and an open run is marked stale until then. */
-  playEdited(sceneId: string, flow: string, loc: string): void;
+  playEdited(sceneId: string, flow: string, loc: string, extensions?: SceneExtensionShards): void;
   /** Subscribe to the editor step-marker (the play window's current beat id, or null to clear). The
    *  beat's `sceneId` lets the editor switch scenes when play crosses into a different one. `optionId`
    *  comes only from the live debug link: a choice frame sent again with the option the game took, which
@@ -1129,7 +1248,7 @@ export interface PatterApi {
   /** Validate the whole project (the CLI's checks): for the problems panel. Reflects disk, unless
    *  `live` is given: the named scene's UNSAVED in-memory source is swapped in first, so problems
    *  track edits as you make them (not just on save). */
-  validate(live?: { sceneId: string; flow: string; loc: string }): Promise<ProblemsDto>;
+  validate(live?: LiveSceneSource): Promise<ProblemsDto>;
   /** Open (or focus) the detached, always-on-top SEARCH tool window in the given mode (#205). `focus`
    *  (the open scene + caret beat) anchors content-search ranking on the current scene from the caret. */
   openSearchWindow(mode: SearchMode, focus?: SearchFocus, query?: string): Promise<void>;

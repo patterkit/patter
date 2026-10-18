@@ -24,11 +24,13 @@ import { rawWithoutQualifier } from "./qualifier.js";
 
 // The say moves as a Fragment, never as text, so bold / italic survive a toggle (review 2026-10,
 // MEDIUM 32: rebuilding through textContent stripped them).
-const makeLine = (id: string, raw: string, character: string, direction: string, content: Fragment): PMNode =>
-  beatNode("line", { id, raw, speaker: character, direction, say: content });
+// The beat keeps its extension data (`ext`) under its new kind: a line's entry becomes the text's, which
+// validation then checks against what the extension declares for text (lossless, and one undo away).
+const makeLine = (id: string, raw: string, character: string, direction: string, content: Fragment, ext = ""): PMNode =>
+  beatNode("line", { id, raw, ext, speaker: character, direction, say: content });
 // A text beat has no speaker qualifier, so a line becoming text leaves its qualifier behind; turned back
 // into dialogue and named, it takes one again by the run rule (src/qualifier.ts).
-const makeProse = (id: string, raw: string, content: Fragment): PMNode => beatNode("prose", { id, raw: rawWithoutQualifier(raw), say: content });
+const makeProse = (id: string, raw: string, content: Fragment, ext = ""): PMNode => beatNode("prose", { id, raw: rawWithoutQualifier(raw), ext, say: content });
 const sayOf = (beat: PMNode): Fragment => sayNode(beat)?.content ?? Fragment.empty;
 
 /** Parse a leading "word:" name and "(direction)" out of free-text content (free text -> dialogue). */
@@ -57,7 +59,7 @@ export const toggleLineType: Command = (state, dispatch) => {
     const dirPrefix = direction ? `(${direction}) ` : "";
     const prefix = charPrefix + dirPrefix;
     const content = prefix ? Fragment.from(S.text(prefix)).append(sayOf(node)) : sayOf(node);
-    const prose = makeProse(id, raw, content);
+    const prose = makeProse(id, raw, content, node.attrs.ext as string);
     // Map the caret into the collapsed content: a content caret keeps its spot
     // (shifted past the prefix); a cue/direction caret maps into the prefix.
     let offset = prefix.length + zoneOffset;            // say (content)
@@ -69,7 +71,7 @@ export const toggleLineType: Command = (state, dispatch) => {
     const original = zoneText(node, "say");
     const { character, direction, rest } = parsePrefix(original);
     const prefixLen = original.length - rest.length; // chars consumed as "name:" + "(direction)"
-    const line = makeLine(id, raw, character, direction, sayOf(node).cut(original.length - rest.length));
+    const line = makeLine(id, raw, character, direction, sayOf(node).cut(original.length - rest.length), node.attrs.ext as string);
     // say content-start, accounting for the optional paren zone before it.
     let beforeSay = pos + 1;
     line.forEach((z) => { if (z.type.name !== "say") beforeSay += z.nodeSize; });
@@ -100,7 +102,7 @@ export function flipToFreeText(state: EditorState): Transaction | null {
   const atEmptyContentStart = c.zone.role === "say" && c.zone.atStart && c.zone.textLen === 0;
   if (!inCue && !atEmptyContentStart) return null;
   const { node, pos } = c.beat;
-  const prose = makeProse(node.attrs.id as string, node.attrs.raw as string, sayOf(node));
+  const prose = makeProse(node.attrs.id as string, node.attrs.raw as string, sayOf(node), node.attrs.ext as string);
   const tr = state.tr.replaceWith(pos, pos + node.nodeSize, prose);
   return tr.setSelection(TextSelection.create(tr.doc, pos + 2)).scrollIntoView();
 }
@@ -111,7 +113,7 @@ export const promoteToDialogue: Command = (state, dispatch) => {
   if (!c.beat || c.beat.kind !== "prose" || c.zone?.role !== "say" || !c.zone.atStart) return false;
   if (dispatch) {
     const { node, pos } = c.beat;
-    const line = makeLine(node.attrs.id as string, node.attrs.raw as string, "", "", sayOf(node));
+    const line = makeLine(node.attrs.id as string, node.attrs.raw as string, "", "", sayOf(node), node.attrs.ext as string);
     const tr = state.tr.replaceWith(pos, pos + node.nodeSize, line);
     dispatch(tr.setSelection(TextSelection.create(tr.doc, pos + 2)).scrollIntoView()); // empty cue
   }

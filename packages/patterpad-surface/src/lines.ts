@@ -254,6 +254,7 @@ function splitSnippetPair(tr: import("prosemirror-state").Transaction, snippetPo
   // would fire twice). Give B a fresh snippet raw, keeping only A's default pause (line padding) so the
   // lines that moved keep their timing. The terminal `jump` is a separate attr and DOES belong to B -
   // endBubble clears it on A.
-  tr.setNodeMarkup(bPos, undefined, { ...b.attrs, raw: rawWithPadDefault(freshSnippetRaw(), padDefaultOf(a)) });
+  // Its extension data stays with A too: an entry belongs to the snippet's id, which B doesn't have.
+  tr.setNodeMarkup(bPos, undefined, { ...b.attrs, raw: rawWithPadDefault(freshSnippetRaw(), padDefaultOf(a)), ext: "" });
   return { aPos, bPos };
 }

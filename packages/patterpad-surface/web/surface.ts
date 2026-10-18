@@ -15,7 +15,9 @@ import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { history, undo, redo, undoDepth, redoDepth, isHistoryTransaction, closeHistory } from "prosemirror-history";
 import type { Node as PMNode, MarkType } from "prosemirror-model";
 import type { PropertyDecl } from "@patterkit/model";
-import { openScene, saveScene } from "../src/load.js";
+import { openScene, saveScene, type SceneExtensionSource, type SavedScene } from "../src/load.js";
+import { extensionLockGuard, extensionLockLoss, type ExtensionLocks } from "../src/extlock.js";
+import { extKindOf } from "../src/bridge.js";
 import { navKeymap } from "../src/navigation.js";
 import { openDirection, closeDirection } from "../src/direction.js";
 import { enter, endBubble, insertLineBefore } from "../src/lines.js";
@@ -52,6 +54,9 @@ export type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, LeafKind,
 } from "../src/inspect.js";
 export type { GroupPropsPatch, SnippetEffect } from "../src/groups.js";
+export type { SceneExtensionSource, SavedScene } from "../src/load.js";
+export type { ExtensionLock, ExtensionLocks } from "../src/extlock.js";
+export type { ExtensionValues } from "../src/inspect.js";
 export type { OptionSummary, PadSource } from "../src/inspect.js";
 export type { DocNote, DocNoteMap } from "./docnotes.js";
 export type { CommentMark, CommentOpenRequest } from "./comments.js";
@@ -77,6 +82,12 @@ export interface MountOptions {
   locSource: string;
   /** Inline bold/italic markup (project `formatting` setting). Default ON. */
   formatting?: boolean;
+  /** The scene's Patter extension shards (one per extension the project names), whose entries go onto
+   *  their nodes as `ext` and come back out through `getSource().extensions`. */
+  extensions?: SceneExtensionSource[];
+  /** Extensions whose shard for this scene somebody else holds: no edit may change their data (see
+   *  `setLockedExtensions`). */
+  lockedExtensions?: ExtensionLocks;
   /** Recency-ordered cast seed; the opened scene's speakers are auto-adopted on top. */
   castSeed?: string[];
   /** The project's speaker qualifiers in display order (gameId + the name the cue shows): drawn after a
@@ -152,7 +163,22 @@ export interface SurfaceHandle {
   /** Serialize the doc to `.patterflow` + `.patterloc` source. Pass `{ prune: true }` on a real SAVE to
    *  tidy stray blank text lines (a snippet's lone / leading / trailing blank text beat) - never on the
    *  live mirror, where a just-created blank line is valid. */
-  getSource(opts?: { prune?: boolean }): { flow: string; loc: string };
+  getSource(opts?: { prune?: boolean }): SavedScene;
+  /** Set (or clear, with `value === undefined`) one field of a node's entry in a Patter extension, by the
+   *  node's id (the scene's id for the scene): one recorded transaction on the node's `ext`, so the
+   *  scene's history undoes it. Sparse: clearing the last field drops the entry, and the last entry the
+   *  attr. False when the id isn't a node that carries extension data here, or the edit was refused (the
+   *  scene is read-only, or the extension's data here is locked). */
+  setExtensionValue(id: string, extension: string, field: string, value: unknown): boolean;
+  /** Replace the extensions whose data is locked here (somebody else holds the shard), by extension id.
+   *  An edit that would change their data is refused with a sentence naming who holds it; `{}` clears. */
+  setLockedExtensions(locks: ExtensionLocks): void;
+  /** Why the next undo (or redo) would be refused, when it would change a locked extension's data: the
+   *  sentence to show. Null when it would go ahead (or there's nothing to do). */
+  historyRefusal(way: "undo" | "redo"): string | null;
+  /** The scene's nodes of an extension node kind (`scene`, `block`, `snippet`, `option`, `line`, `text`,
+   *  `gameEvent`), in document order, with a label to show for each: what a reference field offers. */
+  nodesOfKind(kind: string): Array<{ id: string; label: string }>;
   /** The live cast (seed + auto-adopted + anything added via the popup). */
   getCast(): readonly string[];
   /** Toggle inline formatting. Turning it OFF strips existing marks so the doc matches what ships. */
@@ -310,6 +336,36 @@ export interface SurfaceHandle {
   sceneName(): string;
   focus(): void;
   destroy(): void;
+}
+
+/** A label for a node a reference may point at: its words, trimmed to a line. */
+const clip = (text: string): string => { const t = text.replace(/\s+/g, " ").trim(); return t.length > 60 ? `${t.slice(0, 59)}…` : t; };
+
+/** The scene's nodes of one extension node kind, in document order, each with a label to show. */
+function nodesOfKind(doc: PMNode, kind: string): Array<{ id: string; label: string }> {
+  const out: Array<{ id: string; label: string }> = [];
+  const name = (n: PMNode): string => { const v = rawAttr(n).name; return typeof v === "string" ? v : ""; };
+  if (kind === "scene") {
+    const id = rawAttr(doc).id;
+    if (typeof id === "string") out.push({ id, label: name(doc) || id });
+    return out;
+  }
+  doc.descendants((node, _pos, parent) => {
+    if (node.isTextblock) return false;
+    if (extKindOf(node) !== kind) return true;
+    if (kind === "option" && !isChoiceGroup(parent)) return true; // a plain group is no option
+    const id = modelIdOf(node);
+    if (!id) return true;
+    let label = "";
+    if (kind === "block") label = name(node);
+    else if (kind === "line") { const who = cueText(node), words = clip(sayTextOf(node)); label = who && words ? `${who}: ${words}` : who || words; }
+    else if (kind === "text") label = clip(sayTextOf(node));
+    else if (kind === "option") { node.forEach((ch) => { if (ch.type.name === "optionprompt" && ch.firstChild) label = clip(sayTextOf(ch.firstChild)); }); }
+    else if (kind === "snippet") { const first = node.firstChild; if (first && first.type.name !== "gameEvent") label = clip(sayTextOf(first)); }
+    out.push({ id, label: label || id });
+    return true;
+  });
+  return out;
 }
 
 /** Every distinct character the document already names (for cast auto-adopt). */
@@ -486,7 +542,8 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     if (titleEl.textContent !== n) titleEl.textContent = n;
   };
   let formattingEnabled = opts.formatting ?? true;
-  const opened = openScene(opts.flowSource, opts.locSource, formattingEnabled);
+  const opened = openScene(opts.flowSource, opts.locSource, formattingEnabled, opts.extensions ?? []);
+  let extensionLocks: ExtensionLocks = opts.lockedExtensions ?? {};
 
   // The project cast. Seed (recency-ordered) + auto-adopt every speaker the opened scene already
   // names, so an imported file's speakers are first-class. The popup's "add new" prepends here.
@@ -587,8 +644,12 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   let lastBeatPos: number | null = null;
   let recenterScheduled = false; // coalesce recentres, and defer the layout read out of dispatch
 
-  const getSource = (opts?: { prune?: boolean }): { flow: string; loc: string } =>
-    saveScene({ ...opened, doc: view.state.doc, formatting: formattingEnabled }, opts);
+  // `opened` itself goes in (its doc swapped for the live one), so the extension shards a save reports stay
+  // reported on the next one (load.ts, OpenedExtension.reported).
+  const getSource = (opts?: { prune?: boolean }): SavedScene => {
+    opened.doc = view.state.doc; opened.formatting = formattingEnabled;
+    return saveScene(opened, opts);
+  };
 
   // Change notifications are coalesced to one rAF tick (a docToScene walk per keystroke is too heavy).
   let changeScheduled = false;
@@ -684,6 +745,8 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       plugins: [
         // First, so nothing else sees a transaction it is going to refuse (ruling D).
         structureGuard(say),
+        // An edit that would change a locked extension's data (an undo or redo included) is refused too.
+        extensionLockGuard(() => extensionLocks, say),
         history(),
         ...(opts.hostUndo ? [] : [keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo })]),
         // An explicitly selected chunk (snippet / group NodeSelection) deletes via the themed confirm,
@@ -1300,6 +1363,31 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       return out;
     },
     anchorFor: (nodeId: string) => { const b = findByModelId(view.state.doc, nodeId); if (!b) return null; const dom = view.nodeDOM(b.pos); return dom instanceof HTMLElement ? dom : null; },
+    setExtensionValue(id, extension, field, value) {
+      const doc = view.state.doc;
+      const isScene = rawAttr(doc).id === id;
+      const found = isScene ? null : findByModelId(doc, id, (n) => extKindOf(n) !== null);
+      const node = isScene ? doc : found?.node;
+      if (!node) return false;
+      let data: Record<string, Record<string, unknown>> = {};
+      try { const v = node.attrs.ext as string; if (v) data = JSON.parse(v) as typeof data; } catch { data = {}; }
+      const entry = { ...(data[extension] ?? {}) };
+      if (value === undefined) delete entry[field]; else entry[field] = value;
+      if (Object.keys(entry).length) data[extension] = entry; else delete data[extension];
+      const next = Object.keys(data).length ? JSON.stringify(data) : "";
+      if (next === node.attrs.ext) return true; // nothing changes: no empty step in the history
+      const tr = isScene ? view.state.tr.setDocAttribute("ext", next)
+        : view.state.tr.setNodeMarkup(found!.pos, undefined, { ...node.attrs, ext: next });
+      view.dispatch(tr);
+      return view.state.doc !== doc;
+    },
+    setLockedExtensions(locks) { extensionLocks = { ...locks }; },
+    historyRefusal(way) {
+      let tr: Transaction | null = null;
+      (way === "undo" ? undo : redo)(view.state, (t) => { tr = t; });
+      return tr ? extensionLockLoss(view.state.doc, (tr as Transaction).doc, extensionLocks) : null;
+    },
+    nodesOfKind: (kind) => nodesOfKind(view.state.doc, kind),
     undo: () => { const done = undo(view.state, view.dispatch); view.focus(); return done; },
     redo: () => { const done = redo(view.state, view.dispatch); view.focus(); return done; },
     undoDepth: () => undoDepth(view.state),
