@@ -1,5 +1,23 @@
 # @patterkit/ops
 
+## 0.19.0
+
+### Minor Changes
+
+- f3e1277: `renameGameDataStage` carries a quality game-data field's stage rename into every node of its type that holds the old name. The stage-literal rewrite and the gate count are now the kernel's (`renameStageInExpression` and `stageGateCount` from `@wildwinter/expr`, shared with Storyletter); `stageGateCount` counts each gate, two in one condition being two. A node's `gameData` merges per key, so two writers setting different fields on one node both land. Coverage proposes, for a quality gate, the stages either side of it in ladder order (`stagesEitherSide`), not every stage sorted by name.
+
+### Patch Changes
+
+- cd8a91a: Uses `@patterkit/runtime` 0.28.0, the Patterplay 0.28.0 release.
+- Updated dependencies [f3e1277]
+- Updated dependencies [f3e1277]
+- Updated dependencies [f3e1277]
+- Updated dependencies [f3e1277]
+  - @patterkit/core@0.8.0
+  - @patterkit/compiler@0.8.0
+  - @patterkit/dialect@0.2.12
+  - @patterkit/model@0.15.0
+
 ## 0.18.0
 
 ### Minor Changes
