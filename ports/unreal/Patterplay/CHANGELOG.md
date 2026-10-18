@@ -7,6 +7,13 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A choice's options have game-data fields of their own**: `option` is a node kind, so a project declares
+  fields for options as for any other node, and `UPatterGameData::GameDataFields(Bundle, "option")` resolves the gameData an option
+  arrives with. Pinned by the corpus.
+
+
 ## [0.28.0] - 2026-10-18
 
 ### Added

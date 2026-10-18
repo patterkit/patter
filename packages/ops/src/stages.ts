@@ -166,7 +166,10 @@ export function renameGameDataStage(
     for (const block of scene.blocks) {
       if (kind === "block") visit(block);
       walkNodes(block.children, (node) => {
-        if (node.type !== "snippet") return;
+        if (node.type !== "snippet") {
+          if (kind === "option" && node.selector === "choice") for (const option of node.children) if (option.type === "group") visit(option);
+          return;
+        }
         if (kind === "snippet") visit(node);
         for (const beat of node.beats ?? []) if (beat.kind === kind) visit(beat as { gameData?: GameData });
       });

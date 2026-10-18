@@ -99,6 +99,22 @@ describe("renameGameDataStage", () => {
     expect(renameGameDataStage(scenes, "snippet", "act", "troubled", "uneasy").values).toBe(1);
   });
 
+  it("reaches a choice's options, and not the choice or any other group", () => {
+    const scenes: Scene[] = [{ id: "c", type: "scene", name: "c", blocks: [{ id: "c_b", type: "block", name: "B", children: [
+      { id: "c_g", type: "group", gameData: { act: "troubled" }, children: [
+        { id: "c_ch", type: "group", selector: "choice", gameData: { act: "troubled" }, children: [
+          { id: "c_o1", type: "group", prompt: { id: "c_P1", kind: "text" }, gameData: { act: "troubled" }, children: [] },
+          { id: "c_o2", type: "group", prompt: { id: "c_P2", kind: "text" }, gameData: { act: "calm" }, children: [] },
+        ] },
+      ] },
+    ] }] }];
+    expect(renameGameDataStage(scenes, "option", "act", "troubled", "uneasy").values).toBe(1);
+    const outer = scenes[0]!.blocks[0]!.children[0] as { gameData?: Record<string, unknown>; children: { gameData?: Record<string, unknown>; children: { gameData?: Record<string, unknown> }[] }[] };
+    expect(outer.gameData).toEqual({ act: "troubled" });
+    expect(outer.children[0]!.gameData).toEqual({ act: "troubled" });
+    expect(outer.children[0]!.children.map((o) => o.gameData)).toEqual([{ act: "uneasy" }, { act: "calm" }]);
+  });
+
   it("does nothing for an empty name or a rename to itself", () => {
     expect(renameGameDataStage(withData(), "line", "act", "troubled", " ").values).toBe(0);
     expect(renameGameDataStage(withData(), "line", "act", "troubled", "troubled").values).toBe(0);

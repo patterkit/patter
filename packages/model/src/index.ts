@@ -586,8 +586,10 @@ export interface BundleQualifier {
 export type BundleCastMember = Omit<CastMember, "notes" | "actor" | "gender">;
 
 /** A node TYPE that can carry author-defined gameData fields (the gameData schema, project-level).
- *  Beat kinds map straight through: dialogue = `line`, narration = `text`, game event = `gameEvent`. */
-export type GameDataNodeKind = "scene" | "block" | "snippet" | "line" | "text" | "gameEvent";
+ *  Beat kinds map straight through: dialogue = `line`, narration = `text`, game event = `gameEvent`.
+ *  `option` is a choice's option: a group that is a direct child of a `choice` group, whose gameData the
+ *  host reads off the option `getChoices` hands it. Any other group's gameData stays undeclared. */
+export type GameDataNodeKind = "scene" | "block" | "snippet" | "line" | "text" | "gameEvent" | "option";
 
 /** The value type of a gameData field: the family's one field-type list, shared with Storylets' card and
  *  outcome fields (patterkit design/family-parity-2026-10.md item 9, patter-qualities.md section 1). Drives

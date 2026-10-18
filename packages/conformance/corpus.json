@@ -21824,6 +21824,111 @@
         "act": "arrival",
         "mood": "calm"
       }
+    },
+    {
+      "name": "gameData: an option's fields resolve like any node kind's",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tagdj1",
+          "structureHash": "0fd4b4v"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": []
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "gameDataFields": {
+          "option": [
+            {
+              "name": "tone",
+              "type": "enum",
+              "values": [
+                "kind",
+                "curt"
+              ],
+              "default": "kind"
+            },
+            {
+              "name": "act",
+              "type": "quality",
+              "stages": [
+                "arrival",
+                "departure"
+              ],
+              "default": "departure"
+            }
+          ]
+        },
+        "scenes": {},
+        "strings": {}
+      },
+      "kind": "option",
+      "node": {
+        "tone": "curt",
+        "outcome": "o-leave"
+      },
+      "expected": {
+        "tone": "curt",
+        "act": "departure",
+        "outcome": "o-leave"
+      }
+    },
+    {
+      "name": "gameData: an option that sets nothing yields the option fields' defaults",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tagdj1",
+          "structureHash": "0fd4b4v"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": []
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "gameDataFields": {
+          "option": [
+            {
+              "name": "tone",
+              "type": "enum",
+              "values": [
+                "kind",
+                "curt"
+              ],
+              "default": "kind"
+            },
+            {
+              "name": "act",
+              "type": "quality",
+              "stages": [
+                "arrival",
+                "departure"
+              ],
+              "default": "departure"
+            }
+          ]
+        },
+        "scenes": {},
+        "strings": {}
+      },
+      "kind": "option",
+      "expected": {
+        "tone": "kind",
+        "act": "departure"
+      }
     }
   ],
   "saves": [
@@ -24186,6 +24291,18 @@
               "type": "number",
               "default": 0
             }
+          ],
+          "option": [
+            {
+              "name": "tone",
+              "type": "enum",
+              "values": [
+                "kind",
+                "curt"
+              ],
+              "purpose": "How the option reads",
+              "default": "kind"
+            }
           ]
         },
         "scenes": {
@@ -24450,6 +24567,21 @@
                 "name": "shake",
                 "type": "number",
                 "hasDefault": true
+              }
+            ]
+          },
+          {
+            "kind": "option",
+            "fields": [
+              {
+                "name": "tone",
+                "type": "enum",
+                "hasDefault": true,
+                "values": [
+                  "kind",
+                  "curt"
+                ],
+                "purpose": "How the option reads"
               }
             ]
           }

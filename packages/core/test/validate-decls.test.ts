@@ -228,6 +228,26 @@ describe("choice option prompt (spec §5)", () => {
     const s = choiceScene({ id: "opt", type: "group", prompt: { id: "P", kind: "text" }, children: [{ id: "c", type: "snippet", jump: { to: "END" } }] });
     expect(codes(base(), [s])).toEqual([]);
   });
+
+  it("checks an option's gameData against the option fields, and leaves other groups' alone", () => {
+    const project: ProjectFile = { ...base(), gameDataFields: { option: [
+      { name: "tone", type: "enum", values: ["kind", "curt"] },
+      { name: "act", type: "quality", stages: ["arrival", "departure"] },
+    ] } };
+    const option = (gameData: Record<string, unknown>) => choiceScene({
+      id: "opt", type: "group", prompt: { id: "P", kind: "text" }, gameData,
+      children: [{ id: "c", type: "snippet", jump: { to: "END" } }],
+    });
+    expect(codes(project, [option({ tone: "curt", act: "departure", outcome: "o-leave" })])).toEqual([]);
+    const issues = validateProject({ project, scenes: [option({ tone: "rude", act: "middle" })] });
+    expect(issues.map((i) => i.code)).toEqual(["invalid-gamedata-value", "invalid-gamedata-value"]);
+    expect(issues[0]!.message).toBe(`option 'opt' gameData 'tone' "rude" does not match type 'enum'`);
+    expect(issues[1]!.offLadder).toEqual({ field: "act", bad: "middle", options: ["arrival", "departure"] });
+    // The choice group itself is not an option: its gameData is the game's own.
+    const choice = option({});
+    (choice.blocks[0]!.children[0] as { gameData?: Record<string, unknown> }).gameData = { tone: "rude" };
+    expect(codes(project, [choice])).toEqual([]);
+  });
 });
 
 describe("documentation classes (spec §18)", () => {

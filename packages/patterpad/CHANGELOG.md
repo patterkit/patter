@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **An option has Game Data fields of its own.** Project Settings ▸ Game Data has an Option tab, and an
+  option's fields are edited in the inspector like a line's, instead of shown read-only. A key no field
+  declares, such as the Storyletter pairing's `outcome`, still shows as it stands.
+
 ### Changed
 
 - **A game data value commits as you type**, as every other field in the family does, and Esc puts back what it

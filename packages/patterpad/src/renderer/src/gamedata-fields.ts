@@ -15,6 +15,7 @@ import { mountPropertyList, type PropertyListHandle } from "@wildwinter/app-shel
 const KINDS: Array<{ kind: GameDataNodeKind; label: string }> = [
   { kind: "scene", label: "Scene" }, { kind: "block", label: "Block" }, { kind: "snippet", label: "Snippet" },
   { kind: "line", label: "Dialogue" }, { kind: "text", label: "Text" }, { kind: "gameEvent", label: "Game Event" },
+  { kind: "option", label: "Option" },
 ];
 // The family's field types, in Storyletter's Card template order and words (patterkit design/family-parity-2026-10.md
 // item 9).

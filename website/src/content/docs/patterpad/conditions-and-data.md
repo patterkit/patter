@@ -94,8 +94,9 @@ with its location.
 model itself: a mood for a line, a camera angle, the id of a sound to play.
 
 1. In **Project Settings ▸ Game Data**, decide what fields each kind of beat can carry
-   (a name, a type, a default value).
-2. In the inspector, fill them in on any beat. You only store what you change, so adjusting
+   (a name, a type, a default value), and the same for scenes, blocks, snippets, and a
+   choice's options.
+2. In the inspector, fill them in on any beat, or whatever you've selected. You only store what you change, so adjusting
    a default updates everywhere you left it alone.
 
 Your game reads these off each beat as it plays. That's how a story hands over its cues, what

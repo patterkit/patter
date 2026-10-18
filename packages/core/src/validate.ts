@@ -645,7 +645,11 @@ function validateGameDataValues(project: ProjectFile, scenes: Scene[], issues: V
     for (const block of scene.blocks ?? []) {
       check("block", block.id, block.gameData);
       walkNodes<Group | Snippet>(block.children ?? [], (node) => {
-        if (node.type !== "snippet") return;
+        if (node.type !== "snippet") {
+          // A choice's options are the one kind of group with declared fields.
+          if (node.selector === "choice") for (const option of node.children ?? []) if (option.type === "group") check("option", option.id, option.gameData);
+          return;
+        }
         check("snippet", node.id, node.gameData);
         for (const beat of node.beats ?? []) check(beat.kind, beat.id, (beat as { gameData?: GameData }).gameData);
       });

@@ -3074,6 +3074,7 @@ const describeEverything = {
         { name: "camera", type: "enum", values: ["wide", "close"], default: "wide" },
         { name: "shake", type: "number" },
       ],
+      option: [{ name: "tone", type: "enum", values: ["kind", "curt"], purpose: "How the option reads" }],
     },
   }),
   scenes: [{
@@ -3386,6 +3387,26 @@ const gameDataQualityDefaults = {
   expected: { act: "arrival", mood: "calm" },
 } satisfies GameDataFixture;
 
+// An option's fields: a choice's options are a node kind of their own, declared like any other, so a host resolves
+// the gameData an option arrives with (raw, on getChoices) against the option fields. A key no field declares, such
+// as the Storylets pairing's `outcome` where the project leaves it undeclared, comes through as it stands.
+const gameDataOptionProject = project({ gameDataFields: {
+  option: [
+    { name: "tone", type: "enum", values: ["kind", "curt"] },
+    { name: "act", type: "quality", stages: ["arrival", "departure"], default: "departure" },
+  ],
+} });
+const gameDataOption = {
+  name: "gameData: an option's fields resolve like any node kind's",
+  project: gameDataOptionProject, kind: "option", node: { tone: "curt", outcome: "o-leave" },
+  expected: { tone: "curt", act: "departure", outcome: "o-leave" },
+} satisfies GameDataFixture;
+const gameDataOptionDefaults = {
+  name: "gameData: an option that sets nothing yields the option fields' defaults",
+  project: gameDataOptionProject, kind: "option",
+  expected: { tone: "kind", act: "departure" },
+} satisfies GameDataFixture;
+
 const scriptedListProperties = {
   name: "listProperties: the shared @patter rows, in declaration order",
   project: project({ properties: [
@@ -3547,7 +3568,7 @@ export const cases: Fixtures = {
     scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties, scriptedStages,
     scriptedWorldQuality, scriptedStoryQuality, scriptedQualityDeletedStage, scriptedEnumDeletedValue,
     scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited],
-  gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults, gameDataQuality, gameDataQualityDefaults],
+  gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults, gameDataQuality, gameDataQualityDefaults, gameDataOption, gameDataOptionDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),
     asSaveFixture(scriptedSaveLoadChoice, "a save written by the JS reference loads elsewhere at a pending choice, options replayed"),

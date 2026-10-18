@@ -336,6 +336,25 @@ describe("inspector: line padding fields", () => {
   });
 });
 
+describe("inspector: an option's game data", () => {
+  it("edits an option's declared fields, and shows any other group's game data as it stands", () => {
+    const host = document.createElement("div");
+    const set: Array<[string, string, unknown]> = [];
+    const fields = [{ name: "tone", type: "text" as const }];
+    const h: InspectorHandlers = { ...handlers, gameDataFields: (kind) => (kind === "option" ? fields : []), setGameData: (id, key, v) => { set.push([id, key, v]); } };
+    renderInspector(host, ctx({ kind: "group", id: "o1", role: "option", labelParts: ["Option"], label: "Option", gameData: { outcome: "o-leave" } }), h);
+    const input = host.querySelector<HTMLInputElement>(".insp-gd-row input")!;
+    input.value = "kind";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(set).toEqual([["o1", "tone", "kind"]]);
+    expect(host.querySelector(".insp-gd-cap")?.textContent).toBe("Game Data");
+    expect([...host.querySelectorAll(".insp-gd")].map((k) => k.textContent)).toEqual(["outcome"]);   // undeclared, shown
+    renderInspector(host, ctx({ kind: "group", id: "g", role: "sequence", labelParts: ["Sequence"], label: "Sequence", gameData: { tone: "x" } }), h);
+    expect(host.querySelector(".insp-gd-row")).toBeNull();
+    expect([...host.querySelectorAll(".insp-gd")].map((k) => k.textContent)).toEqual(["tone"]);
+  });
+});
+
 describe("inspector: a game-data value typed through a redraw", () => {
   it("commits as typed, keeps the row, its text and the focus while the inspector rebuilds, and shows the purpose", async () => {
     const host = document.createElement("div");

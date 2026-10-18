@@ -251,7 +251,7 @@ export interface GameDataCase {
   name: string;
   /** Carries `gameDataFields` - the per-type field schema + defaults. */
   bundle: Bundle;
-  /** The node type whose fields apply (`scene` / `block` / `snippet` / `line` / `prose` / `action`). */
+  /** The node type whose fields apply (`scene` / `block` / `snippet` / `line` / `text` / `gameEvent` / `option`). */
   kind: GameDataNodeKind;
   /** The node's sparse override (omit = no overrides; pure defaults). */
   node?: GameData;

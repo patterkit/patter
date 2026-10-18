@@ -611,7 +611,10 @@ function groupBody(lv: GroupLevel, h: InspectorHandlers): HTMLElement[] {
   }
   rows.push(defaultPadRow(lv, h));
   rows.push(tagsRow(lv.id, lv.tags, h));
-  rows.push(...gameDataRows(lv.gameData));
+  // An option's fields are declared (the `option` node kind) and edit here; any other group's gameData has no
+  // declared fields, so it shows as it stands.
+  if (lv.role === "option") rows.push(gameDataSection("option", lv.id, lv.gameData, h));
+  else rows.push(...gameDataRows(lv.gameData));
   return rows.filter((r): r is HTMLElement => r != null);
 }
 

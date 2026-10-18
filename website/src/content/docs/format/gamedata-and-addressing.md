@@ -12,7 +12,7 @@ format doesn't model itself. Where Ink has loose `# tags`, Patter has typed fiel
 define up front.
 
 1. **Define the fields once.** In the project, you define fields grouped by node type
-   (scene, block, snippet, line, text, game event). Each field has a name, a type
+   (scene, block, snippet, line, text, game event, and a choice's option). Each field has a name, a type
    (`text`, `multiline`, `number`, `boolean`, `enum`, `flags`, or `quality`), an optional
    default, the values of an enum or flags field, the stages of a quality field in order,
    and a note on what it's for. Left out, a default is the type's own: false, 0, empty
@@ -28,7 +28,7 @@ define up front.
 
 The runtime never looks inside Game Data: to Patter it's just opaque data, and it's
 entirely yours. Your host reads it off each beat to drive audio, camera, portraits,
-quest state, whatever you need, and reads a scene's or block's with
+quest state, whatever you need, reads an option's off the choice that offers it, and reads a scene's or block's with
 `gameDataForScene(scene)` and `gameDataForBlock(scene, block)` (see
 [Scene and block Game Data](/play/integration/#scene-and-block-game-data)).
 
