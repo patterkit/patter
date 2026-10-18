@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-18
+
 ### Added
 
 - **An extension's settings**: a bundle now carries each Patter extension's settings, every one its manifest
