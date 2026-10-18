@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-18
+
 ### Added
 
 - **Everything Patterpad does can be undone.** Edit ▸ Undo takes back a Project Settings save (its renames
