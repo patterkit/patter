@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-18
+
 ### Added
 
 - **A choice's options have game-data fields of their own**: `option` is a node kind, so a project declares
