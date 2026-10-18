@@ -318,7 +318,7 @@ export interface SceneDeleteInfo {
   startsHere: boolean;
   /** The only scene left: deletion is refused. */
   lastScene: boolean;
-  /** A VCS is configured (softens the "cannot be undone" wording - the VCS is the safety net). */
+  /** A VCS is configured. (The confirm no longer turns on it: a deleted scene comes back with Edit ▸ Undo either way.) */
   vcs: boolean;
   /** Other scenes that jump into this one, or whose conditions name its nodes. */
   referrers: Array<{ sceneId: string; name: string; jumps: number; conditions: number }>;
@@ -339,6 +339,36 @@ export interface SceneSource {
 export interface SaveResult {
   ok: boolean;
   error?: string;
+  /** The write was a step of the project history: the new step, or the one it merged into. */
+  step?: ProjectStep;
+}
+
+/** A step of the project history (patterkit design/patterpad-undo.md, half B), as main announces it to the
+ *  editor's journal: its id, its label ("Replace"), whether it merged into the step before (the same key,
+ *  as a run of edits on the Properties page), and the scenes whose script (flow or strings) or authoring
+ *  shard it touched. */
+export interface ProjectStep { id: number; label: string; merged: boolean; scenes: string[]; authoring: string[] }
+
+/** What a project undo or redo came to, and what the editor must refresh. */
+export interface ProjectHistoryOutcome {
+  ok: boolean;
+  /** The step's label ("Replace"); empty when there was nothing to do. */
+  label: string;
+  error?: string;
+  /** Refused because a file changed since the step: it and every step below it are gone. */
+  drift?: boolean;
+  /** The step asked for is not the one on top: the editor's journal is out of step with the history. */
+  stale?: boolean;
+  /** With `stale`: the step that IS on top, so the journal can catch up with one it hasn't heard of yet. */
+  top?: { id: number; label: string };
+  /** The step's id. */
+  id?: number;
+  /** The refreshed project summary, once a step landed. */
+  project?: OpenedProject;
+  /** Scenes whose script (flow or strings) the step rewrote, created, or removed: the open one reloads. */
+  scenes: string[];
+  /** Scenes whose authoring shard (status, notes, re-record) the step rewrote: refreshed in place. */
+  authoring: string[];
 }
 
 /** A quality's stage renamed in place, `from` to `to`: the quality is a property in a scope (`patter`,
@@ -960,7 +990,17 @@ export interface PatterApi {
   readSettings(): Promise<ProjectSettingsDto | null>;
   /** Persist edited project-level settings back to the .patterproj (lock-aware). On success returns the
    *  refreshed project summary (name etc.) so the renderer can resync the title bar. */
-  saveSettings(settings: ProjectSettingsDto): Promise<SaveResult & { project?: OpenedProject }>;
+  saveSettings(settings: ProjectSettingsDto, undo?: { label?: string; key?: string }): Promise<SaveResult & { project?: OpenedProject }>;
+  /** Undo / redo the newest step of the project history, which must be step `id` (the journal's). The
+   *  outcome says what the editor refreshes. */
+  projectUndo(id?: number): Promise<ProjectHistoryOutcome>;
+  projectRedo(id?: number): Promise<ProjectHistoryOutcome>;
+  /** A new edit in the open scene: the project history's redo goes too, as the scene's has. */
+  projectClearRedo(): Promise<void>;
+  /** The Edit menu's Undo and Redo labels, from the journal's newest entries ("Replace"; none for a scene edit). */
+  setUndoLabels(labels: { undo?: string; redo?: string }): Promise<void>;
+  /** Every step main records in the project history, whichever window asked for the write. */
+  onProjectStep(handler: (step: ProjectStep) => void): void;
   /** Carry stage renames into every condition and set effect that names them (the open scene is saved
    *  first and reloads after). `expressions` is how many were rewritten. */
   renameStages(renames: StageRenameDto[]): Promise<SaveResult & { expressions: number }>;
@@ -980,7 +1020,7 @@ export interface PatterApi {
    *  delete silently, content asks, and inbound references list the referring scenes by name. */
   sceneDeleteInfo(sceneId: string): Promise<SceneDeleteInfo | null>;
   /** Delete a scene (flow + every locale's loc shard + authoring shard, lock-aware), cleaning
-   *  `sceneOrder` and a `start` that pointed at it. Refuses the last scene. Not undoable in-app. */
+   *  `sceneOrder` and a `start` that pointed at it. Refuses the last scene. One step of the project history. */
   deleteScene(sceneId: string): Promise<SaveResult & { project?: OpenedProject }>;
   /** Read one scene's flow + loc source for editing. */
   readScene(sceneId: string): Promise<SceneSource>;

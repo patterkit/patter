@@ -391,6 +391,13 @@ const stub = {
   // call `window.__menu("reset-view")` etc. from the console / preview eval.
   onMenu: (h: (cmd: string) => void) => { (window as unknown as { __menu: unknown }).__menu = h; },
   onOpenProject: () => undefined, // no Finder in the browser preview
+  // Project-level undo: the preview has no files to restore, so its history is always empty. The renderer
+  // subscribes to project steps at module top level, so these MUST exist.
+  projectUndo: async () => ({ ok: false, label: "", stale: true, scenes: [], authoring: [] }),
+  projectRedo: async () => ({ ok: false, label: "", stale: true, scenes: [], authoring: [] }),
+  projectClearRedo: async () => undefined,
+  setUndoLabels: async () => undefined,
+  onProjectStep: () => undefined,
   // Auto-update hooks (#189) - inert in the browser preview, but they MUST exist: the renderer subscribes
   // at module top level, and a missing method throws and aborts boot.
   onUpdaterCheckDirty: () => undefined,

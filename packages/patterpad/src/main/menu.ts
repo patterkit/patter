@@ -8,7 +8,7 @@ import { app, shell, Menu, BrowserWindow, type MenuItemConstructorOptions } from
 import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 // The suite's menu spine. Every LABEL and ACCELERATOR the family shares comes from the shell so both
 // apps spell them the same; the click handlers stay Patterpad's, because the mechanism behind each is
-// per app (ProseMirror history for Undo here, file-byte replay in Storyletter). What is hand-typed
+// per app (the editor's journal over ProseMirror and the project history here, file-byte replay in Storyletter). What is hand-typed
 // below is only what is this app's alone (Patterpack, scenes, spelling, notes, fonts).
 import { EDIT_MENU, GO_MENU, HELP_MENU, APP_MENU, FILE_MENU, PLAY_MENU, PANE_MENU, REVIEW_MENU, PUBLISH_MENU, VIEW_MENU, namedMenuItems, recentsSubmenu } from "@wildwinter/app-shell/menu";
 import type { NamedMenuItem } from "@wildwinter/app-shell/menu";
@@ -41,6 +41,17 @@ const linkItem = (item: NamedMenuItem): MenuItemConstructorOptions => ({
 /** Spelling submenu data: on/off, the active dictionary, and every installed dictionary (Review ▸ Spelling
  *  mirrors the Dictionary settings tab). */
 export interface SpellingMenu { hasProject: boolean; enabled: boolean; language: string; dictionaries: Array<{ id: string; label: string }> }
+
+/** What Edit ▸ Undo and Redo would take back, from the newest entry of the editor's journal ("Replace"),
+ *  or nothing for a scene edit, which reads plain "Undo". */
+let undoLabels: { undo?: string; redo?: string } = {};
+/** Set the Undo and Redo labels; true when they changed, so the caller rebuilds the menu. */
+export function setUndoLabels(labels: { undo?: string; redo?: string }): boolean {
+  const next = { ...(labels.undo ? { undo: labels.undo } : {}), ...(labels.redo ? { redo: labels.redo } : {}) };
+  if (next.undo === undoLabels.undo && next.redo === undoLabels.redo) return false;
+  undoLabels = next;
+  return true;
+}
 
 export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: PaneState, theme: ThemePrefs, lineStatuses: string[] = [], spelling?: SpellingMenu, voiced = false, debugActive = false, audioTracked = false, autoRebuild = false,
   /** A Storyletter project nearby is paired with this one, so Show Card in Storyletter has somewhere to go. */
@@ -131,6 +142,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // so it gets the native text undo, as Select All does: sent on, it undid the main window's scene.
         {
           ...EDIT_MENU.undo,
+          ...(undoLabels.undo ? { label: `${EDIT_MENU.undo.label} ${undoLabels.undo}` } : {}),
           click: () => {
             const focused = BrowserWindow.getFocusedWindow();
             if (focused && focused !== win) { focused.webContents.undo(); return; }
@@ -139,6 +151,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         },
         {
           ...EDIT_MENU.redo,
+          ...(undoLabels.redo ? { label: `${EDIT_MENU.redo.label} ${undoLabels.redo}` } : {}),
           click: () => {
             const focused = BrowserWindow.getFocusedWindow();
             if (focused && focused !== win) { focused.webContents.redo(); return; }

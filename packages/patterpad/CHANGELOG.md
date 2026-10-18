@@ -8,6 +8,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **Everything Patterpad does can be undone.** Edit ▸ Undo takes back a Project Settings save (its renames
+  included), a change on the Properties page, Replace, a new or deleted scene, a merged Patterpack, an imported
+  editable script or translation, an accepted or rejected suggestion, shared scopes, the addresses Publish
+  Bundle pins, a quick fix, the scene order, the start point, dictionary words, and writing status, recording
+  status, re-record flags, and notes. They undo in the order you made them, mixed in with your edits to the
+  script, and the Edit menu says what's next ("Undo Replace"). On the Properties page, Undo takes back the
+  page's last change. If a file has changed since (a pull, or another app), Undo says which and stops rather
+  than overwrite that work; if someone else has a file locked, it says who, and you can try again later.
+  Comments and the suggestions you post aren't undone: they're a conversation.
 - **Renaming a cast member renames them everywhere.** Change a name in Project Settings ▸ Cast, and every line
   they speak, their translated name and labels, and any extension data keyed by them or naming them follow it,
   in the same save. Before, their lines kept the old name and showed as a speaker who isn't in the cast.

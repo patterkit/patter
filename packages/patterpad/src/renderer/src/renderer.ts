@@ -30,8 +30,9 @@ import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type Inspector
 import { buildSpellEngine } from "./spellcheck.js";
 import { adoptSceneName, relabelNavScene } from "./scene-name.js";
 import { selectAllOutsideEditor, undoRoute } from "./edit-commands.js";
+import { UndoJournal, type EntryResult, type JournalEntry } from "./undo-journal.js";
 import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
-import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, StageRenameDto, ThemePrefs, VcsKind } from "../../shared/api.js";
+import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectHistoryOutcome, ProjectSettingsDto, ProjectStep, RecentProject, ReportData, ReviewItem, SaveResult, StageRenameDto, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector, formatSeconds } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
 // open, because they are all the one panel.
@@ -294,13 +295,50 @@ async function ensureProjectStart(): Promise<{ scene: string; block?: string } |
     set.focus();
   });
   if (!chosen) return null;
-  const res = await window.patter.setStart({ scene: chosen });
+  const res = await tracked(window.patter.setStart({ scene: chosen }));
   if (res.project) project = res.project;
   return { scene: chosen };
 }
 let project: OpenedProject | null = null;
 let currentSceneId: string | null = null;
 let surface: SurfaceHandle | null = null;
+/** The scene the mounted surface holds. Usually `currentSceneId`, but the Properties page clears that and
+ *  leaves the surface behind it, and the journal's scene entries are the surface's. */
+let surfaceSceneId: string | null = null;
+
+// --- the journal: one order across the scene's history and the project's ----------------------------
+// (patterkit design/patterpad-undo.md, "The arbiter"; the rules are undo-journal.ts's.) A scene entry is
+// appended when the surface reports a new event in its history, a project entry when main records a new
+// step (announced for every window, and answered by the writes made here, the same id once).
+const journal = new UndoJournal();
+let shownUndoLabels = "";
+journal.onChange = () => {
+  const labels = journal.labels();
+  const sig = JSON.stringify(labels);
+  if (sig === shownUndoLabels) return;
+  shownUndoLabels = sig;
+  void window.patter.setUndoLabels(labels); // Edit ▸ Undo Replace
+};
+/** A step main recorded: a new one goes on the journal; one merged into the step before adds nothing. */
+function noteStep(step: ProjectStep | undefined): void {
+  if (!step) return;
+  // A merged step adds no entry, but it is a new edit: nothing undone before it can be redone.
+  if (step.merged) { journal.noteMerged(); return; }
+  const known = journal.undoEntries.some((e) => e.kind === "project" && e.id === step.id);
+  journal.pushProject(step.id, step.label);
+  // Typing straight after the step starts a new event, so it can't join one from before the step and be
+  // undone out of order.
+  if (!known) surface?.closeHistory();
+}
+/** Project writes still in the air. Cmd+Z waits for them, so a status set a moment ago is on the journal
+ *  before the journal is asked what is newest. */
+const inflightWrites = new Set<Promise<unknown>>();
+function tracked<T extends SaveResult>(p: Promise<T>): Promise<T> {
+  const run = p.then((r) => { noteStep(r.step); return r; });
+  inflightWrites.add(run);
+  void run.finally(() => inflightWrites.delete(run)).catch(() => {});
+  return run;
+}
 
 // The live spell-check engine (#177), built per project from the active dictionary + project words + cast.
 // Cached here so each scene mount can re-push it to the new surface instance without a rebuild.
@@ -329,21 +367,21 @@ async function buildSpellcheck(): Promise<void> {
 /** Add a word to the project dictionary (the surface's "Add to dictionary"), then rebuild + re-validate so
  *  the squiggle and the problems-panel entry clear. */
 async function addWordToDictionary(word: string): Promise<void> {
-  const res = await window.patter.addDictionaryWord(word);
+  const res = await tracked(window.patter.addDictionaryWord(word));
   if (res.ok && res.words && project) { project.dictionary.words = res.words; await buildSpellcheck(); void refreshProblems(); }
 }
 
 /** Ignore a word (the surface's "Ignore") - persist it to the project ignore list, then rebuild + re-validate
  *  so the squiggle clears AND the problems-bar entry drops out (#177). */
 async function ignoreWord(word: string): Promise<void> {
-  const res = await window.patter.addIgnoreWord(word);
+  const res = await tracked(window.patter.addIgnoreWord(word));
   if (res.ok && res.ignore && project) { project.dictionary.ignore = res.ignore; await buildSpellcheck(); void refreshProblems(); }
 }
 
 /** Review ▸ Spelling: flip spell-check on/off or switch the active dictionary, then rebuild + re-validate.
  *  The main process persists it and rebuilds the menu (so the check / tick updates). */
 async function setDictionaryFromMenu(patch: { enabled?: boolean; language?: string }): Promise<void> {
-  const res = await window.patter.setDictionary(patch);
+  const res = await tracked(window.patter.setDictionary(patch));
   if (res.ok && res.dictionary && project) { project.dictionary = res.dictionary; await buildSpellcheck(); void refreshProblems(); }
 }
 // mountSurface fires onChange once on mount (the initial mirror of the source). That is NOT a user
@@ -618,7 +656,7 @@ function newScenePrompt(): void {
       if (name === undefined) return;
       const who = needsSpeaker(kit) ? speaker.value.trim() : undefined;
       void (async () => {
-        const res = await window.patter.createScene(name, kit, who);
+        const res = await tracked(window.patter.createScene(name, kit, who));
         if (!landed(res, "Couldn't add the scene") || !res.project || !res.sceneId) return;
         project = res.project;
         renderNav();
@@ -697,9 +735,9 @@ async function deleteScenePrompt(sceneId?: string): Promise<void> {
   const warnBits = [
     info.referrers.length ? "Those references will dangle and show as problems until you repoint them." : "",
     info.startsHere ? "The project's start point will be cleared." : "",
-    // Ruling F of the October 2026 review: one sentence for what cannot be undone, and under version
-    // control the truth, which is that the files can come back from there.
-    info.vcs ? "Version control keeps its files, so you can bring the scene back from there." : "You can't undo this.",
+    // House style rule 30: a confirmation ends with what undo does. Edit ▸ Undo brings every one of its
+    // files back (the project history), with or without version control.
+    "You can undo this.",
   ].filter(Boolean);
   if (warnBits.length) body.push(el("p", "confirm-body del-warn", warnBits.join(" ")));
 
@@ -718,7 +756,7 @@ async function doDeleteScene(id: string): Promise<void> {
   const order = project?.scenes.map((s) => s.id) ?? [];
   const at = order.indexOf(id);
   const neighbour = order[at - 1] ?? order.find((sid) => sid !== id);
-  const res = await window.patter.deleteScene(id);
+  const res = await tracked(window.patter.deleteScene(id));
   if (!landed(res, "Couldn't delete the scene") || !res.project) return;
   project = res.project;
   renderNav();
@@ -798,7 +836,7 @@ async function commitSceneReorder(movedId: string, targetId: string, before: boo
   const at = ids.indexOf(targetId);
   if (at < 0) return;
   ids.splice(before ? at : at + 1, 0, movedId);
-  const res = await window.patter.reorderScenes(ids);
+  const res = await tracked(window.patter.reorderScenes(ids));
   if (res.project) project = res.project;
   flipNav(() => renderNav());
 }
@@ -1056,21 +1094,128 @@ function selectAllCommand(): void {
   document.execCommand("selectAll");
 }
 
-/** Edit > Undo and Redo in the main window: the scene's history, or the focused field's own text, by
- *  `undoRoute` (edit-commands.ts). Sent straight to the scene, Cmd+Z in Project Settings or on the
- *  Properties page undid the scene hidden behind them. */
+/** Edit > Undo and Redo in the main window: the focused field's own text, or the journal's newest entry
+ *  (the open scene's history or the project's), by `undoRoute` (edit-commands.ts). On the Properties page
+ *  only a project step: the page's own saves. */
 async function undoCommand(dir: "undo" | "redo"): Promise<void> {
-  const open = !!surface && !!currentSceneId;
   const route = undoRoute({
     active: document.activeElement,
     sceneAreas: [editorEl, inspectorStackEl],
     dialogOpen: !!document.querySelector("dialog[open]"),
-    scene: !open ? "none" : overviewEl.hidden && !editorEl.hidden ? "showing" : !overviewEl.hidden ? "hidden" : "none",
+    view: !project ? "none" : !propsDocEl.hidden ? "properties" : !overviewEl.hidden ? "overview" : !panesEl.hidden ? "scene" : "none",
   });
   if (route === "field") { document.execCommand(dir); return; }
   if (route === "none") return;
-  if (route === "show-scene" && currentSceneId) await openSceneFromOverview(currentSceneId);
-  if (dir === "undo") surface?.undo(); else surface?.redo();
+  await settleForUndo();
+  const next = dir === "undo" ? journal.peekUndo() : journal.peekRedo();
+  if (!next || (route === "project" && next.kind !== "project")) return;
+  // A project step may rewrite the open scene's files: whatever it holds goes to disk first, so the step
+  // finds the bytes it left (and the scene reloads from what the step put back).
+  if (next.kind === "project") await flushPending();
+  journalBehind = false;
+  await (dir === "undo" ? journal.undo(applyJournalEntry) : journal.redo(applyJournalEntry));
+  // The journal caught up with a step it hadn't heard of: that step is the newest, so it is the one undone.
+  if (journalBehind) { journalBehind = false; await (dir === "undo" ? journal.undo(applyJournalEntry) : journal.redo(applyJournalEntry)); }
+}
+/** Set when main's answer showed the journal was missing a newer step (see `catchUp`). */
+let journalBehind = false;
+
+/** Before the journal is asked what is newest: every project write in the air has landed and been noted,
+ *  Notes still inside their debounce are saved (a step of their own), and so is the Properties page. */
+async function settleForUndo(): Promise<void> {
+  if (!propsDocEl.hidden) { schedulePropsSave.cancel(); await savePropsDoc(); }
+  await persistDocs();
+  while (inflightWrites.size > 0) await Promise.allSettled([...inflightWrites]);
+}
+
+/** Send one journal entry to its history. A scene entry undoes in the open scene (shown first, from the
+ *  overview: ruling 4), or is refused, with the lock named, in a scene somebody else holds. A project
+ *  entry goes to main by its id, and the editor then refreshes whatever the step touched. */
+async function applyJournalEntry(entry: JournalEntry, way: "undo" | "redo"): Promise<EntryResult> {
+  if (entry.kind === "scene") {
+    if (!surface || entry.sceneId !== surfaceSceneId) return "skip";
+    if (!overviewEl.hidden) await openSceneFromOverview(entry.sceneId);
+    if (!surface) return "skip";
+    if (!surface.isEditable()) {
+      const who = vcMap.get(entry.sceneId)?.lockedBy ?? [];
+      toast(`Couldn't ${way} that edit\nThis scene is locked${who.length ? ` by ${who.join(", ")}` : ""}, so it can't be changed here.`, "error");
+      return "refused";
+    }
+    if ((way === "undo" ? surface.undoDepth() : surface.redoDepth()) === 0) return "skip"; // past the history's depth
+    return (way === "undo" ? surface.undo() : surface.redo()) ? "done" : "skip";
+  }
+  const r = await (way === "undo" ? window.patter.projectUndo(entry.id) : window.patter.projectRedo(entry.id));
+  if (r.ok) { await afterProjectHistory(r); return "done"; }
+  // Out of step with main: either a step is still on its way here (catch up, and ask again), or main has
+  // really let this one go.
+  if (r.stale) {
+    if (journal.catchUp(entry, r.top) === "skip") return "skip";
+    journalBehind = true;
+    return "refused";
+  }
+  landed(r, `Couldn't ${way} ${entry.label}`);
+  return r.drift ? "drift" : "refused";
+}
+
+/** After a project undo or redo: the open scene reloads when the step rewrote its script (or is gone, when
+ *  it was the scene the step made), its status and notes refresh in place when only its authoring shard
+ *  moved, and everything that reads the project file is redrawn, as a settings save does. */
+async function afterProjectHistory(r: ProjectHistoryOutcome): Promise<void> {
+  if (!r.project || !project) return;
+  project = r.project;
+  projectNameEl.textContent = project.name;
+  renderNav();
+  const open = surfaceSceneId;
+  if (open && !project.sceneIds.includes(open)) {
+    // An undo of New Scene (or a redo of Delete Scene) took away the scene on screen: there is nothing of
+    // it left to save, so land on the first scene instead.
+    saver.cancel(); docsDirty = false; commentsDirty = false;
+    journal.dropScene(open);
+    surface?.destroy(); surface = null; surfaceSceneId = null; editorEl.replaceChildren();
+    const wasShowing = currentSceneId === open;
+    currentSceneId = null;
+    if (wasShowing && project.scenes[0]) await loadScene(project.scenes[0].id);
+  } else if (open && currentSceneId === open && r.scenes.includes(open)) {
+    await reloadOpenScene();
+  } else if (open && r.scenes.includes(open)) {
+    // Out of sight behind the Properties page: remounted on the way back, from what the step put back.
+    journal.dropScene(open);
+  } else if (currentSceneId && r.authoring.includes(currentSceneId)) {
+    await refreshSceneAuthoring();
+  }
+  if (currentSceneId) {
+    const fresh = await window.patter.readScene(currentSceneId);
+    sceneProps = fresh.properties;
+    setHostScopeTokens(fresh.hostScopes);
+    highlightNav(currentSceneId);
+  }
+  await buildSpellcheck();
+  pushWritingStatus();
+  surface?.setQualifiers(project.qualifiers ?? []);
+  surface?.setJumpTargets(project.scenes.map((sc) => ({ id: sc.id, label: sc.name, blocks: sc.blocks.map((b) => ({ id: b.id, label: b.name })) })));
+  await refreshPatterProps();
+  if (!propsDocEl.hidden) mountPropsDoc();
+  if (!overviewEl.hidden) renderOverview();
+  void refreshVcStatus();
+  void refreshProblems();
+  lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
+}
+
+/** Re-read the open scene's status, notes, and re-record flags after a step put its authoring shard back,
+ *  so the next status set starts from what is on disk rather than writing the undone map over it. */
+async function refreshSceneAuthoring(): Promise<void> {
+  const id = currentSceneId;
+  if (!id) return;
+  const [docs, writing, recording, rerecord] = await Promise.all([
+    window.patter.readDocs(id), window.patter.readWriting(id), window.patter.readRecording(id), window.patter.readRerecord(id),
+  ]);
+  if (currentSceneId !== id) return;
+  docMap = docs; docsDirty = false;
+  writingMap = writing;
+  recordingMap = recording;
+  rerecordMap = rerecord;
+  pushDocNotes();
+  pushWritingStatus();
 }
 
 /** Take the author to a problem's node: switch to its scene first when it lives elsewhere (the surface
@@ -1138,7 +1283,7 @@ async function applyCurrentFix(): Promise<void> {
     });
     return;
   }
-  const res = await window.patter.applyFix(fix); // add-to-cast / declare-property (project-file writes)
+  const res = await tracked(window.patter.applyFix(fix)); // add-to-cast / declare-property (project-file writes)
   if (!landed(res, "Couldn't apply the fix")) return;
   if (fix.kind === "declare-property") {
     void refreshPatterProps(); // the navigator's count just moved
@@ -1173,7 +1318,7 @@ async function registerCharacter(name: string): Promise<void> {
   const n = name.trim();
   if (!project || !n) return;
   if (project.cast.some((c) => c.toLowerCase() === n.toLowerCase())) return; // already in the master cast
-  const res = await window.patter.applyFix({ kind: "add-to-cast", character: n });
+  const res = await tracked(window.patter.applyFix({ kind: "add-to-cast", character: n }));
   if (!landed(res, `Couldn't add ${n} to the cast`)) return;
   project.cast = [...project.cast, n]; // keep castSeed / spell-check in sync without a reload
   await buildSpellcheck();
@@ -1249,7 +1394,7 @@ function docClassesForKind(kind?: string): typeof docClasses {
 async function persistDocs(): Promise<void> {
   if (!docsDirty || !currentSceneId) return;
   docsDirty = false;
-  const res = await window.patter.saveDocs(currentSceneId, docMap);
+  const res = await tracked(window.patter.saveDocs(currentSceneId, docMap));
   if (!landed(res, "Couldn't save the notes")) docsDirty = true;
 }
 
@@ -1428,7 +1573,7 @@ function setLineStatus(ids: string[], status: string | null): void {
   if (!currentSceneId || !ids.length) return;
   for (const id of ids) { if (status) writingMap[id] = status; else delete writingMap[id]; }
   surface?.setWritingStatus(writingMap);
-  void window.patter.saveWriting(currentSceneId, writingMap);
+  void tracked(window.patter.saveWriting(currentSceneId, writingMap));
   const ctx = lastInspectorCtx;
   if (ctx && ids.some((id) => ctx.levels.some((l) => (l as { id?: string }).id === id))) {
     lastInspectorSig = null; showInspector(ctx);
@@ -1453,8 +1598,11 @@ function carryDuplicatedMetadata(idMap: Record<string, string>): void {
     const notes = docMap[from];
     if (notes?.length) { docMap[to] = notes.map((n) => ({ ...n })); docs = true; }
   }
-  if (writing) { surface?.setWritingStatus(writingMap); void window.patter.saveWriting(currentSceneId, writingMap); }
-  if (docs) { pushDocNotes(); void window.patter.saveDocs(currentSceneId, docMap); }
+  // The copies' status and notes are part of the Duplicate: each write's step joins the journal entry
+  // below it, so one Cmd+Z takes the duplicate and what it carried (the paired gesture).
+  const join = (r: SaveResult): void => { if (r.step && !r.step.merged) journal.join(r.step.id); };
+  if (writing) { surface?.setWritingStatus(writingMap); void tracked(window.patter.saveWriting(currentSceneId, writingMap)).then(join); }
+  if (docs) { pushDocNotes(); void tracked(window.patter.saveDocs(currentSceneId, docMap)).then(join); }
 }
 
 /** Review > Line Status: set which writing-status rungs show a gutter pill (remembered in
@@ -1595,7 +1743,7 @@ function refreshStaleBadge(): void {
 function setRecordingStatus(id: string, status: string | null): void {
   if (!currentSceneId) return;
   if (status) recordingMap[id] = status; else delete recordingMap[id];
-  void window.patter.saveRecording(currentSceneId, recordingMap);
+  void tracked(window.patter.saveRecording(currentSceneId, recordingMap));
   const ctx = lastInspectorCtx;
   if (ctx && ctx.levels.some((l) => (l as { id?: string }).id === id)) { lastInspectorSig = null; showInspector(ctx); }
 }
@@ -1611,7 +1759,7 @@ function hasVoNote(id: string): boolean {
 function setNeedsRerecord(id: string, on: boolean): void {
   if (!currentSceneId) return;
   if (on) rerecordMap[id] = true; else delete rerecordMap[id];
-  void window.patter.saveRerecord(currentSceneId, rerecordMap);
+  void tracked(window.patter.saveRerecord(currentSceneId, rerecordMap));
   const ctx = lastInspectorCtx;
   if (ctx && ctx.levels.some((l) => (l as { id?: string }).id === id)) { lastInspectorSig = null; showInspector(ctx); }
   if (on && !hasVoNote(id)) openNoteEditor(id, document.body, "line", "vo"); // prompt for the "why", opened on the VO note
@@ -1707,7 +1855,7 @@ function openSuggestions(req: SuggestionOpenRequest): void {
  *  flushed first so main sees this one; an out-of-date part is refused there and said so here. */
 async function acceptOnFiles(id: string): Promise<void> {
   await flushReview();
-  const res = await window.patter.decideSuggestions([{ id, accept: true }]);
+  const res = await tracked(window.patter.decideSuggestions([{ id, accept: true }]));
   const outcome = res.results?.find((r) => r.id === id);
   if (!res.ok) toast(res.error ? `Couldn't accept: ${res.error}` : "Couldn't accept the suggestion", "error");
   else if (outcome && outcome.outcome !== "accepted") toast(outcome.reason ? `Not accepted: ${outcome.reason}` : "Not accepted", "error");
@@ -1916,6 +2064,9 @@ function reloadOpenScene(): Promise<void> {
     surface?.destroy();
     surface = null;
     currentSceneId = null;
+    // The scene's history went with the surface (the barrier): its journal entries go too.
+    if (surfaceSceneId) journal.dropScene(surfaceSceneId);
+    surfaceSceneId = null;
     await loadSceneNow(sceneId, caret ? { restoreCaret: caret } : undefined);
   });
 }
@@ -1958,6 +2109,9 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
   closeAnchoredPanel();
   surface?.destroy();
   surface = null;
+  // Switching discards the scene's history (ruling 6), and its journal entries with it.
+  if (surfaceSceneId) journal.dropScene(surfaceSceneId);
+  surfaceSceneId = null;
   editorEl.replaceChildren();
   lastInspectorSig = null; // force the first selection in the new scene to render (don't match the old scene's)
 
@@ -2012,9 +2166,14 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     // An edit the surface refused because it would lose structure (a condition, effects, a jump, a whole
     // choice): one finished sentence saying what and what to do instead (ruling D, October 2026 review).
     onRefuse: (message) => toast(message, "info"),
+    // Edit ▸ Undo is the journal's, never the editor's own keys; a new event in the history is a journal
+    // entry, and clears the project's redo as ProseMirror has cleared the scene's.
+    hostUndo: true,
+    onHistoryStep: () => { if (!mountingScene && journal.pushScene(sceneId)) void window.patter.projectClearRedo(); },
   });
   mountingScene = false; // any onChange from here on is a real edit
   currentSceneId = sceneId;
+  surfaceSceneId = sceneId;
   saver.cancel(); // mount fires onChange once (the initial mirror); not a user edit
   highlightNav(sceneId);
   paintHistory(); // the arrows follow every arrival, not just the ones they caused
@@ -2133,6 +2292,7 @@ async function showProject(open: OpenResult): Promise<void> {
   // as a tooltip, and the overview shows it in full (with a click-to-reveal).
   projectNameEl.dataset.tip = project.root;
   currentSceneId = null;
+  journal.clear(); // main's history starts again with the project, so the journal does too
   // Back and Forward are journeys inside ONE project: carried over, Back landed on this project's overview
   // or Properties page, places never visited in it.
   history.clear(); paintHistory();
@@ -2222,6 +2382,8 @@ let propsHandle: { value(): PropertyDecl[]; firstDuplicate(): HTMLInputElement |
 let propsSavedSig = "";
 /** Stages renamed on the Properties page and not yet saved, in order: the next save carries them. */
 let propsStageRenames: StageRenameDto[] = [];
+/** Counts visits to the Properties page: each visit's saves are one undo step. */
+let propsVisit = 0;
 
 async function refreshPatterProps(): Promise<void> {
   const s = await window.patter.readSettings();
@@ -2249,7 +2411,8 @@ async function savePropsDoc(): Promise<void> {
   // the writing-status ladder after every settled edit on this page cost a dictionary build each time.
   // A stage renamed in place is carried into every condition and set effect that names it, in the same save.
   const stageRenames = propsStageRenames;
-  if (!(await saveProjectSettings({ ...s, properties: next, ...(stageRenames.length ? { stageRenames } : {}) }, { propertiesOnly: true }))) return; // refused: try again next edit
+  // Keyed by the visit, so a run of edits on the page is one undo step (patterkit design/patterpad-undo.md).
+  if (!(await saveProjectSettings({ ...s, properties: next, ...(stageRenames.length ? { stageRenames } : {}) }, { propertiesOnly: true, undo: { label: "Properties", key: `properties:${propsVisit}` } }))) return; // refused: try again next edit
   propsStageRenames = propsStageRenames.slice(stageRenames.length); // any renamed while this one saved wait for the next
   propsSavedSig = sig;
   patterProps = next;
@@ -2275,19 +2438,17 @@ async function showPropertiesDoc(): Promise<void> {
   problembarEl.hidden = true; reviewbarEl.hidden = true;
   titleObserver?.disconnect(); titleObserver = null;
   sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = ""; // no scene is open
-  propsDocHostEl.replaceChildren();
-  propsStageRenames = [];
-  propsHandle = mountProperties(propsDocHostEl, patterProps, {
-    onStageRename: (decl, from, to) => { propsStageRenames.push({ scope: "patter", name: decl.name.trim(), from, to }); schedulePropsSave(); },
-    onStageReorder: (decl, note) => void fillStageNote(note, { scope: "patter", name: decl.name.trim() }),
-  });
-  propsSavedSig = JSON.stringify(patterProps);
+  propsVisit++;
+  mountPropsDoc();
   // The control has no change callback: it writes into its own state on every input, and its chips /
   // movers / delete are buttons. So listen for both and read the state back after it settles, which
   // is also why the save compares signatures - a click that changed nothing must not write a file.
   propsDocHostEl.addEventListener("input", schedulePropsSave);
   propsDocHostEl.addEventListener("change", schedulePropsSave);
   propsDocHostEl.addEventListener("click", schedulePropsSave);
+  // The scene behind the page is remounted on the way back, so its history goes: its journal entries
+  // with it, so Cmd+Z here never reaches past the page's own saves to a scene edit nobody can see.
+  if (surfaceSceneId) journal.dropScene(surfaceSceneId);
   highlightNav("");                       // no scene is current while the document is open
   paintHistory();
   navListEl.querySelector(".nav-doc")?.classList.add("active");
@@ -2296,6 +2457,17 @@ async function showPropertiesDoc(): Promise<void> {
   currentSceneId = null;
   void window.patter.rememberScene(project.root, PROPERTIES_PLACE);
   signalReady();
+}
+
+/** Draw the page's list from `patterProps`: on arrival, and after an undo or redo changed the declarations. */
+function mountPropsDoc(): void {
+  propsDocHostEl.replaceChildren();
+  propsStageRenames = [];
+  propsHandle = mountProperties(propsDocHostEl, patterProps, {
+    onStageRename: (decl, from, to) => { propsStageRenames.push({ scope: "patter", name: decl.name.trim(), from, to }); schedulePropsSave(); },
+    onStageReorder: (decl, note) => void fillStageNote(note, { scope: "patter", name: decl.name.trim() }),
+  });
+  propsSavedSig = JSON.stringify(patterProps);
 }
 
 /** Leaving the document: flush anything mid-debounce, since the next thing may reload the project. */
@@ -2392,7 +2564,8 @@ function showWelcome(state: Pick<BootState, "recents">): void {
   // One call, because all four editors ARE the one anchored panel: closing it
   // fires whichever onClose is registered, which clears that module's singleton.
   closeAnchoredPanel();
-  surface?.destroy(); surface = null; project = null; currentSceneId = null;
+  surface?.destroy(); surface = null; project = null; currentSceneId = null; surfaceSceneId = null;
+  journal.clear(); // the project's history went with it
   debugLink.setVisible(false); // no project -> hide the live-debug-link control
   titleObserver?.disconnect(); titleObserver = null; sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = ""; // no scene -> no suffix
   vcMap.clear(); vcsSceneEl.hidden = true; shell.centre.querySelector(":scope > .vc-lock")?.remove(); // no project -> no VC state
@@ -2670,8 +2843,8 @@ async function openPatterpack(): Promise<void> {
   if (r) await showProject(r);
 }
 
-/** The merge's confirmation, saying what the plan found. Patterpad cannot undo a merge (its undo is
- *  per-scene editor history, and this writes across the project), so it says so; the VCS is the net.
+/** The merge's confirmation, saying what the plan found. The merge is one step of the project history,
+ *  so it says it can be undone: Edit ▸ Undo puts every shard back.
  *
  *  A project-id mismatch takes the title. It nearly always means the wrong file was chosen at one of the
  *  two pickers, and the merge that follows would be a heap of conflicts that reads as though the other
@@ -2695,7 +2868,7 @@ function confirmPackMerge(summary: PackMergeSummary): Promise<boolean> {
     gameScopes?.error
       ? `They changed the World properties, but ${gameScopes.path} won't parse, so their change will not be written there: ${gameScopes.error}`
       : gameScopes ? `They changed the World properties, so ${gameScopes.path}, which the game's other tools share, will take their change too.` : "",
-    "You can't undo this.",
+    "You can undo this.",
   ].filter(Boolean);
   const evidence = el("div", "merge-evidence");
   evidence.append(...lines.map((t) => el("p", "confirm-body", t)));
@@ -3034,8 +3207,8 @@ async function saveSettingsFromDialog(): Promise<boolean> {
 
 /** Save the project's settings; false (after saying why) when the write was refused, so the Settings dialog
  *  can stay open with the author's edits in it. */
-async function saveProjectSettings(s: ProjectSettingsDto, opts: { propertiesOnly?: boolean } = {}): Promise<boolean> {
-  const res = await window.patter.saveSettings(s);
+async function saveProjectSettings(s: ProjectSettingsDto, opts: { propertiesOnly?: boolean; undo?: { label: string; key: string } } = {}): Promise<boolean> {
+  const res = await tracked(window.patter.saveSettings(s, opts.undo));
   if (!landed(res, "Couldn't save the project settings")) return false;
   if (res.project) {
     project = res.project; projectNameEl.textContent = project.name;
@@ -3121,20 +3294,25 @@ function openSceneProps(): HTMLElement | null {
       toast(dup ? DUP_MESSAGE : bad!.title || "That property name can't be used in an expression.", "error");
       return;
     }
-    apply();
+    void apply();
     frame.close();
   });
   frame.actions.append(cancel, saveBtn);
   frame.open();
   return host;
 
-  function apply(): void {
+  async function apply(): Promise<void> {
     if (!surface) return;
     const next = handle.value();
+    // With a stage rename, the scene is saved BEFORE the declarations change: main takes the flow on disk
+    // as what one undo of the rename goes back to, declarations and conditions together (the paired
+    // gesture), since the reload after the rename drops the declaration edit from the scene's history.
+    if (stageRenames.length) await save();
+    if (!surface) return;
     surface.setSceneProps(next); // dispatches a doc edit -> the surface's onChange marks dirty + revalidates
     // A stage renamed in place: the scene saves (its declarations with it), then every condition and set
     // effect in it naming the old stage follows, and it reloads.
-    if (stageRenames.length) void window.patter.renameStages(stageRenames).then((r) => {
+    if (stageRenames.length) void tracked(window.patter.renameStages(stageRenames)).then((r) => {
       if (landed(r, "Couldn't carry the stage rename") && r.expressions > 0) {
         toast(`Renamed in ${plural(r.expressions, "condition or effect", "conditions or effects")}.`);
       }
@@ -3466,6 +3644,9 @@ window.patter.onEditorFlush(() => void (async () => { await save(); window.patte
 window.patter.onFlushBeforeClose(leaveProject);
 // A flow running in main (between its file pickers) asks its questions in our chrome, not a system box.
 window.patter.onPrompt(promptDialog);
+// Every step main records in the project history, from this window or another (Replace, a suggestion
+// decision in the search window), goes on the journal.
+window.patter.onProjectStep((step) => noteStep(step));
 window.patter.onReplaceApplied((announce) => void (async () => {
   await reloadOpenScene(); // re-read the open scene with the replaced text (loadScene skips the open one)
   await refreshProblems();

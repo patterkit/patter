@@ -12,7 +12,7 @@ import { EditorState, TextSelection, Selection, NodeSelection, type Transaction,
 import { EditorView } from "prosemirror-view";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
-import { history, undo, redo } from "prosemirror-history";
+import { history, undo, redo, undoDepth, redoDepth, isHistoryTransaction, closeHistory } from "prosemirror-history";
 import type { Node as PMNode, MarkType } from "prosemirror-model";
 import type { PropertyDecl } from "@patterkit/model";
 import { openScene, saveScene } from "../src/load.js";
@@ -137,6 +137,14 @@ export interface MountOptions {
    *  or remove a whole group (review 2026-10, ruling D); a keyboard delete of a scene's only block. The
    *  edit itself has already been declined. Omit and refusals are silent (nothing is lost either way). */
   onRefuse?: (message: string) => void;
+  /** Called, synchronously, when a transaction adds a NEW event to the scene's undo history: not when it
+   *  joins the event before it (typing inside the group delay), and never for an undo or redo. A host that
+   *  keeps its own journal across histories appends a scene entry here (patterkit design/patterpad-undo.md,
+   *  "The journal"). Also called when the history is full and the new event pushes the oldest ones out. */
+  onHistoryStep?: () => void;
+  /** The host routes Undo and Redo itself (its Edit menu), so the editor binds no keys for them: a key
+   *  the editor handled first would undo the scene behind the host's back. Default false. */
+  hostUndo?: boolean;
 }
 
 export interface SurfaceHandle {
@@ -285,9 +293,16 @@ export interface SurfaceHandle {
   /** The DOM element of a node by id, to anchor a host popover (used by the Review Feedback walk to open
    *  a thread / proposal at its beat). Null if the node isn't in this scene / not rendered. */
   anchorFor(nodeId: string): HTMLElement | null;
-  /** ProseMirror history undo / redo - so the host's Edit menu drives the real editor history. */
-  undo(): void;
-  redo(): void;
+  /** ProseMirror history undo / redo - so the host's Edit menu drives the real editor history. True when
+   *  there was something to undo (or redo) and the editor took it. */
+  undo(): boolean;
+  redo(): boolean;
+  /** How many events the scene's history can undo, and redo. */
+  undoDepth(): number;
+  redoDepth(): number;
+  /** End the history's current event, so the next edit starts a new one rather than joining it: for a
+   *  host whose own step (a project write) has just landed between two edits. */
+  closeHistory(): void;
   /** Edit > Select All, scoped to the field the caret is in (src/selectall.ts): the spoken text of a
    *  dialogue line, a text line's words, a direction, a choice prompt. False when the editor has no
    *  such field to select (no caret in a beat), so the host can fall back to its own select-all. */
@@ -670,7 +685,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         // First, so nothing else sees a transaction it is going to refuse (ruling D).
         structureGuard(say),
         history(),
-        keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo }),
+        ...(opts.hostUndo ? [] : [keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo })]),
         // An explicitly selected chunk (snippet / group NodeSelection) deletes via the themed confirm,
         // ahead of the normal backspace / range-delete (which still run for any other selection).
         keymap({ Backspace: deleteSelectedChunk, Delete: deleteSelectedChunk }),
@@ -805,6 +820,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       const fromStrayClick = lastInputWasPointer && !lastPointerOnCue;
       // A refused transaction (the structure guard's filter) leaves nothing to do: no change to
       // announce, no popup to move.
+      const depthBefore = undoDepth(view.state);
       const { state: applied, transactions } = view.state.applyTransaction(tr);
       if (!transactions.length) return;
       const next = fromStrayClick ? applied : normalizeCueSelection(applied);
@@ -815,6 +831,9 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       // prevent a later re-resolve).
       liveDoc = next.doc;
       view.updateState(next);
+      // A new event in the history moves its depth: up, or (when the history is full and drops its oldest
+      // events) down. An undo or redo moves it too, and is not a new event.
+      if (opts.onHistoryStep && !isHistoryTransaction(tr) && undoDepth(next) !== depthBefore) opts.onHistoryStep();
       const ctx = context(next);
       if (tr.docChanged) { scheduleChange(); syncTitle(); }
       if (tr.selectionSet) scenePinned = false; // a real selection move (beat / block / group) un-pins the scene
@@ -1281,8 +1300,12 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       return out;
     },
     anchorFor: (nodeId: string) => { const b = findByModelId(view.state.doc, nodeId); if (!b) return null; const dom = view.nodeDOM(b.pos); return dom instanceof HTMLElement ? dom : null; },
-    undo: () => { undo(view.state, view.dispatch); view.focus(); },
-    redo: () => { redo(view.state, view.dispatch); view.focus(); },
+    undo: () => { const done = undo(view.state, view.dispatch); view.focus(); return done; },
+    redo: () => { const done = redo(view.state, view.dispatch); view.focus(); return done; },
+    undoDepth: () => undoDepth(view.state),
+    redoDepth: () => redoDepth(view.state),
+    // Applied directly, not dispatched: a metadata-only transaction with nothing for the popups to answer.
+    closeHistory: () => { view.updateState(view.state.apply(closeHistory(view.state.tr))); },
     // The LIVE name. This used to return the name the scene was opened with, so after a rename it went on
     // answering the old one: the Scenes list's sync (#73) copied it back, the topbar suffix showed it, and
     // blanking the title restored it. A rename writes the doc's raw attr (setSceneName), so read that.

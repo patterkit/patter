@@ -35,16 +35,18 @@ export function selectAllOutsideEditor(active: Element | null, editorDom: Elemen
 }
 
 /** Where Edit ▸ Undo and Redo go in the main window (patterkit design/patterpad-undo.md, "Where Cmd+Z goes"):
- *  - `"field"`: the focused field's own text undo. A field outside the script and the inspector holds text the
- *    scene's history never saw (Project Settings before its Save, the Find field, a dialog, the Properties page),
+ *  - `"field"`: the focused field's own text undo. A field outside the script and the inspector holds text no
+ *    history saw yet (Project Settings before its Save, the Find field, a dialog, a Properties page field),
  *    and any open dialog owns the keyboard whatever has the focus.
- *  - `"scene"`: the open scene's history. The script, its title and the inspector edit the scene, so their
- *    edits are the history's to undo.
- *  - `"show-scene"`: the scene is open but out of sight (the overview keeps it mounted): show it, then undo,
- *    so an undo is always something you can see.
- *  - `"none"`: no scene to undo (the Properties page, the welcome screen). The scene behind the Properties page
- *    is remounted on return, so an undo there would change a scene nobody can see and save nothing. */
-export type UndoRoute = "field" | "scene" | "show-scene" | "none";
+ *  - `"journal"`: the newest entry of the journal (undo-journal.ts), whichever history it lives in: the open
+ *    scene's, or the project's. The script, its title and the inspector edit the scene, so their edits are
+ *    the journal's. From the overview a scene entry shows its scene first, so an undo is always something
+ *    you can see.
+ *  - `"project"`: only a project step. The Properties page saves as a project step, so with no field in
+ *    focus Cmd+Z there takes back the page's newest save; the scene behind the page is remounted on return,
+ *    so its edits are not there to undo.
+ *  - `"none"`: no project, nothing to undo. */
+export type UndoRoute = "field" | "journal" | "project" | "none";
 
 export interface UndoPlace {
   /** The focused element (`document.activeElement`). */
@@ -53,15 +55,16 @@ export interface UndoPlace {
   sceneAreas: ReadonlyArray<Element | null>;
   /** A modal dialog is open. */
   dialogOpen: boolean;
-  /** Which scene state the window is in: showing, open but hidden behind the overview, or none. */
-  scene: "showing" | "hidden" | "none";
+  /** What the window shows: the open scene, the overview (the scene stays mounted behind it), the
+   *  Properties page, or nothing (no project). */
+  view: "scene" | "overview" | "properties" | "none";
 }
 
 export function undoRoute(p: UndoPlace): UndoRoute {
   if (p.dialogOpen) return "field";
   const inScene = !!p.active && p.sceneAreas.some((area) => !!area && area.contains(p.active));
   if (!inScene && p.active && isEditableTarget(p.active)) return "field";
-  if (p.scene === "showing") return "scene";
-  if (p.scene === "hidden") return "show-scene";
+  if (p.view === "scene" || p.view === "overview") return "journal";
+  if (p.view === "properties") return "project";
   return "none";
 }

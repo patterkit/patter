@@ -239,9 +239,9 @@ const applyReplace = async (onlyId?: string): Promise<void> => {
     const scenes = new Set(replaceHits.map((h) => h.sceneId)).size;
     const ok = await confirmDialog({
       title: `Replace ${plural(n, "occurrence")} across ${plural(scenes, "scene")}?`,
-      // House style rule 30: a confirmation ends with what undo does. Here, nothing: main rewrites the
-      // shards and the open scene is remounted from disk, so its editor history starts again.
-      body: `Replace “${input.value}” with “${replaceInput.value}”. You can't undo this.`,
+      // House style rule 30: a confirmation ends with what undo does. Replace is one step of the project
+      // history, so Edit ▸ Undo in the editor puts every shard back.
+      body: `Replace “${input.value}” with “${replaceInput.value}”. You can undo this.`,
       confirmLabel: "Replace",
     });
     if (!ok) return;
@@ -335,7 +335,7 @@ const acceptAllClean = async (): Promise<void> => {
   const ok = await confirmDialog({
     title: `Accept ${plural(clean.length, "suggestion")}?`,
     // A sentence, the action on the button, and what undo does (house style rules 29 and 30).
-    body: `This accepts every suggestion shown that still applies cleanly.${stale ? ` ${plural(stale, "out-of-date one")} ${stale === 1 ? "stays" : "stay"} open for review.` : ""} You can't undo this.`,
+    body: `This accepts every suggestion shown that still applies cleanly.${stale ? ` ${plural(stale, "out-of-date one")} ${stale === 1 ? "stays" : "stay"} open for review.` : ""} You can undo this.`,
     confirmLabel: "Accept suggestions",
   });
   if (!ok) return;

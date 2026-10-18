@@ -4,7 +4,7 @@
 // Perforce/Plastic; a plain write for git/none), falling back to a direct write if the VC layer throws.
 
 import { readFile } from "node:fs/promises";
-import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
 import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, renameStage, renameGameDataStage, stageDialect, stageGateCount, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
@@ -22,7 +22,7 @@ import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQu
 import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
-import type { ReviewItem } from "../shared/api.js";
+import type { ReviewItem, ProjectStep, ProjectHistoryOutcome } from "../shared/api.js";
 import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync, prepareToWriteFilesAsync,
   setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
 import { fileSafeName } from "../shared/file-name.js";
@@ -37,6 +37,8 @@ import { editorScopes } from "../shared/host-scopes.js";
 import type { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { startAudioIndex, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
 import { keepUnresolvedMark } from "./unresolved-mark.js";
+import { History, captureBefore, UNDO_LIMIT, type FileState, type Applied, type FileRestorer } from "@wildwinter/app-shell/history";
+import { patterxRestorer, conversationChanged } from "./patterx-restore.js";
 
 interface SceneShards {
   flowPath: string;
@@ -163,9 +165,11 @@ function syncAuthoringAt(path: string, af: AuthoringFile): void {
   else { loaded.authoringFiles.push(path); loaded.authoring.push(af); }
 }
 
-/** Land an authoring-shard write and, on success, keep the in-memory model current (see syncAuthoringModel). */
-async function commitAuthoring(s: SceneShards, write: { path: string; content: string; af: AuthoringFile }): Promise<SaveResult> {
-  const res = await commitWrites([write]);
+/** Land an authoring-shard write and, on success, keep the in-memory model current (see syncAuthoringModel).
+ *  With a `label`, the write is a step of the project history (status, notes, re-record: ruling 3 of
+ *  patterkit design/patterpad-undo.md); without, it is not (comments and suggestions, a conversation). */
+async function commitAuthoring(s: SceneShards, write: { path: string; content: string; af: AuthoringFile }, label?: string): Promise<SaveResult & { step?: ProjectStep }> {
+  const res = label ? await projectCommit(label, freshKey("authoring"), [write]) : await commitWrites([write]);
   if (res.ok) syncAuthoringModel(s, write.af);
   return res;
 }
@@ -357,6 +361,296 @@ async function commitWrites(writes: { path: string; content: string }[], opts: {
   }
 }
 
+// --- the project history (patterkit design/patterpad-undo.md, half B) ----------------------------------
+// Every write Patterpad makes outside the open scene's own save goes through `projectCommit`, which
+// records the files' bytes before and after on the shell's file-byte history: undo writes the befores
+// back, redo the afters, through the same ordered queue and `commitWrites` as any write (so Auto Rebuild
+// still hears about them). A file that has changed since its step refuses the undo and drops the steps
+// below (the shell does that); a file somebody else holds refuses it and keeps the step.
+//
+// The renderer keeps the order between this history and the open scene's (the journal), so each new step
+// is announced with an id. The shell's history has no ids, so `undoMarks` / `redoMarks` shadow its two
+// stacks: one mark per step, moved exactly as the history moves its entries.
+
+/** A file's state for the history: content, or null for absent. `local` is bookkeeping restored with
+ *  plain writes (a merge's `.patterconflict` sidecar). */
+type StepWrite = FileState;
+
+/** A step's mark: its id, key and label, and the `.patterx` files whose conversation (comments,
+ *  suggestions) the step itself changed: only those have their conversation compared and restored when
+ *  this step is undone or redone (patterx-restore.ts). Decided per step, so a suggestion accepted long ago
+ *  doesn't make a later status step's undo trip over a comment posted since. */
+interface StepMark { id: number; key: string; label: string; conversation: Set<string> }
+let undoMarks: StepMark[] = [];
+let redoMarks: StepMark[] = [];
+let nextStepId = 1;
+/** The conversation paths of the step being undone or redone, for the restorer. */
+let applyingConversation: ReadonlySet<string> = new Set();
+/** Set when an undo or redo failed part way and what landed couldn't be put back. */
+let historyPartial = false;
+/** The paths the history last wrote, for working out what an undo or redo touched. */
+let lastHistoryWrite: string[] = [];
+
+const projectHistory = new History({
+  write: async (states) => {
+    lastHistoryWrite = states.map((s) => s.path);
+    const applied = await writeStates(states);
+    if (!applied.ok && applied.wrote) historyPartial = true;
+    return applied;
+  },
+  restorer: (path) => (path.endsWith(".patterx") ? patterxRestorer(applyingConversation.has(path))
+    : path.endsWith(".patterflow") || path.endsWith(".patterloc") ? scriptRestorer : undefined),
+  read: captureBefore,
+});
+
+let stepListener: (step: ProjectStep) => void = () => {};
+/** Hear about every step recorded (the IPC layer tells the editor's journal). */
+export function onProjectStep(cb: (step: ProjectStep) => void): void { stepListener = cb; }
+
+function resetProjectHistory(): void {
+  projectHistory.reset();
+  undoMarks = []; redoMarks = [];
+}
+
+/** A flow or strings shard: the scene's autosave writes the same content in its own layout, so the drift
+ *  check compares what the shard says, not how it is laid out. An undo writes the step's own bytes. */
+const scriptRestorer: FileRestorer = {
+  same(expected, current) {
+    if (expected === current) return true;
+    if (expected === null || current === null) return false;
+    try { return canonicalStringify(parseSource(expected)) === canonicalStringify(parseSource(current)); } catch { return false; }
+  },
+  restore: (target) => target,
+};
+
+/** A fresh undo key: a step of its own, never merged with the one before. */
+let freshKeyCount = 0;
+export const freshKey = (family = "step"): string => `${family}:${++freshKeyCount}`;
+
+/**
+ * Write a set of states, all or nothing, inside the write queue: the project history's writer, and
+ * `projectCommit`'s. Version control is asked about EVERY path first, deletes included, so a file somebody
+ * else holds refuses the whole set before anything moves. Then the deletes (the flow shard last: it is
+ * what makes a scene exist), then the contents through `commitWrites`, then the bookkeeping with plain
+ * writes. Should anything still fail part way, what landed is put back, so a refusal leaves the files as
+ * they were and the step can be tried again.
+ */
+async function writeStates(all: StepWrite[], opts: { writeLocalThroughVc?: boolean } = {}): Promise<Applied> {
+  const viaVc = opts.writeLocalThroughVc ? all : all.filter((s) => s.local !== true);
+  const writes = viaVc.filter((s) => s.content !== null).map((s) => ({ path: s.path, content: s.content! }));
+  const deletes = viaVc.filter((s) => s.content === null && existsSync(s.path)).map((s) => s.path)
+    .sort((x, y) => Number(x.endsWith(".patterflow")) - Number(y.endsWith(".patterflow")));
+  const paths = [...writes.map((w) => w.path), ...deletes];
+  if (paths.length > 0) {
+    let prep: Awaited<ReturnType<typeof prepareToWriteFilesAsync>> | null = null;
+    try { prep = await prepareToWriteFilesAsync(paths); } catch { prep = null; } // no VC tooling: nothing to ask
+    if (prep && !prep.success) {
+      const refused = prep.results.filter((r) => !r.success && (r.status === "locked" || r.status === "outOfDate"));
+      const why = (refused.length ? refused : prep.results.filter((r) => !r.success)).map((r) => r.message || `${basename(r.filePath)} (${r.status})`);
+      return { ok: false, error: `Nothing was written. ${why.join("; ")}`, wrote: false };
+    }
+  }
+  const prior = new Map(captureBefore(deletes).map((s) => [s.path, s.content]));
+  const deleted: string[] = [];
+  let failure: string | null = null;
+  for (const path of deletes) {
+    authoringCache.delete(path);
+    try {
+      const gone = await deleteFileAsync(path);
+      if (gone.success) deleted.push(path); else failure = `Couldn't delete ${basename(path)}: ${gone.message || gone.status}`;
+    } catch (e) {
+      failure = `Couldn't delete ${basename(path)}: ${e instanceof Error ? e.message : String(e)}`;
+    }
+    if (failure) break;
+  }
+  if (deleted.length) { vcShardsMemo = null; maybeScheduleAutoRebuild(deleted.map((path) => ({ path, content: "" }))); }
+  if (!failure && writes.length > 0) {
+    const res = await commitWrites(writes, { allOrNothing: true });
+    if (!res.ok) failure = res.error ?? "write failed";
+  }
+  if (failure) {
+    if (deleted.length === 0) return { ok: false, error: failure, wrote: false };
+    // Put back what went, so the files are as they were.
+    const back = await commitWrites(deleted.map((path) => ({ path, content: prior.get(path)! })), { allOrNothing: true });
+    if (back.ok) return { ok: false, error: failure, wrote: false };
+    return { ok: false, error: `${failure}, and what had gone couldn't be put back (${back.error ?? "write failed"})`, wrote: true };
+  }
+  for (const s of all) {
+    if (s.local !== true || opts.writeLocalThroughVc) continue;
+    if (s.content === null) rmSync(s.path, { force: true });
+    else { mkdirSync(dirname(s.path), { recursive: true }); writeFileSync(s.path, s.content, "utf8"); }
+  }
+  return { ok: true };
+}
+
+/** The scenes a set of paths belongs to: by their script (flow, or strings in any language) and by their
+ *  authoring shard. Read from the shard map as it stands, so call it before and after a write that adds
+ *  or removes a scene. */
+function scenesOfPaths(paths: string[]): { scenes: Set<string>; authoring: Set<string> } {
+  const scenes = new Set<string>(), authoring = new Set<string>();
+  if (!loaded) return { scenes, authoring };
+  const want = new Set(paths.map((p) => resolve(p)));
+  for (const [id, s] of shards) {
+    if ((s.flowPath && want.has(resolve(s.flowPath))) || (s.locPath && want.has(resolve(s.locPath)))) scenes.add(id);
+    if (want.has(resolve(s.authoringPath))) authoring.add(id);
+  }
+  loaded.localeFiles.forEach((f, i) => { const sc = loaded!.locales[i]?.scene; if (sc && want.has(resolve(f)) && shards.has(sc)) scenes.add(sc); });
+  return { scenes, authoring };
+}
+
+/**
+ * Commit a set of writes as ONE step of the project history: read each path's bytes, drop the writes that
+ * change nothing, write the rest all or nothing (inside the write queue: the caller is), and record the
+ * step. A write whose before is known better than the disk (`before`: the open scene's flow as it was
+ * before the edit the step finishes) takes that before. `local` paths are written through version control
+ * like the rest but recorded as bookkeeping, restored with plain writes and never counted as drift.
+ *
+ * Says whether a NEW step was recorded or the write merged into the previous one (the same key).
+ */
+async function projectCommit(
+  label: string, key: string, given: StepWrite[],
+  opts: { before?: Map<string, string | null>; local?: ReadonlySet<string> } = {},
+): Promise<SaveResult & { step?: ProjectStep }> {
+  // One state per path, the last one given winning (a batch can name a shard twice).
+  const byPath = new Map<string, StepWrite>();
+  for (const w of given) byPath.set(w.path, { path: w.path, content: w.content });
+  const writes = [...byPath.values()];
+  const current = captureBefore(writes.map((w) => w.path));
+  const beforeOf = (w: StepWrite, i: number): string | null => (opts.before?.has(w.path) ? opts.before.get(w.path)! : current[i]!.content);
+  const changing = writes.filter((w, i) => w.content !== current[i]!.content || beforeOf(w, i) !== w.content);
+  if (changing.length === 0) return { ok: true };
+  const before: FileState[] = [];
+  writes.forEach((w, i) => { if (changing.includes(w)) before.push({ path: w.path, content: beforeOf(w, i) }); });
+  const local = opts.local;
+  const mark = (s: FileState): FileState => (local?.has(s.path) ? { ...s, local: true } : s);
+  const toWrite = changing.filter((w) => w.content !== current[writes.indexOf(w)]!.content);
+  const touchedBefore = scenesOfPaths(changing.map((w) => w.path));
+  const applied = await writeStates(toWrite, { writeLocalThroughVc: true });
+  let recordBefore = before, recordAfter = changing;
+  if (!applied.ok) {
+    if (!applied.wrote) return { ok: false, error: applied.error };
+    // Part of it landed before something was refused: what did change is a change all the same, and the
+    // step is how the author takes it back. Only the paths that really moved go in it.
+    const now = captureBefore(changing.map((w) => w.path));
+    const moved = new Set(now.filter((s, i) => s.content !== before[i]!.content).map((s) => s.path));
+    recordBefore = before.filter((s) => moved.has(s.path));
+    recordAfter = now.filter((s) => moved.has(s.path));
+    if (recordAfter.length === 0) return { ok: false, error: applied.error };
+  }
+  const step = recordStep(label, key, recordBefore.map(mark), recordAfter.map(mark), touchedBefore);
+  return applied.ok ? { ok: true, step } : { ok: false, error: applied.error, step };
+}
+
+/** Record a step on the history and its mark, and announce it. */
+function recordStep(label: string, key: string, before: FileState[], after: FileState[], touchedBefore: { scenes: Set<string>; authoring: Set<string> }): ProjectStep {
+  const conversation = new Set<string>();
+  for (const a of after) {
+    if (!a.path.endsWith(".patterx")) continue;
+    const b = before.find((s) => s.path === a.path);
+    if (conversationChanged(b?.content ?? null, a.content)) conversation.add(a.path);
+  }
+  const top = undoMarks[undoMarks.length - 1];
+  const merged = !!top && top.key === key;
+  projectHistory.record(label, key, before, after);
+  let id: number;
+  if (merged) { id = top!.id; for (const p of conversation) top!.conversation.add(p); }
+  else {
+    id = nextStepId++;
+    undoMarks.push({ id, key, label, conversation });
+    if (undoMarks.length > UNDO_LIMIT) undoMarks.shift();
+  }
+  redoMarks = [];
+  const touched = scenesOfPaths(after.map((s) => s.path));
+  const step: ProjectStep = {
+    id, label: merged ? top!.label : label, merged,
+    scenes: [...new Set([...touchedBefore.scenes, ...touched.scenes])],
+    authoring: [...new Set([...touchedBefore.authoring, ...touched.authoring])],
+  };
+  stepListener(step);
+  return step;
+}
+
+/** Undo (or redo) the newest project step. `id`, when given, must be that step's: the editor's journal
+ *  names the step it means, and a mismatch is refused rather than undoing a different one. */
+export async function stepProjectHistory(way: "undo" | "redo", id?: number): Promise<ProjectHistoryOutcome> {
+  const r = await enqueueForProject(async (): Promise<ProjectHistoryOutcome & SaveResult> => {
+    const none: ProjectHistoryOutcome = { ok: false, label: "", scenes: [], authoring: [] };
+    if (!loaded) return { ...none, error: "no project open" };
+    const marks = way === "undo" ? undoMarks : redoMarks;
+    const top = marks[marks.length - 1];
+    // Nothing there is the journal out of step too: it holds a step this history no longer has.
+    if (!top) return { ...none, stale: true, error: `Nothing to ${way}.` };
+    // Out of step: say which step is on top, so the journal can catch up (a step still on its way to it).
+    if (id !== undefined && top.id !== id) return { ...none, stale: true, label: top.label, top: { id: top.id, label: top.label }, error: `Nothing to ${way}.` };
+    ensureHydrated();
+    lastHistoryWrite = [];
+    historyPartial = false;
+    applyingConversation = top.conversation;
+    const outcome = way === "undo" ? await projectHistory.applyUndo() : await projectHistory.applyRedo();
+    applyingConversation = new Set();
+    if (!outcome) return { ...none, error: `Nothing to ${way}.` };
+    if (!outcome.ok) {
+      if (outcome.drift) { if (way === "undo") undoMarks = []; else redoMarks = []; }
+      if (historyPartial) {
+        // Part of it landed and couldn't be put back: the step no longer matches the files, so it can't be
+        // tried again. Say so, and read back what the files now say.
+        if (way === "undo") undoMarks = []; else redoMarks = [];
+        reloadAfterHistory();
+        return { ...none, label: outcome.label, error: outcome.error, id: top.id, drift: true };
+      }
+      return { ...none, label: outcome.label, error: outcome.error, id: top.id, ...(outcome.drift ? { drift: true } : {}) };
+    }
+    marks.pop();
+    (way === "undo" ? redoMarks : undoMarks).push(top);
+    const before = scenesOfPaths(lastHistoryWrite);
+    reloadAfterHistory();
+    const after = scenesOfPaths(lastHistoryWrite);
+    return {
+      ok: true, label: outcome.label, id: top.id, project: summarise(loaded!),
+      scenes: [...new Set([...before.scenes, ...after.scenes])],
+      authoring: [...new Set([...before.authoring, ...after.authoring])],
+    };
+  });
+  return { ...r, label: r.label ?? "", scenes: r.scenes ?? [], authoring: r.authoring ?? [] }; // a refusal for a changed project carries none
+}
+
+/** A new edit in the open scene clears the project's redo too: the editor's journal has one redo, and the
+ *  scene's history has just cleared its own (patterkit design/patterpad-undo.md, "The journal"). The
+ *  shell's history has no call for it, so its redo stack is emptied directly; `projectHistoryInternals`
+ *  and the tests hold that to account should the shell's field ever change. */
+export function clearProjectRedo(): void {
+  redoMarks = [];
+  const redo = (projectHistory as unknown as { redoStack?: unknown }).redoStack;
+  if (Array.isArray(redo)) redo.length = 0;
+}
+
+/** The shell history's own view, for tests: it must agree with the marks. */
+export function projectHistoryInternals(): { canUndo: boolean; canRedo: boolean; undoLabel?: string; redoLabel?: string } {
+  return {
+    canUndo: projectHistory.canUndo, canRedo: projectHistory.canRedo,
+    ...(projectHistory.undoLabel !== undefined ? { undoLabel: projectHistory.undoLabel } : {}),
+    ...(projectHistory.redoLabel !== undefined ? { redoLabel: projectHistory.redoLabel } : {}),
+  };
+}
+
+/** The labels of the next project undo and redo, for tests and the menu. */
+export function projectHistoryState(): { undo?: { id: number; label: string }; redo?: { id: number; label: string } } {
+  const u = undoMarks[undoMarks.length - 1], r = redoMarks[redoMarks.length - 1];
+  return { ...(u ? { undo: { id: u.id, label: u.label } } : {}), ...(r ? { redo: { id: r.id, label: r.label } } : {}) };
+}
+
+/** After an undo or redo, read the project back from disk: a step can touch anything, the project file
+ *  and the game's shared scopes included. */
+function reloadAfterHistory(): void {
+  if (!loaded) return;
+  const prevVcs = loaded.project.vcs;
+  try { reloadFromDisk(); }
+  catch (e) { console.warn("patterpad: an undo landed, but reading the project back failed (reopen to see it):", e); return; }
+  refreshGameScopes();
+  if (loaded.project.vcs !== prevVcs) pinVcProvider(loaded.project.vcs);
+  syncAudioIndex();
+}
+
 // --- Audio Folders index (#206) ----------------------------------------------------------------------
 // When the project opts into Audio Folders, a self-contained indexer watches each rung's folder and
 // derives every dialogue line's recording status from the files on disk. The latest snapshot is cached
@@ -504,6 +798,7 @@ function resetProjectState(): void {
   importPlans.clear();         // nor an editable-script import planned against it
   if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; } // a pending rebuild was for it
   lastBuiltHash = undefined;   // the Auto-Rebuild dedup must not carry across projects
+  resetProjectHistory();       // an undo is of the project it was made in
 }
 
 /** The summary `openProject` last handed out: the shell keeps it as the session object, and hands it
@@ -679,19 +974,21 @@ export async function planPackMerge(returnedPath: string, basePath: string): Pro
  * The sidecars go through the same VC path as the shards, deliberately: a `.patterconflict` is a real file
  * the author will want to commit or ignore on purpose, not scratch output.
  */
-export function commitPackMerge(plan: PackMergePlan): Promise<SaveResult & { project?: OpenedProject }> {
+export function commitPackMerge(plan: PackMergePlan): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     // Sidecars first: a merged shard whose sidecar never landed is a conflict resolved to ours without a word.
     const all = [...plan.sidecars, ...plan.writes];
     if (all.length === 0) return { ok: true, project: summarise(loaded) }; // nothing came back that we do not already have
-    const res = await commitWrites(all);
+    // One step. The sidecars are written through version control like the shards, but the history keeps
+    // them as bookkeeping: an undo takes them away with plain deletes, and one edited since is no drift.
+    const res = await projectCommit("Merge Patterpack", freshKey("merge"), all, { local: new Set(plan.sidecars.map((w) => w.path)) });
     if (!res.ok) return res;
     // Re-read from disk, since the merge may have touched anything, but as a RELOAD of the project that is
     // open, not a fresh open: `openProject` made a new session object, so the shell no longer knew this
     // project (Close Project then left it loaded) and the play session and version-control state reset.
     reloadFromDisk();
-    return { ok: true, project: summarise(loaded) };
+    return { ok: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
   });
 }
 
@@ -806,14 +1103,14 @@ export function replacePreview(opts: ReplaceOptions): { hits: ReplaceHit[]; scen
 
 /** Replace APPLY: commit the rewritten shards through the VC layer, then swap them into the in-memory model
  *  (so the open scene reloads with the new text). The open scene is flushed to disk by the caller first. */
-export function applyReplace(opts: ReplaceOptions): Promise<SaveResult & { count: number; scenes: number }> {
+export function applyReplace(opts: ReplaceOptions): Promise<SaveResult & { step?: ProjectStep; count: number; scenes: number }> {
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open", count: 0, scenes: 0 };
     if (!opts.query.trim()) return { ok: true, count: 0, scenes: 0 };
     ensureHydrated();
     const plan = runReplace(loaded, opts);
     if (plan.writes.length === 0) return { ok: true, count: 0, scenes: 0 };
-    const res = await commitWrites(plan.writes);
+    const res = await projectCommit("Replace", freshKey("replace"), plan.writes);
     if (!res.ok) return { ...res, count: 0, scenes: 0 };
     // Swap the rewritten shards into the working copy (element-swap busts the search index cache + makes the
     // open scene's reload read the new strings).
@@ -829,7 +1126,7 @@ export function applyReplace(opts: ReplaceOptions): Promise<SaveResult & { count
       if (i >= 0) loaded.authoring[i] = a.file;
       else { loaded.authoringFiles.push(a.path); loaded.authoring.push(a.file); }
     }
-    return { ok: true, count: plan.hits.length, scenes: plan.scenes };
+    return { ok: true, count: plan.hits.length, scenes: plan.scenes, ...(res.step ? { step: res.step } : {}) };
   });
 }
 
@@ -977,11 +1274,11 @@ function readAuthoringField<T>(sceneId: string, pick: (af: AuthoringFile) => T |
 /** Write one block back to a scene's authoring shard, MERGING over the rest of the file (the other blocks
  *  are untouched). `mutate` sets the already-pruned value onto the AuthoringFile. Serialised + keeps the
  *  in-memory model current via commitAuthoring. */
-function saveAuthoringField(sceneId: string, mutate: (af: AuthoringFile) => void): Promise<SaveResult> {
+function saveAuthoringField(sceneId: string, mutate: (af: AuthoringFile) => void, label?: string): Promise<SaveResult & { step?: ProjectStep }> {
   return enqueueForProject(async () => {
     const s = shards.get(sceneId);
     if (!s) return { ok: false, error: `unknown scene: ${sceneId}` };
-    return commitAuthoring(s, authoringWrite(s, mutate));
+    return commitAuthoring(s, authoringWrite(s, mutate), label);
   });
 }
 
@@ -992,13 +1289,13 @@ export function readSceneDocs(sceneId: string): Record<string, DocLine[]> {
 
 /** Persist a scene's documentation map, MERGING over the rest of the shard. Blank lines / empty nodes are
  *  pruned so the file stays clean. */
-export function saveSceneDocs(sceneId: string, map: Record<string, DocLine[]>): Promise<SaveResult> {
+export function saveSceneDocs(sceneId: string, map: Record<string, DocLine[]>): Promise<SaveResult & { step?: ProjectStep }> {
   const cleaned: Record<string, DocLine[]> = {};
   for (const [id, lines] of Object.entries(map)) {
     const keep = lines.map((l) => ({ ...l, text: l.text.trim() })).filter((l) => l.text);
     if (keep.length) cleaned[id] = keep;
   }
-  return saveAuthoringField(sceneId, (af) => { af.documentation = Object.keys(cleaned).length ? cleaned : undefined; });
+  return saveAuthoringField(sceneId, (af) => { af.documentation = Object.keys(cleaned).length ? cleaned : undefined; }, "Notes");
 }
 
 /** Read a scene's threaded editor comments (#148): every thread anchored to a node in this scene. */
@@ -1027,10 +1324,10 @@ export function readSceneWriting(sceneId: string): Record<string, string> {
 }
 
 /** Persist a scene's per-beat writing status, MERGING over the rest of the shard. Empty -> the field drops. */
-export function saveSceneWriting(sceneId: string, map: Record<string, string>): Promise<SaveResult> {
+export function saveSceneWriting(sceneId: string, map: Record<string, string>): Promise<SaveResult & { step?: ProjectStep }> {
   const kept: Record<string, string> = {};
   for (const [id, name] of Object.entries(map)) if (name) kept[id] = name;
-  return saveAuthoringField(sceneId, (af) => { af.writing = Object.keys(kept).length ? kept : undefined; });
+  return saveAuthoringField(sceneId, (af) => { af.writing = Object.keys(kept).length ? kept : undefined; }, "Writing Status");
 }
 
 /** Read a scene's per-beat MANUAL recording status (#206): beat id -> ladder rung. Source-only metadata. */
@@ -1039,10 +1336,10 @@ export function readSceneRecording(sceneId: string): Record<string, string> {
 }
 
 /** Persist a scene's per-beat recording status, MERGING over the rest of the shard. Empty -> the field drops. */
-export function saveSceneRecording(sceneId: string, map: Record<string, string>): Promise<SaveResult> {
+export function saveSceneRecording(sceneId: string, map: Record<string, string>): Promise<SaveResult & { step?: ProjectStep }> {
   const kept: Record<string, string> = {};
   for (const [id, name] of Object.entries(map)) if (name) kept[id] = name;
-  return saveAuthoringField(sceneId, (af) => { af.recording = Object.keys(kept).length ? kept : undefined; });
+  return saveAuthoringField(sceneId, (af) => { af.recording = Object.keys(kept).length ? kept : undefined; }, "Recording Status");
 }
 
 /** A scene's "needs re-record" flags (#227): beat id -> true, from the authoring shard. */
@@ -1052,10 +1349,10 @@ export function readSceneRerecord(sceneId: string): Record<string, boolean> {
 
 /** Persist a scene's "needs re-record" flags, MERGING over the rest of the shard. Only `true` is kept
  *  (an unticked line drops out), and an empty map removes the field entirely. */
-export function saveSceneRerecord(sceneId: string, map: Record<string, boolean>): Promise<SaveResult> {
+export function saveSceneRerecord(sceneId: string, map: Record<string, boolean>): Promise<SaveResult & { step?: ProjectStep }> {
   const kept: Record<string, boolean> = {};
   for (const [id, on] of Object.entries(map)) if (on) kept[id] = true;
-  return saveAuthoringField(sceneId, (af) => { af.rerecord = Object.keys(kept).length ? kept : undefined; });
+  return saveAuthoringField(sceneId, (af) => { af.rerecord = Object.keys(kept).length ? kept : undefined; }, "Re-record");
 }
 
 /** Read a scene's "suggest a rewrite" proposals (open + resolved alike). */
@@ -1097,9 +1394,9 @@ export function reviewFeedback(scope?: { resolvedComments?: boolean; resolvedSug
 
 /** Write the project file and, only once it has landed, make `next` the open project's: the model never
  *  says something the file does not. Inside an `enqueueWrite`, like every write. */
-async function commitProjectFile(next: ProjectFile): Promise<SaveResult> {
+async function commitProjectFile(next: ProjectFile, label: string): Promise<SaveResult & { step?: ProjectStep }> {
   if (!loaded) return { ok: false, error: "no project open" };
-  const res = await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(next) }]);
+  const res = await projectCommit(label, freshKey("project"), [{ path: loaded.projectFile, content: canonicalStringify(next) }]);
   if (res.ok) loaded.project = next;
   return res;
 }
@@ -1191,7 +1488,7 @@ export function applyEditableImport(planId: string): Promise<SaveResult> {
   return enqueueWrite(async () => {
     const plan = importPlans.get(planId);
     if (!plan) return { ok: false, error: "That import plan has expired; choose the file again." };
-    const res = await commitWrites(plan.writes, { allOrNothing: true });
+    const res = await projectCommit("Import Script", freshKey("import"), plan.writes);
     if (res.ok) { importPlans.delete(planId); reloadFromDisk(); }
     return res;
   });
@@ -1221,7 +1518,7 @@ export function decideSuggestions(decisions: Array<{ id: string; accept: boolean
     ensureHydrated();
     const plan = applySuggestionDecisions(loaded, decisions, { by });
     if (!plan.writes.length) return { ok: true, results: plan.results };
-    const res = await commitWrites(plan.writes, { allOrNothing: true });
+    const res = await projectCommit(decisions.length === 1 ? (decisions[0]!.accept ? "Accept Suggestion" : "Reject Suggestion") : "Decide Suggestions", freshKey("decide"), plan.writes);
     if (res.ok) reloadFromDisk();
     return { ...res, results: plan.results };
   });
@@ -1603,13 +1900,13 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
 }
 
 /** Apply a problem's one-click quick-fix (spec §4), persist it, and refresh the loaded project. */
-export function applyFix(fix: QuickFix): Promise<SaveResult> {
+export function applyFix(fix: QuickFix): Promise<SaveResult & { step?: ProjectStep }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     if (fix.kind === "add-to-cast") {
       const cast = [...(loaded.project.cast ?? [])];
       if (!cast.some((c) => c.name === fix.character)) cast.push({ name: fix.character });
-      return commitProjectFile({ ...loaded.project, cast }); // and the cached project shows the new cast
+      return commitProjectFile({ ...loaded.project, cast }, "Add to Cast"); // and the cached project shows the new cast
     }
     if (fix.kind === "declare-property") {
       const properties = [...(loaded.project.properties ?? [])];
@@ -1617,7 +1914,7 @@ export function applyFix(fix: QuickFix): Promise<SaveResult> {
       const next = { ...loaded.project, properties };
       // The properties changed, so the game's scopes folder (when there is one) hears about it too.
       const writes = [{ path: loaded.projectFile, content: canonicalStringify(next) }, ...patterScopesWrites(next)];
-      const res = await commitWrites(writes);
+      const res = await projectCommit("Declare Property", freshKey("project"), writes);
       if (res.ok) { loaded.project = next; notePatterScopesWritten(writes); } // reflect the new property in the cached project
       return res;
     }
@@ -1753,7 +2050,7 @@ export async function locImport(filePath: string, fallbackLocale?: string): Prom
     catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; } // a scene or language the project lacks
     const { writes, stats } = planned;
     if (writes.length === 0) return { ok: true, locale, updated: 0, files: 0 };
-    const res = await commitWrites(writes);
+    const res = await projectCommit("Import Translations", freshKey("loc"), writes);
     if (!res.ok) return { ok: false, error: res.error };
     try { reloadFromDisk(); }
     catch (e) { console.warn("patterpad: localisation import committed, but reloading the project failed - the in-memory strings are stale until reopen:", e); }
@@ -1861,7 +2158,8 @@ export function buildBundle(opts?: { pin?: boolean }): Promise<{ ok: boolean; pa
     if (opts?.pin) {
       const plan = planPins(loaded);
       if (plan.writes.length) {
-        const res = await commitWrites(plan.writes);
+        // The pins are an edit to the scenes, so they are a step; the bundle that follows is output, and is not.
+        const res = await projectCommit("Pin Scene Addresses", freshKey("pins"), plan.writes);
         if (!res.ok) return { ok: false, error: res.error };
         // Swap the pinned scenes into the working copy (element swap, never in place), and drop their source
         // mirror so the open scene's reload reads the pinned bytes from disk.
@@ -2065,16 +2363,29 @@ function castRenameWrites(renames: Map<string, string>, base: { path: string; co
 }
 
 /** Carry stage renames on their own (the Scene properties dialog, whose declarations the open scene saves). */
-export function renameStages(renames: StageRenameDto[]): Promise<SaveResult & { expressions: number }> {
+export function renameStages(renames: StageRenameDto[], openScene?: { sceneId: string; flowBefore: string | null }): Promise<SaveResult & { expressions: number; step?: ProjectStep }> {
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open", expressions: 0 };
     const { writes, expressions } = stageRenameWrites(renames);
     if (writes.length === 0) return { ok: true, expressions: 0 };
-    const res = await commitWrites(writes);
+    // The declaration the rename finishes is an edit in the open scene, saved just before this; the scene
+    // reloads after, which drops that edit from its history. So the step takes the scene's flow from
+    // before the declaration changed, and one undo takes back both (the paired gesture).
+    const flowPath = openScene ? loaded.sceneFiles[openScene.sceneId] : undefined;
+    const before = flowPath && openScene ? new Map([[flowPath, openScene.flowBefore]]) : undefined;
+    if (flowPath && !writes.some((w) => w.path === flowPath)) writes.push({ path: flowPath, content: readFileSync(flowPath, "utf8") });
+    const res = await projectCommit("Rename Stage", freshKey("stages"), writes, before ? { before } : {});
     if (!res.ok) return { ...res, expressions: 0 };
     reloadFromDisk(); // the rewritten scenes, read back whole
-    return { ok: true, expressions };
+    return { ok: true, expressions, ...(res.step ? { step: res.step } : {}) };
   });
+}
+
+/** The open scene's flow as it is on disk now: what a stage rename's step restores the scene to. */
+export function sceneFlowOnDisk(sceneId: string): string | null {
+  const path = loaded?.sceneFiles[sceneId];
+  if (!path) return null;
+  try { return readFileSync(path, "utf8"); } catch { return null; }
 }
 
 /** How many conditions and set effects order a quality against its stages: what a reorder changes. */
@@ -2203,7 +2514,7 @@ function captionRenamed(cc: ProjectSettingsDto["closedCaptions"], castRenames: R
 
 /** Persist edited project-level settings back to the .patterproj (lock-aware), preserving every other
  *  field. Returns the refreshed project summary on success so the renderer can update the title etc. */
-export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { project?: OpenedProject }> {
+export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?: string } = {}): Promise<SaveResult & { project?: OpenedProject; step?: ProjectStep }> {
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const prevVcs = loaded.project.vcs ?? "none";
@@ -2312,16 +2623,24 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
     // Switching VCS re-emits its config files (vcs-setup.md, .gitattributes, ignore) for the new system.
     // The bundle posture carries over, read from the files the old system was set up with.
     if (s.vcs !== prevVcs && s.vcs !== "none") writes.push(...vcsConfigWrites(loaded.root, s.vcs, currentBundlePosture(loaded.root, prevVcs === "none" ? undefined : prevVcs)));
-    const res = await commitWrites(writes);
+    // One step of the project history, with its renames: the Properties page keys its saves, so a run of
+    // edits there is one step.
+    const res = await projectCommit(undo.label ?? "Project Settings", undo.key ?? freshKey("settings"), writes);
     if (!res.ok) return res;
     // Remove the PREVIOUS system's now-orphaned config files (e.g. git's .gitattributes / .gitignore when
     // moving to Perforce), so a switched project never carries stale VCS hygiene. The shared vcs-setup.md is
     // kept (rewritten above for a real VCS, left as-is for "none"). Best-effort: a failed delete never fails
-    // the settings save. Done after the writes commit, so a write failure can't strand us mid-switch.
+    // the settings save. Done after the writes commit, so a write failure can't strand us mid-switch. Each
+    // that goes is folded into the save's step, so its undo brings them back.
     if (s.vcs !== prevVcs && prevVcs !== "none") {
       const keep = new Set([join(loaded.root, "vcs-setup.md"), ...(s.vcs !== "none" ? vcsConfigWrites(loaded.root, s.vcs).map((w) => w.path) : [])]);
       for (const w of vcsConfigWrites(loaded.root, prevVcs)) {
-        if (!keep.has(w.path) && existsSync(w.path)) { try { await deleteFileAsync(w.path); } catch { /* leave the orphan rather than fail the switch */ } }
+        if (keep.has(w.path) || !existsSync(w.path)) continue;
+        const was = captureBefore([w.path]);
+        try {
+          const gone = await deleteFileAsync(w.path);
+          if (gone.success && res.step) projectHistory.fold(was, [{ path: w.path, content: null }]);
+        } catch { /* leave the orphan rather than fail the switch */ }
       }
     }
     loaded.project = next; // reflect in the cached project
@@ -2331,19 +2650,19 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
     if (loaded.gameScopes) refreshGameScopes(); // the folder may have just changed under us: read it back
     if (s.vcs !== prevVcs) pinVcProvider(next.vcs); // re-pin simple-vc-lib to the newly chosen system (#26)
     syncAudioIndex();      // audio config may have changed (mode toggle / rung folders) (#206)
-    return { ok: true, project: summarise(loaded) };
+    return { ok: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
   });
 }
 
 /** Set just the project start point (ProjectFile.start), lock-aware: for the "set where your story starts"
  *  prompt (Play from Start / Coverage). Returns the refreshed project summary. */
-export function setStart(start: { scene: string; block?: string }): Promise<SaveResult & { project?: OpenedProject }> {
+export function setStart(start: { scene: string; block?: string }): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const next: ProjectFile = { ...loaded.project, start: start.scene ? start : undefined };
-    const res = await commitProjectFile(next);
+    const res = await commitProjectFile(next, "Set Start");
     if (!res.ok) return res;
-    return { ok: true, project: summarise(loaded) };
+    return { ok: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
   });
 }
 
@@ -2353,7 +2672,7 @@ export function setStart(start: { scene: string; block?: string }): Promise<Save
  *  in the same commit when new: the author named them in New Scene's panel, so this is their choice,
  *  not the kit's. The filename stem is the slugged name, de-collided (`-2`, `-3`, …) against existing
  *  shards. Returns the refreshed summary + the new id. */
-export function createScene(name: string, kit: SceneKit = "blank", speaker?: string): Promise<SaveResult & { project?: OpenedProject; sceneId?: string }> {
+export function createScene(name: string, kit: SceneKit = "blank", speaker?: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; sceneId?: string }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     ensureHydrated(); // the stem de-collides against ALL shards, not the landing-only view
@@ -2378,7 +2697,8 @@ export function createScene(name: string, kit: SceneKit = "blank", speaker?: str
     const cast = [...(loaded.project.cast ?? [])];
     const addToCast = kitNeedsSpeaker(kit) && who !== undefined && !cast.some((c) => c.name === who);
     if (addToCast) cast.push({ name: who });
-    const res = await commitWrites([
+    // One step: its undo deletes the files it made (and takes the speaker back out of the cast).
+    const res = await projectCommit("New Scene", freshKey("scene"), [
       { path: flowPath, content: canonicalStringify(flow) },
       { path: locPath, content: canonicalStringify(locale) },
       ...(addToCast ? [{ path: loaded.projectFile, content: canonicalStringify({ ...loaded.project, cast }) }] : []),
@@ -2390,7 +2710,7 @@ export function createScene(name: string, kit: SceneKit = "blank", speaker?: str
     loaded.locales.push(locale);
     loaded.localeFiles.push(locPath);
     shards = buildShards(loaded);
-    return { ok: true, sceneId, project: summarise(loaded) };
+    return { ok: true, sceneId, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
   });
 }
 
@@ -2457,10 +2777,10 @@ export function sceneDeleteInfo(sceneId: string): SceneDeleteInfo | null {
 
 /** Delete a scene: its flow shard, its loc shard in EVERY locale, its authoring shard, and its data for
  *  every extension (`<layout.extensions>/<extension id>/<flow stem>.patterextension`), each through the
- *  lock-aware VC delete; then drop it from `sceneOrder` and clear a `start` that
- *  pointed at it. Refuses the last scene (the loader assumes one exists). Not undoable in-app -
- *  the VCS is the safety net, which is why the renderer's confirm carries the weight it does. */
-export function deleteScene(sceneId: string): Promise<SaveResult & { project?: OpenedProject }> {
+ *  lock-aware VC delete; then drop it from `sceneOrder` and clear a `start` that pointed at it. Refuses the
+ *  last scene (the loader assumes one exists). One step of the project history: its undo writes every one
+ *  of those files back, and the project file as it was. */
+export function deleteScene(sceneId: string): Promise<SaveResult & { project?: OpenedProject; step?: ProjectStep }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     ensureHydrated();
@@ -2487,30 +2807,25 @@ export function deleteScene(sceneId: string): Promise<SaveResult & { project?: O
       const refused = prep.results.filter((r) => !r.success);
       return { ok: false, error: `Couldn't delete the scene: ${refused.map((r) => `${basename(r.filePath)} (${r.message})`).join(", ")}.` };
     }
-    // A refused delete comes back as a result, not a throw, so each one is checked: once this ignored it,
-    // reported the scene deleted, and left its strings on disk for a scene that no longer existed.
-    for (const f of files) {
-      let res: { success: boolean; message: string };
-      try { res = await deleteFileAsync(f); }
-      catch (e) { res = { success: false, message: e instanceof Error ? e.message : String(e) }; }
-      if (!res.success) {
-        reloadFromDisk(); // whatever did go is gone: the model follows the disk
-        return { ok: false, error: `Couldn't delete ${basename(f)}: ${res.message}`, project: summarise(loaded!) };
-      }
-    }
 
-    // Project-file cleanup rides the same operation: the order entry + a start point that now dangles.
+    // Project-file cleanup rides the same step: the order entry + a start point that now dangles.
     const hadOrder = !!p.project.sceneOrder?.includes(sceneId);
     const startsHere = p.project.start?.scene === sceneId;
-    if (hadOrder || startsHere) {
-      const next: ProjectFile = { ...p.project };
-      if (hadOrder) next.sceneOrder = next.sceneOrder!.filter((id) => id !== sceneId);
-      if (startsHere) delete next.start;
-      const res = await commitWrites([{ path: p.projectFile, content: canonicalStringify(next) }]);
-      if (!res.ok) return res;
-      p.project = next;
+    const next: ProjectFile = { ...p.project };
+    if (hadOrder) next.sceneOrder = next.sceneOrder!.filter((id) => id !== sceneId);
+    if (startsHere) delete next.start;
+    // A refused delete comes back as a result, not a throw, and stops the rest: once this ignored it,
+    // reported the scene deleted, and left its strings on disk for a scene that no longer existed. What
+    // did go is still a step, so it can be put back.
+    const res = await projectCommit("Delete Scene", freshKey("scene"), [
+      ...(hadOrder || startsHere ? [{ path: p.projectFile, content: canonicalStringify(next) }] : []),
+      ...files.map((path) => ({ path, content: null })),
+    ]);
+    if (!res.ok) {
+      reloadFromDisk(); // whatever did go is gone: the model follows the disk
+      return { ok: false, error: res.error, project: summarise(loaded!) };
     }
-
+    p.project = next;
     p.scenes.splice(idx, 1);
     delete p.sceneFiles[sceneId];
     for (let i = locIdx.length - 1; i >= 0; i--) { p.locales.splice(locIdx[i]!, 1); p.localeFiles.splice(locIdx[i]!, 1); }
@@ -2518,9 +2833,13 @@ export function deleteScene(sceneId: string): Promise<SaveResult & { project?: O
     for (let i = p.extensionShardFiles.length - 1; i >= 0; i--) {
       if (gone.has(p.extensionShardFiles[i]!)) { p.extensionShards.splice(i, 1); p.extensionShardFiles.splice(i, 1); }
     }
+    if (authoringPath) {
+      const a = p.authoringFiles.indexOf(authoringPath);
+      if (a >= 0) { p.authoringFiles.splice(a, 1); p.authoring.splice(a, 1); }
+    }
     shards = buildShards(p);
     authoringCache.clear();
-    return { ok: true, project: summarise(p) };
+    return { ok: true, project: summarise(p), ...(res.step ? { step: res.step } : {}) };
   });
 }
 
@@ -2544,7 +2863,7 @@ function sceneExtensionShards(p: LoadedProject, sceneId: string): string[] {
 /** Persist the nav's authored scene order (ProjectFile.sceneOrder), lock-aware, and re-sort the
  *  in-memory list to match. Ids must all be scenes of the open project (a stale drag after an
  *  external change is refused rather than silently dropping scenes). Returns the refreshed summary. */
-export function reorderScenes(ids: string[]): Promise<SaveResult & { project?: OpenedProject }> {
+export function reorderScenes(ids: string[]): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     ensureHydrated(); // ordering is a whole-project fact - never validate against the landing-only list
@@ -2553,17 +2872,17 @@ export function reorderScenes(ids: string[]): Promise<SaveResult & { project?: O
       return { ok: false, error: "The scene list changed, so the reorder was ignored." };
     }
     const next: ProjectFile = { ...loaded.project, sceneOrder: ids };
-    const res = await commitProjectFile(next);
+    const res = await commitProjectFile(next, "Reorder Scenes");
     if (!res.ok) return res;
     const rank = new Map(ids.map((id, i) => [id, i]));
     loaded.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
-    return { ok: true, project: summarise(loaded) };
+    return { ok: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
   });
 }
 
 /** Append a word to the project's custom dictionary (#177 "Add to dictionary") and save. Returns the
  *  refreshed word list so the renderer can rebuild the spell engine. */
-export function addDictionaryWord(word: string): Promise<SaveResult & { words?: string[] }> {
+export function addDictionaryWord(word: string): Promise<SaveResult & { step?: ProjectStep; words?: string[] }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const w = word.trim();
@@ -2571,16 +2890,16 @@ export function addDictionaryWord(word: string): Promise<SaveResult & { words?: 
     if (!w || cur.includes(w)) return { ok: true, words: cur };
     const words = [...cur, w];
     const next: ProjectFile = { ...loaded.project, dictionary: { ...loaded.project.dictionary, words } };
-    const res = await commitProjectFile(next);
+    const res = await commitProjectFile(next, "Add to Dictionary");
     if (!res.ok) return res;
-    return { ok: true, words };
+    return { ok: true, words, ...(res.step ? { step: res.step } : {}) };
   });
 }
 
 /** Append a word to the project's IGNORE list (#177 right-click ▸ "Ignore") and save. Distinct from the
  *  custom word list - silences the squiggle without claiming the token is real vocabulary. Returns the
  *  refreshed ignore list so the renderer rebuilds the engine + problems panel. */
-export function addIgnoreWord(word: string): Promise<SaveResult & { ignore?: string[] }> {
+export function addIgnoreWord(word: string): Promise<SaveResult & { step?: ProjectStep; ignore?: string[] }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const w = word.trim();
@@ -2588,9 +2907,9 @@ export function addIgnoreWord(word: string): Promise<SaveResult & { ignore?: str
     if (!w || cur.includes(w)) return { ok: true, ignore: cur };
     const ignore = [...cur, w];
     const next: ProjectFile = { ...loaded.project, dictionary: { ...loaded.project.dictionary, ignore } };
-    const res = await commitProjectFile(next);
+    const res = await commitProjectFile(next, "Ignore Word");
     if (!res.ok) return res;
-    return { ok: true, ignore };
+    return { ok: true, ignore, ...(res.step ? { step: res.step } : {}) };
   });
 }
 
@@ -2603,7 +2922,7 @@ export function dictionarySettings(): { enabled: boolean; language: string } | n
 
 /** Set spell-check on/off and/or the active dictionary (Review ▸ Spelling, mirroring the Dictionary tab) and
  *  save. Returns the refreshed dictionary so the renderer rebuilds the engine. */
-export function setDictionary(patch: { enabled?: boolean; language?: string }): Promise<SaveResult & { dictionary?: { language: string; words: string[]; ignore: string[]; enabled: boolean } }> {
+export function setDictionary(patch: { enabled?: boolean; language?: string }): Promise<SaveResult & { step?: ProjectStep; dictionary?: { language: string; words: string[]; ignore: string[]; enabled: boolean } }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const cur = loaded.project.dictionary ?? {};
@@ -2612,9 +2931,9 @@ export function setDictionary(patch: { enabled?: boolean; language?: string }): 
     if (patch.language !== undefined) { if (patch.language === deriveDictLanguage(loaded.project.locales.default)) delete d.language; else d.language = patch.language; }
     const dictionary = Object.keys(d).length ? d : undefined;
     const next: ProjectFile = { ...loaded.project, dictionary };
-    const res = await commitProjectFile(next);
+    const res = await commitProjectFile(next, "Spelling");
     if (!res.ok) return res;
-    return { ok: true, dictionary: resolveDictionary(next) };
+    return { ok: true, dictionary: resolveDictionary(next), ...(res.step ? { step: res.step } : {}) };
   });
 }
 
@@ -2632,7 +2951,7 @@ export function shareScopesInfo(): { shared?: string; suggested: string } | null
  * project keeps its copy, so it still compiles alone). A folder the walk-up from the project would not
  * find is named in the project (`gameScopes`). Refused when the project already shares one.
  */
-export function shareScopes(dir: string): Promise<SaveResult & { dir?: string }> {
+export function shareScopes(dir: string): Promise<SaveResult & { step?: ProjectStep; dir?: string }> {
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     refreshGameScopes();
@@ -2642,11 +2961,11 @@ export function shareScopes(dir: string): Promise<SaveResult & { dir?: string }>
     try { mkdirSync(dir, { recursive: true }); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
     const projectChanged = plan.project.gameScopes !== loaded.project.gameScopes;
     const writes = [...plan.writes, ...(projectChanged ? [{ path: loaded.projectFile, content: canonicalStringify(plan.project) }] : [])];
-    const res = await commitWrites(writes);
+    const res = await projectCommit("Share Scopes", freshKey("share"), writes);
     if (!res.ok) return res;
     loaded.project = plan.project;
     refreshGameScopes();
-    return { ok: true, dir };
+    return { ok: true, dir, ...(res.step ? { step: res.step } : {}) };
   });
 }
 

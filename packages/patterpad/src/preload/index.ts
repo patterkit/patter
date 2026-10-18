@@ -22,7 +22,7 @@ import { contextBridge, ipcRenderer } from "electron";
  * The value is pinned against the shell's own constant by that same test.
  */
 const JOB_PROGRESS = "job:progress";
-import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress, AppPrompt } from "../shared/api.js";
+import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress, AppPrompt, ProjectStep } from "../shared/api.js";
 
 const api: PatterApi = {
   boot: () => ipcRenderer.invoke("project:boot"),
@@ -101,7 +101,12 @@ const api: PatterApi = {
   exportLoc: (request) => ipcRenderer.invoke("project:exportLoc", request),
   importLoc: (fallbackLocale) => ipcRenderer.invoke("project:importLoc", fallbackLocale),
   readSettings: () => ipcRenderer.invoke("project:readSettings"),
-  saveSettings: (settings) => ipcRenderer.invoke("project:saveSettings", settings),
+  saveSettings: (settings, undo) => ipcRenderer.invoke("project:saveSettings", settings, undo),
+  projectUndo: (id) => ipcRenderer.invoke("project:undo", id),
+  projectRedo: (id) => ipcRenderer.invoke("project:redo", id),
+  projectClearRedo: () => ipcRenderer.invoke("project:clearRedo"),
+  setUndoLabels: (labels) => ipcRenderer.invoke("project:undoLabels", labels),
+  onProjectStep: (handler) => { ipcRenderer.on("project:step", (_e, step: ProjectStep) => handler(step)); },
   renameStages: (renames) => ipcRenderer.invoke("project:renameStages", renames),
   stageGates: (target) => ipcRenderer.invoke("project:stageGates", target),
   setStart: (start) => ipcRenderer.invoke("project:setStart", start),

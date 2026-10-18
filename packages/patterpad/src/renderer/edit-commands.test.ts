@@ -54,7 +54,8 @@ describe("Select All outside the script editor", () => {
 
 // Edit ▸ Undo went straight to the scene's history whatever had the focus, so Cmd+Z in Project Settings, a
 // dialog or on the Properties page undid the scene hidden behind them, and on the Properties page that undone
-// edit was never saved (patterkit design/patterpad-undo.md, "Where Cmd+Z goes").
+// edit was never saved (patterkit design/patterpad-undo.md, "Where Cmd+Z goes"). With the project history,
+// everywhere else goes to the journal, and the Properties page, whose saves are project steps, to its steps.
 describe("where Undo goes in the main window", () => {
   const workspace = () => {
     const editor = document.createElement("div");
@@ -70,27 +71,33 @@ describe("where Undo goes in the main window", () => {
     return { editor, script, title, inspector, gameData, propName, settings, sceneAreas: [editor, inspector] };
   };
 
-  it("goes to the scene from the script, its title and the inspector's fields", () => {
+  it("goes to the journal from the script, its title and the inspector's fields", () => {
     const w = workspace();
     for (const active of [w.script, w.title, w.gameData, document.body]) {
-      expect(undoRoute({ active, sceneAreas: w.sceneAreas, dialogOpen: false, scene: "showing" })).toBe("scene");
+      expect(undoRoute({ active, sceneAreas: w.sceneAreas, dialogOpen: false, view: "scene" })).toBe("journal");
     }
   });
 
   it("is the field's own text undo in a field outside the scene, and anywhere while a dialog is open", () => {
     const w = workspace();
-    expect(undoRoute({ active: w.settings, sceneAreas: w.sceneAreas, dialogOpen: false, scene: "showing" })).toBe("field");
-    expect(undoRoute({ active: w.script, sceneAreas: w.sceneAreas, dialogOpen: true, scene: "showing" })).toBe("field");
+    expect(undoRoute({ active: w.settings, sceneAreas: w.sceneAreas, dialogOpen: false, view: "scene" })).toBe("field");
+    expect(undoRoute({ active: w.script, sceneAreas: w.sceneAreas, dialogOpen: true, view: "scene" })).toBe("field");
+    expect(undoRoute({ active: document.body, sceneAreas: w.sceneAreas, dialogOpen: true, view: "properties" })).toBe("field");
   });
 
-  it("on the Properties page, undoes the field in focus and never the scene behind the page", () => {
+  it("on the Properties page, undoes the field in focus, else the page's newest project step, never the scene behind", () => {
     const w = workspace();
-    expect(undoRoute({ active: w.propName, sceneAreas: w.sceneAreas, dialogOpen: false, scene: "none" })).toBe("field");
-    expect(undoRoute({ active: document.body, sceneAreas: w.sceneAreas, dialogOpen: false, scene: "none" })).toBe("none");
+    expect(undoRoute({ active: w.propName, sceneAreas: w.sceneAreas, dialogOpen: false, view: "properties" })).toBe("field");
+    expect(undoRoute({ active: document.body, sceneAreas: w.sceneAreas, dialogOpen: false, view: "properties" })).toBe("project");
   });
 
-  it("from the overview, shows the scene and then undoes", () => {
+  it("from the overview, goes to the journal (whose scene entry shows its scene first)", () => {
     const w = workspace();
-    expect(undoRoute({ active: document.body, sceneAreas: w.sceneAreas, dialogOpen: false, scene: "hidden" })).toBe("show-scene");
+    expect(undoRoute({ active: document.body, sceneAreas: w.sceneAreas, dialogOpen: false, view: "overview" })).toBe("journal");
+  });
+
+  it("does nothing with no project open", () => {
+    const w = workspace();
+    expect(undoRoute({ active: document.body, sceneAreas: w.sceneAreas, dialogOpen: false, view: "none" })).toBe("none");
   });
 });

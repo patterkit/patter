@@ -15,7 +15,7 @@ import * as project from "./project.js";
 import { fileSafeName } from "../shared/file-name.js";
 import * as dictionaries from "./dictionaries.js";
 import { createStore, type ToolWindowName } from "./store.js";
-import { applyMenu } from "./menu.js";
+import { applyMenu, setUndoLabels } from "./menu.js";
 import { createDebugServer, type DebugServer } from "./debug-link.js";
 import { centeredOnPrimary, defineToolWindows, pinToolWindow } from "@wildwinter/app-shell/tool-window";
 import { plural } from "@wildwinter/app-shell/util";
@@ -104,6 +104,19 @@ function scheduleDebugPush(): void {
     const out = project.compileForDebugPush();
     if (out) debugServer?.pushBundle(out.hash, out.json);
   }, 500);
+}
+
+/** The project changed in a way that shapes the compiled bundle (a settings save, a project undo or
+ *  redo): refresh a connected external game, and a running PLAY WINDOW in place (properties, defaults,
+ *  locales, and captions all shape the bundle), rather than leaving it stale until a restart. */
+function projectChanged(): void {
+  scheduleDebugPush();
+  const playWin = windows.get("play");
+  if (playWin) {
+    const pr = project.refreshPlay();
+    if (pr.kind === "stale") { playWin.webContents.send("play:stale"); win?.webContents.send("play:reset"); }
+    else if (pr.kind !== "none") playWin.webContents.send("play:refreshed", pr.kind, pr.options ?? []);
+  }
 }
 
 // The sensible default author name when the user leaves the identity blank: their OS account name, else
@@ -723,13 +736,10 @@ async function openPatterpackDialog(): Promise<OpenResult | null> {
  * said what they want. There is deliberately NO third picker for a destination: a merge always targets the
  * open project, and letting it target another one would just be an unpack.
  *
- * Then a confirmation, which is where this departs from the brief. The family spec asks for the merge to
- * be ONE undo step, and Storyletter can do that because its undo is a file-byte replay. Patterpad's undo
- * is ProseMirror history, per scene: there is no mechanism here that could unpick a write across every
- * shard in the project. So this follows the local precedent for a project-level edit the app cannot undo
- * (`deleteScene`, whose comment says the same thing): the VCS is the safety net, and the confirm carries
- * the weight. It is shown AFTER the merge has run, so it reports what the merge actually found rather
- * than asking for approval sight unseen - which the op's purity makes free.
+ * Then a confirmation. The merge is ONE undo step, as the family spec asks: it lands through the project
+ * history (project.ts `projectCommit`), so Edit ▸ Undo puts every shard back and takes the sidecars away.
+ * The confirm is shown AFTER the merge has been worked out, so it reports what the merge actually found
+ * rather than asking for approval sight unseen - which the op's purity makes free.
  *
  * The confirm itself is the renderer's, on the shell's themed `confirmDialog`, as Storyletter's is: a
  * native box made Merge the default, so a stray Enter merged. So this is two calls with the renderer
@@ -1049,37 +1059,43 @@ function registerIpc(): void {
   ipcMain.handle("project:readSettings", () => project.readSettings());
   ipcMain.handle("project:renameStages", async (_e, renames: StageRenameDto[]) => {
     // The open scene's unsaved edits (its own @scene declarations among them) go to disk first, and it
-    // reloads from the rewritten file after.
+    // reloads from the rewritten file after. The editor saved the scene just before the declaration
+    // changed, so its flow on disk now is what one undo of the rename takes it back to.
+    const sceneId = renames.find((r) => r.scene)?.scene;
+    const flowBefore = sceneId ? project.sceneFlowOnDisk(sceneId) : null;
     await flushEditorScene();
-    const r = await project.renameStages(renames);
+    const r = await project.renameStages(renames, sceneId ? { sceneId, flowBefore } : undefined);
     if (r.ok && r.expressions > 0) win?.webContents.send("replace:applied");
     return r;
   });
   ipcMain.handle("project:stageGates", (_e, target: { scope: string; name: string; scene?: string }) => project.stageGates(target));
   ipcMain.handle("project:speakerPairs", () => project.speakerPairs());
-  ipcMain.handle("project:saveSettings", async (_e, s: ProjectSettingsDto) => {
+  ipcMain.handle("project:saveSettings", async (_e, s: ProjectSettingsDto, undo?: { label?: string; key?: string }) => {
     // A qualifier gameId rename (or a cast rename) rewrites lines across the project, the open scene's among
     // them: its unsaved edits go to disk first, and it reloads from the rewritten file after.
     const renames = Object.entries(s.qualifierRenames ?? {}).some(([from, to]) => from !== to)
       || Object.entries(s.castRenames ?? {}).some(([from, to]) => from !== to)
       || (s.stageRenames ?? []).some((r) => r.from !== r.to); // a stage rename rewrites conditions across the project too
     if (renames) await flushEditorScene();
-    const r = await project.saveSettings(s);
+    const r = await project.saveSettings(s, undo ?? {});
     if (r.ok && renames) win?.webContents.send("replace:applied");
     refreshMenu(); // dictionary tab may change spell-check on/off + language
-    if (r.ok) {
-      scheduleDebugPush(); // settings shape the bundle, so refresh a connected external game too
-      // ...and a running PLAY WINDOW: properties / defaults / locales / captions all shape the compiled
-      // bundle, so live-refresh the run in place (same path as an editor scene edit) rather than leaving
-      // it stale until restart.
-      const playWin = windows.get("play");
-      if (playWin) {
-        const pr = project.refreshPlay();
-        if (pr.kind === "stale") { playWin.webContents.send("play:stale"); win?.webContents.send("play:reset"); }
-        else if (pr.kind !== "none") playWin.webContents.send("play:refreshed", pr.kind, pr.options ?? []);
-      }
-    }
+    if (r.ok) projectChanged();
     return r;
+  });
+  // The project history (patterkit design/patterpad-undo.md, half B): the editor's journal decides which
+  // history Cmd+Z goes to, and sends a project step here by its id. An undo or redo lands like a settings
+  // save: a connected game and a running play window hear about it.
+  const stepHistory = async (way: "undo" | "redo", id?: number) => {
+    const r = await project.stepProjectHistory(way, typeof id === "number" ? id : undefined);
+    if (r.ok) { refreshMenu(); projectChanged(); }
+    return r;
+  };
+  ipcMain.handle("project:undo", (_e, id?: number) => stepHistory("undo", id));
+  ipcMain.handle("project:redo", (_e, id?: number) => stepHistory("redo", id));
+  ipcMain.handle("project:clearRedo", () => { project.clearProjectRedo(); });
+  ipcMain.handle("project:undoLabels", (_e, labels: { undo?: string; redo?: string }) => {
+    if (setUndoLabels(labels)) refreshMenu();
   });
   ipcMain.handle("project:setStart", (_e, start: { scene: string; block?: string }) => project.setStart(start));
   ipcMain.handle("project:reorderScenes", (_e, ids: string[]) => project.reorderScenes(ids));
@@ -1119,6 +1135,9 @@ function registerIpc(): void {
   });
   ipcMain.handle("recording:setMode", (_e, on: boolean) => { if (on) Menu.setApplicationMenu(null); else refreshMenu(); });
   project.onAudioSnapshot((snap) => { if (win && !win.isDestroyed()) win.webContents.send("audio:index", snap); });
+  // Every step of the project history, whichever window asked for the write (Replace and suggestion
+  // decisions come from the search window), reaches the editor's journal.
+  project.onProjectStep((step) => { if (win && !win.isDestroyed()) win.webContents.send("project:step", step); });
   ipcMain.handle("scene:readSuggestions", (_e, id: string) => project.readSceneSuggestions(id));
   ipcMain.handle("scene:saveSuggestions", (_e, id: string, s: import("@patterkit/model").Suggestion[]) => project.saveSceneSuggestions(id, s));
   ipcMain.handle("review:feedback", (_e, scope?: { resolvedComments?: boolean; resolvedSuggestions?: boolean }) => project.reviewFeedback(scope));
