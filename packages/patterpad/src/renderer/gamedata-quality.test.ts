@@ -18,7 +18,7 @@ describe("the Game Data editor: flags and quality", () => {
     document.body.append(host);
     const handle = mountGameDataFields(host, { line: [{ name: "act", type: "text" }] });
     dialogueTab(host);
-    const type = host.querySelector<HTMLSelectElement>(".gd-type")!;
+    const type = host.querySelector<HTMLSelectElement>(".set-type")!;
     expect(Array.from(type.options).map((o) => o.value)).toEqual(["text", "multiline", "number", "boolean", "enum", "flags", "quality"]);
     type.value = "quality";
     type.dispatchEvent(new Event("change"));
@@ -39,6 +39,20 @@ describe("the Game Data editor: flags and quality", () => {
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     expect(handle.value().line).toEqual([{ name: "act", type: "quality", stages: ["prologue", "act-1"], default: "prologue" }]);
     expect(handle.stageRenames()).toEqual([{ scope: "gameData", gameData: "line", name: "act", from: "arrival", to: "prologue" }]);
+    host.remove();
+  });
+
+  it("is the shell's declaration list: any name, purpose kept, a duplicate found on its own tab", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const handle = mountGameDataFields(host, { line: [{ name: "Camera shot", type: "text" }, { name: "camera shot", type: "number" }] });
+    expect(host.querySelector(".set-name")).toBeNull();          // Scene first: no fields there
+    const dup = handle.firstDuplicate();                          // switches to Dialogue to show it
+    expect(dup?.value.toLowerCase()).toBe("camera shot");
+    const purpose = host.querySelector<HTMLInputElement>(".set-purpose")!;
+    expect(purpose.placeholder).toBe("What this field is for");
+    purpose.value = "  How the shot is framed "; purpose.dispatchEvent(new Event("input"));
+    expect(handle.value().line?.[0]).toEqual({ name: "Camera shot", type: "text", purpose: "How the shot is framed" });
     host.remove();
   });
 
@@ -73,13 +87,12 @@ describe("a quality game-data value in the inspector", () => {
     expect(setGameData).toHaveBeenCalledWith("L", "act", undefined);
   });
 
-  it("takes a flags value as a list", () => {
+  it("picks a flags value from the declared values, as a list", () => {
     const setGameData = vi.fn();
     const row = gameDataFieldRow({ name: "marks", type: "flags", values: ["met", "owed"] }, "L", ["met"], { setGameData });
-    const input = row.querySelector<HTMLInputElement>("input")!;
-    expect(input.value).toBe("met");
-    input.value = "met, owed";
-    input.dispatchEvent(new Event("change"));
+    const chips = Array.from(row.querySelectorAll<HTMLButtonElement>(".shell-flag"));
+    expect(chips.map((c) => `${c.textContent}${c.classList.contains("on") ? "*" : ""}`)).toEqual(["default (none)", "met*", "owed"]);
+    chips[2]!.click();
     expect(setGameData).toHaveBeenCalledWith("L", "marks", ["met", "owed"]);
   });
 });

@@ -841,3 +841,8 @@ body.writing-view #hintbar { padding-right: 192px; }
    titlebar strip) goes to the OS as a window drag before the page sees it. The shell exempts its own
    layers (app-shell dialog.css has the whole story, 2026-09-28); these are ours. */
 .scratch-overlay, .scratch-overlay * { -webkit-app-region: no-drag; }
+
+/* A game-data value is the shell's field row (inspector.ts gameDataFieldRow): a multiline value takes the
+   row's width, and the purpose under it keeps the inspector's small voice. */
+.insp-gd-row textarea.insp-gd-input { max-width: none; resize: vertical; }
+.insp-gd-row .shell-fieldrow-purpose, .insp-gd-row .shell-fieldrow-problem { font-size: 11.5px; }

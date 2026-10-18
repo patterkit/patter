@@ -4,6 +4,7 @@
 // open-where-you-left-off / recents / identity store in store.ts.
 
 import { app, autoUpdater, BrowserWindow, dialog, ipcMain, screen, shell, systemPreferences, Menu } from "electron";
+import { guardAllWindows } from "@wildwinter/app-shell/window-guard";
 import { findPairedStorylets, findStoryletter, launchStoryletter } from "./storyletter.js";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1428,6 +1429,11 @@ function launchLocationFromArgv(argv: string[]): string | null {
 // notifications) via the AppUserModelID; electron-builder stamps the shortcut with the appId, and we
 // must claim the same one or the taskbar shows a blank icon. No-op on the other platforms.
 app.setAppUserModelId("com.patterkit.patterpad");
+
+// Every window stays on the page it loaded, opens no other window and attaches no webview (the family's
+// window hardening, patterkit design/family-parity-2026-10.md item 12). Nothing it refuses is opened in the
+// browser instead: the only addresses that leave the app are the About links, by ABOUT_LINKS.
+guardAllWindows(app);
 
 // Single instance: double-clicking a .patterflow while Patterpad is already open should hand the file to
 // the RUNNING window (second-instance), not spawn a rival. The non-primary launch quits immediately.

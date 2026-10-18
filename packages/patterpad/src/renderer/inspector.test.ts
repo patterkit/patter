@@ -335,3 +335,27 @@ describe("inspector: line padding fields", () => {
     expect(field(event)).toBeNull();
   });
 });
+
+describe("inspector: a game-data value typed through a redraw", () => {
+  it("commits as typed, keeps the row, its text and the focus while the inspector rebuilds, and shows the purpose", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    let gd: Record<string, unknown> = {};
+    const fields = [{ name: "mood", type: "text" as const, purpose: "How the line is played" }];
+    const draw = (): void => renderInspector(host, ctx({ kind: "leaf", beat: "gameEvent", id: "A_1", gameData: gd }), h);
+    // The renderer redraws the whole stack on every change, as showInspector does when a value lands.
+    const h: InspectorHandlers = { ...handlers, gameDataFields: () => fields, setGameData: (_id, key, v) => { gd = v === undefined ? {} : { [key]: v }; draw(); } };
+    draw();
+    expect(host.querySelector(".shell-fieldrow-purpose")?.textContent).toBe("How the line is played");
+    const input = host.querySelector<HTMLInputElement>(".insp-gd-row input")!;
+    input.focus();
+    for (const text of ["c", "ca", "cal"]) { input.value = text; input.dispatchEvent(new Event("input", { bubbles: true })); }
+    await new Promise<void>((r) => queueMicrotask(r));
+    expect(gd).toEqual({ mood: "cal" });
+    expect(host.querySelector(".insp-gd-row input")).toBe(input);
+    expect(document.activeElement).toBe(input);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(gd).toEqual({});   // Esc puts back what it held at focus: nothing set
+    host.remove();
+  });
+});

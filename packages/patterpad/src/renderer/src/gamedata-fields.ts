@@ -10,7 +10,7 @@
 import type { GameDataField, GameDataFields, GameDataFieldType, GameDataNodeKind } from "@patterkit/model";
 import type { StageRenameDto } from "../../shared/api.js";
 import { el } from "./dom.js";
-import { iconBtn, labelled, moveItem, tagChips, stageChips, defaultControl, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
+import { mountPropertyList, type PropertyListHandle } from "@wildwinter/app-shell";
 
 const KINDS: Array<{ kind: GameDataNodeKind; label: string }> = [
   { kind: "scene", label: "Scene" }, { kind: "block", label: "Block" }, { kind: "snippet", label: "Snippet" },
@@ -18,7 +18,7 @@ const KINDS: Array<{ kind: GameDataNodeKind; label: string }> = [
 ];
 // The family's field types, in Storyletter's Card template order and words (patterkit design/family-parity-2026-10.md
 // item 9).
-const TYPES: Array<[GameDataFieldType, string]> = [
+const TYPES: ReadonlyArray<readonly [GameDataFieldType, string]> = [
   ["text", "Text"], ["multiline", "Text (multiline)"], ["number", "Number"], ["boolean", "True / False"], ["enum", "List"],
   ["flags", "Flags"], ["quality", "Quality"],
 ];
@@ -38,7 +38,7 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
   const state: GameDataFields = structuredClone(initial ?? {}); // never mutate the caller's object
   let activeKind: GameDataNodeKind = "scene";
   const fieldsOf = (kind: GameDataNodeKind): GameDataField[] => (state[kind] ??= []);
-  const guard = dupGuard();
+  let list: PropertyListHandle | undefined;
   const renames: StageRenameDto[] = [];
   // Names are unique PER node kind. Only the active kind is in the DOM, so find the first kind whose data
   // has a clash (for the save gate to jump to).
@@ -50,84 +50,39 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
     return null;
   };
 
-  // The default control is the shell's (`defaultControl`, typed: a real boolean / number in the model). A
-  // multiline field's default is a one-line text field, as it always was. The row itself stays hand-built:
-  // a game-data field name is the host's word and takes none of the property-name rules the shell list binds.
-  const fieldRow = (f: GameDataField, i: number, fields: GameDataField[]): HTMLElement => {
-    const name = el("input", "gd-input gd-name") as HTMLInputElement;
-    name.type = "text"; name.placeholder = "Field name"; name.value = f.name; name.spellcheck = false;
-    name.addEventListener("input", () => { f.name = name.value; });
-    guard.track(name);
-
-    const type = el("select", "insp-select gd-type") as HTMLSelectElement;
-    for (const [v, l] of TYPES) { const o = el("option", undefined, l) as HTMLOptionElement; o.value = v; if (v === f.type) o.selected = true; type.append(o); }
-    type.addEventListener("change", () => {
-      f.type = type.value as GameDataFieldType;
-      delete f.default;                       // a default rarely survives a type change - reset it
-      if (f.type === "enum" || f.type === "flags") f.values ??= []; else delete f.values;
-      if (f.type === "quality") f.stages ??= []; else delete f.stages;
-      render();                    // re-render: the default + values controls depend on type
-    });
-
-    // Default on the line; rebuilt in place when enum values change so the new options become selectable.
-    // A field's enum may hold none chosen (""), which "(none)" writes; blank gives no default, the type's.
-    const dfltOpts = { typed: true, noneChosen: true } as const;
-    let dflt = defaultControl(f, undefined, dfltOpts);
-    const refreshDefault = (): void => { const fresh = defaultControl(f, undefined, dfltOpts); dflt.replaceWith(fresh); dflt = fresh; };
-
-    const acts = el("div", "gd-acts");
-    acts.append(
-      iconBtn("up", "Move up", () => { moveItem(fields, i, -1); render(); }, i === 0),
-      iconBtn("down", "Move down", () => { moveItem(fields, i, 1); render(); }, i === fields.length - 1),
-      iconBtn("close", "Delete field", () => { fields.splice(i, 1); render(); }, false, true),
-    );
-
-    const purpose = el("input", "gd-input") as HTMLInputElement;
-    purpose.type = "text"; purpose.placeholder = "What this field is for"; purpose.value = f.purpose ?? "";
-    purpose.addEventListener("input", () => { f.purpose = purpose.value.trim() || undefined; });
-    const details: HTMLElement[] = [];
-    if (f.type === "enum" || f.type === "flags") details.push(labelled("Values", tagChips(f, refreshDefault)));
-    // A quality's ladder, IN ORDER (position is the meaning). A stage renamed in place carries every node's
-    // value that names it, at save; no expression reads game data, so a reorder changes no gate.
-    if (f.type === "quality") {
-      const kind = activeKind;
-      details.push(labelled("Stages (in order)", stageChips(f, refreshDefault, {
-        onRename: (from, to) => {
-          if (f.default === from) f.default = to;
-          refreshDefault();
-          if (f.name.trim()) renames.push({ scope: "gameData", gameData: kind, name: f.name.trim(), from, to });
-        },
-      })));
-    }
-    details.push(labelled("Purpose", purpose));
-
-    return expandableRow({ line: [name, type, dflt, acts], details });
-  };
-
   const render = (): void => {
-    guard.reset();
     host.replaceChildren();
     const tabs = el("div", "gd-kindtabs");
+    let activeCount: (() => void) | undefined;
     for (const { kind, label } of KINDS) {
       const b = el("button", `gd-kindtab${kind === activeKind ? " active" : ""}`); b.type = "button";
       b.append(document.createTextNode(label));
-      const n = state[kind]?.length ?? 0;
-      if (n) b.append(el("span", "gd-kindcount", String(n)));
+      const count = el("span", "gd-kindcount");
+      const recount = (): void => { const n = state[kind]?.length ?? 0; count.textContent = String(n); if (n) b.append(count); else count.remove(); };
+      recount();
+      if (kind === activeKind) activeCount = recount;
       b.addEventListener("click", () => { activeKind = kind; render(); });
       tabs.append(b);
     }
     host.append(tabs);
 
-    const fields = fieldsOf(activeKind);
-    const list = el("div", "gd-fieldlist");
-    if (!fields.length) list.append(el("p", "empty", "No game-data fields on this node type yet."));
-    else fields.forEach((f, i) => list.append(fieldRow(f, i, fields)));
-    host.append(list);
-    guard.check();
-
-    const add = el("button", "gd-add", "+ Add field"); add.type = "button";
-    add.addEventListener("click", () => { fields.push({ name: "", type: "text" }); render(); focusNewRow(host.querySelector<HTMLElement>(".gd-fieldlist")); });
-    host.append(add);
+    // The kind's fields are the shell's declaration list, as Settings' properties and Storyletter's Card
+    // template are: one type list, purpose, values and the ordered ladder for free. A game-data field name is
+    // the host's word, so the list takes any name and refuses only a duplicate.
+    const kind = activeKind;
+    const listHost = el("div", "gd-fieldlist");
+    host.append(listHost);
+    list = mountPropertyList(listHost, fieldsOf(kind), {
+      noun: "field", names: "free", types: TYPES, typed: true,
+      onChange: () => activeCount?.(),   // the tab's count follows an add or a delete
+      // A field's enum may hold none chosen (""), which "(none)" writes; blank gives no default, the type's.
+      noneChosen: true,
+      addLabel: "+ Add field", emptyText: "No game-data fields on this node type yet.",
+      newDecl: () => ({ name: "", type: "text" }),
+      // A stage renamed in place carries every node's value that names it, at save; no expression reads game
+      // data, so a reorder changes no gate.
+      onStageRename: (f, from, to) => { if (f.name.trim()) renames.push({ scope: "gameData", gameData: kind, name: f.name.trim(), from, to }); },
+    });
   };
 
   render();
@@ -137,7 +92,7 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
       const kind = kindWithDup();
       if (!kind) return null;
       activeKind = kind; render(); // surface the clashing kind so its red field is on screen
-      return guard.firstDuplicate();
+      return list?.firstDuplicate() ?? null;
     },
     stageRenames(): StageRenameDto[] {
       return [...renames];
@@ -152,7 +107,7 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
             if (f.default !== undefined) c.default = f.default;
             if ((f.type === "enum" || f.type === "flags") && f.values?.length) c.values = [...f.values];
             if (f.type === "quality" && f.stages) c.stages = [...f.stages];
-            if (f.purpose) c.purpose = f.purpose;
+            if (f.purpose?.trim()) c.purpose = f.purpose.trim();
             return c;
           });
         if (fields.length) out[kind] = fields;

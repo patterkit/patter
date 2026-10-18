@@ -6,6 +6,21 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **A game data value commits as you type**, as every other field in the family does, and Esc puts back what it
+  held. The inspector keeps your place as it redraws. Each field's purpose shows under its control instead of
+  in a rollover, Flags are picked from the declared values instead of typed with commas, and a Text (multiline)
+  field is a text area.
+- **Project Settings ▸ Game Data is the same declaration list as World properties and Storyletter's Card
+  template**: name, type, default, values or stages, and purpose in one row each, with the same controls. A
+  field name is still any name you like.
+
+### Security
+
+- **Every window carries a content security policy and stays on its own page**: a window no longer navigates
+  away, opens another window or attaches a web view.
+
 ## [0.32.0] - 2026-10-18
 
 ### Added

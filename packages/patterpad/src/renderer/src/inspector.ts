@@ -3,7 +3,7 @@
 // surface's `onSelect` context; a header click jumps to that node (revealNode). The snippet / group
 // CONDITION rows are editable - clicking opens the visual expression editor (M1, editCondition).
 
-import { defaultLabel, fallbackText, iconNode, iconHtml, iconSvg, metaLine, rungStrip } from "@wildwinter/app-shell"; // the family's drawn icon set: one spelling of every icon across the suite; the drawn separator
+import { fieldRows, iconNode, iconHtml, iconSvg, metaLine } from "@wildwinter/app-shell"; // the family's drawn icon set: one spelling of every icon across the suite; the drawn separator
 import type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, GroupPropsPatch, PadSource,
 } from "@patterkit/patterpad-surface/surface";
@@ -61,12 +61,12 @@ function gameDataRows(gd: Record<string, unknown> | undefined): HTMLElement[] {
 }
 
 /** The author-defined gameData fields for a node type, as EDITABLE rows (value or, when unset, the
- *  field default), plus any orphaned keys read-only. The `purpose` is the row's hover hint. */
+ *  field default), plus any orphaned keys read-only. */
 function gameDataFieldRows(kind: GameDataNodeKind, id: string | null, gd: GameData | undefined, h: InspectorHandlers): HTMLElement[] {
   const fields = h.gameDataFields(kind);
   const rows: HTMLElement[] = [];
   const defined = new Set<string>();
-  for (const f of fields) { defined.add(f.name); rows.push(gameDataFieldRow(f, id, gd?.[f.name], h)); }
+  for (const f of fields) { defined.add(f.name); rows.push(gameDataFieldRow(f, id, gd?.[f.name], h, kind)); }
   for (const [k, v] of Object.entries(gd ?? {})) {
     if (!defined.has(k)) { const r = el("div", "insp-row"); r.append(el("span", "insp-key insp-gd", k), el("span", "insp-val insp-mono", typeof v === "string" ? v : JSON.stringify(v))); rows.push(r); }
   }
@@ -83,63 +83,22 @@ function gameDataSection(kind: GameDataNodeKind, id: string | null, gd: GameData
   return sec;
 }
 
-/** One editable gameData field row. `current` is the node's override (undefined = falls back to the
- *  field default). Committing an empty / "default" value clears the override (sparse storage). */
-export function gameDataFieldRow(f: GameDataField, id: string | null, current: unknown, h: Pick<InspectorHandlers, "setGameData">): HTMLElement {
-  const r = el("div", "insp-row insp-gd-row");
-  const key = el("span", "insp-key", f.name);
-  if (f.purpose) key.dataset.tip = f.purpose; // rollover hint
-  r.append(key);
-  const set = (v: unknown): void => { if (id) h.setGameData(id, f.name, v); };
-  const defHint = fallbackText(f);   // what an unset value falls back to: the field's default, else its type's
+/** The game-data rows, kept across the inspector's redraws: the inspector rebuilds its whole stack whenever
+ *  its levels change, and a game-data value is in them, so a value typed into a fresh row every keystroke
+ *  would lose the focus. The shell's cache hands back the same row, focus and caret included. */
+const fieldRowCache = fieldRows();
 
-  if (f.type === "quality" && (f.stages?.length ?? 0) > 0) {
-    // A quality value is a step on the field's LADDER: the family's one strip, the stage marked. Unset, it
-    // says what it falls back to, "default (x)", which also clears an override (sparse storage).
-    const holder = el("span", "insp-gd-rungs");
-    const draw = (value: unknown): void => {
-      holder.replaceChildren(rungStrip({
-        stages: f.stages!, value: typeof value === "string" ? value : undefined, decl: f,
-        ...(id ? { onPick: (stage: string) => { set(stage); draw(stage); }, onClear: () => { set(undefined); draw(undefined); } } : {}),
-      }));
-    };
-    draw(current);
-    r.append(holder);
-    return r;
-  }
-  if (f.type === "boolean" || f.type === "enum") {
-    const sel = el("select", "insp-select") as HTMLSelectElement;
-    const opts: Array<[string, string]> = f.type === "boolean"
-      ? [["", defaultLabel(f)], ["true", "True"], ["false", "False"]]
-      : [["", defaultLabel(f)], ...(f.values ?? []).map((v): [string, string] => [v, v])];
-    for (const [v, l] of opts) { const o = el("option", undefined, l) as HTMLOptionElement; o.value = v; sel.append(o); }
-    sel.value = current == null ? "" : String(current);
-    sel.addEventListener("change", () => {
-      if (sel.value === "") set(undefined);
-      else set(f.type === "boolean" ? sel.value === "true" : sel.value);
-    });
-    if (!id) sel.disabled = true;
-    r.append(sel);
-  } else {
-    const input = el("input", "insp-gd-input") as HTMLInputElement;
-    input.type = f.type === "number" ? "number" : "text";
-    input.placeholder = f.type === "flags" ? `Flags, separated by commas (default: ${defHint})` : `Default is ${defHint}`;
-    input.value = current == null ? "" : Array.isArray(current) ? current.join(", ") : String(current);
-    if (!id) input.disabled = true;
-    // Commit on change (blur / Enter), not per keystroke, which is where this departs from the family's
-    // as-you-type rule (ruling N, 2026-10). The inspector re-renders whenever its levels change, and a
-    // gameData value is in them, so a per-keystroke commit would rebuild this row and drop the focus.
-    // Esc still restores, as everywhere in the family.
-    escRestores(input);
-    input.addEventListener("change", () => {
-      const raw = input.value.trim();
-      if (raw === "") set(undefined);
-      else if (f.type === "flags") set(raw.split(",").map((x) => x.trim()).filter((x) => x.length > 0));
-      else set(f.type === "number" ? Number(raw) : raw);
-    });
-    r.append(input);
-  }
-  return r;
+/** One editable gameData field row: the family's field row (`@wildwinter/app-shell` fieldRow), drawn by the
+ *  field's type, its purpose under it, and unset saying what it falls back to, "default (x)". `current` is the
+ *  node's override (undefined = falls back to the field default); clearing it removes the override (sparse
+ *  storage). A value commits as it is typed, and Esc puts back what the field held, as everywhere in the
+ *  family. Read-only when there is no node to write to. */
+export function gameDataFieldRow(f: GameDataField, id: string | null, current: unknown, h: Pick<InspectorHandlers, "setGameData">, kind = ""): HTMLElement {
+  return fieldRowCache.row(`${kind}\u0000${id ?? ""}\u0000${f.name}`, {
+    decl: f, value: current ?? undefined, disabled: id === null,
+    onCommit: (v) => { if (id) h.setGameData(id, f.name, v); },
+    className: "insp-row insp-gd-row", labelClassName: "insp-key", controlClassName: "insp-gd-input",
+  });
 }
 
 /** Esc puts back the value the field held when it got focus (the family's field rule, ruling N). The
@@ -831,7 +790,8 @@ export function renderInspector(host: HTMLElement, ctx: InspectorContext, h: Ins
   host.replaceChildren();
   if (!ctx.levels.length) {
     host.append(el("p", "empty", "Click in the script to inspect what's there."));
-    return;
+  } else {
+    for (const lv of ctx.levels) host.append(levelView(lv, h));
   }
-  for (const lv of ctx.levels) host.append(levelView(lv, h));
+  fieldRowCache.sweep();
 }
