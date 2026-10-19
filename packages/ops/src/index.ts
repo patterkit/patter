@@ -60,7 +60,7 @@ export type { InitOptions, InitResult, InitVcs, BundlePosture } from "./init.js"
 export { runResolve, runSearch, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runFieldBrowse, listGameDataFields } from "./resolve.js";
 export type { ResolveEntry, SearchFocus } from "./resolve.js";
 export { runReplace } from "./replace.js";
-export type { ReplaceOptions, ReplaceHit, ReplacePlan } from "./replace.js";
+export type { ReplaceOptions, ReplaceHit, ReplacePlan, ReplaceField } from "./replace.js";
 export { renameStage, renameGameDataStage, renameStageInExpression, stageGateCount, stageDialect } from "./stages.js";
 export type { GameDataStageRenameResult, StageTarget, StageRenameResult } from "./stages.js";
 // Pin on publish: Build Bundle writes down every scene and block address still following its name

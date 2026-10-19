@@ -17,6 +17,7 @@ const fieldHits: SearchEntry[] = [
   { id: "L_work", kind: "beat", text: "Aye - rats in the cellar.", location: ["The Tavern", "Bar"], sceneId: "scn_tavern", field: { name: "mood", type: "enum", value: "calm", isDefault: true } },
   { id: "sn_barks", kind: "snippet", text: "A patron mutters into their ale.", location: ["The Tavern", "Bar"], sceneId: "scn_tavern", field: { name: "mood", type: "text", value: "", isDefault: false } },
 ];
+const gameDataNote = "The stranger arrives at dusk.\nKeep the room quiet.";
 const statusHits: SearchEntry[] = [
   { id: "L_greet", kind: "beat", text: "What'll it be, stranger?", location: ["The Tavern", "Intro"], sceneId: "scn_tavern" },
 ];
@@ -52,7 +53,11 @@ const stub = {
   replacePreview: async (opts: { query: string; replacement: string }) => {
     const hits = opts.query.trim()
       ? contentHits.filter((e) => e.text?.toLowerCase().includes(opts.query.toLowerCase()))
-          .map((e) => ({ id: e.id, sceneId: e.sceneId, location: e.location, before: e.text!, after: e.text!.replaceAll(opts.query, opts.replacement) }))
+          .map((e) => ({ id: e.id, field: "text" as `field:${string}` | "text", sceneId: e.sceneId, location: e.location, before: e.text!, after: e.text!.replaceAll(opts.query, opts.replacement) }))
+          // A multiline gameData value, as a Game Data row shows one.
+          .concat(gameDataNote.toLowerCase().includes(opts.query.toLowerCase())
+            ? [{ id: "scn_tavern", field: "field:note", sceneId: "scn_tavern", location: ["The Tavern"], before: gameDataNote, after: gameDataNote.replaceAll(opts.query, opts.replacement) }]
+            : [])
       : [];
     return { hits, scenes: new Set(hits.map((h) => h.sceneId)).size };
   },

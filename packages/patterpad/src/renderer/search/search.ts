@@ -235,23 +235,29 @@ const renderReplace = (): void => {
   for (const h of replaceHits) {
     const r = document.createElement("div"); r.className = "swin-row swin-rrow";
     const diff = document.createElement("span"); diff.className = "swin-name";
+    // A gameData value says which field it is (`note:`), as the Field tab's rows do.
+    if (h.field !== "text") {
+      const f = document.createElement("span"); f.className = "swin-rfield"; f.textContent = `${h.field.slice("field:".length)}:`;
+      diff.append(f);
+    }
     const before = document.createElement("span"); before.className = "swin-before"; before.textContent = h.before;
     const arrow = document.createElement("span"); arrow.className = "swin-arrow"; arrow.append(iconNode("arrowRight", 12));
     const after = document.createElement("span"); after.className = "swin-after"; after.textContent = h.after;
     diff.append(before, arrow, after);
     const loc = document.createElement("span"); loc.className = "swin-loc"; loc.append(locationCrumbs(h.location));
     const btn = document.createElement("button"); btn.type = "button"; btn.className = "swin-rone"; btn.textContent = "Replace";
-    btn.addEventListener("click", () => void applyReplace(h.id));
+    btn.addEventListener("click", () => void applyReplace(h));
     r.append(diff, loc, btn);
     resultsEl.append(r);
   }
 };
 
-/** Apply the replacement: all matches, or just `onlyId`. Confirm bulk changes; never touch ids/addresses. */
-const applyReplace = async (onlyId?: string): Promise<void> => {
-  const n = onlyId ? 1 : replaceHits.length;
+/** Apply the replacement: all matches, or just `one` (that node's one text). Confirm bulk changes; never
+ *  touch ids/addresses. */
+const applyReplace = async (one?: ReplaceHitDto): Promise<void> => {
+  const n = one ? 1 : replaceHits.length;
   if (n === 0) return;
-  if (!onlyId) {
+  if (!one) {
     const scenes = new Set(replaceHits.map((h) => h.sceneId)).size;
     const ok = await confirmDialog({
       title: `Replace ${plural(n, "occurrence")} across ${plural(scenes, "scene")}?`,
@@ -262,7 +268,7 @@ const applyReplace = async (onlyId?: string): Promise<void> => {
     });
     if (!ok) return;
   }
-  const res = await search.replaceApply({ ...replaceOpts(), onlyId });
+  const res = await search.replaceApply({ ...replaceOpts(), ...(one ? { onlyId: one.id, onlyField: one.field } : {}) });
   if (!res.ok) { toast(`Replace failed: ${res.error ?? "unknown error"}`, "error"); return; }
   await runReplacePreview(); // refresh: the applied hits are gone
 };

@@ -182,6 +182,28 @@ describe("every write in the project history undoes and redoes to the exact byte
     expect(readFileSync(join(dir, "loc", "en", "tavern.patterloc"), "utf8")).toContain("friend");
   });
 
+  it("Replace over a text gameData value: the flow shard is the step, and the working copy follows", async () => {
+    // The fixture declares no fields: declare the street scene's `music` as text, then open.
+    const dir = join(mkdtempSync(join(tmpdir(), "pp-history-")), "tavern.patter");
+    cpSync(TAVERN, dir, { recursive: true });
+    const projPath = join(dir, "tavern.patterproj");
+    const proj = parseSource(readFileSync(projPath, "utf8")) as Record<string, unknown>;
+    writeFileSync(projPath, canonicalStringify({ ...proj, gameDataFields: { scene: [{ name: "music", type: "text" }] } }));
+    project.openProject(dir);
+    project.hydrate();
+    const flowPath = join(dir, "scenes", "street.patterflow");
+    const original = readFileSync(flowPath, "utf8");
+    expect(project.replacePreview({ query: "street_theme", replacement: "lane_theme" }).hits).toMatchObject([{ id: "scn_street", field: "field:music" }]);
+    const res = await project.applyReplace({ query: "street_theme", replacement: "lane_theme" });
+    expect(res).toMatchObject({ ok: true, count: 1, scenes: 1 });
+    expect((parseSource(readFileSync(flowPath, "utf8")) as FlowFile).scene.gameData).toEqual({ music: "lane_theme" });
+    // The working copy holds the new value, so the next preview starts from it.
+    expect(project.replacePreview({ query: "street_theme", replacement: "x" }).hits).toHaveLength(0);
+    expect(project.replacePreview({ query: "lane_theme", replacement: "x" }).hits).toHaveLength(1);
+    expect(await undo()).toMatchObject({ ok: true, label: "Replace" });
+    expect(readFileSync(flowPath, "utf8")).toBe(original);
+  });
+
   it("writing status, recording status, re-record, and notes: each a step of its own (ruling 3)", async () => {
     const dir = openCopy();
     await roundTrip(dir, () => project.saveSceneWriting("scn_tavern", { L_greet: "draft" }), "Writing Status");

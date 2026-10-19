@@ -12,6 +12,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   Data field, such as `mood`, to list every node that has it with the value it holds, or narrow it with
   `mood = tense` or `mood != calm`. A node that sets nothing holds the field's default, which the row marks.
   Storyletter's Find has the same tab and reads a query the same way (family parity item 16).
+- **Replace covers Game Data text.** Replace now finds and rewrites the values nodes set for text and multiline
+  Game Data fields, as well as dialogue, text, and choice text. Each such row names its field, and its own
+  Replace button changes just that value. Other field types and a field's default are left alone. Storyletter's
+  Replace covers its field values the same way (family parity item 16).
 
 ## [0.36.0] - 2026-10-19
 

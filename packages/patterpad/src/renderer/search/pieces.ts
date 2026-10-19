@@ -28,7 +28,7 @@ export function modeHint(mode: SearchMode): HTMLElement[] {
     case "qualifier": return [lead("Pick a qualifier, then type to filter"), hintBar([MOVE, JUMP])];
     case "property": return [lead("Find where a property is used"), hintBar([MOVE, JUMP])];
     case "field": return [lead("Find nodes by a Game Data value"), hintBar([MOVE, JUMP])];
-    case "replace": return [lead("Replaces dialogue, text, and choice text across every scene. Review, then Replace all.")];
+    case "replace": return [lead("Replaces dialogue, text, choice text, and Game Data text across every scene. Review, then Replace all.")];
     case "suggestions": return [lead("Pick a handoff, or All. Click a line to see it; out-of-date suggestions stay open.")];
     default: return [hintBar([MOVE, JUMP, CLOSE]), lead("Drag the bar to move this window")];
   }

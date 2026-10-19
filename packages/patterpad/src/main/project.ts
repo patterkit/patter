@@ -1144,7 +1144,8 @@ export function tagList(): Array<{ name: string; count: number }> {
   return listProjectTags(loaded);
 }
 
-/** Replace PREVIEW (no writes): the source-prose hits a project-wide replacement would make (#231 follow-up). */
+/** Replace PREVIEW (no writes): the hits a project-wide replacement would make, in the source prose and in
+ *  text and multiline gameData values (#231 follow-up, family parity item 16). */
 export function replacePreview(opts: ReplaceOptions): { hits: ReplaceHit[]; scenes: number } {
   if (!opts.query.trim()) return { hits: [], scenes: 0 };
   ensureHydrated(); // spans every scene
@@ -1162,7 +1163,10 @@ export function applyReplace(opts: ReplaceOptions): Promise<SaveResult & { step?
     ensureHydrated();
     const plan = runReplace(loaded, opts);
     if (plan.writes.length === 0) return { ok: true, count: 0, scenes: 0 };
-    const res = await projectCommit("Replace", freshKey("replace"), plan.writes);
+    // A rebuilt flow shard keeps the `unresolved` mark its file carries, as every other flow write here does.
+    const flowPaths = new Set(plan.flows.map((f) => f.path));
+    const writes = plan.writes.map((w) => (flowPaths.has(w.path) ? { ...w, content: withDiskMark(w.path, w.content) } : w));
+    const res = await projectCommit("Replace", freshKey("replace"), writes);
     if (!res.ok) return { ...res, count: 0, scenes: 0 };
     // Swap the rewritten shards into the working copy (element-swap busts the search index cache + makes the
     // open scene's reload read the new strings).
@@ -1177,6 +1181,12 @@ export function applyReplace(opts: ReplaceOptions): Promise<SaveResult & { step?
       const i = loaded.authoringFiles.indexOf(a.path);
       if (i >= 0) loaded.authoring[i] = a.file;
       else { loaded.authoringFiles.push(a.path); loaded.authoring.push(a.file); }
+    }
+    // And the scenes whose gameData values changed (element swap, never in place, as pins do).
+    for (const { scene } of plan.flows) {
+      const i = loaded.scenes.findIndex((s) => s.id === scene.id);
+      if (i >= 0) loaded.scenes[i] = scene;
+      sourceMirror.delete(scene.id);
     }
     return { ok: true, count: plan.hits.length, scenes: plan.scenes, ...(res.step ? { step: res.step } : {}) };
   });

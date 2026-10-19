@@ -108,6 +108,7 @@ body.swin {
 }
 .swin-rrow .swin-loc { grid-column: 1; grid-row: 2; max-width: 100%; }
 .swin-rrow .swin-rone { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.swin-rfield { margin-right: 5.5px; color: var(--ink-soft); font: 12px var(--font-ui); }
 .swin-before { color: var(--muted); } /* muted (not struck) - the → after + ink colour shows the change */
 .swin-arrow { display: inline-flex; vertical-align: middle; margin: 0 5.5px; color: var(--muted); }
 .swin-after { color: var(--ink); }

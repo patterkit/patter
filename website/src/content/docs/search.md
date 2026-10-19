@@ -51,8 +51,10 @@ not just the open one. Type what to find, type the replacement, and the list pre
 **before → after**. **Replace all** then rewrites every match at once, asking you to confirm the
 count first. The **Replace** button on any row applies just that one.
 
-Replace only ever touches **dialogue, text, and choice text** in your source language. It never
-touches ids or Game IDs, conditions or effects, or your translations. Every change is written through
+Replace only ever touches **dialogue, text, and choice text** in your source language, and the values
+nodes set for **Game Data fields of type text or multiline**. A Game Data row names its field, such as
+`note:`. It never touches ids or Game IDs, conditions or effects, other Game Data types (an enum, a
+quality, a number), a field's default (change that in Project Settings), or your translations. Every change is written through
 version control, so a project-wide replace is one commit you can review and undo. Your open scene is saved
 before the replace runs, and reloads with the new text afterward.
 

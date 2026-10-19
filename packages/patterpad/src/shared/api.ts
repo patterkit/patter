@@ -697,19 +697,23 @@ export interface SearchEntry {
   field?: { name: string; type: string; value: string; isDefault: boolean };
 }
 
-/** A project-wide find-and-replace request (source-language prose only). Mirrors ops `ReplaceOptions`. */
+/** A project-wide find-and-replace request (source-language prose, and text and multiline gameData values).
+ *  Mirrors ops `ReplaceOptions`. */
 export interface ReplaceQuery {
   query: string;
   replacement: string;
   caseSensitive?: boolean;
   wholeWord?: boolean;
-  /** Restrict to one beat id (the per-row "Replace this one"). */
+  /** Restrict to one node id (the per-row "Replace this one"), and with `onlyField` to one of its texts. */
   onlyId?: string;
+  onlyField?: ReplaceHitDto["field"];
 }
 
 /** One previewed replacement (for the confirm list). Mirrors ops `ReplaceHit`. */
 export interface ReplaceHitDto {
   id: string;
+  /** The node's prose (`text`) or one of its gameData values (`field:<name>`). */
+  field: "text" | `field:${string}`;
   sceneId: string;
   location: string[];
   before: string;
