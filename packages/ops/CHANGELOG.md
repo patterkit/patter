@@ -1,5 +1,22 @@
 # @patterkit/ops
 
+## 0.23.0
+
+### Minor Changes
+
+- b0e8f5e: `runFieldBrowse(loaded, query, focus?)` finds every node by a gameData field's value (`mood`, `mood = tense`, `mood != calm`), read by `@wildwinter/toolkit`'s shared field matcher, so Patterpad's and Storyletter's Field tabs read a query the same way. The value tested is the one that holds: the node's own, else the field's declared default. Each row carries a `field` (name, type, the value as text, and `isDefault`). `listGameDataFields(loaded)` lists the declared fields by name with the node kinds that declare them.
+- 105884d: Patter extensions can declare a `pick` field (`@wildwinter/toolkit` 0.2.5): one choice from fixed words, the nodes of a reference kind such as the cast, and lists of text on the extension's own project node. The compiler checks each value against them, from the extension's project entry wherever its shard sits: a value no source holds is an error (`not-a-choice`), one two sources hold a warning (`pick-ambiguous`), and each name two sources hold is reported once for the project (`pick-clash`), so `patter validate` catches a misspelt name. A cast rename rewrites the pick values naming the member (`renameCastKeys`), as it rewrites references; a renamed entry of a project list isn't followed, so a value naming the old entry is reported missing.
+- 3b48e93: `runReplace` also rewrites each node's own value for a gameData field declared `text` or `multiline` (family parity item 16, as Storyletter's replace covers string field values). Every `ReplaceHit` carries a `field`, `"text"` for the source prose or `field:<name>` for a gameData value, and `ReplaceOptions.onlyField` narrows `onlyId` to one of them. The plan's new `flows` holds the rewritten scenes, whose flow shard writes come last in `writes`. Other field types and declared defaults are never touched, and a field value stamps no `modifiedAt`, as it has no translations.
+
+### Patch Changes
+
+- 00db6be: Uses `@patterkit/runtime` 0.33.0, the Patterplay 0.33.0 release.
+- 35964cc: Version-control setup and `patter mergetool` now come from `@wildwinter/toolkit` 0.2.3's shared `vcs` module, the same copy Storylets uses. Every pattern, attribute, and command in the generated files is unchanged; their wording is tidied and their rows are column-aligned. `mergetool` keeps its order and exit codes.
+- Updated dependencies [105884d]
+- Updated dependencies [35964cc]
+  - @patterkit/compiler@0.13.0
+  - @patterkit/core@0.9.4
+
 ## 0.22.0
 
 ### Minor Changes
