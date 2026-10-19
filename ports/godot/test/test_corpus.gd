@@ -837,10 +837,13 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 				# Static read of a scene's or block's OWN Patter extension values, raw, by extension id.
 				# Values are any JSON, so they compare deeply (key order not significant, and numbers by
 				# value: Godot's JSON parser gives floats). Scene alone = the scene accessor, scene + block
-				# = the block accessor.
+				# = the block accessor, snippet (no scene, corpus 6) = the snippet accessor.
 				var ext: Dictionary
-				var ext_scope: String = str(op["scene"])
-				if op.has("block"):
+				var ext_scope: String = str(op.get("scene", ""))
+				if op.has("snippet"):
+					ext = holder["engine"].extensions_for_snippet(op["snippet"])
+					ext_scope = "snippet " + str(op["snippet"])
+				elif op.has("block"):
 					ext = holder["engine"].extensions_for_block(op["scene"], op["block"])
 					ext_scope += "/" + str(op["block"])
 				else:

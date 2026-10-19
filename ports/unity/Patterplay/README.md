@@ -100,8 +100,8 @@ and the outline's beats, blocks, and scenes also carry `Extensions`: each extens
 the bundle wrote them, as a neutral tree (`OrderedMap<string, object>`, `List<object>`, `double`, `string`,
 `bool`, or null), and null when the node has none. The engine never reads them. Fill in an extension's
 defaults with `GameDataHelpers.EffectiveGameData(GameDataHelpers.ExtensionDecls(bundle, "lighting", "line"),
-step.Extensions?.GetOrDefault("lighting"))`. `engine.ExtensionsForScene` and `engine.ExtensionsForBlock` read a
-scene's and a block's own, and `GameDataHelpers.ExtensionsOf(bundle, kind, address)` reads any node's: the
+step.Extensions?.GetOrDefault("lighting"))`. `engine.ExtensionsForScene`, `engine.ExtensionsForBlock` and
+`engine.ExtensionsForSnippet` read a scene's, a block's and a snippet's own, and `GameDataHelpers.ExtensionsOf(bundle, kind, address)` reads any node's: the
 project's (no address), a scene's, a block's (`"scene/block"`), or a snippet's, an option's or a beat's by its
 id.
 

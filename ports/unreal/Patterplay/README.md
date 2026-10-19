@@ -128,7 +128,8 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   `Extensions` on a line, text or game event step (a replayed prompt and `StepFor` included), on each
   option, and on the outline's scenes, blocks and beats, as `FPatterExtensionValues` (the extension id and
   its values, each an `FPatterExtensionEntry` of name and JSON text, since a value may be a record, a map
-  or a list). `Engine->ExtensionsForScene` / `ExtensionsForBlock` read a scene's or a block's own. On
+  or a list). `Engine->ExtensionsForScene` / `ExtensionsForBlock` / `ExtensionsForSnippet` read a scene's, a block's or a
+  snippet's own. On
   `UPatterGameData`: `ExtensionDecls(Bundle, Extension, Kind)` gives the declarations, every default
   resolved (in `DefaultJson`, and typed as well when it's a scalar); `GetEffectiveExtensionValues` fills
   in what a node leaves out; `ExtensionsOf(Bundle, Kind, Address)` reads any node's values (the project, a

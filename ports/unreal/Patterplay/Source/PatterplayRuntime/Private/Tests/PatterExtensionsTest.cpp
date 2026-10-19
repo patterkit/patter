@@ -51,7 +51,7 @@ namespace
     "s_x": { "id": "s_x", "type": "scene", "name": "Harbour", "extensions": { "probe": { "theme": "harbour" } },
       "blocks": [{ "id": "b_main", "type": "block", "name": "Main", "extensions": { "probe": { "pace": 2 } },
         "children": [
-          { "id": "sn_a", "type": "snippet", "beats": [
+          { "id": "sn_a", "type": "snippet", "extensions": { "probe": { "weight": 3 } }, "beats": [
             { "id": "L_one", "kind": "line", "character": "ANNA",
               "extensions": { "probe": { "note": "lights down", "cue": { "sound": "bell", "gain": 0.5 } } } },
             { "id": "E_one", "kind": "gameEvent", "extensions": { "probe": { "cue": "thunder" } } }] },
@@ -165,6 +165,9 @@ bool FPatterExtensionsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("ExtensionsForScene"), JsonOf(Engine->ExtensionsForScene(TEXT("harbour")), TEXT("probe"), TEXT("theme")), FString(TEXT("\"harbour\"")));
 	TestEqual(TEXT("ExtensionsForBlock"), JsonOf(Engine->ExtensionsForBlock(TEXT("s_x"), TEXT("main")), TEXT("probe"), TEXT("pace")), FString(TEXT("2")));
 	TestEqual(TEXT("ExtensionsForScene: an unknown ref"), Engine->ExtensionsForScene(TEXT("nowhere")).Num(), 0);
+	TestEqual(TEXT("ExtensionsForSnippet"), JsonOf(Engine->ExtensionsForSnippet(TEXT("sn_a")), TEXT("probe"), TEXT("weight")), FString(TEXT("3")));
+	TestEqual(TEXT("ExtensionsForSnippet: a snippet with none"), Engine->ExtensionsForSnippet(TEXT("sn_go")).Num(), 0);
+	TestEqual(TEXT("ExtensionsForSnippet: an option is not a snippet"), Engine->ExtensionsForSnippet(TEXT("o_go")).Num(), 0);
 	{
 		const TArray<FPatterOutlineScene> Outline = Engine->GetOutline();
 		if (TestEqual(TEXT("one scene"), Outline.Num(), 1) && TestEqual(TEXT("one block"), Outline[0].Blocks.Num(), 1))

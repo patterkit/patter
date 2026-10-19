@@ -1112,6 +1112,16 @@ func extensions_for_block(scene_ref: String, block_ref: String) -> Dictionary:
 	return _own_extensions(_host.block_by_id[block_id])
 
 
+## A snippet's own Patter extension values, by snippet id (as a beat sequence or a step names it). Raw,
+## like extensions_for_scene(): its scene's and block's are not folded in. Empty when the snippet has none,
+## the id is unknown, or it names a node that isn't a snippet.
+func extensions_for_snippet(snippet_id: String) -> Dictionary:
+	var node: Dictionary = _host.node_index.get(snippet_id, {})
+	if node.get("type", "") != "snippet":
+		return {}
+	return _own_extensions(node)
+
+
 # A node's own extension values as a fresh shallow copy, or {} when it has none.
 static func _own_extensions(node: Dictionary) -> Dictionary:
 	var ext = node.get("extensions", null)

@@ -208,7 +208,10 @@ export type ScriptOp =
   // `expectResult` is the node's values by extension id, raw, exactly as the bundle carries them: `{}` for a
   // node with none or a ref that doesn't resolve. Values are any JSON, compared deeply; key order is not part
   // of the contract.
+  // A snippet's own values (corpus 6): `snippet` alone, no `scene`, = `extensionsForSnippet` (by node id; `{}`
+  // for an id that names no snippet).
   | { op: "expectExtensions"; scene: string; block?: string; expectResult: NodeExtensions }
+  | { op: "expectExtensions"; snippet: string; expectResult: NodeExtensions }
   // Any node's extension values, read off the BUNDLE by the helper `extensionsOf(bundle, kind, address)`
   // (corpus 3): `project` (no address); `scene` by id or gameId; `block` as "scene/block", each by id or
   // gameId; `snippet`, `line`, `text`, `gameEvent` and `option` by node id (a node of another kind reads as

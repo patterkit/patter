@@ -28,8 +28,10 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  5: action text (patterkit design/proposals/action-text.md): `action: true` on a transcript's text step, for
  *  a dialogue scene's text in a project that doesn't localise it, whose text is the source in every locale.
  *  No earlier expectation changed.
+ *  6: `expectExtensions` with `snippet` (and no `scene`): a snippet's own values, `extensionsForSnippet`.
+ *  No earlier expectation changed.
  */
-export const CORPUS_VERSION = 5;
+export const CORPUS_VERSION = 6;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at

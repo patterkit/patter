@@ -125,6 +125,7 @@ const API = [
   // `expectExtensions` script op (corpus 3).
   { on: "Engine", js: "extensionsForScene", unity: "ExtensionsForScene", godot: "extensions_for_scene", unreal: "extensionsForScene", bp: "ExtensionsForScene" },
   { on: "Engine", js: "extensionsForBlock", unity: "ExtensionsForBlock", godot: "extensions_for_block", unreal: "extensionsForBlock", bp: "ExtensionsForBlock" },
+  { on: "Engine", js: "extensionsForSnippet", unity: "ExtensionsForSnippet", godot: "extensions_for_snippet", unreal: "extensionsForSnippet", bp: "ExtensionsForSnippet" },
   // The extension helpers, read off a bundle beside the gameData helpers, corpus-gated by the
   // `expectNodeExtensions` script op: an extension's declarations for a node kind, and any node's values.
   { on: "Bundle", js: "extensionDecls", unity: "ExtensionDecls", godot: "extension_decls", unreal: "extensionDecls", bp: "ExtensionDecls" },

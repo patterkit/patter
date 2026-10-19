@@ -1084,8 +1084,17 @@ namespace Patterkit.Patterplay.TestHost
                             }
                             case "expectExtensions":
                             {
-                                // Static read of a scene's / block's OWN raw Patter extension values (corpus 3):
-                                // any JSON, compared deeply, key order ignored.
+                                // Static read of a scene's / block's OWN raw Patter extension values (corpus 3), or
+                                // a snippet's (corpus 6, `snippet` and no `scene`): any JSON, compared deeply, key
+                                // order ignored.
+                                if (op.TryGetProperty("snippet", out var esn))
+                                {
+                                    var gotSn = engine.ExtensionsForSnippet(esn.GetString());
+                                    string wantSn = ShowJson(op.GetProperty("expectResult")), gotSnText = ShowJson(gotSn);
+                                    if (wantSn != gotSnText)
+                                        throw new Exception($"expectExtensions snippet {esn.GetString()}: expected {wantSn}, got {gotSnText}");
+                                    break;
+                                }
                                 string es = op.GetProperty("scene").GetString();
                                 bool hasBlock = op.TryGetProperty("block", out var eb);
                                 var got = hasBlock ? engine.ExtensionsForBlock(es, eb.GetString()) : engine.ExtensionsForScene(es);

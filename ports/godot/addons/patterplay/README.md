@@ -102,8 +102,8 @@ In `demo/` (delete the folder freely):
 - **Patter extension values**: when the project uses Patter extensions, a `"line"`, `"text"` or
   `"gameEvent"` step, a choice option, and each scene, block and beat of `get_outline()` carry
   `extensions`, by extension id, raw as the bundle wrote them (any JSON), and only when the node has any.
-  `engine.extensions_for_scene(ref)` and `engine.extensions_for_block(scene, block)` read a scene's and a
-  block's own. Fill in an extension's defaults with the same helper, given its declarations:
+  `engine.extensions_for_scene(ref)`, `engine.extensions_for_block(scene, block)` and
+  `engine.extensions_for_snippet(snippet_id)` read a scene's, a block's and a snippet's own. Fill in an extension's defaults with the same helper, given its declarations:
   `PatterBundle.effective_game_data(PatterBundle.extension_decls(bundle, id, kind), step["extensions"].get(id))`.
   `PatterBundle.extensions_of(bundle, kind, address)` reads any node's values off the bundle: `"project"`
   (no address), `"scene"`, `"block"` (`"scene/block"`), or a `"snippet"`, `"option"`, `"line"`, `"text"` or

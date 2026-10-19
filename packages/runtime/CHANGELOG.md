@@ -33,6 +33,14 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **`engine.extensionsForSnippet(snippetId)`** reads a snippet's own Patter extension values, beside
+  `extensionsForScene` and `extensionsForBlock`: raw and sparse, a fresh object, empty when the snippet has none,
+  the id is unknown, or it names a node that isn't a snippet. A snippet is named by its id, as a beat sequence or a
+  step names it. On all four runtimes, in the API parity check and the conformance corpus (version 6:
+  `expectExtensions` with `snippet`).
+
 ## [0.32.0] - 2026-10-19
 
 ### Added

@@ -2743,6 +2743,14 @@ namespace patter
             auto it = host_.blockById.find(resolveBlockRef(resolveSceneRef(sceneRef), blockRef));
             return it != host_.blockById.end() ? it->second->extensions : NodeExtensions{};
         }
+        // A snippet's own Patter extension values, by snippet id (as a beat sequence or a step names it). Raw,
+        // like extensionsForScene; its scene's and block's are not folded in. Empty when the snippet has none,
+        // the id is unknown, or it names a node that isn't a snippet.
+        NodeExtensions extensionsForSnippet(const std::string& snippetId)
+        {
+            auto it = host_.nodeIndex.find(snippetId);
+            return it != host_.nodeIndex.end() && it->second->isSnippet() ? it->second->extensions : NodeExtensions{};
+        }
 
         // Every cast member the PROJECT declares, in authored order - the same list describeBundle
         // counts. A superset of any scene's cast: a beat's character must be a declared member, so

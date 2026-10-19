@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- `engine.extensions_for_snippet(snippet_id)` reads a snippet's own Patter extension values, beside the scene and block
+  accessors: raw and sparse, a fresh copy, empty when the snippet has none, the id is unknown, or it names a
+  node that isn't a snippet. A snippet is named by its id, as a beat sequence or a step names it.
+
 ## [0.32.0] - 2026-10-19
 
 ### Changed

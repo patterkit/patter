@@ -563,6 +563,13 @@ TArray<FPatterExtensionValues> UPatterEngine::ExtensionsForBlock(const FString& 
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
 }
 
+TArray<FPatterExtensionValues> UPatterEngine::ExtensionsForSnippet(const FString& SnippetId) const
+{
+	if (!Engine) return {};
+	try { return ToUeExtensions(Engine->extensionsForSnippet(Std(SnippetId))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
+}
+
 TArray<FPatterStep> UPatterEngine::RunFlow(const FString& FlowName, const FString& Scene, const FString& Block)
 {
 	TArray<FPatterStep> Played;

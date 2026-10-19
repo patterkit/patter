@@ -3632,6 +3632,12 @@ const scriptedExtensions: ScriptedFixture = {
     { op: "expectExtensions", scene: "the-probe", block: "main", expectResult: { probe: { pace: 2 } } },
     { op: "expectExtensions", scene: "nowhere", expectResult: {} },
     { op: "expectExtensions", scene: "s_probe", block: "nowhere", expectResult: {} },
+    // A snippet's own values, by id; none for one with none, an unknown id, or a node that isn't a snippet.
+    { op: "expectExtensions", snippet: "sn_a", expectResult: { probe: { weight: 3 } } },
+    { op: "expectExtensions", snippet: "sn_go", expectResult: {} },
+    { op: "expectExtensions", snippet: "nowhere", expectResult: {} },
+    { op: "expectExtensions", snippet: "o_go", expectResult: {} },
+    { op: "expectExtensions", snippet: "L_full", expectResult: {} },
     // Any node, off the bundle.
     { op: "expectNodeExtensions", kind: "project", expectResult: { probe: { studio: "Wildwinter" } } },
     { op: "expectNodeExtensions", kind: "project", effective: { extension: "probe" }, expectResult: { studio: "Wildwinter" } },

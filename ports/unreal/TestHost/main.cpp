@@ -1046,18 +1046,22 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                     }
                     ++gameDataReads;
                 }
-                // Static scene / block Patter extension values (corpus 3): the node's own, raw, by extension id.
-                // Compared deeply; key order is not significant (matchValue finds each key).
+                // Static scene / block Patter extension values (corpus 3), or a snippet's (corpus 6, `snippet` and
+                // no `scene`): the node's own, raw, by extension id. Compared deeply; key order is not significant
+                // (matchValue finds each key).
                 else if (kind == "expectExtensions")
                 {
-                    const std::string scene = op.at("scene").str;
-                    const bool forBlock = op.has("block");
-                    const JsonValue produced = extensionsToJson(forBlock ? engine->extensionsForBlock(scene, op.at("block").str)
+                    const bool forSnippet = op.has("snippet");
+                    const std::string scene = forSnippet ? std::string() : op.at("scene").str;
+                    const bool forBlock = !forSnippet && op.has("block");
+                    const JsonValue produced = extensionsToJson(forSnippet ? engine->extensionsForSnippet(op.at("snippet").str)
+                                                              : forBlock ? engine->extensionsForBlock(scene, op.at("block").str)
                                                                          : engine->extensionsForScene(scene));
                     const JsonValue& want = op.at("expectResult");
                     if (!matchValue(produced, want))
                     {
-                        const std::string scope = forBlock ? scene + "/" + op.at("block").str : scene;
+                        const std::string scope = forSnippet ? "snippet " + op.at("snippet").str
+                                                : forBlock ? scene + "/" + op.at("block").str : scene;
                         throw std::runtime_error("expectExtensions " + scope + ": expected " + dump(want) + ", got " + dump(produced));
                     }
                     ++extensionReads;

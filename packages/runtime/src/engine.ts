@@ -1038,6 +1038,13 @@ export class Engine {
     const block = id != null ? this.host.blockById.get(id) : undefined;
     return { ...block?.extensions };
   }
+  /** A snippet's own Patter extension values, by snippet id (as a beat sequence or a step names it). Raw, like
+   *  {@link extensionsForScene}; its scene's and block's are not folded in. Empty when none / unknown, or when
+   *  the id names a node that isn't a snippet. */
+  extensionsForSnippet(snippetId: string): NodeExtensions {
+    const node = this.host.nodeIndex.get(snippetId);
+    return node?.type === "snippet" ? { ...node.extensions } : {};
+  }
 
   /**
    * Every cast member the PROJECT declares, in authored order - the same list `describeBundle` counts.

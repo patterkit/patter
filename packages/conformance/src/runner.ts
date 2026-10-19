@@ -215,8 +215,9 @@ export function runScript(
         break;
       }
       case "expectExtensions": {
-        const got = op.block === undefined ? engine.extensionsForScene(op.scene) : engine.extensionsForBlock(op.scene, op.block);
-        const scope = op.block === undefined ? op.scene : `${op.scene}/${op.block}`;
+        const got = "snippet" in op ? engine.extensionsForSnippet(op.snippet)
+          : op.block === undefined ? engine.extensionsForScene(op.scene) : engine.extensionsForBlock(op.scene, op.block);
+        const scope = "snippet" in op ? `snippet ${op.snippet}` : op.block === undefined ? op.scene : `${op.scene}/${op.block}`;
         if (showJson(got) !== showJson(op.expectResult)) {
           throw new Error(`expectExtensions ${scope}: expected ${showJson(op.expectResult)}, got ${showJson(got)}`);
         }

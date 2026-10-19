@@ -318,6 +318,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
 	TArray<FPatterExtensionValues> ExtensionsForBlock(const FString& SceneRef, const FString& BlockRef) const;
 
+	// A snippet's own Patter extension values (raw), by snippet id; its scene's and block's are not folded in.
+	// Empty when it has none, the id is unknown, or it names a node that isn't a snippet.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	TArray<FPatterExtensionValues> ExtensionsForSnippet(const FString& SnippetId) const;
+
 	// "Play this address and give me everything it produced" - the one-call bark form. The NAMED flow is
 	// reused if it already exists (moved with Goto) and opened at the address if not, then run to its next
 	// stop. Reuse is the point: a flow owns its selector cursors, so a shuffle keeps its bag and a

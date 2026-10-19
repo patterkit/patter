@@ -930,6 +930,14 @@ namespace Patterkit.Patterplay
             return GameDataHelpers.CopyExtensions(id != null && _host.BlockById.TryGetValue(id, out var block) ? block.Extensions : null);
         }
 
+        /// <summary>A snippet's own Patter extension values, by snippet id (as a beat sequence or a step names
+        /// it). Raw, like ExtensionsForScene; its scene's and block's are not folded in. A fresh map each call;
+        /// empty (never null) when none, unknown, or the id names a node that isn't a snippet.</summary>
+        public OrderedMap<string, OrderedMap<string, object>> ExtensionsForSnippet(string snippetId)
+        {
+            return GameDataHelpers.CopyExtensions(snippetId != null && _host.NodeIndex.TryGetValue(snippetId, out var node) && node.IsSnippet ? node.Extensions : null);
+        }
+
         // --- cast ------------------------------------------------------------
 
         /// <summary>Every cast member the PROJECT declares, in authored order - the same list
