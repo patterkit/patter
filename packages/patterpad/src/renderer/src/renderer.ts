@@ -2357,6 +2357,13 @@ function openTagBrowse(): void {
   void window.patter.openSearchWindow("tag", focus);
 }
 
+/** Review ▸ Find by Field: the search window's Field tab (find nodes by a gameData value), the caret's scene first. */
+function openFieldBrowse(): void {
+  if (!project) return;
+  const focus = currentSceneId ? { sceneId: currentSceneId, fromBeatId: caretNodeId ?? undefined } : undefined;
+  void window.patter.openSearchWindow("field", focus);
+}
+
 /** Review ▸ Find Lines by Qualifier: the search window's Qualifier tab, the caret's scene first. */
 function openQualifierBrowse(): void {
   if (!project) return;
@@ -3709,6 +3716,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "find-by-recording") openRecordingBrowse();
   else if (cmd === "find-property") openPropertyUsage();
   else if (cmd === "find-by-tag") openTagBrowse();
+  else if (cmd === "find-by-field") openFieldBrowse();
   else if (cmd === "find-by-qualifier") openQualifierBrowse();
   else if (cmd === "spelling:toggle") void setDictionaryFromMenu({ enabled: !(project?.dictionary.enabled ?? true) });
   else if (cmd.startsWith("spelling:dict:")) void setDictionaryFromMenu({ language: cmd.slice("spelling:dict:".length) });

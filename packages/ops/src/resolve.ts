@@ -7,7 +7,9 @@
 // ---------------------------------------------------------------------------
 
 import { walkNodes, effectiveGameId, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES } from "@patterkit/model";
-import type { Group, Snippet } from "@patterkit/model";
+import type { Group, Snippet, GameData, GameDataField, GameDataFieldType, GameDataNodeKind } from "@patterkit/model";
+import { defaultFor } from "@wildwinter/scoperegistry";
+import { parseFieldQuery, fieldNameMatches, fieldValueMatches, fieldValueText } from "@wildwinter/toolkit";
 import type { LoadedProject } from "./load.js";
 import { sourceStrings, mergeAuthoring, effectiveRecording } from "./loaded-helpers.js";
 
@@ -35,6 +37,18 @@ export interface ResolveEntry {
   sceneId: string;
   /** The scene source file the node lives in. */
   file?: string;
+  /** A Field browse hit only: the gameData field that answered, and the value it holds. */
+  field?: FieldHit;
+}
+
+/** The field a Field browse row is about: its name and type as declared, the value as a row shows it
+ *  (`fieldValueText`: flags joined with commas), and whether the node sets none, so the declared default
+ *  holds. */
+export interface FieldHit {
+  name: string;
+  type: GameDataFieldType;
+  value: string;
+  isDefault: boolean;
 }
 
 /**
@@ -249,6 +263,74 @@ export function runPropertyUsage(loaded: LoadedProject, query: string, focus?: S
     }
   }
   // Caret's scene first (stable sort keeps document order within each group).
+  if (focus) out.sort((a, b) => (a.sceneId === focus.sceneId ? 0 : 1) - (b.sceneId === focus.sceneId ? 0 : 1));
+  return out;
+}
+
+/** The project's declared gameData fields by name, in declaration order, each with the node kinds that
+ *  declare it: the Field tab's empty state names them. */
+export function listGameDataFields(loaded: LoadedProject): Array<{ name: string; kinds: GameDataNodeKind[] }> {
+  const byName = new Map<string, { name: string; kinds: GameDataNodeKind[] }>();
+  for (const [kind, fields] of Object.entries(loaded.project.gameDataFields ?? {}) as Array<[GameDataNodeKind, GameDataField[]]>) {
+    for (const f of fields) {
+      const entry = byName.get(f.name) ?? { name: f.name, kinds: [] };
+      if (!entry.kinds.includes(kind)) entry.kinds.push(kind);
+      byName.set(f.name, entry);
+    }
+  }
+  return [...byName.values()];
+}
+
+/**
+ * Field browse (family parity item 16): every node of a gameData node kind that DECLARES a field named by
+ * `query` (`mood`, `mood = tense`, `mood != calm`; the family's shared reading, `@wildwinter/toolkit`'s
+ * `parseFieldQuery`), whose value satisfies it, in project order (the caret's scene first when `focus` is
+ * given). The value tested is the one that holds: the node's own, else the field's declared default (the
+ * kernel's `defaultFor`, as the compiler resolves it into the bundle), so `mood = calm` finds the lines that
+ * leave a calm mood alone. Each row carries the field and its value; `isDefault` marks a node that sets none.
+ * A query that isn't a field name, or names no declared field, finds nothing.
+ */
+export function runFieldBrowse(loaded: LoadedProject, query: string, focus?: SearchFocus): ResolveEntry[] {
+  const q = parseFieldQuery(query);
+  if (!q) return [];
+  const declared = loaded.project.gameDataFields ?? {};
+  const fieldFor = (kind: GameDataNodeKind): GameDataField | undefined => declared[kind]?.find((f) => fieldNameMatches(f.name, q));
+  if (!(Object.keys(declared) as GameDataNodeKind[]).some((k) => fieldFor(k))) return [];
+  const strings = sourceStrings(loaded);
+  const out: ResolveEntry[] = [];
+  for (const scene of loaded.scenes) {
+    const file = loaded.sceneFiles[scene.id];
+    // One row when the node's kind declares the field and its holding value answers the query.
+    const visit = (kind: GameDataNodeKind, gd: GameData | undefined, row: Omit<ResolveEntry, "sceneId" | "file" | "field">): void => {
+      const f = fieldFor(kind);
+      if (!f) return;
+      const own = gd?.[f.name];
+      const isDefault = own === undefined || own === null;
+      const value = isDefault ? defaultFor(f) : own;
+      if (!fieldValueMatches(f.type, value, q)) return;
+      out.push({ ...row, sceneId: scene.id, file, field: { name: f.name, type: f.type, value: fieldValueText(f.type, value), isDefault } });
+    };
+    visit("scene", scene.gameData, { id: scene.id, kind: "scene", name: scene.name, gameId: effectiveGameId(scene), location: [scene.name] });
+    for (const block of scene.blocks) {
+      const segments = [scene.name, block.name];
+      visit("block", block.gameData, { id: block.id, kind: "block", name: block.name, gameId: effectiveGameId(block), location: segments });
+      // An option is a group that is a direct child of a choice group; the walk visits the choice first.
+      const options = new Set<string>();
+      walkNodes<Group | Snippet>(block.children, (node) => {
+        if (node.type === "group") {
+          if (node.selector === "choice") for (const c of node.children) if (c.type === "group") options.add(c.id);
+          if (options.has(node.id)) visit("option", node.gameData, { id: node.id, kind: "group", text: node.prompt ? strings[node.prompt.id] : undefined, location: segments });
+          return;
+        }
+        visit("snippet", node.gameData, { id: node.id, kind: "snippet", text: strings[node.beats?.[0]?.id ?? ""], location: segments });
+        for (const beat of node.beats ?? []) {
+          if (beat.kind === "line" || beat.kind === "text" || beat.kind === "gameEvent") {
+            visit(beat.kind, (beat as { gameData?: GameData }).gameData, { id: beat.id, kind: "beat", text: strings[beat.id], location: segments });
+          }
+        }
+      });
+    }
+  }
   if (focus) out.sort((a, b) => (a.sceneId === focus.sceneId ? 0 : 1) - (b.sceneId === focus.sceneId ? 0 : 1));
   return out;
 }

@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Find by Field.** The Find window has a Field tab, and the Review menu a Find by Field… item. Type a Game
+  Data field, such as `mood`, to list every node that has it with the value it holds, or narrow it with
+  `mood = tense` or `mood != calm`. A node that sets nothing holds the field's default, which the row marks.
+  Storyletter's Find has the same tab and reads a query the same way (family parity item 16).
+
 ## [0.36.0] - 2026-10-19
 
 ### Changed

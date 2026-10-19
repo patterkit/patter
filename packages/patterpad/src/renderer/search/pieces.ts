@@ -5,7 +5,7 @@
 // the window.
 
 import { hintBar, breadcrumb } from "@wildwinter/app-shell";
-import type { SearchMode } from "../../shared/api.js";
+import type { SearchEntry, SearchMode } from "../../shared/api.js";
 
 const MOVE = { keys: "Up Down", label: "Move" };
 const JUMP = { keys: "Enter", label: "Jump" };
@@ -27,6 +27,7 @@ export function modeHint(mode: SearchMode): HTMLElement[] {
     case "tag": return [lead("Pick a tag, then type to filter"), hintBar([MOVE, JUMP])];
     case "qualifier": return [lead("Pick a qualifier, then type to filter"), hintBar([MOVE, JUMP])];
     case "property": return [lead("Find where a property is used"), hintBar([MOVE, JUMP])];
+    case "field": return [lead("Find nodes by a Game Data value"), hintBar([MOVE, JUMP])];
     case "replace": return [lead("Replaces dialogue, text, and choice text across every scene. Review, then Replace all.")];
     case "suggestions": return [lead("Pick a handoff, or All. Click a line to see it; out-of-date suggestions stay open.")];
     default: return [hintBar([MOVE, JUMP, CLOSE]), lead("Drag the bar to move this window")];
@@ -37,4 +38,27 @@ export function modeHint(mode: SearchMode): HTMLElement[] {
  *  the control that goes there. */
 export function locationCrumbs(location: string[]): HTMLElement {
   return breadcrumb(location);
+}
+
+/** The Field tab's empty box: what to type, naming up to two of the project's own declared fields, or where
+ *  fields come from when it declares none. The same sentences as Storyletter's Field tab. */
+export function fieldEmptyText(fields: ReadonlyArray<{ name: string }>): string {
+  if (!fields.length) return "No gameData fields in this project. Add them in Project Settings.";
+  const [first, second] = fields;
+  return second ? `Type a field, such as ${first!.name} or ${second.name}.` : `Type a field, such as ${first!.name}.`;
+}
+
+/** A Field row's value: `mood: tense`, a quiet "default" marker when the node sets none and the declared
+ *  default holds, and "(empty)" for a value with nothing in it. */
+export function fieldValuePiece(field: NonNullable<SearchEntry["field"]>): HTMLElement {
+  const s = document.createElement("span");
+  s.className = "swin-field";
+  s.textContent = `${field.name}: ${field.value === "" ? "(empty)" : field.value}`;
+  if (field.isDefault) {
+    const d = document.createElement("span");
+    d.className = "swin-field-default";
+    d.textContent = "default";
+    s.append(d);
+  }
+  return s;
 }

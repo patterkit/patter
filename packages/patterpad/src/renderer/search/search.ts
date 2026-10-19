@@ -7,6 +7,7 @@
 //   - "status":      pick a writing-status rung and browse every line at it (unset = lowest); the box filters.
 //   - "recording":   the same over the recording ladder, in a project that tracks audio status.
 //   - "property":    every place a property is used (conditions, effects, interpolated text).
+//   - "field":       every node by a gameData field's value (mood, mood = tense, mood != calm).
 //   - "tag":         every node carrying a tag.
 //   - "qualifier":   every dialogue line carrying a speaker qualifier (TAM (O.S.)).
 //   - "suggestions": the open suggestions, to accept or reject.
@@ -25,7 +26,7 @@ import "@wildwinter/app-shell/dialog.css"; // the modal frame the confirm sits o
 import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "@wildwinter/app-shell/tool-window.css"; // ...and the tool-window chrome (drag bar, pin, close)
 import "@wildwinter/app-shell/keys.css"; // ...and the keycaps of the hint line
-import { modeHint, locationCrumbs } from "./pieces.js";
+import { modeHint, locationCrumbs, fieldEmptyText, fieldValuePiece } from "./pieces.js";
 import { pinButton, toolWindowHead, iconNode, toast, plural, debounce } from "@wildwinter/app-shell";
 
 // The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
@@ -40,6 +41,7 @@ const modeReplaceBtn = document.getElementById("mode-replace") as HTMLButtonElem
 const modeStatusBtn = document.getElementById("mode-status") as HTMLButtonElement;
 const modeRecordingBtn = document.getElementById("mode-recording") as HTMLButtonElement;
 const modePropertyBtn = document.getElementById("mode-property") as HTMLButtonElement;
+const modeFieldBtn = document.getElementById("mode-field") as HTMLButtonElement;
 const modeTagBtn = document.getElementById("mode-tag") as HTMLButtonElement;
 const modeQualifierBtn = document.getElementById("mode-qualifier") as HTMLButtonElement;
 const modeSuggestionsBtn = document.getElementById("mode-suggestions") as HTMLButtonElement;
@@ -89,6 +91,8 @@ let results: SearchEntry[] = [];
 let replaceHits: ReplaceHitDto[] = []; // the previewed replacements (Replace mode)
 let suggHits: OpenSuggestionDto[] = []; // the open suggestions for the picked chip (Suggestions mode)
 let suggShown: OpenSuggestionDto[] = []; // ...after the box's filter
+// The project's declared gameData field names (Field mode's empty box names them), read while the box is empty.
+let fieldNames: Array<{ name: string }> = [];
 let sel = 0;
 let token = 0; // guards against an out-of-order async response overwriting a newer query
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -114,7 +118,9 @@ const rowEl = (e: SearchEntry, i: number): HTMLElement => {
   // What this row IS: a title / Game ID / the line's text - falling back to its location, then its id.
   const what = e.name ?? e.gameId ?? e.text;
   if (what !== undefined) name.textContent = what; else if (e.location.length) name.append(locationCrumbs(e.location)); else name.textContent = e.id;
-  r.append(kind, name);
+  // A Field hit says the value it holds (`mood: tense`) straight after its kind, marked when it is the
+  // declared default; the row's text then takes what room is left.
+  if (e.field) { r.classList.add("swin-frow"); r.append(kind, fieldValuePiece(e.field), name); } else r.append(kind, name);
   if (e.location.length) { const loc = document.createElement("span"); loc.className = "swin-loc"; loc.append(locationCrumbs(e.location)); r.append(loc); }
   if (e.gameId && e.name) { const gid = document.createElement("span"); gid.className = "swin-gid"; gid.textContent = e.gameId; r.append(gid); }
   // The opaque id on every row, so an "id → line" lookup confirms the match (and is one click to copy/eye).
@@ -135,6 +141,7 @@ const renderResults = (): void => {
       ? (activeChip ? (mode === "tag" ? `Nothing tagged “${activeChip}”.`
         : mode === "qualifier" ? `No lines with ${chips.find((c) => chipKey(c) === activeChip)?.name ?? activeChip}.`
         : `No ${activeChip} lines.`) : "")
+      : mode === "field" ? (input.value.trim() ? "Nothing has that value." : fieldEmptyText(fieldNames))
       : (input.value.trim() ? "No matches." : "");
     resultsEl.append(empty);
     return;
@@ -177,6 +184,15 @@ const runProperty = async (): Promise<void> => {
   const hits = q.trim() ? await search.propertyUsage(q) : [];
   if (mine !== token) return;
   results = hits; sel = 0; renderResults();
+};
+
+const runField = async (): Promise<void> => {
+  const q = input.value;
+  const mine = ++token;
+  // An empty box names the declared fields, read afresh each time (Project Settings may have changed them).
+  const [hits, names] = q.trim() ? [await search.fieldUsage(q), fieldNames] : [[], await search.fields()];
+  if (mine !== token) return;
+  fieldNames = names; results = hits; sel = 0; renderResults();
 };
 
 const loadChip = async (name: string): Promise<void> => {
@@ -346,7 +362,7 @@ acceptCleanBtn.addEventListener("click", () => void acceptAllClean());
 // --- mode switching ----------------------------------------------------------
 async function setMode(next: SearchMode): Promise<void> {
   mode = next;
-  for (const [btn, m] of [[modeContentBtn, "content"], [modeReplaceBtn, "replace"], [modeStatusBtn, "status"], [modeRecordingBtn, "recording"], [modePropertyBtn, "property"], [modeTagBtn, "tag"], [modeQualifierBtn, "qualifier"], [modeSuggestionsBtn, "suggestions"]] as const) {
+  for (const [btn, m] of [[modeContentBtn, "content"], [modeReplaceBtn, "replace"], [modeStatusBtn, "status"], [modeRecordingBtn, "recording"], [modePropertyBtn, "property"], [modeFieldBtn, "field"], [modeTagBtn, "tag"], [modeQualifierBtn, "qualifier"], [modeSuggestionsBtn, "suggestions"]] as const) {
     btn.classList.toggle("on", mode === m);
     btn.setAttribute("aria-selected", String(mode === m));
   }
@@ -357,6 +373,7 @@ async function setMode(next: SearchMode): Promise<void> {
     : mode === "tag" ? "Filter tagged nodes…"
     : statusLike(mode) || mode === "qualifier" ? "Filter these lines…"
     : mode === "property" ? "Property usage… (@gold, world.threat, faction rebels)"
+    : mode === "field" ? "Field… (mood, mood = tense, mood != calm)"
     : mode === "replace" ? "Find text to replace…"
     : "Search… (text, title, Game ID, or paste an id)";
   hintEl.replaceChildren(...modeHint(mode)); // the lead phrase + the shell's key bar (pieces.ts)
@@ -379,6 +396,8 @@ async function setMode(next: SearchMode): Promise<void> {
     await loadChip(activeChip);
   } else if (mode === "property") {
     await runProperty();
+  } else if (mode === "field") {
+    await runField();
   } else if (mode === "replace") {
     await runReplacePreview();
   } else {
@@ -392,6 +411,7 @@ async function setMode(next: SearchMode): Promise<void> {
 const rerun = (): void => {
   if (chipMode(mode)) applyChipFilter();
   else if (mode === "property") void runProperty();
+  else if (mode === "field") void runField();
   else if (mode === "replace") void runReplacePreview();
   else void runContent();
 };
@@ -421,6 +441,7 @@ modeReplaceBtn.addEventListener("click", () => void setMode("replace"));
 modeStatusBtn.addEventListener("click", () => void setMode("status"));
 modeRecordingBtn.addEventListener("click", () => void setMode("recording"));
 modePropertyBtn.addEventListener("click", () => void setMode("property"));
+modeFieldBtn.addEventListener("click", () => void setMode("field"));
 modeTagBtn.addEventListener("click", () => void setMode("tag"));
 modeQualifierBtn.addEventListener("click", () => void setMode("qualifier"));
 modeSuggestionsBtn.addEventListener("click", () => void setMode("suggestions"));

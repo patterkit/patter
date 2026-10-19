@@ -76,6 +76,11 @@ body.swin {
 .swin-loc { flex: none; display: inline-flex; min-width: 0; color: var(--muted); font: 12px var(--font-ui); max-width: 40%; overflow: hidden; white-space: nowrap; }
 .swin-loc .shell-crumbs { font-size: inherit; }
 .swin-gid { flex: none; color: var(--ink-soft); font: 11.5px var(--font-mono); }
+/* A Field hit's value (`mood: tense`); "default" quietly marks a node that sets none, so the declared default holds. */
+.swin-field { flex: none; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); font: 12px var(--font-ui); }
+.swin-field-default { margin-left: 5.5px; color: var(--muted); font-style: italic; }
+/* A Field row carries one more piece, so its trail gives way first and the line's text keeps some room. */
+.swin-frow .swin-loc { flex: 0 1 auto; max-width: 28%; }
 /* The opaque id, shown on every row so an id → line lookup is unambiguous. Quieter than the Game ID. */
 .swin-id { flex: none; color: var(--muted); font: 11px var(--font-mono); opacity: 0.8; }
 

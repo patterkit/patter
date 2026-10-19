@@ -19,7 +19,7 @@ and the **pin** button keeps it on top. Close it with **✕** or **Escape**.
 
 <figure class="doc-shot">
   <img src="/doc-images/SearchWindow.png" alt="The floating search window over a dimmed editor: tabs for Text, Replace, Writing, Recording, Property and Tags, a query box holding choice, and a ranked list of Beat and Block results each showing its scene path and internal id." />
-  <figcaption>The floating search window. Tabs across the top switch modes, Text, Replace, Writing, Recording, Property, Tags, Qualifier, and Suggestions; each result shows its kind, its scene path, and its internal id, so a match is never ambiguous. <code>↑ / ↓</code> move, <code>Enter</code> jumps, and you can drag the bar to reposition the window.</figcaption>
+  <figcaption>The floating search window. Tabs across the top switch modes, Text, Replace, Writing, Recording, Property, Field, Tags, Qualifier, and Suggestions; each result shows its kind, its scene path, and its internal id, so a match is never ambiguous. <code>↑ / ↓</code> move, <code>Enter</code> jumps, and you can drag the bar to reposition the window.</figcaption>
 </figure>
 
 Type in the box and matches appear instantly. Search covers **dialogue and text**, the words your
@@ -87,6 +87,19 @@ The **Property** tab answers "where is `@x` used?". Type a property (`@gold`, `@
 [coverage test](/production/coverage-testing/): when a branch reads as
 *needs input* because it's gated on `@world.something`, the test's link opens this tab on that
 property. You can also open it from **Review ▸ Find Property Usage…**.
+
+## Finding nodes by a field's value
+
+The **Field** tab finds nodes by their [Game Data](/format/gamedata-and-addressing/) values. Type a field's
+name, such as `mood`, and it lists every scene, block, snippet, line, text, game event, or option whose type
+has that field, with the value each one holds. Add a value to narrow it: `mood = tense` lists the nodes
+where the mood is tense, and `mood != calm` the ones where it isn't. Put a value with spaces in quotes, and
+`mood =` finds the nodes left empty.
+
+A node that sets no value holds the field's default, so `mood = calm` also finds every line that leaves a
+calm default alone; those rows are marked **default**. Flags match a node that has that flag set, numbers
+match by value (`cost = 5`), and a true-or-false field matches `true` or `false`. Open it from the tab or from
+**Review ▸ Find by Field…**. Storyletter's Find has the same tab and reads a query the same way.
 
 ## Browsing by tag
 

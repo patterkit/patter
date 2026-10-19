@@ -234,6 +234,8 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { ...REVIEW_MENU.findPropertyUsage, enabled: hasProject, click: () => send("find-property") },
         // Browse every node carrying an author tag (#215) - the search palette in tag mode.
         { label: "Find by Tag…", enabled: hasProject, click: () => send("find-by-tag") },
+        // Browse every node by a gameData field's value (mood = tense) - the search palette in field mode.
+        { label: "Find by Field…", enabled: hasProject, click: () => send("find-by-field") },
         // Browse every dialogue line carrying a speaker qualifier (V.O., O.S., ...) - the search palette in qualifier mode.
         { label: "Find Lines by Qualifier…", enabled: hasProject, click: () => send("find-by-qualifier") },
         {

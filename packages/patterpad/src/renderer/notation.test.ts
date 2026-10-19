@@ -8,7 +8,7 @@
 import { afterEach, describe, it, expect } from "vitest";
 import { setKeyPlatform } from "@wildwinter/app-shell";
 import type { Problem, CoverageReport } from "../shared/api.js";
-import { modeHint, locationCrumbs } from "./search/pieces.js";
+import { modeHint, locationCrumbs, fieldEmptyText, fieldValuePiece } from "./search/pieces.js";
 import { renderCoverage } from "./src/coverage-view.js";
 import { PATTERPAD_PROBLEM_COPY, problemCode, problemLineFor, toProblemLike } from "./src/problem-copy.js";
 
@@ -41,7 +41,7 @@ describe("the search window's hint line", () => {
     expect(typed(h)).not.toMatch(TYPED);
   });
   it("every mode is free of typed notation, and replace mode is a sentence with no keys", () => {
-    for (const mode of ["content", "replace", "status", "recording", "property", "tag", "qualifier", "suggestions"] as const) {
+    for (const mode of ["content", "replace", "status", "recording", "property", "field", "tag", "qualifier", "suggestions"] as const) {
       const h = host(...modeHint(mode));
       expect(typed(h), mode).not.toMatch(TYPED);
       expect(h.textContent, mode).not.toContain(" / ");
@@ -61,6 +61,21 @@ describe("a result's location", () => {
     expect(seps.length).toBe(1);
     expect(seps[0]?.getAttribute("data-icon")).toBe("forward");
     expect(trail.textContent).not.toMatch(TYPED);
+  });
+});
+
+describe("the Field tab's pieces", () => {
+  it("names the project's own fields in the empty box, or says where fields come from", () => {
+    expect(fieldEmptyText([{ name: "mood" }, { name: "cost" }, { name: "act" }])).toBe("Type a field, such as mood or cost.");
+    expect(fieldEmptyText([{ name: "mood" }])).toBe("Type a field, such as mood.");
+    expect(fieldEmptyText([])).toBe("No gameData fields in this project. Add them in Project Settings.");
+  });
+  it("shows a value as field: value, marks the default quietly, and says (empty) for nothing", () => {
+    expect(fieldValuePiece({ name: "mood", type: "enum", value: "tense", isDefault: false }).textContent).toBe("mood: tense");
+    const d = fieldValuePiece({ name: "mood", type: "enum", value: "calm", isDefault: true });
+    expect(d.querySelector(".swin-field-default")?.textContent).toBe("default");
+    expect(d.firstChild?.textContent).toBe("mood: calm");
+    expect(fieldValuePiece({ name: "note", type: "text", value: "", isDefault: true }).firstChild?.textContent).toBe("note: (empty)");
   });
 });
 

@@ -11,6 +11,12 @@ const propertyHits: SearchEntry[] = [
   { id: "sn_reward", kind: "snippet", text: "on enter: set @gold = @gold + 5", location: ["The Tavern", "Intro"], sceneId: "scn_tavern" },
   { id: "L_purse", kind: "beat", text: "You have {@gold} gold.", location: ["The Tavern", "Intro"], sceneId: "scn_tavern" },
 ];
+// The Field tab: one set value and one where the declared default holds, plus an empty text value.
+const fieldHits: SearchEntry[] = [
+  { id: "L_greet", kind: "beat", text: "What'll it be, stranger?", location: ["The Tavern", "Intro"], sceneId: "scn_tavern", field: { name: "mood", type: "enum", value: "tense", isDefault: false } },
+  { id: "L_work", kind: "beat", text: "Aye - rats in the cellar.", location: ["The Tavern", "Bar"], sceneId: "scn_tavern", field: { name: "mood", type: "enum", value: "calm", isDefault: true } },
+  { id: "sn_barks", kind: "snippet", text: "A patron mutters into their ale.", location: ["The Tavern", "Bar"], sceneId: "scn_tavern", field: { name: "mood", type: "text", value: "", isDefault: false } },
+];
 const statusHits: SearchEntry[] = [
   { id: "L_greet", kind: "beat", text: "What'll it be, stranger?", location: ["The Tavern", "Intro"], sceneId: "scn_tavern" },
 ];
@@ -41,6 +47,8 @@ const stub = {
   info: async () => ({ mode: (new URLSearchParams(location.search).get("mode") ?? "property") as "property", pinned: true, hasProject: true, voiced: true, query: "@gold", theme: { colour: "system" as const, font: "newsreader" as const } }),
   search: async (q: string) => (q.trim() ? contentHits : []),
   propertyUsage: async (q: string) => (q.trim() ? propertyHits.filter((e) => !q.includes(" ") || e.text!.toLowerCase().includes(q.split(/\s+/)[1]!.toLowerCase())) : []),
+  fieldUsage: async (q: string) => (q.trim().toLowerCase().startsWith("mood") ? fieldHits : []),
+  fields: async () => [{ name: "mood", kinds: ["line"] }, { name: "cost", kinds: ["option"] }],
   replacePreview: async (opts: { query: string; replacement: string }) => {
     const hits = opts.query.trim()
       ? contentHits.filter((e) => e.text?.toLowerCase().includes(opts.query.toLowerCase()))

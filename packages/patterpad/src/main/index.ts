@@ -1264,6 +1264,8 @@ function registerIpc(): void {
   // not-opted-out), matching the inspector / menu (#206).
   ipcMain.handle("searchWin:info", () => ({ mode: searchMode, pinned: store.window("search").pinned(), hasProject: project.hasProject(), voiced: project.isAudioTracked(), query: searchSeed, theme: store.read().theme }));
   ipcMain.handle("searchWin:byProperty", (_e, query: string) => project.propertyUsage(query, searchFocus));
+  ipcMain.handle("searchWin:byField", (_e, query: string) => project.fieldUsage(query, searchFocus));
+  ipcMain.handle("searchWin:fields", () => project.fieldList());
   ipcMain.handle("searchWin:byTag", (_e, tag: string) => project.tagUsage(tag, searchFocus));
   ipcMain.handle("searchWin:tags", () => project.tagList());
   ipcMain.handle("searchWin:byQualifier", (_e, gameId: string) => project.linesByQualifier(gameId, searchFocus));

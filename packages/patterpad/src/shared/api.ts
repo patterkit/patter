@@ -692,6 +692,9 @@ export interface SearchEntry {
   location: string[];
   /** The scene this node lives in (to jump to it). */
   sceneId: string;
+  /** Field-tab hits only: the gameData field that answered, the value it holds as text (flags joined with
+   *  commas), and whether that is the declared default because the node sets none. Mirrors ops `FieldHit`. */
+  field?: { name: string; type: string; value: string; isDefault: boolean };
 }
 
 /** A project-wide find-and-replace request (source-language prose only). Mirrors ops `ReplaceOptions`. */
@@ -824,7 +827,7 @@ export interface PatterPlayApi {
 
 /** The faces of the search tool window (#205): find by text / id, replace, browse by writing / recording
  *  status, find property usage, or browse by author tag (#215). */
-export type SearchMode = "content" | "replace" | "status" | "recording" | "property" | "tag" | "qualifier" | "suggestions";
+export type SearchMode = "content" | "replace" | "status" | "recording" | "property" | "field" | "tag" | "qualifier" | "suggestions";
 
 /** Audio Folders index entry (#206): a dialogue beat's folder-derived recording status + the absolute path
  *  to the audio file that resolved it, plus (for scratch takes, #224) the text-hash stamped in the WAV so
@@ -856,6 +859,13 @@ export interface PatterSearchApi {
   /** Property-usage search: every node referencing a property (`@gold`, `world.threat`, `faction rebels`)
    *  in a condition, effect, or interpolated text. */
   propertyUsage(query: string): Promise<SearchEntry[]>;
+  /** Field browse (family parity item 16): every node whose gameData field answers `query` (`mood`,
+   *  `mood = tense`, `mood != calm`), read by the family's shared matcher; the value tested is the one that
+   *  holds, the declared default when the node sets none. */
+  fieldUsage(query: string): Promise<SearchEntry[]>;
+  /** The project's declared gameData field names, each with the node kinds that declare it, for the Field
+   *  tab's empty state. */
+  fields(): Promise<Array<{ name: string; kinds: string[] }>>;
   /** Tag browse (#215): every node whose own author tags include `tag` (any level: scene / block / group /
    *  snippet / prompt / beat). */
   tagUsage(tag: string): Promise<SearchEntry[]>;

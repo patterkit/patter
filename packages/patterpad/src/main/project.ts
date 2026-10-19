@@ -6,7 +6,7 @@
 import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, renameStage, renameGameDataStage, stageDialect, stageGateCount, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
+import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runFieldBrowse, listGameDataFields, runReplace, renameStage, renameGameDataStage, stageDialect, stageGateCount, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, describeLocExport, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs, handoffWrite,
@@ -1112,6 +1112,21 @@ export function propertyUsage(query: string, focus?: SearchFocus): SearchEntry[]
   ensureHydrated(); // spans every scene's expressions
   if (!loaded) return [];
   return runPropertyUsage(loaded, query, focus).slice(0, 200);
+}
+
+/** Field browse (family parity item 16): every node whose gameData field answers `query` (`mood = tense`),
+ *  the caret's scene first. */
+export function fieldUsage(query: string, focus?: SearchFocus): SearchEntry[] {
+  if (!query.trim()) return [];
+  ensureHydrated(); // spans every scene's nodes
+  if (!loaded) return [];
+  return runFieldBrowse(loaded, query, focus).slice(0, 500);
+}
+
+/** The project's declared gameData fields (name + the node kinds declaring it), for the Field tab's empty state.
+ *  Read off the project file, so no scene needs hydrating. */
+export function fieldList(): Array<{ name: string; kinds: string[] }> {
+  return loaded ? listGameDataFields(loaded) : [];
 }
 
 /** Tag browse (#215): every node whose own author tags include `tag`, the caret's scene first. */
