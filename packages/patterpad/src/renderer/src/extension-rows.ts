@@ -16,7 +16,7 @@
 import { el } from "./dom.js";
 import { valueRows } from "@wildwinter/app-shell/value-rows";
 import type { ValueAdapter, ValueDecl, ValueRows } from "@wildwinter/app-shell/value-rows";
-import { effectiveClaim, entryProblems, valueProblems } from "@wildwinter/toolkit/extensions";
+import { effectiveClaim, entryProblems, pickLists, valueProblems } from "@wildwinter/toolkit/extensions";
 import type { ClaimDecl, TargetDecl, TypeDecl } from "@wildwinter/toolkit/extensions";
 import type { ExtensionDto, ExtensionFieldDto, ExtensionNodeDto, Problem } from "../../shared/api.js";
 import { takenLine } from "../../shared/extensions.js";
@@ -49,6 +49,13 @@ const orList = (xs: readonly string[]): string =>
 const existsOf = (adapter: ValueAdapter) => (kind: string, id: string): boolean =>
   adapter.nodes(kind).some((n) => n.id === id) || adapter.label?.(kind, id) !== undefined;
 
+/** The adapter for one extension's rows: the project's nodes, and that extension's project lists for a pick's
+ *  `list` sources, read off its project entry (the toolkit's `pickLists`). */
+export function extensionScoped(adapter: ValueAdapter, extension: ExtensionDto, projectEntry = extension.projectValues): ValueAdapter {
+  const project = { fields: extension.targets["project"]?.fields ?? [] } as unknown as TargetDecl;
+  return { ...adapter, list: pickLists(project, projectEntry) };
+}
+
 /**
  * The problems a row says that the shell's rows don't say themselves, by field: a required field not set, and
  * every warning (a stage since renamed, a field the extension no longer declares). Only for a node that has an
@@ -58,7 +65,8 @@ export function fieldProblems(fields: readonly ExtensionFieldDto[], entry: Recor
   const out = new Map<string, string>();
   if (entry === undefined) return out;
   const target = { fields } as unknown as TargetDecl;
-  const found = entryProblems(target, entry, adapter ? { exists: existsOf(adapter) } : {});
+  const found = entryProblems(target, entry, adapter
+    ? { exists: existsOf(adapter), ...(adapter.list ? { list: (name: string) => adapter.list!(name) } : {}) } : {});
   for (const p of found) {
     if (p.code !== "required" && p.severity !== "warning") continue;
     if (p.path.includes(".") || p.path.includes("[")) continue; // a part's own row says it
@@ -128,7 +136,9 @@ interface RowsFor {
  *  group changes, then any key the node holds that the extension doesn't declare, read-only. */
 function extensionRows(o: RowsFor): HTMLElement[] {
   const fields = o.extension.targets[o.kind]?.fields ?? [];
-  const problems = fieldProblems(fields, o.entry, o.adapter);
+  // A project's own rows read its lists as they stand in the entry being edited, not as last saved.
+  const adapter = extensionScoped(o.adapter, o.extension, o.kind === "project" ? o.entry ?? {} : o.extension.projectValues);
+  const problems = fieldProblems(fields, o.entry, adapter);
   const out: HTMLElement[] = [];
   if (o.locked) out.push(el("p", "insp-ext-lock", o.locked));
   let group: string | undefined;
@@ -141,7 +151,7 @@ function extensionRows(o: RowsFor): HTMLElement[] {
     const row = o.cache.row(`${o.extension.id}\u0000${o.kind}\u0000${o.id ?? ""}\u0000${decl.name}`, {
       decl: decl as unknown as ValueDecl,
       value: o.entry?.[decl.name],
-      adapter: o.adapter,
+      adapter,
       disabled,
       ...(o.readOnly ? {} : { onCommit: (v: unknown) => { if (!disabled) o.commit(decl.name, v); } }),
       ...(renamed ? { replaceProblem: renamedStageSentence(renamed.from, renamed.to, o.extension.name) }

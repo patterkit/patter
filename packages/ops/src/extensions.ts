@@ -188,6 +188,15 @@ function renameValue(decl: TypeDecl, value: unknown, renames: ReadonlyMap<string
       count.n++;
       return to;
     }
+    case "pick": {
+      // A pick follows a renamed cast member as a reference does; a renamed entry of a project list it can't
+      // tell from a removal and an addition, so a value naming one is reported missing instead.
+      const castSource = (decl.from ?? []).some((s) => "to" in s && s.to === "cast");
+      const to = castSource && typeof value === "string" ? renames.get(value) : undefined;
+      if (to === undefined) return value;
+      count.n++;
+      return to;
+    }
     case "record":
       return isRecord(value) ? renameFields(decl.fields ?? [], value, renames, count) : value;
     case "list":

@@ -216,6 +216,13 @@ export function extensionProblemLine(p: Pick<Problem, "message" | "detail" | "ex
   if (clash) return say({ text: `It reads the ${kindWord(clash[1]!)} game data field ${quoted(clash[2]!)} as ${clash[3]}, but the project declares it as ${clash[4]}.`, next: "Change the field's type in Project Settings ▸ Game Data so they agree." });
   const undeclared = /^the Patter extension "[^"]+" claims the (\w+) gameData field "([^"]+)", which the project doesn't declare$/.exec(m);
   if (undeclared) return say({ text: `It reads the ${kindWord(undeclared[1]!)} game data field ${quoted(undeclared[2]!)}, which the project doesn't declare.`, next: "Add it in Project Settings ▸ Game Data." });
+  // A name two of a pick's sources hold: "the Patter extension "<x>": "<name>" is <sources>, so a value naming it is ambiguous".
+  const pickClash = /^the Patter extension "[^"]+": "([^"]*)" is (.+), so a value naming it is ambiguous$/.exec(m);
+  if (pickClash) {
+    const listLabel = (list: string): string => x?.targets["project"]?.fields.find((f) => f.name === list)?.label ?? list;
+    const sources = pickClash[2]!.replace(/the list "([^"]*)"/g, (_, list: string) => `the list ${quoted(listLabel(list))}`);
+    return say({ text: `${quoted(pickClash[1]!)} is ${sources}, so a value naming it is ambiguous.`, next: "Rename one of them." });
+  }
   const notTaken = /^data for the Patter extension "([^"]+)", which the project doesn't take/.exec(m);
   if (notTaken) return `There's data here for the extension ${quoted(notTaken[1]!)}, which this project doesn't take. It's kept, but your game won't get it.`;
   return undefined;

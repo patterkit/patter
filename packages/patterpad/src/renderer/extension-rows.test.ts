@@ -2,7 +2,8 @@
 // Patter extensions in the inspector and Project Settings (renderer/src/extension-rows.ts), on the
 // conformance suite's probe manifest: a section per extension for each level that has fields, the shell's
 // rows for every type (help, value help and "default (x)" included), a reference's choices and a held
-// node named from the project's index, commits to the surface, a claimed gameData field drawn as the
+// node named from the project's index, a pick over the cast and the extension's own project lists, commits
+// to the surface, a claimed gameData field drawn as the
 // extension presents it, locks, the inline problems validation would raise, the Settings section, and
 // where a problem about an extension goes.
 
@@ -12,7 +13,7 @@ import { parseManifest } from "@wildwinter/toolkit/extensions";
 import type { ProjectFile, GameDataField } from "@patterkit/model";
 import type { InspectorContext } from "@patterkit/patterpad-surface/surface";
 import { renderInspector, type InspectorHandlers } from "./src/inspector.js";
-import { extensionAdapter, fieldProblems, mountProjectSection, problemSettingsSection, renamedStage } from "./src/extension-rows.js";
+import { extensionAdapter, extensionScoped, fieldProblems, mountProjectSection, problemSettingsSection, renamedStage } from "./src/extension-rows.js";
 import { extensionProblemLine, problemLineFor, type ExtensionProblemContext } from "./src/problem-copy.js";
 import { extensionDtos } from "../shared/extensions.js";
 import type { ExtensionDto, Problem } from "../shared/api.js";
@@ -195,6 +196,45 @@ describe("extension sections in the inspector", () => {
   });
 });
 
+describe("a pick", () => {
+  const shot = parseManifest(JSON.stringify({
+    schema: "wildwinter/extension@0", id: "shot", name: "Shot", version: "1.0.0",
+    targets: { patter: {
+      line: { fields: [{ name: "to", label: "To", type: "pick", from: [{ words: ["all"] }, { to: "cast" }, { list: "pointsOfInterest" }] }] },
+      project: { fields: [{ name: "pointsOfInterest", label: "Points of interest", type: "list", of: { type: "text" } }] },
+    } },
+  }));
+  const shots = (poi: string[]): ExtensionDto[] => extensionDtos(
+    { project: { id: "proj_t", name: "T" }, extensions: { shot: { version: "1.0.0" } } } as unknown as ProjectFile,
+    new Map([["shot", shot]]),
+    new Map([["shot", { entries: { project: { proj_t: { pointsOfInterest: poi } } } }]]),
+  )!;
+  const options = (row: HTMLElement): string[] =>
+    [...row.querySelector("select")!.querySelectorAll("option")].map((o) => o.textContent ?? "");
+
+  it("offers its words, the cast and the extension's project list in the inspector, and checks against them", () => {
+    const seen: unknown[] = [];
+    const h = handlersWith({ extensions: () => shots(["Gate", "BEN"]), setExtensionValue: (_id, _x, _f, v) => seen.push(v) });
+    const host = draw(h, { kind: "leaf", beat: "line", id: "L_bell", ext: { shot: { to: "BEN" } } });
+    const row = rowOf(host, "To")!;
+    expect(options(row)).toEqual(["auto", "all", "ANNA", "BEN", "Gate"]);
+    expect(row.querySelector(".shell-fieldrow-problem")?.textContent).toContain("a cast member and an entry of the list");
+    const sel = row.querySelector("select")!;
+    sel.value = "Gate"; sel.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(seen).toEqual(["Gate"]);
+  });
+
+  it("says a value no source holds is missing, and reads the project's lists as Settings holds them, before Save", () => {
+    const host = draw(handlersWith({ extensions: () => shots(["Gate"]) }), { kind: "leaf", beat: "line", id: "L_bell", ext: { shot: { to: "Well" } } });
+    expect(options(rowOf(host, "To")!)).toContain("Well (missing)");
+    expect(rowOf(host, "To")!.querySelector(".shell-fieldrow-problem")?.textContent).toContain("not one of its choices");
+    const [x] = shots(["Gate"]);
+    expect(extensionScoped(adapter, x!).list!("pointsOfInterest")).toEqual(["Gate"]);
+    expect(extensionScoped(adapter, x!, { pointsOfInterest: ["Well"] }).list!("pointsOfInterest")).toEqual(["Well"]);
+    expect(extensionScoped(adapter, x!).list!("nowhere")).toBeUndefined();
+  });
+});
+
 describe("an extension's section of Project Settings", () => {
   it("says what the project takes it at, draws the project's fields, and hands back the whole entry", () => {
     const [x] = probe({ deliveryField: "mood" }, { studio: "Wildwinter" });
@@ -313,6 +353,14 @@ describe("an extension's problem in the problems bar", () => {
     const claimed: ExtensionProblemContext = { ...ctx, extension: (id) => probe({ deliveryField: "mood" }).find((x) => x.id === id) };
     expect(extensionProblemLine({ message: "line 'L_greet' gameData \"mood\", as the Patter extension \"probe\" claims it: the value is \"hostile\", which is not one of its values", detail: "not-a-value", extension: "probe" }, claimed))
       .toBe("Probe: Delivery on “What'll it be, stranger?” is “hostile”, which isn't one of its choices. Pick one in the inspector.");
+  });
+
+  it("words a pick's missing and ambiguous values, and a name two of its sources hold", () => {
+    expect(line("entries.line.L_greet.to: \"to\" is \"Gaet\", which is not one of its choices", "not-a-choice")).toBe("Probe: To on “What'll it be, stranger?” is “Gaet”, which isn't one of its choices. Pick one in the inspector.");
+    expect(line("entries.line.L_greet.to: \"to\" is \"Gate\", which is a cast member and an entry of the list \"pointsOfInterest\"", "pick-ambiguous"))
+      .toBe("Probe: To on “What'll it be, stranger?” is “Gate”, which is a cast member and an entry of the list “pointsOfInterest”, so it's ambiguous. Rename one of them.");
+    expect(line("the Patter extension \"probe\": \"Gate\" is a cast member and an entry of the list \"studio\", so a value naming it is ambiguous", "pick-clash"))
+      .toBe("Probe: “Gate” is a cast member and an entry of the list “studio”, so a value naming it is ambiguous. Rename one of them.");
   });
 
   it("shows a shape it doesn't know as it stands, and the bar takes the worded line", () => {

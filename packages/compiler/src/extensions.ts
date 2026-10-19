@@ -18,10 +18,10 @@ import type {
   BundleExtension, ExtensionFieldDecl, ExtensionShard, GameData, Group, NodeExtensions, ProjectFile, Scene, Snippet,
 } from "@patterkit/model";
 import {
-  HOSTS, claimClashes, compileEntry, compiledTarget, effectiveClaim, entryProblems, manifestProblems, orphanedEntries, resolvedClaims,
-  settingValues, targetOf, valueProblems,
+  HOSTS, claimClashes, compileEntry, compiledTarget, effectiveClaim, entryProblems, manifestProblems, orphanedEntries, pickClashes,
+  pickLists, resolvedClaims, settingValues, targetOf, valueProblems,
 } from "@wildwinter/toolkit/extensions";
-import type { Manifest, Problem, ResolvedClaim } from "@wildwinter/toolkit/extensions";
+import type { Manifest, Problem, ResolvedClaim, TypeDecl, ValueContext } from "@wildwinter/toolkit/extensions";
 
 /** One extension's manifest, as a project keeps it (`extensions/<id>.extension.json`). */
 export interface ExtensionManifestFile {
@@ -206,6 +206,34 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
   // --- the data ---------------------------------------------------------------------------
   const exists = (kind: string, id: string): boolean =>
     kind === "cast" ? (project.cast ?? []).some((c) => c.name === id) : nodes.get(id)?.kind === kind;
+  // A pick's choices: the cast and the project's nodes by kind, and each extension's own project lists, read
+  // off its project entry wherever that entry sits.
+  const projectId = project.project.id;
+  const projectEntries = new Map<string, Record<string, unknown>>();
+  for (const { shard } of input.shards) {
+    const entry = (shard.entries as Record<string, Record<string, unknown> | undefined> | undefined)?.["project"]?.[projectId];
+    if (typeof entry === "object" && entry !== null && !Array.isArray(entry) && !projectEntries.has(shard.extension)) {
+      projectEntries.set(shard.extension, entry as Record<string, unknown>);
+    }
+  }
+  const contexts = new Map<string, ValueContext>();
+  for (const [ext, manifest] of sound) {
+    contexts.set(ext, { exists, list: pickLists(targetOf(manifest, "patter", "project"), projectEntries.get(ext)) });
+  }
+  const nodesOf = (kind: string): { id: string }[] =>
+    kind === "cast" ? (project.cast ?? []).map((c) => ({ id: c.name })) : [...nodes].filter(([, n]) => n.kind === kind).map(([id]) => ({ id }));
+  for (const [ext, manifest] of [...sound].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    // A name two of a pick's sources hold, once for the project however many fields offer it.
+    const said = new Set<string>();
+    for (const decl of pickDecls(manifest)) {
+      for (const p of pickClashes(decl, { nodes: nodesOf, list: contexts.get(ext)!.list! })) {
+        if (said.has(p.message)) continue;
+        said.add(p.message);
+        issues.push({ severity: p.severity, file: projectPath, node: projectId, code: p.code, message: `the Patter extension "${ext}": ${p.message}` });
+      }
+    }
+  }
+
   const sceneIds = new Set(scenes.map((s) => s.id));
   const values = new Map<string, NodeExtensions>();
   const projectValues = new Map<string, Record<string, unknown>>();
@@ -256,7 +284,7 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
           issues.push({ severity: "warning", file: path, node: id,
             message: `entries.${kind}.${id} belongs ${node.scene === undefined ? "in the project's own shard" : `in scene "${node.scene}"'s shard`}; it's compiled from here all the same` });
         }
-        const problems = entryProblems(target, entry, { exists });
+        const problems = entryProblems(target, entry, contexts.get(ext) ?? { exists });
         for (const p of problems) issues.push(issueOf(path, p, `entries.${kind}.${id}${p.path === "" ? ": " : "."}`, id));
         if (problems.some((p) => p.severity === "error")) continue;
         const compiled = compileEntry(target, entry as Record<string, unknown>);
@@ -288,6 +316,18 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
   }
   const sortedNodes = new Map([...values.entries()].map(([id, v]) => [id, sortRecord(v)]));
   return { issues, compiled: { bundle, nodes: sortedNodes } };
+}
+
+/** Every pick a manifest declares for Patter, at any depth (in a record, or as a map's or a list's items). */
+function pickDecls(manifest: Manifest): TypeDecl[] {
+  const out: TypeDecl[] = [];
+  const walk = (decl: TypeDecl): void => {
+    if (decl.type === "pick") out.push(decl);
+    for (const f of decl.fields ?? []) walk(f);
+    if (decl.of !== undefined) walk(decl.of);
+  };
+  for (const target of Object.values(manifest.targets.patter ?? {})) for (const f of target.fields ?? []) walk(f);
+  return out;
 }
 
 /** A record with its keys in order: the same values, whatever order the shards were read in. */

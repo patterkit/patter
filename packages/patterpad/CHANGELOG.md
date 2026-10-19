@@ -8,6 +8,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **Pick fields for extensions.** An extension can declare a field whose value is one choice from a mix of
+  sources: fixed words, the cast, and lists on the extension's own Project Settings section (points of interest,
+  say). The inspector offers them in one menu, "auto" first, each source under its name. A value no source holds
+  is kept and marked missing, and a name two sources hold (a character and a point of interest both called Gate)
+  is flagged. Renaming a cast member rewrites the values naming them.
 - **Find by Field.** The Find window has a Field tab, and the Review menu a Find by Field… item. Type a Game
   Data field, such as `mood`, to list every node that has it with the value it holds, or narrow it with
   `mood = tense` or `mood != calm`. A node that sets nothing holds the field's default, which the row marks.

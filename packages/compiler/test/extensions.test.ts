@@ -62,6 +62,37 @@ describe("extensionPass", () => {
     expect(compiled.nodes.get("L1")).toEqual({ probe: { note: "hi", perf: { ANNA: { expression: "smile" } } } });
   });
 
+  it("checks a pick against the cast, its words and the extension's project lists, and reports a name two hold once", () => {
+    const shot = {
+      schema: "wildwinter/extension@0", id: "shot", name: "Shot", version: "1.0.0",
+      targets: { patter: {
+        line: { fields: [
+          { name: "to", type: "pick", from: [{ words: ["all"] }, { to: "cast" }, { list: "pointsOfInterest" }] },
+          { name: "look", type: "pick", from: [{ to: "cast" }, { list: "pointsOfInterest" }, { words: ["away"] }] },
+        ] },
+        project: { fields: [{ name: "pointsOfInterest", type: "list", of: { type: "text" } }] },
+      } },
+    };
+    const run = (poi: string[], to: Record<string, string>) => pass({
+      project: project({ cast: [{ name: "ANNA" }, { name: "Gate" }], extensions: { shot: { version: "1.0.0" } } }),
+      manifests: [{ path: "extensions/shot.extension.json", id: "shot", manifest: shot }],
+      // The scene's shard first: the project's lists are read wherever its entry sits.
+      shards: [shard("s1", { line: Object.fromEntries(Object.entries(to).map(([id, v]) => [id, { to: v }])) }, "shot"),
+        shard("@project", { project: { p: { pointsOfInterest: poi } } }, "shot")],
+    });
+    const quiet = run(["Well"], { L1: "all", L2: "ANNA", L_bare: "Well" });
+    expect(quiet.issues).toEqual([]);
+    expect(quiet.compiled.nodes.get("L_bare")).toEqual({ shot: { to: "Well" } });
+
+    const { issues } = run(["Well", "Gate"], { L1: "Gaet", L2: "Gate" });
+    expect(messages(issues)).toEqual([
+      `warning: the Patter extension "shot": "Gate" is a cast member and an entry of the list "pointsOfInterest", so a value naming it is ambiguous`,
+      `error: entries.line.L1.to: "to" is "Gaet", which is not one of its choices`,
+      `warning: entries.line.L2.to: "to" is "Gate", which is a cast member and an entry of the list "pointsOfInterest"`,
+    ]);
+    expect(issues[0]).toMatchObject({ file: "p.patterproj", node: "p", code: "pick-clash" });
+  });
+
   it("warns of a taken extension with no manifest, and leaves its data out", () => {
     const { issues, compiled } = pass({ manifests: [], shards: [shard("s1", { line: { L1: { note: "hi" } } })] });
     expect(messages(issues).join("\n")).toContain(`warning: the project takes the Patter extension "probe", but has no manifest`);

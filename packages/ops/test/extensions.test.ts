@@ -433,6 +433,23 @@ describe("a cast rename", () => {
     expect(renameCastKeys([{ path: "d", shard: clash }], [{ id: "deep", manifest }], renames)).toEqual([]);
     // No manifest, no rewrite: the data is left as it is.
     expect(renameCastKeys([{ path: "d", shard }], [], renames)).toEqual([]);
+
+    // A pick follows a cast member when the cast is one of its sources, and only then; a list entry isn't followed.
+    const picks = {
+      schema: "wildwinter/extension@0", id: "shot", name: "Shot", version: "1.0.0",
+      targets: { patter: { line: { fields: [
+        { name: "to", type: "pick", from: [{ words: ["all"] }, { to: "cast" }, { list: "pointsOfInterest" }] },
+        { name: "mood", type: "pick", from: [{ list: "moods" }] },
+      ] }, project: { fields: [
+        { name: "pointsOfInterest", type: "list", of: { type: "text" } }, { name: "moods", type: "list", of: { type: "text" } },
+      ] } } },
+    };
+    const picked: ExtensionShard = { schema: "patter/extension@0", extension: "shot", scene: "s", entries: { line: {
+      L1: { to: "ANNA", mood: "ANNA" }, L2: { to: "all" },
+    } } };
+    const out2 = renameCastKeys([{ path: "p", shard: picked }], [{ id: "shot", manifest: picks }], renames);
+    expect(out2[0]!.renamed).toBe(1);
+    expect(out2[0]!.shard.entries["line"]).toEqual({ L1: { to: "ANNE", mood: "ANNA" }, L2: { to: "all" } });
   });
 
   it("rewrites the lines naming the member, option prompts among them, and the project-level strings keyed by them", () => {
