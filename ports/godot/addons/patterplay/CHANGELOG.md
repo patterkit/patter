@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-19
+
 ### Added
 
 - `engine.extensions_for_snippet(snippet_id)` reads a snippet's own Patter extension values, beside the scene and block

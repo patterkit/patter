@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-19
+
 ### Added
 
 - **`engine.extensionsForSnippet(snippetId)`** reads a snippet's own Patter extension values, beside

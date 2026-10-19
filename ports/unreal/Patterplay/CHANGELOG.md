@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-19
+
 ### Added
 
 - `ExtensionsForSnippet(SnippetId)` (on `UPatterEngine`, Blueprint-callable, and `extensionsForSnippet` on the
