@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-19
+
 ### Added
 
 - **`resolveSceneRef` and `sceneAddressIndex`**, re-exported from the model: the one rule for a scene reference
