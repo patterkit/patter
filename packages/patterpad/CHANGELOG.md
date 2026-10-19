@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **Merges keep your order and your comments.** A merge (Merge Returned Patterpack, or the structured merge your
+  version control runs) put the cast, the properties and the Game Data fields back in name order, undoing Move up
+  and Move down; they now keep your order, and two different reorders of one list are a conflict. Two replies to
+  one comment thread both survive, an edit to a message or a moved anchor is no longer lost, and two people tagging
+  one line no longer clash. The family's shared merge rules, as Storyletter has them.
+
 ### Fixed
 
 - **Show Card in Storyletter names the scene by its address.** It named a scene whose internal id was a legal Game
