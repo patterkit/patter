@@ -1,5 +1,14 @@
 # @patterkit/play-helpers
 
+## 0.9.4
+
+### Patch Changes
+
+- b1e5e0b: A host scope's declarations (`@world`) ship in the bundle with their defaults resolved, as every other declaration's are. Nothing plays differently: a bound resolver still supplies the game's values, and the default is only the fallback the runtime self-backs with.
+- 5a36907: Uses `@patterkit/runtime` 0.32.0, the Patterplay 0.32.0 release.
+- Updated dependencies [0e0708a]
+  - @patterkit/model@0.19.0
+
 ## 0.9.3
 
 ### Patch Changes
