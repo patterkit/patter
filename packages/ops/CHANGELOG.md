@@ -1,5 +1,23 @@
 # @patterkit/ops
 
+## 0.22.0
+
+### Minor Changes
+
+- b1e5e0b: Merges follow the family's shared rules (`@wildwinter/toolkit` 0.2.2), as Storylets' do. Declaration lists (properties, cast, and each node type's gameData fields) keep the author's order instead of being re-sorted by name, so Move up and Move down survive a merge: the side that reordered wins, two different reorders clash, and the other side's additions go in after the entry they followed. Comment threads merge message by message and field by field, so an edit to a message and a moved anchor are no longer lost, and a message edited two ways is a conflict. A line's tags merge as a set, so two people tagging one line no longer clash. Conflict paths into a declaration list now name the entry in brackets (`cast[PLAYER]`).
+
+### Patch Changes
+
+- 0e0708a: One exported rule for a scene reference: `resolveSceneRef(scenes, ref, byAddress?)` in the model resolves by the scene's address (its effective gameId) first, then its internal id, and `sceneAddressIndex(scenes)` builds the address lookup once for many references, so a tool that has to land where the game will calls the same function rather than keeping a copy. The runtime resolves with it, and ops' playable runtime is regenerated to match; nothing plays differently.
+- 5a36907: Uses `@patterkit/runtime` 0.32.0, the Patterplay 0.32.0 release.
+- Updated dependencies [b1e5e0b]
+- Updated dependencies [b1e5e0b]
+- Updated dependencies [0e0708a]
+  - @patterkit/core@0.9.3
+  - @patterkit/compiler@0.12.0
+  - @patterkit/model@0.19.0
+  - @patterkit/dialect@0.2.16
+
 ## 0.21.0
 
 ### Minor Changes
