@@ -1,5 +1,18 @@
 # @patterkit/compiler
 
+## 0.11.0
+
+### Minor Changes
+
+- f5775c7: `exportBundle` compiles a dialogue scene's text beats as action when the project doesn't localise them (`localiseDialogueText` off, the default): `action: true` on the beat, and its source text in every locale's string table, whatever a translated shard still holds. An option's prompt never is. **This changes existing projects:** a localised project that shows its dialogue scenes' text to players should turn `localiseDialogueText` on, which compiles exactly as before. A hand-written `action` key in source never reaches the bundle.
+
+### Patch Changes
+
+- Updated dependencies [f5775c7]
+  - @patterkit/model@0.18.0
+  - @patterkit/core@0.9.2
+  - @patterkit/dialect@0.2.15
+
 ## 0.10.0
 
 ### Minor Changes
