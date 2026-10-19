@@ -1,5 +1,21 @@
 # @patterkit/ops
 
+## 0.21.0
+
+### Minor Changes
+
+- f5775c7: Action text in the production tools. `extractLoc` leaves a dialogue scene's action text out; `applyLoc` drops any translation of it a shard still holds (`ApplyStats.dropped`), refuses one a file brings back, and marks each translated shard it writes with whether its scene's text was action (`textAction`). `actionTextChanges` lists the text that has dropped out of the loc files or come into them since, and `describeLocExport` words what an export says beside the file: how many text lines it left out as action, and the setting that does it, then those changes. `runValidate` warns, naming the scene, when a scene's kind no longer matches its loc files. `runReport` counts action beside the written lines (`action` on each scene and in the totals), never in them or in the localisation counts, and the report spreadsheet adds Action columns when there's any. The playable HTML export shows action as a direction, timed by its pause alone.
+
+### Patch Changes
+
+- f09d1c6: Uses `@patterkit/runtime` 0.31.0, the Patterplay 0.31.0 release.
+- Updated dependencies [f5775c7]
+- Updated dependencies [f5775c7]
+  - @patterkit/compiler@0.11.0
+  - @patterkit/model@0.18.0
+  - @patterkit/core@0.9.2
+  - @patterkit/dialect@0.2.15
+
 ## 0.20.1
 
 ### Patch Changes
