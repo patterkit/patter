@@ -28,6 +28,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   from the shared editor shell, with Patterpad's own handling of what the game sends plugged in (family parity
   item 14). Two things change: after a save is pushed to the game, the chip shows a different build until the
   game confirms it has the new one, and if the port is taken the link stays off, so the next click tries again.
+- **Version-control files come from the family's shared setup.** Switching a project's version control writes
+  its ignore and attributes files from the same module Storyletter uses (family parity item V). Every pattern and
+  rule is unchanged; the wording is tidied and the rows line up.
 
 ## [0.36.0] - 2026-10-19
 
