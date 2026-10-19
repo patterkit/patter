@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-19
+
 ### Added
 
 - **Action text.** A new setting on Project Settings' Language tab, "Localise text lines in dialogue scenes", off
