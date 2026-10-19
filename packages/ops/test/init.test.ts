@@ -40,11 +40,14 @@ describe("runInit", () => {
     const dir = join(scratch(), "g");
     applyWrites(runInit({ dir, vcs: "git" }).writes);
     const attrs = readFileSync(join(dir, ".gitattributes"), "utf8");
-    expect(attrs).toContain("*.patterflow text eol=lf");
-    expect(attrs).toContain("*.patterflow merge=patter"); // structured-merge driver, active
-    expect(attrs).not.toContain("# *.patterflow merge=patter"); // not commented out
-    expect(attrs).toContain("*.patterc    text eol=lf merge=ours"); // committed-but-regenerated bundle
-    expect(attrs).toContain("*.patterpack binary");                 // packed document envelope
+    // Rows are column-aligned (toolkit's vcsConfigFiles), so match on the pattern and attributes.
+    expect(attrs).toMatch(/^\*\.patterflow +text eol=lf$/m);
+    expect(attrs).toMatch(/^\*\.patterflow +merge=patter$/m); // structured-merge driver, active
+    expect(attrs).not.toMatch(/# \*\.patterflow +merge=patter/); // not commented out
+    expect(attrs).toMatch(/^\*\.patterc +text eol=lf merge=ours$/m); // committed-but-regenerated bundle
+    expect(attrs).toMatch(/^\*\.patterpack +binary$/m);             // packed document envelope
+    expect(attrs).toMatch(/^\*\.patterextension +text eol=lf$/m);
+    expect(attrs).toMatch(/^extensions\/\*\.extension\.json +text eol=lf$/m);
     expect(readFileSync(join(dir, "vcs-setup.md"), "utf8")).toContain("## git");
   });
 

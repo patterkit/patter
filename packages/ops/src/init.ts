@@ -12,12 +12,28 @@ import { readdirSync, existsSync, readFileSync } from "node:fs";
 import { newId, slug, canonicalStringify } from "@patterkit/core";
 import type { ProjectFile, FlowFile, LocaleFile } from "@patterkit/model";
 import type { PlannedWrite } from "./write.js";
-import { FLOW_SCHEMA, PROJECT_SCHEMA, STRINGS_SCHEMA } from "@patterkit/model";
+import { FLOW_SCHEMA, PROJECT_SCHEMA, STRINGS_SCHEMA, MANIFEST_EXTENSION, EXTENSIONS_DIR } from "@patterkit/model";
+import { vcsConfigFiles, bundlePostureOf, type VcsFormat, type VcsKind, type BundlePosture } from "@wildwinter/toolkit/vcs";
+import { SHARD_EXTENSIONS } from "./pack.js";
+import { CONFLICT_SIDECAR } from "./merge.js";
 
-export type InitVcs = "git" | "perforce" | "plastic" | "svn";
+/** The VCSs `init` sets a project up for: toolkit's list, shared with Storylets. */
+export type InitVcs = VcsKind;
 
 /** Whether the compiled `.patterc` bundle is committed or built in CI (spec §11). */
-export type BundlePosture = "commit" | "ignore";
+export type { BundlePosture };
+
+/** What Patter's files are, for toolkit's version-control setup (the rules and the words are shared). */
+export const PATTER_VCS_FORMAT: VcsFormat = {
+  product: "Patter",
+  tool: "patter",
+  driver: "patter",
+  source: SHARD_EXTENSIONS.map((ext) => ext.slice(1)),
+  manifest: { dir: EXTENSIONS_DIR, suffix: MANIFEST_EXTENSION },
+  bundle: "patterc",
+  pack: "patterpack",
+  conflict: CONFLICT_SIDECAR.slice(1),
+};
 
 export interface InitOptions {
   /** Directory to scaffold into (created by the caller's `applyWrites`). */
@@ -107,30 +123,18 @@ export function runInit(opts: InitOptions): InitResult {
 }
 
 /** The VCS-specific config writes for a project (spec §12): the `vcs-setup.md` guide, git's
- *  `.gitattributes`, and the VCS's ignore file. Shared by `runInit` (scaffold) and the Project Settings
- *  "switch VCS" path (which re-emits these for the newly-chosen VCS). No collision check - callers
- *  overwrite when switching. */
+ *  `.gitattributes`, and the VCS's ignore file, from toolkit's `vcsConfigFiles`. Shared by `runInit`
+ *  (scaffold) and the Project Settings "switch VCS" path (which re-emits these for the newly-chosen VCS).
+ *  No collision check - callers overwrite when switching. */
 export function vcsConfigWrites(dir: string, vcs: InitVcs | undefined, bundle: BundlePosture = "commit"): PlannedWrite[] {
-  const writes: PlannedWrite[] = [{ path: join(dir, "vcs-setup.md"), content: vcsSetup(vcs, bundle) }];
-  if (vcs === "git") writes.push({ path: join(dir, ".gitattributes"), content: GITATTRIBUTES });
-  // The ignore file keeps generated artifacts out of source control: the packed document always, the
-  // compiled bundle too under the "ignore" posture (§11).
-  const ignore = ignoreFileFor(vcs);
-  if (ignore) writes.push({ path: join(dir, ignore), content: ignoreContent(bundle) });
-  return writes;
+  return vcsConfigFiles(PATTER_VCS_FORMAT, vcs, bundle).map((f) => ({ path: join(dir, f.path), content: f.content }));
 }
 
-/**
- * The bundle posture a project was set up with, read back from the files `init` wrote: the VCS's ignore
- * file naming `*.patterc`, else `vcs-setup.md` saying the project ignores it (svn keeps its ignore list in
- * a property). "commit" when neither says so. Switching VCS re-emits these files, and always writing
- * "commit" lost the ignore rule of a project made with `init --bundle ignore`.
- */
+/** The bundle posture a project was set up with, read back from the files `init` wrote (toolkit's
+ *  `bundlePostureOf`). Switching VCS re-emits these files, and always writing "commit" lost the ignore
+ *  rule of a project made with `init --bundle ignore`. */
 export function currentBundlePosture(dir: string, vcs: InitVcs | undefined): BundlePosture {
-  const read = (name: string): string => { try { return readFileSync(join(dir, name), "utf8"); } catch { return ""; } };
-  const ignore = ignoreFileFor(vcs);
-  if (ignore && read(ignore).split(/\r?\n/).some((l) => l.trim() === "*.patterc")) return "ignore";
-  return read("vcs-setup.md").includes("This project IGNORES the compiled") ? "ignore" : "commit";
+  return bundlePostureOf(PATTER_VCS_FORMAT, vcs, (name) => { try { return readFileSync(join(dir, name), "utf8"); } catch { return undefined; } });
 }
 
 // --- emitted file bodies (spec §10/§12 hygiene + merge config) ---------------
@@ -147,186 +151,3 @@ insert_final_newline = true
 indent_style = space
 indent_size = 2
 `;
-
-const GITATTRIBUTES = `# Patter source is UTF-8 + LF text (pinned; never let autocrlf touch it).
-*.patterflow text eol=lf
-*.patterloc  text eol=lf
-*.patterx    text eol=lf
-*.patterproj text eol=lf
-*.patterextension text eol=lf
-
-# Id-keyed structured merge for Patter source (the 'patter merge' driver).
-# Register it once per clone (see vcs-setup.md); until then git falls back to a
-# normal text merge for these - no harm, just not structure-aware.
-*.patterflow merge=patter
-*.patterloc  merge=patter
-*.patterx    merge=patter
-*.patterproj merge=patter
-*.patterextension merge=patter
-
-# An extension's manifest is the extension's own JSON, kept in the project so
-# every machine reads the same one, and never edited here: text, merged as text.
-extensions/*.extension.json text eol=lf
-
-# Generated artifacts (spec §11). The compiled bundle is committed but
-# REGENERATED, never hand-merged - keep ours on conflict and rebuild (the
-# validate staleness gate catches a stale one). Needs a one-time
-# 'git config merge.ours.driver true' (see vcs-setup.md).
-*.patterc    text eol=lf merge=ours
-# The packed document (.patterpack) is a binary zip envelope - kept out of VCS (.gitignore).
-*.patterpack binary
-`;
-
-/** The ignore filename for a VCS (SVN uses a property, not a file - documented). */
-function ignoreFileFor(vcs?: InitVcs): string | undefined {
-  switch (vcs) {
-    case "git": return ".gitignore";
-    case "perforce": return ".p4ignore";
-    case "plastic": return "ignore.conf";
-    default: return undefined; // svn (svn:ignore property) / none -> see vcs-setup.md
-  }
-}
-
-/** Ignore patterns for generated artifacts (gitignore/p4ignore/Plastic share this syntax). */
-function ignoreContent(bundle: BundlePosture): string {
-  const lines = [
-    "# Patter generated artifacts - not source (see vcs-setup.md).",
-    "# Packed document (the send-and-return envelope):",
-    "*.patterpack",
-    "# Unresolved merge sidecar (a lingering one is a validate error). The merge also names its clashes",
-    "# in the shard itself, under \"unresolved\", which IS committed with the file, so CI refuses an",
-    "# unresolved merge wherever it goes:",
-    "*.patterconflict",
-  ];
-  if (bundle === "ignore") {
-    lines.push("# Compiled bundle (built in CI, not committed under this posture):", "*.patterc");
-  }
-  return lines.join("\n") + "\n";
-}
-
-function vcsSetup(vcs: InitVcs | undefined, bundle: BundlePosture): string {
-  const sections: Record<InitVcs, string> = {
-    git: `## git
-
-\`.gitattributes\` (already emitted) pins Patter source shards to UTF-8 + LF text
-and marks the generated artifacts (the \`.patterc\` bundle \`merge=ours\`, the
-\`.patterpack\` document \`binary\`). \`.gitignore\` (already emitted) keeps the document
-(and the bundle, under the "ignore" posture) out of source control.
-
-Recommended pre-commit hook (\`.git/hooks/pre-commit\`, executable):
-
-    #!/bin/sh
-    patter validate || exit 1
-
-The \`merge=patter\` rules in \`.gitattributes\` are already active; register the
-drivers once per clone (git config is not repo-tracked) - until then git falls
-back to a normal text merge for those files:
-
-    git config merge.patter.name "Patter structured merge"
-    git config merge.patter.driver "patter merge %O %A %B -o %A --path %P"
-    git config merge.ours.driver true
-
-git invokes the per-path driver directly (no \`mergetool\` wrapper needed). \`%O %A
-%B\` are base / ours / theirs; the merged result is written back to \`%A\`, and
-\`%P\` is the file's real path. On a conflict \`patter merge\` exits non-zero and
-writes a \`.patterconflict\` sidecar beside that file, so the merge stays unresolved.
-`,
-    perforce: `## Perforce
-
-Add Patter extensions to the typemap (\`p4 typemap\`): source shards and the
-compiled bundle are TEXT with LF; the packed document is BINARY:
-
-    text   //....patterflow
-    text   //....patterloc
-    text   //....patterx
-    text   //....patterproj
-    text   //....patterextension
-    text   //....extension.json
-    text   //....patterc
-    binary //....patterpack
-
-On a unicode-mode server, set \`P4CHARSET=utf8\`. For the lock-based workflow
-(spec: one scene per file = one lock per scene), add \`+l\` to make checkouts
-exclusive. A \`.p4ignore\` (already emitted) keeps the packed document out of the
-depot.
-
-Perforce allows ONE global merge tool, so set \`patter mergetool\` as it - it
-runs the structured merge for Patter source and hands everything else to your
-normal tool. Map Perforce's variables into the order BASE THEIRS OURS OUT:
-
-    patter mergetool --fallback "<your merge tool>" %b %t %y %r
-
-(\`%b\` base, \`%t\` theirs, \`%y\` yours/ours, \`%r\` result - adjust to your P4
-client's variable names; the argument ORDER is what matters.)
-`,
-    plastic: `## Plastic SCM (Unity VC)
-
-Patter source shards are plain UTF-8 text; Plastic handles them as-is. The
-\`ignore.conf\` (already emitted) keeps the packed document out of the repo. For
-the lock-based workflow, configure exclusive checkout (lock.conf) for the shard
-extensions.
-
-In Preferences > Merge tools, add an external tool (a global entry is fine -
-the wrapper sniffs the path) with the arguments in BASE THEIRS OURS OUT order:
-
-    patter mergetool --fallback "<your merge tool>" @basefile @sourcefile @destinationfile @output
-`,
-    svn: `## SVN
-
-Set auto-props so Patter source keeps LF (\`~/.subversion/config\` or repo config):
-
-    [auto-props]
-    *.patterflow = svn:eol-style=LF
-    *.patterloc = svn:eol-style=LF
-    *.patterx = svn:eol-style=LF
-    *.patterproj = svn:eol-style=LF
-    *.patterextension = svn:eol-style=LF
-    *.extension.json = svn:eol-style=LF
-    *.patterc = svn:eol-style=LF
-    *.patterpack = svn:mime-type=application/octet-stream
-
-SVN's ignore is a directory PROPERTY, not a file - set it from the project root:
-
-    svn propset svn:ignore "*.patterpack${bundle === "ignore" ? "\\n*.patterc" : ""}\\n*.patterconflict" .
-
-For the lock-based workflow add \`svn:needs-lock\` to the shard patterns.
-
-SVN allows one global merge tool. Point \`[helpers] merge-tool-cmd\` at a small
-wrapper script that forwards SVN's four arguments (base theirs mine merged =
-BASE THEIRS OURS OUT) to \`patter mergetool\`:
-
-    #!/bin/sh
-    exec patter mergetool --fallback "<your merge tool>" "$1" "$2" "$3" "$4"
-`,
-  };
-  const head = vcs
-    ? sections[vcs]
-    : `No VCS selected (\`patter init --vcs git|perforce|plastic|svn\` emits tailored
-config). Whichever you adopt, the rules are the same: Patter source is UTF-8 +
-LF text, one scene per file, and \`patter validate\` belongs in your pre-commit /
-CI. Sections for every supported VCS:
-
-${(Object.keys(sections) as InitVcs[]).map((k) => sections[k]).join("\n")}`;
-  return `# Version-control setup for this Patter project\n\n${head}\n${bundleSection(bundle)}`;
-}
-
-/** Shared note: the two generated artifacts and the committed-bundle discipline (spec §11). */
-function bundleSection(bundle: BundlePosture): string {
-  const posture = bundle === "commit"
-    ? `This project COMMITS the compiled \`.patterc\` bundle (\`patter init --bundle ignore\`
-to build it in CI instead). The bundle is regenerated, never hand-merged: on a
-conflict, keep ours and re-run \`patter export\`. \`patter validate\` recomputes the
-bundle's embedded hash from source and FAILS if it is stale, so a forgotten
-regenerate cannot ship silently.`
-    : `This project IGNORES the compiled \`.patterc\` bundle (built in CI; \`patter init
---bundle commit\` to commit it instead). Run \`patter export\` as a build step.`;
-  return `## Compiled bundle & packed document
-
-${posture}
-
-The packed \`.patterpack\` document (\`patter pack\`) is the send-and-return envelope
-for collaborators without VCS. It is a binary zip and a projection of the
-shards - NOT source - so it stays out of version control (ignored above); edits
-return via \`patter unpack\`.
-`;
-}

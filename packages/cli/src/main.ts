@@ -15,7 +15,6 @@
 // ---------------------------------------------------------------------------
 
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { canonicalStringify, parseSource } from "@patterkit/core";
 import {
@@ -84,6 +83,7 @@ function writeMergeResult(result: MergeResult, out: string, realPath: string, an
   return 0;
 }
 import { writeTextFiles, writeBinaryFile, currentUser } from "@wildwinter/simple-vc-lib";
+import { runMergetool } from "@wildwinter/toolkit/vcs";
 // The number comes from the MANIFEST, inlined by both shipping paths (tsup and Bun --compile), rather
 // than a hand-kept constant. A release is tagged from the manifest, so a constant that drifts from it
 // drifts from the name of the file the user downloaded, which is the one thing they can still read.
@@ -828,31 +828,26 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       // SVN all agree); git uses the per-path driver and calls `patter merge`.
       const [baseP, theirsP, oursP, outP] = positionals;
       if (!baseP || !theirsP || !oursP || !outP) return usage("mergetool", "needs BASE THEIRS OURS OUT");
-      const fallback = typeof flags.fallback === "string" ? flags.fallback : undefined;
-
-      if (isPatterSource(outP) || isPatterSource(oursP)) {
-        const src = parseThree(baseP, oursP, theirsP, "mergetool");
-        if (!src) return 2;
-        try {
-          const manifest = mergeManifest(src.ours, outP);
-          return writeMergeResult(runMerge(src.base, src.ours, src.theirs, manifest ? { manifest } : undefined), outP, outP, false);
-        } catch (e) {
-          if (e instanceof UnsupportedMergeError) { console.error(`mergetool: ${e.message}`); return 2; }
-          throw e;
-        }
-      }
-
-      // Not a Patter file: hand the VCS's own arguments to the configured tool.
-      // No shell - the four file paths are passed as separate argv entries, so
-      // spaces/metacharacters in them are safe; the fallback may carry its own
-      // flags (e.g. "code --wait --merge"), split off the command here.
-      if (!fallback) { console.error(`mergetool: ${outP} is not Patter source and no --fallback configured`); return 2; }
-      const [cmd, ...pre] = fallback.split(/\s+/).filter(Boolean);
-      if (!cmd) return usage("mergetool", "empty --fallback");
-      const r = spawnSync(cmd, [...pre, baseP, theirsP, oursP, outP], { stdio: "inherit" });
-      // A tool that could not start (not installed, not on PATH) has no status: say so, or the merge just fails.
-      if (r.error) { console.error(`mergetool: could not run the fallback '${cmd}': ${r.error.message}`); return 1; }
-      return r.status ?? 1;
+      // Patter source -> the structured merge; anything else -> the fallback, by toolkit's shared wrapper
+      // (no shell: the four paths go as separate argv entries; exit 2 with no fallback, 1 when it cannot start).
+      return runMergetool({
+        base: baseP, theirs: theirsP, ours: oursP, out: outP,
+        fallback: typeof flags.fallback === "string" ? flags.fallback : undefined,
+        isSource: isPatterSource,
+        merge: () => {
+          const src = parseThree(baseP, oursP, theirsP, "mergetool");
+          if (!src) return 2;
+          try {
+            const manifest = mergeManifest(src.ours, outP);
+            return writeMergeResult(runMerge(src.base, src.ours, src.theirs, manifest ? { manifest } : undefined), outP, outP, false);
+          } catch (e) {
+            if (e instanceof UnsupportedMergeError) { console.error(`mergetool: ${e.message}`); return 2; }
+            throw e;
+          }
+        },
+        error: (message) => console.error(message),
+        tool: "patter",
+      });
     }
 
   }
