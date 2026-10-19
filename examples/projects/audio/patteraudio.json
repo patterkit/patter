@@ -1,6 +1,10 @@
 {
   "schema": "patter/audio@0",
   "clips": {
+    "L_02irf71j": {
+      "file": "scratch/L_02irf71j.wav",
+      "status": "scratch"
+    },
     "L_0vvvty20": {
       "file": "scratch/L_0vvvty20.wav",
       "status": "scratch"
@@ -9,8 +13,20 @@
       "file": "scratch/L_2ec5fwcx.wav",
       "status": "scratch"
     },
+    "L_2lqfp2j1": {
+      "file": "scratch/L_2lqfp2j1.wav",
+      "status": "scratch"
+    },
     "L_2rkpjkyq": {
       "file": "scratch/L_2rkpjkyq.wav",
+      "status": "scratch"
+    },
+    "L_48la1il4": {
+      "file": "scratch/L_48la1il4.wav",
+      "status": "scratch"
+    },
+    "L_4gw5bkrh": {
+      "file": "scratch/L_4gw5bkrh.wav",
       "status": "scratch"
     },
     "L_53ew1muy": {
@@ -19,6 +35,14 @@
     },
     "L_8ndfou2l": {
       "file": "scratch/L_8ndfou2l.wav",
+      "status": "scratch"
+    },
+    "L_9lypohpy": {
+      "file": "scratch/L_9lypohpy.wav",
+      "status": "scratch"
+    },
+    "L_begzzbls": {
+      "file": "scratch/L_begzzbls.wav",
       "status": "scratch"
     },
     "L_dgowlmkp": {
@@ -33,12 +57,40 @@
       "file": "scratch/L_gzze295b.wav",
       "status": "scratch"
     },
+    "L_heik1go9": {
+      "file": "scratch/L_heik1go9.wav",
+      "status": "scratch"
+    },
     "L_jjyt2npu": {
       "file": "scratch/L_jjyt2npu.wav",
       "status": "scratch"
     },
+    "L_jmnwski3": {
+      "file": "scratch/L_jmnwski3.wav",
+      "status": "scratch"
+    },
+    "L_jptgfwlx": {
+      "file": "scratch/L_jptgfwlx.wav",
+      "status": "scratch"
+    },
     "L_kqsapwb7": {
       "file": "scratch/L_kqsapwb7.wav",
+      "status": "scratch"
+    },
+    "L_l6w28hh0": {
+      "file": "scratch/L_l6w28hh0.wav",
+      "status": "scratch"
+    },
+    "L_mshi7u3l": {
+      "file": "scratch/L_mshi7u3l.wav",
+      "status": "scratch"
+    },
+    "L_navdbi88": {
+      "file": "scratch/L_navdbi88.wav",
+      "status": "scratch"
+    },
+    "L_r1x3eof8": {
+      "file": "scratch/L_r1x3eof8.wav",
       "status": "scratch"
     },
     "L_s2ugg6fo": {
@@ -51,6 +103,14 @@
     },
     "L_uk56f61b": {
       "file": "scratch/L_uk56f61b.wav",
+      "status": "scratch"
+    },
+    "L_w7yp2n8k": {
+      "file": "scratch/L_w7yp2n8k.wav",
+      "status": "scratch"
+    },
+    "L_y6cp8bjw": {
+      "file": "scratch/L_y6cp8bjw.wav",
       "status": "scratch"
     }
   }
