@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
+  the JS runtime's: it exports `resolveSceneRef`, the one rule for a scene reference (the address first,
+  then the internal id), which this runtime already resolves by. Nothing in this runtime changed.
+
 ## [0.31.0] - 2026-10-19
 
 ### Added
