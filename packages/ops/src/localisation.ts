@@ -8,6 +8,13 @@
 //                                      list every serializer renders).
 //   applyLoc(loaded, catalog)       -> PlannedWrite[] (the loc shards + the
 //                                      localisedAt stamps) for the caller to commit.
+//   actionTextChanges(loaded)       -> the text that has dropped out of the loc files
+//                                      or come into them since loc import last wrote them.
+//
+// Action text (patterkit design/proposals/action-text.md): a dialogue scene's text beats, in a project that
+// doesn't localise them (`textIsAction`), are left out of the export, and import drops any translation of
+// them a shard still holds. Each translated shard import writes says whether its scene's text was action
+// (`LocaleFile.textAction`), so a scene that changes kind is reported, never silent.
 //
 // Population mirrors report.ts's localisation set (written-line ids with source
 // text), PLUS the project-level cast display names (the `@project` shard, keyed
@@ -21,10 +28,10 @@
 import { basename, dirname, join, sep } from "node:path";
 import { canonicalStringify } from "@patterkit/core";
 import {
-  walkNodes, castStringKey, qualifierStringKey, speakerLabelKey, usedQualifiers, usedSpeakerPairs, projectQualifiers,
+  walkNodes, textIsAction, castStringKey, qualifierStringKey, speakerLabelKey, usedQualifiers, usedSpeakerPairs, projectQualifiers,
   SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, PROJECT_LOCALE_SCENE, projectLayout, STRINGS_SCHEMA, AUTHORING_SCHEMA,
 } from "@patterkit/model";
-import type { AuthoringFile, GrammaticalGender, Group, LocaleFile, ProjectFile, Snippet } from "@patterkit/model";
+import type { AuthoringFile, GrammaticalGender, Group, LocaleFile, ProjectFile, Scene, Snippet } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import { tableFor, mergeAuthoring } from "./loaded-helpers.js";
 import type { PlannedWrite } from "./write.js";
@@ -65,6 +72,109 @@ export interface ApplyStats {
   updated: number;
   /** Loc shard files touched. */
   files: number;
+  /** Translations dropped because their beat is now action text. */
+  dropped: number;
+}
+
+/** A text beat whose place in the loc files has changed since loc import last wrote them: `dropped` (its scene's
+ *  text is now action, so its translation goes at the next import) or `added` (no longer action, so it's sent
+ *  for translation from the next export). */
+export interface ActionTextChange {
+  id: string;
+  scene: string;
+  locale: string;
+  change: "dropped" | "added";
+}
+
+/** The setting's name as Patterpad shows it, and where, for the lines that explain action text to people. */
+const SETTING_NAME = `"Localise text lines in dialogue scenes" (Project Settings, Language; \`localiseDialogueText\` in the project file)`;
+
+/**
+ * What a loc export tells a person beside the file, for the CLI and Patterpad alike: first, how many text lines it
+ * left out because they're action, and the setting that does it, so nobody wonders where they went; then what has
+ * dropped out of the loc files or come into them since loc import last wrote them (`actionTextChanges`), a heading
+ * per locale and kind of change with each beat's id and scene name indented under it. Empty when the export left
+ * nothing out and nothing has changed.
+ */
+export function describeLocExport(loaded: LoadedProject, opts: { locale?: string } = {}): string[] {
+  const source = tableFor(loaded, loaded.project.locales.default);
+  let lines = 0, scenes = 0;
+  for (const ids of actionTextIds(loaded).values()) {
+    const n = [...ids].filter((id) => source[id]).length;
+    if (n) { lines += n; scenes++; }
+  }
+  const out: string[] = [];
+  if (lines) {
+    out.push(`Left out ${lines} text line${lines === 1 ? "" : "s"} in ${scenes} dialogue scene${scenes === 1 ? "" : "s"}: `
+      + `${lines === 1 ? "it's" : "they're"} action, a direction for whoever stages the scene, because ${SETTING_NAME} is off. `
+      + `Turn it on to translate ${lines === 1 ? "it" : "them"}.`);
+  }
+  return [...out, ...describeActionTextChanges(loaded, actionTextChanges(loaded, opts))];
+}
+
+/** The lines that tell a person what `actionTextChanges` found: a heading per locale and kind of change, then
+ *  each beat's id and scene name. Empty when nothing has changed. */
+function describeActionTextChanges(loaded: Pick<LoadedProject, "scenes">, changes: readonly ActionTextChange[]): string[] {
+  const nameOf = new Map(loaded.scenes.map((sc) => [sc.id, sc.name]));
+  const out: string[] = [];
+  const groups = new Map<string, ActionTextChange[]>();
+  for (const c of changes) {
+    const key = `${c.locale}|${c.change}`;
+    (groups.get(key) ?? groups.set(key, []).get(key)!).push(c);
+  }
+  for (const [key, list] of groups) {
+    const [locale, change] = key.split("|") as [string, ActionTextChange["change"]];
+    const n = `${list.length} text line${list.length === 1 ? "" : "s"}`;
+    out.push(change === "dropped"
+      ? `${n} now action, so left out of '${locale}': the next loc import drops ${list.length === 1 ? "its translation" : "their translations"} (turn on ${SETTING_NAME} to keep ${list.length === 1 ? "it" : "them"})`
+      : `${n} no longer action, so new to '${locale}' and untranslated`);
+    for (const c of list) out.push(`  ${c.id} in '${nameOf.get(c.scene) ?? c.scene}'`);
+  }
+  return out;
+}
+
+/** A scene's text beats, its option prompts left out (a prompt is always localised), in authored order. */
+export function sceneTextIds(scene: Scene): string[] {
+  const out: string[] = [];
+  for (const block of scene.blocks) {
+    walkNodes<Group | Snippet>(block.children, (node) => {
+      if (node.type === "snippet") for (const beat of node.beats ?? []) if (beat.kind === "text") out.push(beat.id);
+    });
+  }
+  return out;
+}
+
+/** Each scene's action text ids (`textIsAction`), by scene id. A scene without action text isn't listed. */
+export function actionTextIds(loaded: Pick<LoadedProject, "project" | "scenes">): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const scene of loaded.scenes) if (textIsAction(loaded.project, scene)) out.set(scene.id, new Set(sceneTextIds(scene)));
+  return out;
+}
+
+/**
+ * The text that has dropped out of the loc files, or come into them, since loc import last wrote them, for each
+ * translated locale (or the one given). Dropped: a scene's text is now action, and its shard still holds a
+ * translation of it. Added: the shard says its scene's text was action (`textAction`) and it no longer is, so
+ * each of its text beats with source text is new to the translators. In scene, then authored, order.
+ */
+export function actionTextChanges(loaded: LoadedProject, opts: { locale?: string } = {}): ActionTextChange[] {
+  const defaultLocale = loaded.project.locales.default;
+  const locales = opts.locale !== undefined ? (opts.locale === defaultLocale ? [] : [opts.locale]) : loaded.project.locales.all.filter((l) => l !== defaultLocale);
+  const source = tableFor(loaded, defaultLocale);
+  const out: ActionTextChange[] = [];
+  for (const locale of locales) {
+    for (const scene of loaded.scenes) {
+      const path = existingLocPath(loaded, scene.id, locale);
+      const shard = path ? findFile<LocaleFile>(loaded.localeFiles, loaded.locales, path) : undefined;
+      if (!shard) continue;
+      const action = textIsAction(loaded.project, scene);
+      for (const id of sceneTextIds(scene)) {
+        if (action && shard.strings[id]) out.push({ id, scene: scene.id, locale, change: "dropped" });
+        else if (!action && shard.textAction && source[id]) out.push({ id, scene: scene.id, locale, change: "added" });
+      }
+    }
+  }
+  return out;
 }
 
 
@@ -135,8 +245,9 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
     entries.push({ id, scene, source: src, translation, comments: commentsOf(id), context: withGender(context), stale: staleFor(id, translation) });
   };
 
-  // Scene strings: line / text beats + option prompts (the same population report.ts counts).
+  // Scene strings: line / text beats + option prompts (the same population report.ts counts), less action text.
   for (const scene of loaded.scenes) {
+    const action = textIsAction(loaded.project, scene);
     for (const block of scene.blocks) {
       walkNodes<Group | Snippet>(block.children, (node) => {
         if (node.type === "group") {
@@ -145,7 +256,8 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
           return;
         }
         for (const beat of node.beats ?? []) {
-          if (beat.kind !== "gameEvent") push(beat.id, scene.id, lineContext(beat));
+          if (beat.kind === "gameEvent" || (action && beat.kind === "text")) continue;
+          push(beat.id, scene.id, lineContext(beat));
         }
       });
     }
@@ -252,7 +364,7 @@ const findFile = <T>(files: string[], items: T[], path: string): T | undefined =
 export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now?: string } = {}): { writes: PlannedWrite[]; stats: ApplyStats } {
   const locale = catalog.locale;
   if (!locale || locale === loaded.project.locales.default) {
-    return { writes: [], stats: { updated: 0, files: 0 } }; // nothing to import into the source language
+    return { writes: [], stats: { updated: 0, files: 0, dropped: 0 } }; // nothing to import into the source language
   }
   // The catalogue is a file from outside (a translator, a vendor), and the target paths are built from
   // its own scene and locale names: refuse any the project does not have before planning a write, or a
@@ -270,18 +382,27 @@ export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now
   // Group accepted translations by scene. `fresh` ids (not flagged stale) get their localisedAt
   // restamped to now; stale-flagged ids keep their text written but stay flagged for review (decision
   // 3a) - the translator clears stale by un-flagging the entry, not merely by re-submitting the file.
+  const action = actionTextIds(loaded);
   const bySceneText = new Map<string, Map<string, string>>();
   const bySceneFresh = new Map<string, Set<string>>();
   for (const e of catalog.entries) {
     if (!e.translation.trim()) continue; // empty = not translated; leave any existing value untouched
+    if (action.get(e.scene)?.has(e.id)) continue; // action text has no translations (an older file may hold one)
     (bySceneText.get(e.scene) ?? bySceneText.set(e.scene, new Map()).get(e.scene)!).set(e.id, e.translation);
     if (!e.stale) (bySceneFresh.get(e.scene) ?? bySceneFresh.set(e.scene, new Set()).get(e.scene)!).add(e.id);
   }
 
   const writes: PlannedWrite[] = [];
   let updated = 0;
+  let dropped = 0;
+  let files = 0;
 
-  for (const [scene, strings] of bySceneText) {
+  // Every scene the file translates, and every scene with a shard in this locale already, which may need its
+  // action text dropped or its `textAction` mark brought up to date.
+  const scenes = new Set<string>(bySceneText.keys());
+  for (const l of loaded.locales) if (l.locale === locale && l.scene !== PROJECT_LOCALE_SCENE && known.has(l.scene)) scenes.add(l.scene);
+  for (const scene of scenes) {
+    const strings = bySceneText.get(scene) ?? new Map<string, string>();
     // Loc shard: start from the existing (scene, locale) shard, then overlay the translations.
     const path = targetLocPath(loaded, scene, locale, loaded.project.locales.default);
     const existing = findFile<LocaleFile>(loaded.localeFiles, loaded.locales, path);
@@ -289,8 +410,16 @@ export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now
     // Count only strings whose translation actually CHANGED (not every string in the sheet), so a
     // re-import of an unedited file honestly reads "0 updated" instead of "N updated".
     for (const [id, text] of strings) { if (merged[id] !== text) updated++; merged[id] = text; }
-    const file: LocaleFile = { schema: existing?.schema ?? STRINGS_SCHEMA, scene, locale, strings: merged };
-    writes.push({ path, content: canonicalStringify(file) });
+    const actionIds = action.get(scene);
+    for (const id of actionIds ?? []) if (id in merged) { delete merged[id]; dropped++; }
+    const file: LocaleFile = {
+      schema: existing?.schema ?? STRINGS_SCHEMA, scene, locale, ...(actionIds ? { textAction: true as const } : {}), strings: merged,
+    };
+    const content = canonicalStringify(file);
+    if (!existing || strings.size > 0 || canonicalStringify(existing) !== content) {
+      writes.push({ path, content });
+      files++;
+    }
 
     // Authoring shard: stamp localisedAt[locale] for the FRESH ids only (staleness reconciliation).
     const fresh = bySceneFresh.get(scene);
@@ -306,5 +435,5 @@ export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now
     writes.push({ path: aPath, content: canonicalStringify(authoring) });
   }
 
-  return { writes, stats: { updated, files: bySceneText.size } };
+  return { writes, stats: { updated, files, dropped } };
 }

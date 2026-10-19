@@ -25,7 +25,7 @@ stays clean.
 | **`.patterflow`** | one **scene**'s structure: blocks, groups, snippets, beats, conditions, selectors, jumps | No prose, no audio. Tiny and stable, so it merges cleanly. |
 | **`.patterloc`** | the **strings** for one scene in one locale, keyed by beat id (`loc/<locale>/<scene>.patterloc`) | Text only. Even the source language lives here, not in the flow. |
 | **`.patterx`** | all volatile **authoring metadata**: comments, documentation notes, writing/recording status, the edit trail, cut markers, estimates, suggestions | Stripped at export. Merges by union of ids. |
-| **`.patterproj`** | project **settings**: cast, speaker qualifiers, the default pause after a line, properties, Game Data schema, status ladders, locales, VCS kind | The thing the editor "opens." Found by walking up the directory tree. |
+| **`.patterproj`** | project **settings**: cast, speaker qualifiers, the default pause after a line, properties, Game Data schema, status ladders, locales, whether a dialogue scene's text is localised, VCS kind | The thing the editor "opens." Found by walking up the directory tree. |
 
 Two things follow from this that are worth knowing.
 

@@ -7,6 +7,13 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Action text**: a text step can be action, a direction for whoever stages the scene that the player never
+  sees. A dialogue scene's text is action unless the project localises it, and its text is the source in every
+  locale. `FPatterStep::bAction` is true on such a Text step (and `patter::StepResult::action` in C++), false on
+  any other step and on a replayed option prompt, which never is. Pinned by the corpus (version 5).
+
 ## [0.30.0] - 2026-10-18
 
 ### Added

@@ -56,7 +56,7 @@ from a CDN), described on [JavaScript & web](/play/javascript/). Unity (C#), Unr
 and Godot (GDScript) each have a native plugin with the same API, and
 [Playing in your game](/play/overview/) is where those start.
 
-Each runtime loads the bundle and walks it beat by beat (line, narration, choice) while your
+Each runtime loads the bundle and walks it beat by beat (line, text, choice) while your
 game reads its own [Game Data](/format/gamedata-and-addressing/) off each beat to drive audio,
 camera, quests, and everything else.
 

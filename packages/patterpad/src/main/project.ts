@@ -7,7 +7,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
 import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, renameStage, renameGameDataStage, stageDialect, stageGateCount, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
-  extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
+  extractLoc, applyLoc, describeLocExport, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs, handoffWrite,
   discoverGameScopes, gameScopesCatalogue, gameScopeTokens, worldSettingsScopes, planWorldSave, planShareScopes, defaultGameScopesDir,
@@ -283,6 +283,7 @@ function summarise(p: LoadedProject): OpenedProject {
     cast: (p.project.cast ?? []).map((c) => c.name),
     qualifiers: projectQualifiers(p.project),
     padAfterDefault: p.project.padAfterDefault ?? DEFAULT_PAD_AFTER,
+    localiseDialogueText: p.project.localiseDialogueText ?? false,
     gameDataFields: p.project.gameDataFields ?? {},
     scenes: p.scenes.map((s) => ({ id: s.id, name: s.name, blocks: s.blocks.map((b) => ({ id: b.id, name: b.name })) })),
     sceneIds: p.scenes.map((s) => s.id),
@@ -1630,7 +1631,7 @@ function reloadFromDisk(): void {
   hydrated = true;
 }
 
-/** Editable lines (dialogue, narration, option prompts) an export of one scene, and of the project, holds. */
+/** Editable lines (dialogue, text, option prompts) an export of one scene, and of the project, holds. */
 export function editableLineCounts(sceneId: string | null): { scene: number; project: number } {
   if (!loaded) return { scene: 0, project: 0 };
   ensureHydrated();
@@ -1787,7 +1788,7 @@ function resetPlaySession(): void { flow = null; engine = null; playBundle = nul
 const toStep = (r: StepResult, scene: string | null): PlayStep | null => {
   const s = scene ?? undefined;
   if (r.type === "line") return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction, qualifier: r.qualifier, qualifierName: r.qualifierName, speakerLabel: r.speakerLabel, padAfter: r.padAfter };
-  if (r.type === "text") return { kind: "text", id: r.id, scene: s, text: r.text, padAfter: r.padAfter };
+  if (r.type === "text") return { kind: "text", id: r.id, scene: s, text: r.text, padAfter: r.padAfter, ...(r.action ? { action: true } : {}) };
   if (r.type === "gameEvent") return { kind: "gameEvent", id: r.id, scene: s };
   return null; // choice / end carry no played beat
 };
@@ -2253,21 +2254,24 @@ export async function reportXlsx(): Promise<{ buffer: Buffer; defaultName: strin
 
 /** Render localisation strings (spec §14) for export: a serialised file + a suggested filename. The main
  *  process owns the Save dialog + write (it holds the window + fs); this just produces the bytes. */
-export async function locExport(format: "json" | "xlsx" | "po", locale?: string): Promise<{ content: string | Buffer; defaultName: string } | null> {
+export async function locExport(format: "json" | "xlsx" | "po", locale?: string): Promise<{ content: string | Buffer; defaultName: string; changes: string[] } | null> {
   if (!loaded) return null;
   ensureHydrated(); // strings come from every scene
   const catalog = extractLoc(loaded, { locale });
+  // The action text it left out, and why, and what has dropped out of the loc files or come into them since, told
+  // as the CLI tells it.
+  const changes = describeLocExport(loaded, { locale });
   const stem = safeStem("strings");
   const tag = locale ?? "template";
-  if (format === "xlsx") return { content: await catalogToXlsx(catalog), defaultName: `${stem} - ${tag}.xlsx` };
-  if (format === "po") return { content: catalogToPo(catalog), defaultName: locale ? `${tag}.po` : `${stem}.pot` };
-  return { content: catalogToJson(catalog), defaultName: `${stem} - ${tag}.json` };
+  if (format === "xlsx") return { content: await catalogToXlsx(catalog), defaultName: `${stem} - ${tag}.xlsx`, changes };
+  if (format === "po") return { content: catalogToPo(catalog), defaultName: locale ? `${tag}.po` : `${stem}.pot`, changes };
+  return { content: catalogToJson(catalog), defaultName: `${stem} - ${tag}.json`, changes };
 }
 
 /** Import a translated file back into the project: parse by extension, apply, commit, and refresh the
  *  cached project so validate / report / play reflect the new strings. `fallbackLocale` covers formats
  *  that don't carry one (Excel). Returns the locale + counts, or an error to surface. */
-export async function locImport(filePath: string, fallbackLocale?: string): Promise<{ ok: boolean; error?: string; locale?: string; updated?: number; files?: number }> {
+export async function locImport(filePath: string, fallbackLocale?: string): Promise<{ ok: boolean; error?: string; locale?: string; updated?: number; files?: number; dropped?: number }> {
   if (!loaded) return { ok: false, error: "no project open" };
   ensureHydrated(); // applyLoc writes across every scene's loc shard
   const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
@@ -2297,7 +2301,7 @@ export async function locImport(filePath: string, fallbackLocale?: string): Prom
     if (!res.ok) return { ok: false, error: res.error };
     try { reloadFromDisk(); }
     catch (e) { console.warn("patterpad: localisation import committed, but reloading the project failed - the in-memory strings are stale until reopen:", e); }
-    return { ok: true, locale, updated: stats.updated, files: stats.files };
+    return { ok: true, locale, updated: stats.updated, files: stats.files, dropped: stats.dropped };
   });
 }
 
@@ -2677,6 +2681,7 @@ export function readSettings(): ProjectSettingsDto | null {
     formatting: p.formatting ?? true,
     // Line padding: the project's default pause, else the built-in one, so the field is never blank.
     padAfterDefault: p.padAfterDefault ?? DEFAULT_PAD_AFTER,
+    localiseDialogueText: p.localiseDialogueText ?? false,
     localeDefault: p.locales.default,
     locales: p.locales.all,
     gameDataFields: p.gameDataFields ?? {},
@@ -2792,6 +2797,8 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
       // Line padding: stored only when it differs from the built-in default, as the ladders are. A caller
       // that sends none (an older settings shape) leaves the project's as it is.
       padAfterDefault: s.padAfterDefault === undefined ? loaded.project.padAfterDefault : s.padAfterDefault === DEFAULT_PAD_AFTER ? undefined : s.padAfterDefault,
+      // Action text: default OFF, so stored only when ticked on; an older settings shape leaves it alone.
+      localiseDialogueText: s.localiseDialogueText === undefined ? loaded.project.localiseDialogueText : s.localiseDialogueText ? true : undefined,
       // Autosave and Auto Rebuild are no longer project settings (rulings A and B of the October 2026
       // review): the family always saves, and Auto Rebuild is per person. A file that still names either
       // has it dropped on the next save.

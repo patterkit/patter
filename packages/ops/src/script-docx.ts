@@ -18,7 +18,7 @@
 import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TabStopType, TextRun } from "docx";
 import { TOKENS, characterColour, cueLabel, textRuns, type ScriptDoc, type ScriptElement, type TextRun as Run } from "./script-doc.js";
 
-export const SERIF = "Georgia";     // reading: dialogue, narration, headings
+export const SERIF = "Georgia";     // reading: dialogue, text, headings
 export const SANS = "Arial";        // chrome: character cues, group labels, option tags
 export const MONO = "Courier New";  // machine text: conditions, {@property} values, game events
 
@@ -32,7 +32,7 @@ const WITHIN = 30;           // twips before a within-snippet row
 
 export const S = { h1: 32, h2: 26, body: 22, cue: 18, label: 16, tag: 15, mech: 18 }; // half-points
 
-/** Body runs (dialogue / narration / option) as Word runs. `color` sets the prose ink; `{@property}` runs
+/** Body runs (dialogue / text / option) as Word runs. `color` sets the prose ink; `{@property}` runs
  *  switch to accent mono; `<b>/<i>/<bi>` markup rides each run. `base` forces bold/italic over the whole. */
 export function bodyRuns(runs: Run[], color: string, base: { bold?: boolean; italic?: boolean } = {}): TextRun[] {
   return runs.map((r) => r.code

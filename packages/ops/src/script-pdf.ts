@@ -3,7 +3,7 @@
 // script-docx. Pure: ScriptDoc in, Buffer out (collected from PDFKit's stream; no file I/O).
 //
 // The design's three type ROLES are embedded as real faces (from the font packages, see script-fonts.ts):
-//   serif = Newsreader     - reading: dialogue, narration, headings
+//   serif = Newsreader     - reading: dialogue, text, headings
 //   sans  = Inter          - chrome: character cues, group labels, option tags
 //   mono  = IBM Plex Mono  - machine text: conditions, {@property} values, game events
 // Each role is a chain of Unicode-subset files. Any glyph the chain lacks (the ◇ ↪ ⚙ marks, maths, arrows,
@@ -102,7 +102,7 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
       if (buf) out.push({ text: buf, font: cur, color });
       return out;
     };
-    /** Body runs (dialogue / narration / option) as pieces: prose in the serif, `{@property}` runs in accent
+    /** Body runs (dialogue / text / option) as pieces: prose in the serif, `{@property}` runs in accent
      *  mono; `<b>/<i>/<bi>` markup rides each run. `base` forces bold/italic. */
     const bodyPieces = (runs: TextRun[], color: string, base: { bold?: boolean; italic?: boolean } = {}): Piece[] =>
       runs.flatMap((r) => r.code ? split(r.text, "Mono", ACCENT) : split(r.text, SERIF(base.bold || r.bold, base.italic || r.italic), color));

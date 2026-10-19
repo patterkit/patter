@@ -49,6 +49,7 @@ import { writingStatusPlugin, setWritingStatusMap, setWritingStatusShown, setWri
 import { replaceSayText } from "../src/lines.js";
 import { multiSelectDecorations } from "./multiselect.js";
 import { qualifiersPlugin, setQualifierList, qualifierList, type QualifierChoice } from "./qualifiers.js";
+import { actionTextPlugin, setLocaliseDialogueText } from "./action-text.js";
 import { cycleQualifier as cycleQualifierCmd } from "../src/qualifier.js";
 export type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, LeafKind,
@@ -94,6 +95,9 @@ export interface MountOptions {
    *  qualified line's speaker, `TAM (O.S.)`, and cycled by the keyboard route. Push changes with
    *  `setQualifiers`. */
   qualifiers?: QualifierChoice[];
+  /** The project's "Localise text lines in dialogue scenes" (default off): off, a dialogue scene's text beats
+   *  are action and drawn as directions (web/action-text.ts). Push changes with `setLocaliseDialogueText`. */
+  localiseDialogueText?: boolean;
   /** The project's default pause after a line (line padding), read when an edit pins a moved line to the
    *  pause it had (src/pad.ts). Absent, or answering undefined, means DEFAULT_PAD_AFTER. */
   projectPadAfterDefault?: () => number | undefined;
@@ -232,6 +236,8 @@ export interface SurfaceHandle {
   setPadAfterDefault(id: string, seconds: number | null): boolean;
   /** Replace the project's qualifier list (after a Project Settings save): the cues repaint with it. */
   setQualifiers(list: QualifierChoice[]): void;
+  /** The project's "Localise text lines in dialogue scenes" changed: action text is redrawn. */
+  setLocaliseDialogueText(on: boolean): void;
   /** This scene's local `@scene` property declarations (read from the scene doc, for the editor). */
   sceneProps(): PropertyDecl[];
   /** Replace this scene's local `@scene` property declarations (an empty list clears them). */
@@ -774,6 +780,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         spellcheckPlugin(), // inline spell-check squiggles + right-click fix menu (#177; handle.setSpellChecker)
         writingStatusPlugin(), // per-beat writing-status colour badges in the LEFT icon gutter (#196)
         qualifiersPlugin(opts.qualifiers ?? []), // the cue's (O.S.) and run inheritance of a line's qualifier
+        actionTextPlugin(opts.localiseDialogueText ?? false), // a dialogue scene's text drawn as action
         projectPad(() => opts.projectPadAfterDefault?.()), // the project's default pause, for pinning a moved line
         keepTimingOnJoin(), // lines a range edit joins into another bubble keep their timing (line padding)
       ],
@@ -1185,6 +1192,9 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     },
     setQualifiers(list) {
       view.dispatch(setQualifierList(view.state, list));
+    },
+    setLocaliseDialogueText(on) {
+      view.dispatch(setLocaliseDialogueText(view.state, on));
     },
     sceneProps() {
       const raw = JSON.parse(view.state.doc.attrs.raw as string) as Record<string, unknown>;

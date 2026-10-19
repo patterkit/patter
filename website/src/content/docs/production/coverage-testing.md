@@ -15,7 +15,7 @@ dead content before a player does.
 **Review ▸ Coverage Test…** (`Shift+Cmd+C`) opens a window that stays open while you edit, so you can act
 on what it finds. Up top: **Runs**, **Max steps**, **Seed** (the same seed replays the same
 run, for repeatable checks), and a **Start** scene. Press **Run test** for a table of every
-line, narration, and game event beat, showing how often each one came up.
+line, text, and game event beat, showing how often each one came up.
 
 The story needs a **start point** for the test (and for **Play ▸ Play from Start**); if you
 haven't set one, you'll be asked to pick a scene, saved to **Project Settings ▸ General ▸

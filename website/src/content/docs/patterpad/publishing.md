@@ -81,7 +81,7 @@ and uploads as-is to itch.io (zipped) or any static host.
 ## A readable script: for people who'd rather read
 
 **Publish ▸ Publish Readable Script…** writes the whole story as a screenplay-style **PDF** or
-**Word** document: scene headings, dialogue, narration, and the branching laid out plainly
+**Word** document: scene headings, dialogue, text, and the branching laid out plainly
 (choices as labelled lists, jumps as "go to …"). It's the thing to hand an editor, a
 collaborator, or anyone giving notes on the *writing* rather than playing it. Details:
 [Building & shipping](/setup/building-and-shipping/#a-readable-script-pdf--word).

@@ -28,7 +28,7 @@ const flow = engine.openFlow("main", { scene: "square" });
 for (;;) {
   const step = flow.advance();
   if (step.type === "line")   render(step.character, step.speakerLabel, step.text);
-  else if (step.type === "text")   narrate(step.text);
+  else if (step.type === "text")   step.action ? stage(step) : show(step.text);
   else if (step.type === "gameEvent") host(step.gameData);   // your side-effects
   else if (step.type === "choice") flow.choose(pick(step.options).id);
   else if (step.type === "end")    break;
@@ -112,7 +112,7 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 | `step.type` | Fields |
 | --- | --- |
 | `"line"` | `id`, `text`, `character?`, `characterName?`, `direction?`, `qualifier?`, `qualifierName?`, `speakerLabel?`, `padAfter`, `gameData?`, `tags?` |
-| `"text"` | `id`, `text`, `padAfter`, `gameData?`, `tags?` |
+| `"text"` | `id`, `text`, `padAfter`, `action?`, `gameData?`, `tags?` |
 | `"gameEvent"` | `id`, `gameData?`, `tags?`: no text; the host-event beat |
 | `"choice"` | `groupId`, `options: ChoiceOption[]` |
 | `"end"` |: |
@@ -133,6 +133,13 @@ putting `characterName` and `qualifierName` together yourself: how they combine 
 translator's (see [How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)). It's
 absent when the line has no speaker, on a silenced line, and in IDs-only mode.
 
+**`action`** is `true` on a text step that is **action**: a direction for whoever stages the scene
+(`MARA turns away.`), not words for the player. A dialogue scene's text is action unless the project
+localises it (see [What gets translated](/production/localisation/#what-gets-translated)). Use it to
+stage the moment, a look, a move, a camera cut, rather than show it as on-screen text. Its `text` is
+the source language in every locale, since action isn't translated. The field is absent on shown text,
+and a replayed option prompt is never action.
+
 **`padAfter`** is the writer's pause after a line or text beat, in seconds, already resolved from the
 beat's own value and the defaults above it (0.6 when nothing sets one). Negative means the next beat
 starts that long before this one ends, so a line or text beat straight after it cuts in on it. A
@@ -145,6 +152,7 @@ these are the rules the writer expects:
   player decides.
 - Start the first line, and the reply to a choice with no spoken prompt, at once.
 - Count a pause after a game event from when the event is done, so a held event doesn't eat it.
+- Give action no time of its own: like a game event, only its `padAfter` separates it from the next beat.
 - Apply no pauses when the player clicks through.
 
 A **`ChoiceOption`** is `{ id, prompt?, eligible, gameData? }`: ineligible options are still present

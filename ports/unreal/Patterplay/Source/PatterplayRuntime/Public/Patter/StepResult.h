@@ -59,6 +59,10 @@ namespace patter
         // The pause after a line or text step, in seconds (line padding): always set on those two, resolved
         // from the beat's own value and the defaults above it; 0 on any other step, which carries none.
         double padAfter = 0;
+        // A text step that is action: a direction for whoever stages the scene, never shown to the player (a
+        // dialogue scene's text, unless the project localises it). Its text is the source in every locale. False
+        // on any other step, and on a replayed option prompt, which never is.
+        bool action = false;
         std::shared_ptr<GameData> gameData;
         // A line, text or game-event step's Patter extension values (the beat's, a replayed prompt's
         // included), by extension id, raw as the bundle carries them; empty when the beat has none.

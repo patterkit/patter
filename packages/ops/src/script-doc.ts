@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Readable screenplay export: the written script + flow as a human-readable document, set like a PRINTED
 // PAPER SCRIPT - the artifact a writer hands a director or actor. Dialogue with coloured speaker cues,
-// prose narration, choices and branches as real structure, and the mechanical beats (game events, jumps)
+// prose text, choices and branches as real structure, and the mechanical beats (game events, jumps)
 // set apart in the margin. Pure data out; the .docx (script-docx.ts) and .pdf (script-pdf.ts) renderers
 // are views, like the voice-script / report / loc exports.
 //
@@ -26,7 +26,7 @@ import type { LoadedProject } from "./load.js";
 export const TOKENS = {
   ink: "26221c",        // near-black warm ink (headings)
   inkRead: "3a352d",    // dialogue body (ink ~84% + muted)
-  inkSoft: "5c554b",    // narration (ink ~68% + muted) - a step softer than dialogue
+  inkSoft: "5c554b",    // text (ink ~68% + muted) - a step softer than dialogue
   muted: "8c8479",      // labels, quiet tags
   accent: "8a5a34",     // structural marks: conditions, options, jumps, game events
   line: "e4dfd5",       // hairlines / rules / the group rail
@@ -116,7 +116,7 @@ export type ScriptElement =
    *  qualifier rides as its `gameId` (`qualifier`) and its shown name (`qualifierName`), for the cue to print
    *  after the character (`cueLabel`). */
   | { kind: "line"; id: string; indent: number; snippet?: number; character: string; qualifier?: string; qualifierName?: string; direction?: string; runs: TextRun[] }
-  /** Prose narration / on-screen text (speaker-less), upright in a soft ink, flush left. `id` is the beat. */
+  /** Text (speaker-less prose: on-screen text or action; the kind keeps its old name), upright in a soft ink, flush left. `id` is the beat. */
   | { kind: "narration"; id: string; indent: number; snippet?: number; runs: TextRun[] }
   /** A gating condition, set in accent mono above the beat it controls: `‹ if @brave ›`. `id` is the node
    *  it gates. */
@@ -242,7 +242,7 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
   let snippetSeq = 0;
   const nextSid = (): number => ++snippetSeq;
 
-  // Emit a snippet's beats (dialogue / narration / game events) and any trailing jump, at `indent`/`sid`.
+  // Emit a snippet's beats (dialogue / text / game events) and any trailing jump, at `indent`/`sid`.
   const emitBeats = (node: Snippet, indent: number, sid: number | undefined): void => {
     for (const beat of node.beats ?? []) {
       if (cut.has(beat.id)) continue;

@@ -85,7 +85,10 @@ Render each `step` into your own dialogue UI; on a `Choice`, show `step.Options`
 writer and the translator chose (see [How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)). A `Line` or
 `Text` step's `PadAfter` (a `double?`, null on the other steps) is the writer's pause after it in
 seconds, already resolved; `Bundle.DefaultPadAfter` (0.6) is the one a project gets when it sets
-none. The [timing rules](/play/engine/#step-shapes) say how to play it.
+none. The [timing rules](/play/engine/#step-shapes) say how to play it. A `Text` step with
+`Action` set is [action](/play/engine/#step-shapes), a direction for whoever stages the scene: stage
+it, or let it pass, but don't show it as on-screen text. `Action` is false on shown text and on a
+replayed prompt.
 
 Two ready-made samples ship with the package. Import them from **Package Manager ▸ Patterplay ▸
 Samples**. Each carries a **ready-made scene**, so there is nothing to set up: import, open the

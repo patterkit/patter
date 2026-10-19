@@ -2,7 +2,7 @@
 // Project-wide find-and-replace over the SOURCE-language prose (spec §6/§13).
 // The counterpart to runSearch: where search navigates, replace rewrites.
 //
-// Scope is deliberately narrow: only the localisable text a line / narration /
+// Scope is deliberately narrow: only the localisable text a line / text /
 // choice prompt carries, which lives in the default-locale `.patterloc` shards.
 // It NEVER touches opaque ids (immutable join keys), Game IDs / scene+block
 // names (addresses, edited elsewhere), condition / effect expressions, or the

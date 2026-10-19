@@ -40,7 +40,7 @@
   --warn:   #a9772b;   /* warm amber / ochre - warnings, stale */
   --ok:     #3f7d49;   /* warm green - success, live / in-sync (matches --char-4) */
   /* derived reading inks (theme-agnostic: mix the live ink/muted) */
-  --ink-soft: color-mix(in oklab, var(--ink) 70%, var(--muted)); /* narration / authorial voice */
+  --ink-soft: color-mix(in oklab, var(--ink) 70%, var(--muted)); /* text */
   --ink-read: color-mix(in oklab, var(--ink) 82%, var(--muted)); /* dialogue body, eased off stark */
 
 

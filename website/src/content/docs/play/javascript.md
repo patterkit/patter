@@ -94,7 +94,7 @@ save/load to `localStorage`. (A working copy ships in
     for (;;) {
       const step = flow.advance();
       if (step.type === "line")   add(`${step.speakerLabel ?? ""}: ${step.text}`);
-      else if (step.type === "text")   add(step.text);
+      else if (step.type === "text")   { if (!step.action) add(step.text); }   // action: staged, not shown
       else if (step.type === "gameEvent") doHostCue(step);          // your game's cue
       else if (step.type === "choice") return renderChoice(step);
       else if (step.type === "end")    return add("The End");
@@ -131,6 +131,10 @@ save/load to `localStorage`. (A working copy ships in
 
 That's the whole integration: `engine.openFlow` to start, `flow.advance()` to pull the next
 beat, `flow.choose(id)` on a pick, `engine.saveGame()` / `loadGame()` for persistence.
+
+A text step with `step.action` set (absent when false) is [action](/play/engine/#step-shapes), a
+direction for whoever stages the scene, so the player above leaves it out. A game with a stage to set
+can play it there instead: a look, a move, a camera cut.
 
 ## Getting the bundle into the page
 

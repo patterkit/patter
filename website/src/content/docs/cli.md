@@ -55,7 +55,9 @@ in place stays a plain folder.)
 
 ### `patter validate [path]`
 Check structure, expressions, interpolation, encoding, the localisation files, a stale bundle, and
-unresolved merges. Exit **1** if anything is wrong: the command to gate a PR on. A choice that can run
+unresolved merges. It warns, naming the scene, when a scene's text has become
+[action](/production/localisation/#what-gets-translated) since its translations were imported, or
+stopped being action. Exit **1** if anything is wrong: the command to gate a PR on. A choice that can run
 dry is a warning, as in Patterpad, and never fails the run. A bundle counts as stale when it no longer
 matches the source or is not strict JSON, wherever the project writes it. Where the game
 [shares its scopes](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools),
@@ -84,7 +86,7 @@ change, and in an **Audio Folders** project the `patteraudio.json` manifest besi
 with `-o -`).
 
 ### `patter export-script [path] [-o file.pdf|.docx]`
-Export a **readable screenplay** of the script + flow: dialogue, narration, choices (with their
+Export a **readable screenplay** of the script + flow: dialogue, text, choices (with their
 conditions / flags), and jumps, in reading order, with a speaker qualifier in the cue (`TAM (O.S.)`).
 Format follows the extension; default
 beside the bundle, as `<name>.pdf`. The PDF embeds its fonts and covers any script or emoji; the `.docx`
@@ -135,7 +137,9 @@ it as one argument (`"faction rebels"`). `--json` emits the hits for scripting.
 ## Production & localisation
 
 ### `patter report [path]` (alias `stats`)
-A production report: status, burndown, recording coverage. `--xlsx file` also writes
+A production report: status, burndown, recording coverage, and an `action lines` count when the
+project has [action text](/production/tracking-and-reports/#action-text), counted beside the written
+lines rather than in them. `--xlsx file` also writes
 a spreadsheet; `--json` emits JSON to stdout (for pipelines). In an **Audio Folders**
 project, recording status is derived from the takes on disk, the same numbers Patterpad
 shows.
@@ -145,11 +149,16 @@ Export strings for translation. `--format json|xlsx|po` (required) · `--locale 
 (omit for a blank template / POT). `-o -` writes JSON or PO to stdout. Each string carries its translator context, including
 the speaker's [grammatical
 gender](/production/localisation/#who-is-speaking-grammatical-gender).
+[Action text](/production/localisation/#what-gets-translated) is left out: the export says how many
+text lines it left out and that `localiseDialogueText` is off (see [Why lines are missing from an
+export](/production/localisation/#why-lines-are-missing-from-an-export)), then lists every text line
+that has dropped out of the loc files or come into them since, by id and scene.
 
 ### `patter loc-import <file> [path]`
 Import a translated file back; the format is read from the extension, and `--locale xx`
 overrides the file's locale. A file naming a scene the project doesn't have, or a language it doesn't
-declare, is refused and nothing is written.
+declare, is refused and nothing is written. Any translation of a line that's now action is dropped,
+and the import says how many.
 
 ### `patter voice-export [path] -o file.xlsx`
 A voice-recording script. Requires a **Voiced** project (`voiced: true`), or it exits with an

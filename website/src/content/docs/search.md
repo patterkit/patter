@@ -22,7 +22,7 @@ and the **pin** button keeps it on top. Close it with **✕** or **Escape**.
   <figcaption>The floating search window. Tabs across the top switch modes, Text, Replace, Writing, Recording, Property, Tags, Qualifier, and Suggestions; each result shows its kind, its scene path, and its internal id, so a match is never ambiguous. <code>↑ / ↓</code> move, <code>Enter</code> jumps, and you can drag the bar to reposition the window.</figcaption>
 </figure>
 
-Type in the box and matches appear instantly. Search covers **dialogue and narration**, the words your
+Type in the box and matches appear instantly. Search covers **dialogue and text**, the words your
 characters say and the prose the player reads. It covers **scene and block titles**, and their
 **Game IDs** (the addresses your game uses).
 
@@ -51,7 +51,7 @@ not just the open one. Type what to find, type the replacement, and the list pre
 **before → after**. **Replace all** then rewrites every match at once, asking you to confirm the
 count first. The **Replace** button on any row applies just that one.
 
-Replace only ever touches **dialogue, narration, and choice text** in your source language. It never
+Replace only ever touches **dialogue, text, and choice text** in your source language. It never
 touches ids or Game IDs, conditions or effects, or your translations. Every change is written through
 version control, so a project-wide replace is one commit you can review and undo. Your open scene is saved
 before the replace runs, and reloads with the new text afterward.

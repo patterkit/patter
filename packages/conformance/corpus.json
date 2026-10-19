@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "expressions": [
     {
       "name": "number comparison",
@@ -7947,6 +7947,401 @@
       ]
     },
     {
+      "name": "a dialogue scene's text is action: action: true, the source text in every locale, its own pause; prompts and text scenes are localised",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1xtogx6",
+          "structureHash": "1veesdh"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "MARA"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_turn",
+                        "kind": "text",
+                        "padAfter": 1.25,
+                        "action": true
+                      },
+                      {
+                        "id": "L_mara",
+                        "kind": "line",
+                        "character": "MARA"
+                      },
+                      {
+                        "id": "T_gone",
+                        "kind": "text",
+                        "action": true
+                      }
+                    ],
+                    "jump": {
+                      "to": "b_ask"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_ask",
+                "type": "block",
+                "name": "Ask",
+                "children": [
+                  {
+                    "id": "g_ask",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "s2"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "s2": {
+            "id": "s2",
+            "type": "scene",
+            "name": "S2",
+            "blocks": [
+              {
+                "id": "b2",
+                "type": "block",
+                "name": "B2",
+                "children": [
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_page",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "L_none",
+                        "kind": "line"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_turn": "MARA turns away.",
+            "L_mara": "Leave it.",
+            "T_gone": "She's gone.",
+            "P_go": "Follow",
+            "T_page": "The page is blank.",
+            "L_none": "A voice."
+          },
+          "fr": {
+            "T_turn": "MARA turns away.",
+            "L_mara": "Laisse.",
+            "P_go": "Suivre",
+            "T_page": "La page est blanche.",
+            "L_none": "Une voix.",
+            "T_gone": "She's gone."
+          }
+        }
+      },
+      "locale": "fr",
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_go"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T_turn",
+          "text": "MARA turns away.",
+          "padAfter": 1.25,
+          "action": true
+        },
+        {
+          "type": "line",
+          "id": "L_mara",
+          "text": "Laisse.",
+          "character": "MARA"
+        },
+        {
+          "type": "text",
+          "id": "T_gone",
+          "text": "She's gone.",
+          "action": true
+        },
+        {
+          "type": "choice",
+          "groupId": "g_ask",
+          "options": [
+            {
+              "id": "o_go",
+              "prompt": {
+                "kind": "text",
+                "text": "Suivre"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "T_page",
+          "text": "La page est blanche."
+        },
+        {
+          "type": "line",
+          "id": "L_none",
+          "text": "Une voix."
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "with localiseDialogueText on, a dialogue scene's text is localised and shown, not action",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0cawjtp",
+          "structureHash": "1ei3m4x"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "MARA"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_turn",
+                        "kind": "text",
+                        "padAfter": 1.25
+                      },
+                      {
+                        "id": "L_mara",
+                        "kind": "line",
+                        "character": "MARA"
+                      },
+                      {
+                        "id": "T_gone",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "b_ask"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_ask",
+                "type": "block",
+                "name": "Ask",
+                "children": [
+                  {
+                    "id": "g_ask",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "s2"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "s2": {
+            "id": "s2",
+            "type": "scene",
+            "name": "S2",
+            "blocks": [
+              {
+                "id": "b2",
+                "type": "block",
+                "name": "B2",
+                "children": [
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_page",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "L_none",
+                        "kind": "line"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_turn": "MARA turns away.",
+            "L_mara": "Leave it.",
+            "T_gone": "She's gone.",
+            "P_go": "Follow",
+            "T_page": "The page is blank.",
+            "L_none": "A voice."
+          },
+          "fr": {
+            "T_turn": "MARA se détourne.",
+            "L_mara": "Laisse.",
+            "P_go": "Suivre",
+            "T_page": "La page est blanche.",
+            "L_none": "Une voix."
+          }
+        }
+      },
+      "locale": "fr",
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_go"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T_turn",
+          "text": "MARA se détourne.",
+          "padAfter": 1.25
+        },
+        {
+          "type": "line",
+          "id": "L_mara",
+          "text": "Laisse.",
+          "character": "MARA"
+        },
+        {
+          "type": "text",
+          "id": "T_gone",
+          "text": "<Untranslated: T_gone> She's gone."
+        },
+        {
+          "type": "choice",
+          "groupId": "g_ask",
+          "options": [
+            {
+              "id": "o_go",
+              "prompt": {
+                "kind": "text",
+                "text": "Suivre"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "T_page",
+          "text": "La page est blanche."
+        },
+        {
+          "type": "line",
+          "id": "L_none",
+          "text": "Une voix."
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
       "name": "specificity prefers the more specific line (AND sums)",
       "bundle": {
         "schema": "patter/bundle@0",
@@ -11004,7 +11399,7 @@
       ]
     },
     {
-      "name": "closed captions off strips dialogue-line cues (not narration); live toggle, no state change",
+      "name": "closed captions off strips dialogue-line cues (not text); live toggle, no state change",
       "bundle": {
         "schema": "patter/bundle@0",
         "content": {

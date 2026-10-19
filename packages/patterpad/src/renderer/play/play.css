@@ -56,6 +56,9 @@ body.play {
 @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .pline { animation: none; } }
 .pline.text { color: var(--ink-soft); }
+/* Action: a direction for whoever stages the scene, never shown to the player, so it reads as one (the line's
+   direction ink and italic), not as a line of shown text. */
+.pline.text.action { color: var(--muted); font-style: italic; }
 .pline.pwarn { color: var(--warn); font: 13px var(--font-ui); }
 .pline.gameEvent { color: var(--muted); font: 0.85rem var(--font-mono); display: flex; align-items: center; gap: 0.3rem; }
 /* The event's mark is drawn, and sized off the line so it tracks the reading scale. */

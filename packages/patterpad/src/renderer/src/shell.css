@@ -582,6 +582,8 @@ input::placeholder, textarea::placeholder {
 .editable-error { margin: 9.5px 0 0; padding: 6.5px 9.5px; border-left: 2px solid var(--danger); font: 13px var(--font-ui); color: var(--ink); }
 .loc-row { display: flex; gap: 16px; }
 .loc-row .identity-field { flex: 1; }
+/* What an export found dropping out of the loc files or coming into them (action text): the beats, listed. */
+.loc-changes-list { margin: 3px 0 10px; padding-left: 18px; font-size: 12.5px; color: var(--muted); }
 
 /* Production Information (read-only report view): summary line, headline cards, status bars, tables. */
 .report-dialog { --dialog-width: 896px; max-height: 88vh; }

@@ -178,11 +178,11 @@ frameHost.hidden = false;
  *  here would be putting content in front of a decision (the kit gallery brief, section 7). */
 const PROJECT_KITS = [
   { id: "starter" as const, name: "Starter project",
-    blurb: "A scene called Start with one line of narration in it, so the project plays the moment it opens. Replace that line with your own writing.",
-    tile: "One scene, one line of narration, ready to play.",
+    blurb: "A scene called Start with one line of text in it, so the project plays the moment it opens. Replace that line with your own writing.",
+    tile: "One scene, one line of text, ready to play.",
     features: ["A first scene", "Playable at once"],
     play: "Press Play: the Start scene plays its line.",
-    lands: ["A scene called Start", "One line of narration in English, your default language"] },
+    lands: ["A scene called Start", "One line of text in English, your default language"] },
 ];
 
 const welcomeEl = $("welcome");
@@ -605,7 +605,7 @@ function renderNav(): void {
  *  2026-09-27). What each one writes is main/scene-kits.ts; these lines are written from it. A feature
  *  pill names what the game has, as a player meets it, never a part of the model: the author's ruling. */
 const SCENE_KIT_ITEMS: KitGalleryItem<SceneKitId>[] = [
-  { id: "blank", name: "Blank", blurb: "A scene with one line of narration in it, ready to write into.",
+  { id: "blank", name: "Blank", blurb: "A scene with one line of text in it, ready to write into.",
     play: "Press Play: the line, then the end." },
   { id: "conversation", name: "Conversation with choices",
     blurb: "Someone says something, the player answers, and both answers come back together.",
@@ -2226,6 +2226,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     formatting: project.formatting,
     castSeed: project.cast,
     qualifiers: project.qualifiers ?? [], // the cue's (O.S.), the keyboard cycle
+    localiseDialogueText: project.localiseDialogueText, // off: a dialogue scene's text is drawn as action
     // Cross-scene jump targets: every scene + its blocks (the surface adds THIS scene with live blocks).
     jumpTargets: project.scenes.map((s) => ({ id: s.id, label: s.name, blocks: s.blocks.map((b) => ({ id: b.id, label: b.name })) })),
     showTitle: true,
@@ -2797,7 +2798,19 @@ async function openLocalisation(): Promise<void> {
   const row = el("div", "loc-row");
   row.append(formatField, localeField);
   const status = el("p", "settings-note");
-  frame.body.append(row, status);
+  // What an export says beside the file (action text): what it left out and why, then what has dropped out of the
+  // loc files or come into them, a heading per change with the beats under it.
+  const changes = el("div", "loc-changes");
+  const showChanges = (lines: string[] = []): void => {
+    changes.replaceChildren();
+    let list: HTMLElement | null = null;
+    for (const line of lines) {
+      if (line.startsWith("  ")) { (list ??= changes.appendChild(el("ul", "loc-changes-list"))).append(el("li", "", line.trim())); continue; }
+      changes.append(el("p", "settings-note", line));
+      list = null;
+    }
+  };
+  frame.body.append(row, status, changes);
 
   const importBtn = dialogButton("Import…");
   const exportBtn = dialogButton("Export…");
@@ -2805,18 +2818,19 @@ async function openLocalisation(): Promise<void> {
   exportBtn.addEventListener("click", () => void (async () => {
     const format = formatSel.value as "json" | "xlsx" | "po";
     const locale = localeSel.value || undefined; // "" = template
-    status.textContent = "Exporting…";
+    status.textContent = "Exporting…"; showChanges();
     const res = await withJob("Exporting localisation…", () => window.patter.exportLoc({ format, locale }));
-    if (res.ok) status.textContent = `Exported to ${res.path}`;
+    if (res.ok) { status.textContent = `Exported to ${res.path}`; showChanges(res.changes); }
     else if (res.canceled) status.textContent = "";
     else status.textContent = `Couldn't export. ${res.error ?? "Try again, and check the file isn't locked in version control."}`;
   })());
   importBtn.addEventListener("click", () => void (async () => {
     const fallback = localeSel.value || undefined; // used when the file carries no locale (Excel)
-    status.textContent = "Importing…";
+    status.textContent = "Importing…"; showChanges();
     const res = await window.patter.importLoc(fallback);
     if (res.ok) {
-      status.textContent = `Imported ${res.updated ?? 0} string(s) for ${res.locale} across ${res.files ?? 0} scene(s).`;
+      status.textContent = `Imported ${res.updated ?? 0} string(s) for ${res.locale} across ${res.files ?? 0} scene(s).`
+        + (res.dropped ? ` Dropped ${res.dropped} translation(s) of action text, which isn't translated while "Localise text lines in dialogue scenes" is off.` : "");
       await refreshProblems(); // the bundle is now stale relative to the new strings
     } else if (res.canceled) status.textContent = "";
     else status.textContent = `Import failed: ${res.error ?? "unknown error"}`;
@@ -3050,7 +3064,7 @@ interface LiveSettings {
   build: HTMLInputElement; buildLocales: HTMLSelectElement; buildSourceDebug: HTMLInputElement;
   vcs: HTMLSelectElement;
   ccOpen: HTMLInputElement; ccClose: HTMLInputElement; ccCharacter: HTMLInputElement;
-  langs: ReturnType<typeof mountLanguages>; gd: ReturnType<typeof mountGameDataFields>;
+  langs: ReturnType<typeof mountLanguages>; localiseDialogueText: HTMLInputElement; gd: ReturnType<typeof mountGameDataFields>;
   world: ReturnType<typeof mountWorld>; worldHost: HTMLElement; cast: ReturnType<typeof mountCast>;
   qualifiers: ReturnType<typeof mountQualifiers>;
   writingStatus: ReturnType<typeof mountWritingStatus>; estimating: ReturnType<typeof mountEstimating>;
@@ -3124,7 +3138,7 @@ function buildSettingsDialog(): SettingsDialog {
       // Audio is meaningful only for a VOICED project (#206): the Audio tab reads this box (its `disabled`
       // below), and flipping it here updates the tab without reopening.
       voiced.input.addEventListener("change", () => settingsDlg.refreshTabs());
-      const formatting = sToggle("Inline formatting", "Bold and italic in dialogue and narration.", s.formatting);
+      const formatting = sToggle("Inline formatting", "Bold and italic in dialogue and text.", s.formatting);
       // Line padding: the project's default pause after a line. Blank goes back to the built-in one.
       const padAfter = el("input", "settings-seconds"); padAfter.type = "number"; padAfter.step = "0.1";
       padAfter.min = String(PAD_AFTER_MIN); padAfter.max = String(PAD_AFTER_MAX);
@@ -3261,6 +3275,11 @@ function buildSettingsDialog(): SettingsDialog {
       host.append(sNote("settings-note", "The default language is the one you write in. The others are translation targets."));
       const langHost = el("div"); host.append(langHost);
       live.langs = mountLanguages(langHost, { localeDefault: s.localeDefault, locales: s.locales });
+      const dialogueText = sToggle("Localise text lines in dialogue scenes",
+        "When this is off, a text line in a scene where characters speak is action: a direction for whoever stages the scene. It isn't translated or shown to the player.",
+        s.localiseDialogueText ?? false);
+      host.append(dialogueText.row);
+      live.localiseDialogueText = dialogueText.input;
       return {};
     } },
   ],
@@ -3303,7 +3322,7 @@ async function saveSettingsFromDialog(): Promise<boolean> {
     padAfterDefault: l.padAfter.value.trim() === "" ? DEFAULT_PAD_AFTER : Number(l.padAfter.value), // the gate checked its range
     closedCaptions: { open: l.ccOpen.value, close: l.ccClose.value, character: l.ccCharacter.value.trim() },
     buildBundle: l.build.value.trim(), buildLocalisation: l.buildLocales.value as "embedded" | "ids", buildSourceDebug: l.buildSourceDebug.checked,
-    ...l.langs.value(), gameDataFields: l.gd.value(),
+    ...l.langs.value(), localiseDialogueText: l.localiseDialogueText.checked, gameDataFields: l.gd.value(),
     properties: read.s.properties, // @patter lives in the Properties document now; pass the current set through untouched
     ...l.world.value(), ...(() => {
       // Stages renamed in place on World properties and on game-data fields: the save carries each into
@@ -3341,6 +3360,7 @@ async function saveProjectSettings(s: ProjectSettingsDto, opts: { propertiesOnly
       await buildSpellcheck(); // the Dictionary settings (language / words / on-off) may have changed (#177)
       pushWritingStatus(); // the writing-status ladder (names / colours) may have changed - re-push to the surface (#196)
       surface?.setQualifiers(project.qualifiers ?? []); // the qualifier names (and list) may have changed: the cues repaint
+      surface?.setLocaliseDialogueText(project.localiseDialogueText); // action text may have become shown text, or the reverse
     }
     void refreshProblems();  // revalidate against the new declarations (and, after a full save, the new spelling setup)
     lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // refresh the status dropdown + condition pills

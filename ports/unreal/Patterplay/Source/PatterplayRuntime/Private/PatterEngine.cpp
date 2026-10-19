@@ -159,6 +159,7 @@ namespace
 		Out.bHasSpeakerLabel = S.hasSpeakerLabel;
 		if (S.hasSpeakerLabel) Out.SpeakerLabel = Ue(S.speakerLabel);
 		Out.PadAfter = S.padAfter;   // line padding: set on a line or text step, 0 on the rest
+		Out.bAction = S.action;      // action text: a text step only, never a replayed prompt
 		// Game Data + tags cross the UObject boundary too: host events ride on Game Data (#116), so a
 		// Blueprint host must be able to read them straight off the step (parity with the other ports).
 		if (S.gameData) Out.GameData = ConvertGameData(*S.gameData);

@@ -19,11 +19,12 @@ function makeProject(): string {
   w("game.patterproj", {
     schema: "patter/project@0", project: { id: "loc", name: "Loc Game" },
     locales: { default: "en", all: ["en", "fr"] },
+    localiseDialogueText: true, // T1 is shown text here; action-text.test.ts covers the default
     // ANNA declares a grammatical gender (translator context); BO leaves it unspecified.
     cast: [{ name: "ANNA", displayName: "Anna", gender: "female" }, { name: "BO" }], // BO has no display name -> no @project entry
   });
 
-  // s1: a line (ANNA), a line by an ungendered speaker (BO), a narration text, and a choice with one prompted option.
+  // s1: a line (ANNA), a line by an ungendered speaker (BO), a text beat, and a choice with one prompted option.
   w("scenes/one.patterflow", { schema: "patter/flow@0", scene: {
     id: "s1", type: "scene", name: "Opening", blocks: [
       { id: "b1", type: "block", name: "Main", children: [

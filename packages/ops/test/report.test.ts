@@ -22,6 +22,7 @@ function makeProject(voiced = true, estimating = true): string {
   w("game.patterproj", {
     schema: "patter/project@0", project: { id: "rep", name: "Report Game" },
     locales: { default: "en", all: ["en", "fr"] },
+    localiseDialogueText: true, // T1 is shown text here; action-text.test.ts covers the default
     ...(voiced ? { voiced: true, trackAudioStatus: true } : {}),
     cast: [{ name: "ANNA" }, { name: "BO" }],
     // Estimating: threshold omitted (= lowest rung, "stub"); default 20 lines; two tags, largest wins.

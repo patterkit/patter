@@ -8,8 +8,11 @@
 //
 // Two line populations (spec §13):
 //   - VOICED lines  = line beats (spoken). Carry writing + RECORDING status.
-//   - WRITTEN lines = the superset: voiced + text (narration) + choice labels.
+//   - WRITTEN lines = the superset: voiced + text + choice labels, what the player reads.
 //     The localisation deliverable; recording never applies.
+//   - ACTION = a dialogue scene's text in a project that doesn't localise it
+//     (`textIsAction`, design/proposals/action-text.md): written, and status-tracked,
+//     but never seen by the player, so counted beside the written lines, not in them.
 // Statuses are per BEAT against the ordered ladders; the FIRST status ("stub")
 // is the absence/level-0 - nothing is inferred from content. Aggregation is
 // derived here, never stored.
@@ -28,7 +31,7 @@
 // separately.
 // ---------------------------------------------------------------------------
 
-import { DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS } from "@patterkit/model";
+import { DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS, textIsAction } from "@patterkit/model";
 import type { Group, Snippet, EditRecord } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import { stringsByLocale, mergeAuthoring, effectiveRecording } from "./loaded-helpers.js";
@@ -36,7 +39,7 @@ import { stringsByLocale, mergeAuthoring, effectiveRecording } from "./loaded-he
 /** Fallback words-per-line for deriving an estimated scene's word count when the project has no real
  *  written lines yet to average from. */
 const DEFAULT_WORDS_PER_LINE = 6;
-/** The bucket key for the share of an estimate that falls on narration / character-less lines. */
+/** The bucket key for the share of an estimate that falls on text / character-less lines. */
 const UNATTRIBUTED = "(unattributed)";
 
 /** Counts for the WRITTEN population (line + text + label beats). */
@@ -65,6 +68,8 @@ export interface SceneReport {
   voiced: VoicedCounts;
   /** Actual WRITTEN counts. Empty for an estimated scene. */
   written: WrittenCounts;
+  /** Actual ACTION counts: the scene's text beats when they're action, beside `written`, never in it. */
+  action: WrittenCounts;
   /** The scene's estimate in written lines, when `estimated`. */
   estimate?: number;
   /** Written / voiced lines DONE and REMAINING. For an estimated scene: 0 done, the estimate remaining. */
@@ -96,6 +101,7 @@ export interface LocaleReport {
 export interface ReportTotals {
   voiced: VoicedCounts;
   written: WrittenCounts;
+  action: WrittenCounts;
   choices: number;
   writtenDone: number;
   writtenRemaining: number;
@@ -128,7 +134,7 @@ export interface ReportData {
   totals: ReportTotals;
 }
 
-interface Unit { id: string; voiced: boolean; words: number; character?: string; }
+interface Unit { id: string; voiced: boolean; words: number; character?: string; action?: boolean; }
 
 /**
  * Allocate an integer `total` across weighted keys by the LARGEST-REMAINDER method, so the parts sum
@@ -201,6 +207,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
 
   for (const scene of loaded.scenes) {
     const sceneCut = cutSet.has(scene.id);
+    const sceneAction = textIsAction(project, scene);
 
     // Gather this scene's content units (line/text beats + choice labels) and count its choice points.
     const units: Unit[] = [];
@@ -225,7 +232,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
           for (const beat of node.beats ?? []) {
             if (beat.kind === "gameEvent") continue;
             add({ id: beat.id, voiced: beat.kind === "line", words: wordsOf(beat.id),
-              character: beat.kind === "line" ? beat.character : undefined });
+              character: beat.kind === "line" ? beat.character : undefined, ...(sceneAction && beat.kind === "text" ? { action: true } : {}) });
           }
         }
       };
@@ -234,10 +241,10 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
     const isCut = (id: string): boolean => cutSet.has(id) || underCut.has(id);
 
     // Cut content: count it and drop out (a whole cut scene never enters the scene list).
-    for (const u of units) if (sceneCut || isCut(u.id)) { cut.writtenLines++; if (u.voiced) cut.voicedLines++; }
+    for (const u of units) if (sceneCut || isCut(u.id)) { if (!u.action) cut.writtenLines++; if (u.voiced) cut.voicedLines++; }
     if (sceneCut) { cut.scenes++; continue; }
     const live = units.filter((u) => !isCut(u.id));
-    for (const u of live) if (sourceStrings[u.id]) localeIds.push(u.id);
+    for (const u of live) if (sourceStrings[u.id] && !u.action) localeIds.push(u.id);
 
     // Scene status = the lowest-rung live beat; eligibility for estimating = the HIGHEST is at/below threshold.
     const statusIdx = live.length ? Math.min(...live.map((u) => rungIdxOf(u.id))) : undefined;
@@ -248,7 +255,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
     if (estimated) {
       const tagLines = (scene.tags ?? []).map((t) => tagMap.get(t)).filter((n): n is number => n != null);
       const estimateLines = tagLines.length ? Math.max(...tagLines) : defaultLines;
-      // Weight each character by their placeholder line count; narration / character-less lines pool as UNATTRIBUTED.
+      // Weight each character by their placeholder line count; text / character-less lines pool as UNATTRIBUTED.
       const weights = new Map<string, number>();
       for (const u of live) {
         const key = u.voiced && u.character ? u.character : UNATTRIBUTED;
@@ -264,7 +271,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
       const report: SceneReport = {
         sceneId: scene.id, name: scene.name, file: loaded.sceneFiles[scene.id],
         status, estimated: true, choices,
-        voiced: emptyVoiced(writingLadder, recordingLadder), written: emptyWritten(writingLadder),
+        voiced: emptyVoiced(writingLadder, recordingLadder), written: emptyWritten(writingLadder), action: emptyWritten(writingLadder),
         estimate: estimateLines,
         writtenDone: 0, writtenRemaining: estimateLines,
         voicedDone: 0, voicedRemaining: voicedShare,
@@ -277,8 +284,10 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
     // Actuals: tally each live beat against the ladders and its speaker.
     const voiced = emptyVoiced(writingLadder, recordingLadder);
     const written = emptyWritten(writingLadder);
+    const action = emptyWritten(writingLadder);
     for (const u of live) {
       const ws = wsOf(u.id);
+      if (u.action) { action.count++; action.words += u.words; action.byWriting[ws] = (action.byWriting[ws] ?? 0) + 1; continue; }
       written.count++; written.words += u.words; written.byWriting[ws] = (written.byWriting[ws] ?? 0) + 1;
       actualWrittenLines++; actualWords += u.words;
       if (!u.voiced) continue;
@@ -296,7 +305,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
     const voicedStub = voiced.byWriting[stub] ?? 0;
     reports.push({
       sceneId: scene.id, name: scene.name, file: loaded.sceneFiles[scene.id],
-      status, estimated: false, choices, voiced, written,
+      status, estimated: false, choices, voiced, written, action,
       writtenDone: written.count - writtenStub, writtenRemaining: writtenStub,
       voicedDone: voiced.count - voicedStub, voicedRemaining: voicedStub,
     });
@@ -378,6 +387,7 @@ function computeTotals(
   const t: ReportTotals = {
     voiced: emptyVoiced(writingLadder, recordingLadder),
     written: emptyWritten(writingLadder),
+    action: emptyWritten(writingLadder),
     choices: 0, writtenDone: 0, writtenRemaining: 0, voicedDone: 0, voicedRemaining: 0,
     projectedWritten: 0, projectedVoiced: 0,
   };
@@ -390,6 +400,8 @@ function computeTotals(
     add(t.voiced.byWriting, s.voiced.byWriting); add(t.voiced.byRecording, s.voiced.byRecording);
     t.written.count += s.written.count; t.written.words += s.written.words;
     add(t.written.byWriting, s.written.byWriting);
+    t.action.count += s.action.count; t.action.words += s.action.words;
+    add(t.action.byWriting, s.action.byWriting);
     t.choices += s.choices;
     t.writtenDone += s.writtenDone; t.writtenRemaining += s.writtenRemaining;
     t.voicedDone += s.voicedDone; t.voicedRemaining += s.voicedRemaining;
@@ -406,6 +418,7 @@ export function renderReportText(data: ReportData): string[] {
   out.push(`${data.project.name} - ${data.scenes.length} scene(s)`);
   out.push(`written lines: ${t.writtenDone} done / ${t.writtenRemaining} to write -> ${t.projectedWritten} projected (${t.written.words} words)`);
   // Voiced line counts + the recording breakdown are reported only for a VOICED project (#206).
+  if (t.action.count > 0) out.push(`action lines: ${t.action.count}, not shown to the player (${t.action.words} words)`);
   if (data.voiced) out.push(`voiced lines:  ${t.voicedDone} done / ${t.voicedRemaining} to write -> ${t.projectedVoiced} projected (${t.voiced.words} words)`);
   out.push(`writing status: ${Object.entries(t.written.byWriting).map(([k, v]) => `${k} ${v}`).join(", ")}`);
   out.push(`scene status: ${Object.entries(data.scenesByStatus).map(([k, v]) => `${k} ${v}`).join(", ")}`);

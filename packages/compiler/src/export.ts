@@ -18,7 +18,7 @@ import type { ScalarValue, ScopeRegistrySpec } from "@wildwinter/scoperegistry";
 import type { MergedScopes } from "@wildwinter/scoperegistry/scopes";
 import { canonicalStringify, hash32 } from "@patterkit/core";
 import { hostScopesToSpec, withEngineScopes, EXTERNAL_SCOPES } from "@patterkit/dialect";
-import { usedQualifiers, usedSpeakerPairs, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
+import { textIsAction, usedQualifiers, usedSpeakerPairs, walkNodes, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
 import { compileExpression } from "./expressions.js";
 import { externalGameScopes, projectScopes } from "./game-scopes.js";
 import { extensionPass } from "./extensions.js";
@@ -58,18 +58,33 @@ export interface ExportInput {
 interface CompileCtx {
   foreign?: ScopeRegistrySpec;
   extensions: ReadonlyMap<string, NodeExtensions>;
+  /** The scene being compiled has action text (`textIsAction`): its snippets' text beats get `action: true`. */
+  action?: boolean;
 }
 
 /**
- * A beat as the bundle carries it: the source beat, with its compiled extension values set. Source keeps
- * them in extension shards, never on the beat, so a hand-written `extensions` key there never reaches the
- * bundle. A beat with neither is passed through as it is.
+ * A beat as the bundle carries it: the source beat, with its compiled extension values set, and `action: true`
+ * on a snippet's text beat in a scene whose text is action (`asAction`; an option's prompt never is). Source
+ * keeps extension values in extension shards and never says `action`, so a hand-written `extensions` or
+ * `action` key there never reaches the bundle. A beat with none of these is passed through as it is.
  */
-function compileBeat<B extends Beat>(beat: B, ctx: CompileCtx): B {
+function compileBeat<B extends Beat>(beat: B, ctx: CompileCtx, asAction = false): B {
   const values = ctx.extensions.get(beat.id);
-  if (values === undefined && !Object.prototype.hasOwnProperty.call(beat, "extensions")) return beat;
-  const { extensions: _source, ...rest } = beat;
-  return (values !== undefined ? { ...rest, extensions: values } : rest) as B;
+  const action = asAction && beat.kind === "text";
+  const has = (k: string): boolean => Object.prototype.hasOwnProperty.call(beat, k);
+  if (values === undefined && !action && !has("extensions") && !has("action")) return beat;
+  const { extensions: _source, action: _action, ...rest } = beat as B & { action?: true };
+  return { ...rest, ...(values !== undefined ? { extensions: values } : {}), ...(action ? { action: true } : {}) } as B;
+}
+
+/** The ids of a compiled scene's action text beats, in authored order. */
+function collectActionIds(scene: CompiledScene, out: string[]): void {
+  for (const block of scene.blocks) {
+    walkNodes<CompiledGroup | CompiledSnippet>(block.children, (node) => {
+      if (node.type !== "snippet") return;
+      for (const beat of node.beats ?? []) if (beat.kind === "text" && beat.action) out.push(beat.id);
+    });
+  }
 }
 
 function compileEffect(e: Effect, foreign?: ScopeRegistrySpec): CompiledEffect {
@@ -102,7 +117,7 @@ function compileNode(node: Group | Snippet, ctx: CompileCtx): CompiledGroup | Co
     id: node.id,
     type: "snippet",
     condition: node.condition !== undefined ? compileExpression(node.condition, foreign) : undefined,
-    beats: node.beats && node.beats.map((b) => compileBeat(b, ctx)),
+    beats: node.beats && node.beats.map((b) => compileBeat(b, ctx, ctx.action)),
     onEnter: node.onEnter?.map((e) => compileEffect(e, foreign)),
     onExit: node.onExit?.map((e) => compileEffect(e, foreign)),
     padAfterDefault: node.padAfterDefault,   // line padding: the default for the beats inside
@@ -214,7 +229,14 @@ export function exportBundle(input: ExportInput): Bundle {
     compiledExt !== undefined && Object.keys(compiledExt.bundle).length > 0 ? compiledExt.bundle : undefined;
   const ctx: CompileCtx = { foreign: compileScopes, extensions: compiledExt?.nodes ?? new Map() };
   const scenesOut: Record<string, CompiledScene> = {};
-  for (const scene of scenes) scenesOut[scene.id] = compileScene(scene, ctx);
+  // A scene whose text is action (design/proposals/action-text.md) marks its text beats, and their ids are
+  // held to the source text in every locale below.
+  const actionIds: string[] = [];
+  for (const scene of scenes) {
+    const action = textIsAction(project, scene);
+    scenesOut[scene.id] = compileScene(scene, action ? { ...ctx, action } : ctx);
+    if (action) collectActionIds(scenesOut[scene.id]!, actionIds);
+  }
   const externalScopes = externalScopesIn(scenesOut, new Set([...EXTERNAL_SCOPES, ...gameExternal.map((s) => s.token)]));
 
   // The qualifiers the content uses, as the bundle ships them: `gameId` and authored name (the description
@@ -237,6 +259,19 @@ export function exportBundle(input: ExportInput): Bundle {
         throw new Error(`duplicate string key '${key}' in locale '${loc.locale}' with differing text`);
       }
       table[key] = text;
+    }
+  }
+  // Action has no translations: every locale carries its source text, whatever a translated shard still holds
+  // (loc import drops those; until then they're ignored here).
+  if (actionIds.length > 0) {
+    const source: Record<string, string> = {};
+    for (const loc of locales) if (loc.locale === project.locales.default) Object.assign(source, loc.strings);
+    for (const [locale, table] of Object.entries(strings)) {
+      if (locale === project.locales.default) continue;
+      for (const id of actionIds) {
+        if (id in source) table[id] = source[id]!;
+        else delete table[id];
+      }
     }
   }
 

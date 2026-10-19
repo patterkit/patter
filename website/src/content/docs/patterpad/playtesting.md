@@ -28,7 +28,7 @@ not above everything else on your screen. Unpin it from its own pin control.
 
 ## The controls
 
-Step (**▸**) plays one beat, a line, a piece of narration, or a game event.
+Step (**▸**) plays one beat, a line, a piece of text, or a game event.
 
 Auto-continue (the **▸▸ Continue** toggle in the header, on by default) turns Step into
 **Continue to next stop**. It plays on to the next choice or the end, revealing one line
@@ -37,8 +37,10 @@ to step one beat at a time.
 
 **Continue** times the scene the way the game will. A line lasts as long as its recording, when
 it has one, or as long as it would take to read, and then waits for its
-[pause](/patterpad/writing-surface/#pauses-between-lines) before the next line starts. Narration is
-timed by the same reading estimate. Recordings exist only in an [Audio Folders](/production/audio/)
+[pause](/patterpad/writing-surface/#pauses-between-lines) before the next line starts. Text is
+timed by the same reading estimate. Action, a dialogue scene's text when the project doesn't
+localise it, is shown as a direction, in muted italic, and takes no time of its own: like a game
+event, only its pause comes before the next line. Recordings exist only in an [Audio Folders](/production/audio/)
 project, and a line that has one is timed by it even with **Audio** off, so muting doesn't change the
 timing. A line with a negative pause is cut in on, so the next line arrives before it finishes and
 both play at once. The options appear as the line before them starts, so you can choose while it's

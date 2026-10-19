@@ -24,7 +24,7 @@ export interface SceneScaffold {
   name: string;
   /** The scene's address, pinned: the card's gameId, so the pairing never depends on the name. */
   gameId: string;
-  /** The opening narration: the card's purpose, say. A prompt to write the scene when absent. */
+  /** The opening text: the card's purpose, say. A prompt to write the scene when absent. */
   opening?: string;
   /** The card's outcomes: `gameId` labels an option, `title` is its words. */
   outcomes: ReadonlyArray<{ gameId: string; title?: string }>;

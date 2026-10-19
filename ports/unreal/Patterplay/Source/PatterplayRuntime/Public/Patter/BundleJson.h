@@ -435,6 +435,7 @@ namespace patter
             if (const J* p = field(o, "direction")) { b.hasDirection = true; b.direction = text(*p); }
             if (const J* p = field(o, "qualifier")) { b.hasQualifier = true; b.qualifier = text(*p); }
             if (const J* p = field(o, "padAfter")) readPad(*p, b.hasPadAfter, b.padAfter);   // line padding
+            if (const J* p = field(o, "action")) b.action = flag(*p);   // action text: a text beat only
             if (const J* p = field(o, "gameData")) b.gameData = gameData(*p);
             if (const J* p = field(o, "extensions")) b.extensions = nodeExtensions(*p);
             if (const J* p = field(o, "tags")) b.tags = strList(*p);   // author tags (#215)

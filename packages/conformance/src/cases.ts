@@ -14,12 +14,15 @@ import { castStringKey, qualifierStringKey, speakerLabelKey, SPEAKER_PATTERN_KEY
 import type { ExtensionShard } from "@patterkit/model";
 import { readFileSync } from "node:fs";
 
-// A minimal project scaffold shared by the runtime fixtures.
+// A minimal project scaffold shared by the runtime fixtures. It localises a dialogue scene's text
+// (`localiseDialogueText`), so the cases written before action text keep their text beats shown text, and
+// their bundles, exactly as they were; the action-text cases set it as they need.
 const project = (extra: Partial<ProjectFile> = {}): ProjectFile => ({
   schema: "patter/project@0",
   project: { id: "conf", name: "Conformance" },
   locales: { default: "en", all: ["en"] },
   cast: [{ name: "NPC" }],
+  localiseDialogueText: true,
   ...extra,
 });
 const loc = (scene: string, strings: Record<string, string>, locale = "en"): LocaleFile => ({
@@ -1458,11 +1461,11 @@ const scriptedSetLocale = {
 } satisfies ScriptedFixture;
 
 // Closed captions (#214): with captions OFF, a DIALOGUE line's caption cues (between the bundle's
-// delimiters) + the surrounding whitespace are stripped; narration (text) and everything else are
+// delimiters) + the surrounding whitespace are stripped; text and everything else are
 // untouched. The toggle is live (setClosedCaptions) and not save state. Proves both directions, the
-// line-vs-narration distinction, a line-kind choice prompt, and the baked custom-default delimiter pair.
+// line-vs-text distinction, a line-kind choice prompt, and the baked custom-default delimiter pair.
 const scriptedClosedCaptions = {
-  name: "closed captions off strips dialogue-line cues (not narration); live toggle, no state change",
+  name: "closed captions off strips dialogue-line cues (not text); live toggle, no state change",
   project: project({ closedCaptions: { open: "(", close: ")" }, cast: [{ name: "NPC" }, { name: "SFX" }] }),
   scenes: [{
     id: "s", type: "scene", name: "S",
@@ -1494,7 +1497,7 @@ const scriptedClosedCaptions = {
     { op: "openFlow", flow: "main", scene: "s" },
     { op: "advance", expect: [{ type: "line", id: "L1", text: "Oh dear. (sigh) What now?" }] }, // captions on -> full
     { op: "setClosedCaptions", on: false },
-    { op: "advance", expect: [{ type: "text", id: "T1", text: "A door slams. (off-screen)" }] }, // narration kept
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "A door slams. (off-screen)" }] }, // text kept
     { op: "advance", expect: [{ type: "line", id: "L2", text: "Wait. Listen." }] },              // dialogue stripped
     { op: "advance", expect: [{ type: "choice", groupId: "g", options: [{ id: "opt", prompt: { kind: "line", text: "Hello?" }, eligible: true }] }] }, // line prompt stripped
     { op: "choose", id: "opt" },
@@ -2115,6 +2118,77 @@ const linePaddingPrompt = {
   ],
 } satisfies RuntimeFixture;
 
+// --- action text (patterkit design/proposals/action-text.md) -------------------------------------------
+// A dialogue scene (a line naming a character) in a project that doesn't localise its text: its text beats
+// are action, `action: true` on the step, the source text in every locale whatever a translated shard still
+// holds, with their own pause. An option's prompt is still localised, text or line. A scene with no named
+// speaker is a text scene, localised and shown as before.
+const actionScenes: Scene[] = [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+  { id: "sn", type: "snippet", beats: [
+    { id: "T_turn", kind: "text", padAfter: 1.25 },
+    { id: "L_mara", kind: "line", character: "MARA" },
+    { id: "T_gone", kind: "text" },
+  ], jump: { to: "b_ask" } },
+] }, { id: "b_ask", type: "block", name: "Ask", children: [
+  { id: "g_ask", type: "group", selector: "choice", children: [
+    { id: "o_go", type: "group", prompt: { id: "P_go", kind: "text" }, children: [
+      { id: "go_c", type: "snippet", jump: { to: "s2" } },
+    ] },
+  ] },
+] }] }, { id: "s2", type: "scene", name: "S2", blocks: [{ id: "b2", type: "block", name: "B2", children: [
+  { id: "sn2", type: "snippet", beats: [
+    { id: "T_page", kind: "text" },
+    { id: "L_none", kind: "line" },
+  ], jump: { to: "END" } },
+] }] }];
+const actionLocales: LocaleFile[] = [
+  loc("s", { T_turn: "MARA turns away.", L_mara: "Leave it.", T_gone: "She's gone.", P_go: "Follow" }),
+  loc("s", { T_turn: "MARA se détourne.", L_mara: "Laisse.", P_go: "Suivre" }, "fr"), // T_turn's old translation
+  loc("s2", { T_page: "The page is blank.", L_none: "A voice." }),
+  loc("s2", { T_page: "La page est blanche.", L_none: "Une voix." }, "fr"),
+];
+const actionText = {
+  name: "a dialogue scene's text is action: action: true, the source text in every locale, its own pause; prompts and text scenes are localised",
+  project: project({ cast: [{ name: "MARA" }], locales: { default: "en", all: ["en", "fr"] }, localiseDialogueText: undefined }), // the default
+  scenes: actionScenes,
+  locales: actionLocales,
+  locale: "fr",
+  choices: ["o_go"],
+  expectedTranscript: [
+    { type: "text", id: "T_turn", text: "MARA turns away.", padAfter: 1.25, action: true }, // its translation is ignored
+    { type: "line", id: "L_mara", text: "Laisse.", character: "MARA" },
+    { type: "text", id: "T_gone", text: "She's gone.", action: true },                     // no "<Untranslated>"
+    { type: "choice", groupId: "g_ask", options: [
+      { id: "o_go", prompt: { kind: "text", text: "Suivre" }, eligible: true },            // a prompt is localised
+    ] },
+    { type: "text", id: "T_page", text: "La page est blanche." },                          // a text scene: shown
+    { type: "line", id: "L_none", text: "Une voix." },                                      // names no one
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// The same project with "Localise text lines in dialogue scenes" on: the dialogue scene's text is shown text,
+// localised, with no `action`.
+const actionTextLocalised = {
+  name: "with localiseDialogueText on, a dialogue scene's text is localised and shown, not action",
+  project: project({ cast: [{ name: "MARA" }], locales: { default: "en", all: ["en", "fr"] }, localiseDialogueText: true }),
+  scenes: actionScenes,
+  locales: actionLocales,
+  locale: "fr",
+  choices: ["o_go"],
+  expectedTranscript: [
+    { type: "text", id: "T_turn", text: "MARA se détourne.", padAfter: 1.25 },
+    { type: "line", id: "L_mara", text: "Laisse.", character: "MARA" },
+    { type: "text", id: "T_gone", text: "<Untranslated: T_gone> She's gone." },
+    { type: "choice", groupId: "g_ask", options: [
+      { id: "o_go", prompt: { kind: "text", text: "Suivre" }, eligible: true },
+    ] },
+    { type: "text", id: "T_page", text: "La page est blanche." },
+    { type: "line", id: "L_none", text: "Une voix." },                                      // names no one
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
 // --- a flow taken out and put back (captureFlow / restoreFlow) ------------------------------------------
 // A captured flow is its save snapshot plus its OWN property values (its @patter locals and its own @scene
 // bag), without its id: closed at once, restored later under another id, it carries on exactly where it was,
@@ -2564,7 +2638,7 @@ const replayCaptionsOff = {
       { id: "o_note", prompt: { kind: "text", text: "Read [the note]" }, eligible: true },
     ] },
     { type: "line", id: "P_sigh", text: "Fine.", character: "ANNA", characterName: "Anna" },
-    { type: "text", id: "T_sigh", text: "[A door creaks.]" }, // narration keeps its brackets
+    { type: "text", id: "T_sigh", text: "[A door creaks.]" }, // text keeps its brackets
     { type: "end" },
   ],
 } satisfies RuntimeFixture;
@@ -2742,7 +2816,7 @@ const scriptedCast = {
       { id: "b_greet", type: "block", name: "Greeting", children: [
         { id: "sn1", type: "snippet", beats: [
           { id: "L1", kind: "line", character: "GUARD" },
-          { id: "T1", kind: "text" },                      // narration: no speaker to collect
+          { id: "T1", kind: "text" },                      // text: no speaker to collect
           { id: "L2", kind: "line", character: "ANNA" },
           { id: "L3", kind: "line", character: "GUARD" },   // second GUARD line: deduped, keeps first position
         ] },
@@ -2784,7 +2858,7 @@ const scriptedCast = {
     { op: "expectCast", scene: "tavern", block: "greeting", expectResult: ["GUARD", "ANNA", "SFX", "COOK"] },
     { op: "expectCast", scene: "scn_tavern", block: "b_back", expectResult: ["ANNA", "BARD"] },
 
-    // Nothing to report: narration only, and refs that do not resolve.
+    // Nothing to report: text only, and refs that do not resolve.
     { op: "expectCast", scene: "scn_quiet", expectResult: [] },
     { op: "expectCast", scene: "no-such-scene", expectResult: [] },
     { op: "expectCast", scene: "scn_tavern", block: "no-such-block", expectResult: [] },
@@ -3811,7 +3885,7 @@ export const cases: Fixtures = {
     escapedEmoji, characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance, qualityScene,
     replayPrompt, replayOff, replayBorrowed, replayCaptionsOff, emptySpeakerFields,
     speakerQualifiers, speakerQualifiersLocale, speakerQualifiersIds, speakerQualifiersSilent, speakerLabels, speakerLabelsLocale,
-    linePadding, linePaddingPrompt,
+    linePadding, linePaddingPrompt, actionText, actionTextLocalised,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ruleErrorsPlayThrough, ruleBestMatchFailingPart, ruleNumberText, rulePromptTags, ruleAllGreyedRunsDry],
   scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedEscapedEmojiSaveLoad, scriptedSetLocale,

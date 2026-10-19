@@ -549,6 +549,12 @@ struct FPatterStep
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	double PadAfter = 0;
 
+	/** True on a Text step that is action: a direction for whoever stages the scene, never shown to the
+	 *  player (a dialogue scene's text, unless the project localises it). Its Text is the source in every
+	 *  locale. False on any other step, and on a replayed option prompt, which never is. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bAction = false;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterOption> Options;
 

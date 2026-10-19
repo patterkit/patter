@@ -33,6 +33,14 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Action text**: a text step can be action, `action: true` on the step (absent otherwise). It's a dialogue
+  scene's text in a project that doesn't localise it (the new project setting "Localise text lines in dialogue
+  scenes", off by default): a direction for whoever stages the scene, never shown to the player, so a game stages
+  it rather than showing it as on-screen text. Its text is the source in every locale, and it keeps its `padAfter`.
+  A replayed option prompt is never action. The conformance corpus (version 5) pins it on all four runtimes.
+
 ## [0.30.0] - 2026-10-18
 
 ### Added

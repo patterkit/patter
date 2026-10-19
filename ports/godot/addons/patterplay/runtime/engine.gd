@@ -5,6 +5,9 @@
 #   var flow := engine.open_flow("main", "demo")
 #   var step := flow.advance()                         # { "type": "line"/"text"/"choice"/"end", ... }
 #
+# A "text" step with "action": true is action, a direction for whoever stages the scene, never shown to the
+# player: its text is the source in every locale. Absent means shown text.
+#
 # Every property bag lives in ONE scope registry per game (the one-registry model): the game hands
 # the engine its registry ({"registry": PatterScopeRegistry}) or the engine makes its own and acts as
 # its own game. `@patter` is registered under `patter`; the per-flow and per-scene bags under keys

@@ -25,8 +25,11 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  JSON, so a runner compares them deeply. No earlier expectation changed.
  *  4: an extension's settings in the bundle (`extensions[id].settings`) and the op `expectExtensionSettings`.
  *  No earlier expectation changed.
+ *  5: action text (patterkit design/proposals/action-text.md): `action: true` on a transcript's text step, for
+ *  a dialogue scene's text in a project that doesn't localise it, whose text is the source in every locale.
+ *  No earlier expectation changed.
  */
-export const CORPUS_VERSION = 4;
+export const CORPUS_VERSION = 5;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at

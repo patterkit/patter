@@ -66,6 +66,10 @@ namespace Patterkit.Patterplay
         /// seconds, resolved from the beat's own value and the defaults above it (line padding). Negative = the
         /// next line cuts in that long before this one ends; never negative on a snippet's last line.</summary>
         public double? PadAfter;
+        /// <summary>Text only: this step is action, a direction for whoever stages the scene, never shown to the
+        /// player (a dialogue scene's text, unless the project localises it). Its text is the source in every
+        /// locale. False = shown text, and always false on a replayed prompt.</summary>
+        public bool Action;
         public GameData GameData;
         /// <summary>Line, text and game event only: the beat's Patter extension values, by extension id, raw as
         /// the bundle carries them (any JSON as the neutral tree). Null when it has none.</summary>

@@ -85,7 +85,8 @@
 .pt-screen-title { font-size: 14px; font-weight: 600; color: var(--l-ink); }
 .pt-screen-meta { font-size: 13px; color: var(--l-muted); }
 .pt-screen-body { padding: 26px 28px 30px; font-family: var(--pt-read, "Newsreader", Georgia, serif); }
-.pt-narration { margin: 0; font-size: 16.5px; line-height: 1.55; color: var(--l-body); font-style: italic; }
+/* A text line in a scene where characters speak is action, drawn in italic as Patterpad draws it. */
+.pt-action-text { margin: 0; font-size: 16.5px; line-height: 1.55; color: var(--l-body); font-style: italic; }
 .pt-lines { margin-top: 20px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: baseline; }
 /* The character cue: uppercase because a screenplay's cues are, in the UI face like the app's own. */
 .pt-cue { font-family: var(--sl-font, "Inter", sans-serif); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--l-cue); }

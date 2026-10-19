@@ -411,6 +411,7 @@ namespace Patterkit.Patterplay
                 Direction = (string)b["direction"],
                 Qualifier = (string)b["qualifier"],
                 PadAfter = Num(b["padAfter"]),
+                Action = b["action"]?.Type == JTokenType.Boolean && (bool)b["action"], // action text; absent = shown text
             };
             if (b["gameData"] is JObject gd) beat.GameData = ParseGameData(gd);
             beat.Extensions = NodeExtensions(b["extensions"]);

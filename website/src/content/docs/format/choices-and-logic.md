@@ -228,18 +228,18 @@ replaced with the property's current value:
 
 | Text | Embedding a value |
 | --- | --- |
-| **Narration** (`text` beats) | always |
+| **Text** (`text` beats) | always |
 | **Choice options** | always |
 | **Dialogue** (`line` beats) | **only when the project is not voiced** |
 
-Narration and choice options are always on-screen, so a value can always be substituted in.
+Text and choice options are never voiced, so a value can always be substituted in.
 
 Dialogue is the exception, and it comes down to whether the project is
 [**Voiced**](/patterpad/projects-and-settings/). A voiced line ships as **recorded audio**,
 and you can't splice a runtime value into a fixed recording, so **a voiced project rejects a
 `{…}` slot in a dialogue line, as a build error**. If the project is **not** voiced, its
-dialogue is just on-screen text like narration, so embedding works there too.
+dialogue is just on-screen text, so embedding works there too.
 
-In short, narration and choices always; spoken lines only when there's no voice audio to
+In short, text and choices always; spoken lines only when there's no voice audio to
 contradict them. If you switch a project to Voiced later, any `{…}` already sitting in a
 dialogue line will surface as a build error to clean up.

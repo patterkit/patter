@@ -40,7 +40,7 @@ export function buildSceneKit(kit: SceneKit, name: string, speaker?: string): Bu
 
   const line = (text: string, direction?: string): Beat =>
     ({ id: words(newId("L"), text), kind: "line", character: who, ...(direction ? { direction } : {}) });
-  const narration = (text: string): Beat => ({ id: words(newId("T"), text), kind: "text" });
+  const textBeat = (text: string): Beat => ({ id: words(newId("T"), text), kind: "text" });
   const snippet = (beats: Beat[], to?: string): Snippet =>
     ({ id: newId("sn"), type: "snippet", beats, ...(to ? { jump: { to } } : {}) });
   const option = (prompt: string, children: Snippet[], flags: { sticky?: boolean } = {}): Group =>
@@ -52,7 +52,7 @@ export function buildSceneKit(kit: SceneKit, name: string, speaker?: string): Bu
   let blocks: Scene["blocks"];
   switch (kit) {
     case "blank":
-      blocks = [block("Main", [snippet([narration("A new scene.")], "END")])];
+      blocks = [block("Main", [snippet([textBeat("A new scene.")], "END")])];
       break;
 
     // A line, a choice of two answers, and the talk gathering back after either: an option with
@@ -63,7 +63,7 @@ export function buildSceneKit(kit: SceneKit, name: string, speaker?: string): Bu
         snippet([line("You look like you've come a long way.")]),
         choice([
           option("Tell them about the road", [snippet([line("Rough, was it? It always is, this time of year.")])]),
-          option("Say nothing", [snippet([narration("You shrug. They let it go.")])], { sticky: true }),
+          option("Say nothing", [snippet([textBeat("You shrug. They let it go.")])], { sticky: true }),
         ]),
         snippet([line("Well. You're here now.")], "END"),
       ])];
@@ -109,7 +109,7 @@ export function buildSceneKit(kit: SceneKit, name: string, speaker?: string): Bu
     case "cutscene":
       blocks = [block("Main", [snippet([
         { id: newId("E"), kind: "gameEvent", gameData: { camera: "wide" } },
-        narration("Rain on the harbour. A lamp gutters in the wind."),
+        textBeat("Rain on the harbour. A lamp gutters in the wind."),
         line("You shouldn't have come back.", "quietly, without turning round"),
         { id: newId("E"), kind: "gameEvent", gameData: { animation: "turn-to-face" } },
         line("But since you're here, you might as well hear it."),

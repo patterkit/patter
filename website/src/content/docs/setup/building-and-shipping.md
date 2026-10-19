@@ -42,7 +42,7 @@ source text alongside the ids, handy while you're developing.
 To hand someone the script to *read* (a producer, an editor, a reviewer who wants it on paper),
 **Publish ▸ Publish Readable Script…** writes a screenplay-style document of the whole project in
 reading order. It has scene and block headings, dialogue (speaker, any performance direction, the
-line), prose narration, and the branching laid out plainly, with choices as a labelled list (with
+line), text, and the branching laid out plainly, with choices as a labelled list (with
 their conditions and once-only / repeatable flags) and jumps as “go to …”. A line with a
 [speaker qualifier](/setup/cast/#speaker-qualifiers) prints it in the cue, `TAM (O.S.)`, as the
 [editable script](/production/editable-script/) does. Pick **PDF** or **Word (.docx)** in the Save
@@ -74,7 +74,9 @@ Restart, and Save/Load (kept in that browser).
 Lines arrive on the scene's own timing. With no recordings in the page, each line is held for an
 estimate of its reading time, then waits for the writer's
 [pause](/patterpad/writing-surface/#pauses-between-lines), so a cut-in arrives before the line it
-cuts into has finished. A **Speed** control (Half / Normal / Double / Instant) slows the timing
+cuts into has finished. [Action](/production/localisation/#what-gets-translated), a dialogue
+scene's text when the project doesn't localise it, reads as a direction, in muted italic, and takes
+no time of its own, only its pause. A **Speed** control (Half / Normal / Double / Instant) slows the timing
 down, speeds it up, or drops the waits, and that browser remembers the choice. A line with a
 [speaker qualifier](/setup/cast/#speaker-qualifiers) shows it after the name, `TAM (O.S.)`.
 

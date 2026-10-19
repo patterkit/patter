@@ -396,6 +396,7 @@ export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
     case "text": {
       const s: TranscriptStep = { type: "text", id: r.id, text: r.text };
       if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = padField(r.padAfter);
+      if (r.action) s.action = true; // action text: not shown to the player
       if (r.gameData !== undefined) s.gameData = r.gameData;
       if (r.extensions !== undefined) s.extensions = r.extensions;
       if (r.tags !== undefined) s.tags = r.tags;

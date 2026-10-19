@@ -30,6 +30,24 @@ Every scene also has a **status**: the stage of its **lowest** beat, its weakest
 unset beat counts as the lowest). The report shows each scene's status and counts how many
 scenes sit at each stage, so you can see which are furthest from done.
 
+## Action text
+
+In a scene where characters speak, a text line is usually [action](/production/localisation/#what-gets-translated),
+a direction for whoever stages the scene that the player never reads. The report counts it **beside**
+the written lines, never inside them, so the written lines and words are what the player actually reads,
+and the localisation counts are what translators are actually sent. Action still carries a writing
+status, and still counts towards its scene's status.
+
+When a project has any action, it shows in each of the reports:
+
+- **Production Information** adds an **Action lines** card, with its word count, and an **Action
+  words** column for each scene.
+- The exported spreadsheet adds **Action** and **Action words** columns.
+- `patter report` adds an **action lines** line to its summary.
+
+A project that turns on **Localise text lines in dialogue scenes** has no action, so all its text is
+counted as written.
+
 ## Coverage testing
 
 Rollups tell you how much is *written*; **coverage testing** tells you how much is *reachable*.
@@ -68,7 +86,7 @@ covered under [Projects & settings](/patterpad/projects-and-settings/) and
 The "share with anyone" outputs live in the **Publish** menu instead.
 
 Run **Publish ▸ Publish Readable Script…** for a screenplay of the whole story (dialogue,
-narration, choices, jumps) as a **PDF** or **Word (.docx)**, the document to hand someone who just
+text, choices, jumps) as a **PDF** or **Word (.docx)**, the document to hand someone who just
 wants to *read* it.
 [Building & shipping](/setup/building-and-shipping/#a-readable-script-pdf--word) has the detail.
 
@@ -97,9 +115,9 @@ scene has several such tags, the **largest** wins. Tag scenes `cutscene` or `con
 them by type.
 
 **By character.** Assign your placeholder lines to the characters you expect in the scene, and the
-guess is **split between them in proportion** (narration and speaker-less lines pool as an
+guess is **split between them in proportion** (text and other speaker-less lines pool as an
 "unattributed" share). A scene estimated at 20 lines with two BARKEEP placeholders, one GUARD, and
-one line of narration comes out **BARKEEP 10, GUARD 5, unattributed 5**, feeding the per-character
+one line of text comes out **BARKEEP 10, GUARD 5, unattributed 5**, feeding the per-character
 counts in the report.
 
 **In the report.** Estimated scenes are marked `(est.)` and their figures are projections, not

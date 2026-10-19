@@ -225,13 +225,13 @@ describe("main exit codes", () => {
 });
 
 describe("loc-export / loc-import", () => {
-  // A minimal en+fr project: one scene with a line + narration, a cast member with a display name.
+  // A minimal en+fr project: one scene with a line + text, a cast member with a display name.
   function makeLocProject(): string {
     const dir = mkdtempSync(join(tmpdir(), "patter-cli-loc-"));
     for (const d of ["scenes", "loc/en", "loc/fr", "authoring"]) mkdirSync(join(dir, d), { recursive: true });
     const w = (p: string, o: unknown) => writeFileSync(join(dir, p), JSON.stringify(o));
     w("game.patterproj", { schema: "patter/project@0", project: { id: "loc", name: "Loc" },
-      locales: { default: "en", all: ["en", "fr"] }, cast: [{ name: "ANNA", displayName: "Anna" }] });
+      locales: { default: "en", all: ["en", "fr"] }, cast: [{ name: "ANNA", displayName: "Anna" }], localiseDialogueText: true });
     w("scenes/one.patterflow", { schema: "patter/flow@0", scene: { id: "s1", type: "scene", name: "Opening", blocks: [
       { id: "b1", type: "block", name: "Main", children: [
         { id: "n1", type: "snippet", beats: [{ id: "L1", kind: "line", character: "ANNA" }, { id: "T1", kind: "text" }], jump: { to: "END" } },
@@ -292,6 +292,23 @@ describe("loc-export / loc-import", () => {
     expect(await main(["voice-export", dir])).toBe(2); // -o still required
     expect(await main(["voice-export", dir, "-o", out])).toBe(0);
     expect(readFileSync(out).subarray(0, 2).toString("latin1")).toBe("PK"); // xlsx (zip) magic
+  });
+
+  it("tells what action text drops out of the loc files, and import drops it", async () => {
+    const dir = makeLocProject();
+    const projectPath = join(dir, "game.patterproj");
+    writeFileSync(projectPath, JSON.stringify({ ...JSON.parse(readFileSync(projectPath, "utf8")), localiseDialogueText: undefined }));
+    writeFileSync(join(dir, "loc/fr/strings.patterloc"), JSON.stringify({ schema: "patter/strings@0", scene: "s1", locale: "fr", strings: { L1: "Bonjour", T1: "Récit" } }));
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((m?: unknown) => { lines.push(String(m)); });
+    const jsonPath = join(dir, "fr.json");
+    expect(await main(["loc-export", dir, "--format", "json", "--locale", "fr", "-o", jsonPath])).toBe(0);
+    expect(await main(["loc-import", jsonPath, dir])).toBe(0);
+    spy.mockRestore();
+    expect(lines).toContain(`Left out 1 text line in 1 dialogue scene: it's action, a direction for whoever stages the scene, because "Localise text lines in dialogue scenes" (Project Settings, Language; \`localiseDialogueText\` in the project file) is off. Turn it on to translate it.`);
+    expect(lines).toContain(`1 text line now action, so left out of 'fr': the next loc import drops its translation (turn on "Localise text lines in dialogue scenes" (Project Settings, Language; \`localiseDialogueText\` in the project file) to keep it)`);
+    expect(lines).toContain("  T1 in 'Opening'");
+    expect(lines).toContain(`dropped 1 translation(s) of action text, which isn't localised while "Localise text lines in dialogue scenes" (localiseDialogueText) is off`);
   });
 
   it("rejects an unknown import format and a source-locale import", async () => {

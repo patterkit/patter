@@ -86,7 +86,7 @@ export const patterSchema = new Schema({
       group: "beat", content: "cue paren? say", attrs: { id: {}, raw: { default: "{}" }, ext: { default: "" } },
       toDOM: () => ["div", { class: "beat kind-line" }, 0],
     },
-    // Free text / narration: content only.
+    // Text: content only.
     prose: {
       group: "beat", content: "say", attrs: { id: {}, raw: { default: "{}" }, ext: { default: "" } },
       toDOM: () => ["div", { class: "beat kind-prose" }, 0],
@@ -99,7 +99,7 @@ export const patterSchema = new Schema({
     },
 
     // --- zones (textblocks the cursor occupies) -----------------------------
-    // Only the spoken / narration CONTENT (the say zone) is formattable. The cue (a speaker name) and
+    // Only the spoken / text CONTENT (the say zone) is formattable. The cue (a speaker name) and
     // the paren (a performance direction) are plain - `marks: ""` forbids strong / em there; the bridge
     // maps the say's marks to / from the <b><i><bi> tags in the stored string.
     cue: { content: "text*", marks: "", toDOM: () => ["span", { class: "zone cue" }, 0] },

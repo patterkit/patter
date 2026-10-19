@@ -6,6 +6,13 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Action text**: a `"text"` step carries `"action": true` when the beat is action, a direction for whoever
+  stages the scene, never shown to the player. The compiler marks a dialogue scene's text this way when the
+  project doesn't localise it, and puts the source text in every locale. The key is absent on shown text,
+  and a replayed prompt is never action. Pinned by the corpus (version 5).
+
 ## [0.30.0] - 2026-10-18
 
 ### Added

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Inline spell-check (#177): a ProseMirror plugin that red-wavy-underlines misspelled words in the SAY
-// zones (dialogue / narration content). The host (renderer) builds the engine - nspell over the active
+// zones (dialogue / text content). The host (renderer) builds the engine - nspell over the active
 // Hunspell dictionary + the project word list + the cast - and pushes it via the handle's setSpellChecker,
 // so checking is synchronous (no IPC per word). Right-clicking a flagged word opens a Word / Docs-style
 // menu: pick a suggestion to replace it, add it to the project dictionary, or ignore it for this session.

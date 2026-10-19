@@ -406,7 +406,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
           seeId(beat.id, "beat", `snippet '${node.id}'`);
           checkTags(beat.tags, `beat '${beat.id}'`, beat.id);
           // A kind the runtime does not know delivers nothing, silently: the beat is in the script and
-          // never plays. (Found writing a test that used "narration", which is a `text` beat.)
+          // never plays. (Found writing a test that used "narration" for a `text` beat.)
           const kind: string = beat.kind;
           if (kind !== "line" && kind !== "text" && kind !== "gameEvent") {
             issues.push({ code: "malformed-node", message: `beat '${beat.id}' has an unknown kind '${kind}' (line, text, or gameEvent)`, id: beat.id });

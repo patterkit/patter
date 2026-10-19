@@ -3,11 +3,11 @@
 // every editable line's words in a shaded box, so a script editor outside the Patter world can change
 // them in Word, Google Docs, or OnlyOffice and send the file back.
 //
-// Each editable line (dialogue, narration, a choice option's prompt) is a one-row table:
+// Each editable line (dialogue, text, a choice option's prompt) is a one-row table:
 //   lead cell    the cue (with any speaker qualifier, `TAM (O.S.)`) and direction, or ◇ for an option
 //                (context, styled as the readable script),
 //                set right so each sits against its box;
-//                narration has none, so its words start flush left, apart from the dialogue
+//                text has none, so its words start flush left, apart from the dialogue
 //   text cell    the words, shaded with a hairline edge: the only thing meant to be edited
 //   margin cell  the option tag, the optional writing status, and the marker `[#K7Q2M]`
 // Everything else (headings, conditions, choice labels, jumps, game events, notes) is an ordinary
@@ -185,7 +185,7 @@ function box(el: Editable, code: string, status: string | undefined): Table {
   if (status) margin.push(new TextRun({ text: `${status}  `, font: SANS, smallCaps: true, size: S.tag, color: TOKENS.muted }));
   margin.push(new TextRun({ text: formatMarker(code), font: MONO, size: 14, color: MARKER_INK }));
 
-  // Narration has no speaker, so it has no lead cell: its box takes the cue column too and starts flush
+  // Text has no speaker, so it has no lead cell: its box takes the cue column too and starts flush
   // left, where dialogue is indented past its cue (a screenplay's action against its dialogue). An empty
   // cue column read as the previous speaker carrying on.
   const narration = el.kind === "narration";

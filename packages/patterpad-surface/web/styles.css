@@ -303,8 +303,8 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 
 .beat { display: block; padding: 0; margin: 0; }
 .beat.kind-line, .beat.kind-prose { display: block; min-height: 1.45em; }
-/* Dialogue is INSET slightly (the character name sits in from the margin) so that when dialogue,
-   narration, and text mix in a bubble it reads more like a script - narration stays flush left,
+/* Dialogue is INSET slightly (the character name sits in from the margin) so that when dialogue
+   and text mix in a bubble it reads more like a script - text stays flush left,
    speech steps in (Patterpad §4 "dialogue may be inset"). Snippet content only; option prompts are
    their own cell and stay flush (--line-inset defaults to 0).
    HANGING INDENT: when a dialogue line wraps, the continuation hangs under the first content zone -
@@ -324,7 +324,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .beats .beat.kind-line { --line-inset: 1.25rem; }
 .beat.kind-line > .zone.cue, .beat.kind-line > .zone.paren { flex: 0 0 auto; }
 .beat.kind-line > .zone.say { flex: 1 1 auto; min-width: 0; }
-/* Narration wraps flush-left. We previously hung wrapped continuations by 2ch via
+/* Text wraps flush-left. We previously hung wrapped continuations by 2ch via
    `padding-left: 2ch; text-indent: -2ch`, but that negative text-indent mis-places the caret on an
    EMPTY line - the browser positions the first-line caret at the indent offset, which on a beat-less
    new line paints far to the left of where the text actually starts (the same hazard the dialogue line
@@ -402,10 +402,14 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    have and hide an authored <i>. A quieter soft ink is the register cue; the make-surface still reads
    beautifully (design-language §4) - never a faint grey. */
 .beat.kind-prose .zone.say { color: var(--ink-soft); }
+/* Action (web/action-text.ts): a dialogue scene's text when the project doesn't localise it, a direction for
+   whoever stages the scene that the player never sees. It's set apart as a screenplay sets a direction, in the
+   parenthetical's muted italic, so the writer sees at a glance which text won't reach the player. */
+.beat.kind-prose.kind-action .zone.say { color: var(--muted); font-style: italic; }
 /* Dialogue content: eased back from stark full ink (see --ink-read). */
 .beat.kind-line .zone.say { color: var(--ink-read); }
 /* Inline formatting marks (project-gated, §formatting). The mark toDOM emits <strong>/<em>; make the
-   effect explicit and colour-inheriting so bold / italic read in the dialogue + narration ink. The
+   effect explicit and colour-inheriting so bold / italic read in the dialogue + text ink. The
    author only ever sees this effect, never the <b>/<i> markup it round-trips to. */
 .zone strong { font-weight: 700; }
 .zone em { font-style: italic; }
@@ -632,7 +636,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    text-indent): on an EMPTY prompt that -2ch pulled the caret left, over the ◇ marker, so typing
    made the caret jump forward. Flush start = caret sits where the text will. */
 .option-prompt .beat.kind-prose { padding-left: 0; text-indent: 0; }
-/* the choice text reads as a confident label - not the quiet muted-italic of body narration */
+/* the choice text reads as a confident label - not the quiet muted-italic of body text */
 /* The option prompt is a confident ANCHOR, so its text stays full ink (not the eased reading inks),
    for both a text and a dialogue prompt. Higher specificity than the reading-ink rules above. */
 .option-prompt .beat.kind-prose .zone.say,

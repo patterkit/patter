@@ -9,7 +9,7 @@ in the project's own files (the source language), never ships to your game, and 
 play. (Where it rolls up into reports lives under
 [Running the project](/production/tracking-and-reports/).)
 
-> Only **line** (dialogue) and **text** (narration) beats carry a status. **Game Event**
+> Only **line** (dialogue) and **text** beats carry a status. **Game Event**
 > beats, the silent cues to your game, are never tracked and never counted in production
 > stats.
 

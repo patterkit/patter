@@ -76,8 +76,19 @@ radio. It says how the line is delivered, not who says it, so `TAM` and `TAM (O.
 character everywhere. The line stores the qualifier's `gameId` (`os`), picked from the project's
 list of [qualifiers](/setup/cast/#speaker-qualifiers).
 
-A `text` beat is narration or the author's voice. It has no speaker, is never voiced, and is
-free to interpolate property values.
+A `text` beat is prose with no speaker: a description, the author's voice, or a page the player
+reads. It's never voiced, and is free to interpolate property values. (Narration, in Patter, is a
+spoken line whose character is a narrator, such as `NARRATOR`.)
+
+What a text beat is for depends on its scene. A **dialogue scene** has at least one `line` beat that
+names a character (an option's spoken prompt counts); any other scene is a **text scene**. In a text
+scene, text is shown to the player and localised. In a dialogue scene, text is **action** by default,
+as in a screenplay: a direction for whoever stages the scene (`MARA turns away.`), never shown to the
+player and never localised. The bundle marks each action beat with `action: true` and carries its
+source text in every locale. Turn on the project setting `localiseDialogueText` in the `.patterproj`
+(off when absent) and a dialogue scene's text is localised and shown like a text scene's instead. An
+option's prompt is never action. See
+[What gets translated](/production/localisation/#what-gets-translated).
 
 A game event is an instruction to the engine with **no visible words**. It carries only Game
 Data the host reads when the beat plays, so it can play a sound or move a camera. Game event

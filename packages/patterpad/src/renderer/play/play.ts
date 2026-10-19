@@ -264,7 +264,7 @@ function appendWarnings(batch: PlayBatch): void {
 
 function appendStep(step: PlayStep): HTMLElement {
   const div = document.createElement("div");
-  div.className = `pline ${step.kind}`;
+  div.className = `pline ${step.kind}${step.action ? " action" : ""}`;
   if (step.kind === "line") {
     // The speaker's label as the runtime resolved it, localised: the display name, or with a qualifier the
     // speaker pattern filled in (TAM (O.S.)) or the pair's own label. This window never builds one itself.
@@ -405,7 +405,9 @@ async function revealFrom(batch: PlayBatch, gen: number, startIdx: number): Prom
     // A recording that loaded after the beat's turn starts it late: the rest of the run moves on by as
     // much, so no overlap appears that nobody set.
     clock.delay(performance.now() - clock.at(start));
-    const length = s.kind === "gameEvent" ? 0 : lineLength(clip?.duration, estimateDuration(s.text));
+    // A game event, and action text (a direction, never shown to the player), take no time of their own: only
+    // their pause separates them from the next beat.
+    const length = s.kind === "gameEvent" || s.action ? 0 : lineLength(clip?.duration, estimateDuration(s.text));
     timeline.place(s, length);
     const el = appendStep(s); play.mark(s.id, s.scene); scrollToEnd();
     if (clip && audioOn) playLoaded(clip, el);

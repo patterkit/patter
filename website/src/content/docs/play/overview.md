@@ -7,7 +7,7 @@ sidebar:
 
 Your story reaches a player through a Patterplay runtime. You build the project to one
 `.patterc` [bundle](/format/overview/), the runtime loads it, and it hands your game a flat
-stream of beats (a line, a narration, a choice) that you render and drive however you like.
+stream of beats (a line, some text, a choice) that you render and drive however you like.
 
 There's one runtime per engine, a set of four equals (JavaScript, Unity, Unreal, and Godot)
 rather than approximations of each other. Every one is checked against the same

@@ -17,6 +17,7 @@ import type { Bundle } from "@patterkit/model";
 import { EXTENSION_SHARD, PROJECT_LOCALE_SCENE, projectLayout } from "@patterkit/model";
 import { reachabilityIssues } from "./reachability.js";
 import { walkFilesByExt } from "./load.js";
+import { actionTextChanges, existingLocPath } from "./localisation.js";
 import { SHARD_EXTENSIONS } from "./pack.js";
 import type { LoadedProject } from "./load.js";
 import { patterScopesStale, previewRegistry } from "./game-scopes.js";
@@ -325,6 +326,23 @@ function locIssues(loaded: LoadedProject): GameScopesIssue[] {
       if (seen.text !== text) out.push({ file, severity: "error", message: `'${key}' has different '${l.locale}' text here and in ${seen.file}; the project will not build until one is removed` });
     }
   });
+  // A scene whose kind has changed since loc import last wrote its shard (design/proposals/action-text.md), so
+  // the drop or the addition is seen before an export.
+  const changes = new Map<string, { dropped: number; added: number }>();
+  for (const c of actionTextChanges(loaded)) {
+    const key = `${c.scene}|${c.locale}`;
+    const n = changes.get(key) ?? changes.set(key, { dropped: 0, added: 0 }).get(key)!;
+    n[c.change]++;
+  }
+  const nameOf = new Map(loaded.scenes.map((sc) => [sc.id, sc.name]));
+  for (const [key, n] of changes) {
+    const [scene, locale] = key.split("|") as [string, string];
+    const file = existingLocPath(loaded, scene, locale) ?? "";
+    const name = nameOf.get(scene) ?? scene;
+    const lines = (k: number): string => `${k} text line${k === 1 ? "" : "s"}`;
+    if (n.dropped) out.push({ file, severity: "warning", message: `the text in '${name}' is now action (a dialogue scene's text, which the project doesn't localise), but the '${locale}' strings still translate ${lines(n.dropped)}: the next loc import drops ${n.dropped === 1 ? "it" : "them"}` });
+    if (n.added) out.push({ file, severity: "warning", message: `the text in '${name}' is no longer action, so ${lines(n.added)} ${n.added === 1 ? "isn't" : "aren't"} in the '${locale}' strings yet: the next loc export sends ${n.added === 1 ? "it" : "them"} for translation` });
+  }
   return out;
 }
 

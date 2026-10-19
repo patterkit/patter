@@ -79,6 +79,11 @@ that voices the prompts itself. When your game times lines itself, follow the
 carries none. `GetOutline` and `GetBeatSequence` report the same `PadAfter` on a line or text
 beat's `BeatInfo`, with `OwnPadAfter` when the beat sets its own.
 
+A text step with `Action` set is action: a direction for whoever stages the scene, such as "MARA turns
+away.", that the player never sees. It's a dialogue scene's text when the project doesn't localise it, and its
+`Text` is the source in every locale. Use it to stage the scene, or ignore it, but don't show it as on-screen
+text. A text step without it is shown text, as is a prompt spoken back.
+
 To show a line again that your game kept by its id (after a load, or a language switch), call
 `flow.StepFor(beatId)`. It gives the step the flow would deliver for that beat right now, built as `Advance`
 builds it: the text in the active locale, interpolated against the flow's values, closed captions applied, the

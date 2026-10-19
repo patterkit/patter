@@ -94,6 +94,9 @@ export interface OpenedProject {
   /** The project's default pause after a line, in seconds (ProjectFile.padAfterDefault, else the built-in
    *  `DEFAULT_PAD_AFTER`): what the inspector's Pad after field shows when nothing nearer sets one. */
   padAfterDefault: number;
+  /** Localise text lines in dialogue scenes (ProjectFile.localiseDialogueText, default off). Off, a dialogue
+   *  scene's text is action: the surface draws it as a direction and Play doesn't show it as text. */
+  localiseDialogueText: boolean;
   /** Author-defined gameData field definitions per node type (the inspector renders editable rows). */
   gameDataFields: GameDataFields;
   /** Every scene in the project, in file order. */
@@ -213,6 +216,9 @@ export interface ProjectSettingsDto {
    *  populated (the built-in default when the project sets none); saveSettings drops it again when it
    *  still matches. Optional on save, so a caller with an older settings shape leaves it alone. */
   padAfterDefault?: number;
+  /** Localise text lines in dialogue scenes (ProjectFile.localiseDialogueText): default off, stored only when
+   *  on. Optional on save, so a caller with an older settings shape leaves it alone. */
+  localiseDialogueText?: boolean;
   /** Build output: where Build Bundle writes the compiled `.patterc` (ProjectFile.export.bundle, relative
    *  to the project root or absolute). Always populated for display - the sibling default when unpinned. */
   buildBundle: string;
@@ -601,6 +607,10 @@ export interface ExportResult {
   error?: string;
   /** Build Bundle only: how many scene and block addresses it pinned first (pin on publish). */
   pinned?: number;
+  /** Localisation export only: what it says beside the file (`describeLocExport`): the action text it left out,
+   *  and why, then what has dropped out of the loc files or come into them, a heading per change with each beat
+   *  indented. Absent when there's nothing to say. */
+  changes?: string[];
 }
 
 /** What a Merge Returned Patterpack did, per shard and in total, ready to render without further work.
@@ -663,6 +673,8 @@ export interface LocImportResult {
   /** Distinct strings written, and scenes touched. */
   updated?: number;
   files?: number;
+  /** Translations dropped because their beat is now action text. */
+  dropped?: number;
 }
 
 /** A search hit (spec §6). The palette finds nodes by Game ID / title / text content, and folds in
@@ -674,7 +686,7 @@ export interface SearchEntry {
   name?: string;
   /** Host-facing Game ID address (scenes / blocks only). */
   gameId?: string;
-  /** Matched dialogue / narration / choice text (content hits). */
+  /** Matched dialogue / text / choice text (content hits). */
   text?: string;
   /** Named location trail (scene, block). */
   location: string[];
@@ -709,9 +721,12 @@ export interface PlayResultDto {
   error?: string;
 }
 
-/** One played step in the interactive walk (a line / narration / game-event beat). */
+/** One played step in the interactive walk (a line / text / game-event beat). */
 export interface PlayStep {
   kind: "line" | "text" | "gameEvent";
+  /** A text step that is action (a dialogue scene's text the project doesn't localise): a direction for
+   *  whoever stages the scene, never shown to the player. Play shows it as a direction, timed by its pause alone. */
+  action?: true;
   /** The beat's model id - the play window reports it back for the editor step-marker. */
   id: string;
   /** The scene this beat lives in - lets the editor SWITCH scenes when play crosses into another. */

@@ -45,7 +45,7 @@ export interface Jump {
 // ---------------------------------------------------------------------------
 
 // A scene holds any mix of the three kinds (spec §2): spoken dialogue, prose
-// narration, and engine instructions.
+// text, and engine instructions.
 
 export interface LineBeat {
   id: string;
@@ -75,7 +75,7 @@ export interface LineBeat {
 }
 
 /**
- * Authorial voice / narration - speaker-less prose (spec §2). Never voiced; its
+ * Text - speaker-less prose (spec §2). Never voiced; its
  * localised text always permits inline `{@name}` interpolation (spec §16). This
  * is the on-screen-text role (e.g. "A door slams!") - distinct from a game-event
  * beat, which is a pure engine instruction with no localised content.
@@ -95,6 +95,11 @@ export interface TextBeat {
   extensions?: NodeExtensions;
   /** Author tags (#215). See LineBeat.tags. */
   tags?: string[];
+  /** Bundle only: this text beat is ACTION, a direction to the people staging the scene that the player
+   *  never sees (design/proposals/action-text.md). Set by the compiler on every text beat of a dialogue scene
+   *  (`isDialogueScene`) when the project's `localiseDialogueText` is off; its text is then the source in
+   *  every locale. Absent = shown text. Never in source. */
+  action?: true;
 }
 
 /**
@@ -577,6 +582,30 @@ export function usedSpeakerPairs(scenes: Scene[]): { character: string; qualifie
   return out;
 }
 
+/** A DIALOGUE scene (design/proposals/action-text.md): one with at least one line beat that names a
+ *  character, an option's prompt included. Any other scene is a TEXT scene. */
+export function isDialogueScene(scene: Scene): boolean {
+  let found = false;
+  for (const block of scene.blocks) {
+    walkNodes<Group | Snippet>(block.children, (node) => {
+      if (found) return;
+      if (node.type === "group") {
+        if (node.prompt?.kind === "line" && node.prompt.character) found = true;
+        return;
+      }
+      for (const beat of node.beats ?? []) if (beat.kind === "line" && beat.character) { found = true; return; }
+    });
+    if (found) return true;
+  }
+  return false;
+}
+
+/** Whether a scene's text beats are ACTION: a dialogue scene, in a project that doesn't localise dialogue
+ *  scenes' text (`localiseDialogueText` off, the default). Its option prompts never are. */
+export function textIsAction(project: Pick<ProjectFile, "localiseDialogueText">, scene: Scene): boolean {
+  return !project.localiseDialogueText && isDialogueScene(scene);
+}
+
 /** The built-in `padAfter`, in seconds, for a project that sets no default of its own: the same on every runtime
  *  and in Patterpad's Play window (design/proposals/line-padding.md section 4). */
 export const DEFAULT_PAD_AFTER = 0.6;
@@ -598,7 +627,7 @@ export interface BundleQualifier {
 export type BundleCastMember = Omit<CastMember, "notes" | "actor" | "gender">;
 
 /** A node TYPE that can carry author-defined gameData fields (the gameData schema, project-level).
- *  Beat kinds map straight through: dialogue = `line`, narration = `text`, game event = `gameEvent`.
+ *  Beat kinds map straight through: dialogue = `line`, text = `text`, game event = `gameEvent`.
  *  `option` is a choice's option: a group that is a direct child of a `choice` group, whose gameData the
  *  host reads off the option `getChoices` hands it. Any other group's gameData stays undeclared. */
 export type GameDataNodeKind = "scene" | "block" | "snippet" | "line" | "text" | "gameEvent" | "option";
@@ -809,7 +838,7 @@ export interface ProjectFile {
    *  opt-in even for a voiced project (a voiced story may want voice scripts without tracking recording status). */
   trackAudioStatus?: boolean;
   /**
-   * Inline text formatting. When true, authors can mark dialogue / narration / direction /
+   * Inline text formatting. When true, authors can mark dialogue / text / direction /
    * choice-prompt text bold, italic, or bold+italic; it is stored INSIDE the localised strings
    * (and the flow's `direction`) as `<b>…</b>`, `<i>…</i>`, `<bi>…</bi>`, with literal `<`, `>`,
    * `&` escaped to `&lt;` / `&gt;` / `&amp;`. The runtime treats the string as opaque - it is the
@@ -868,6 +897,11 @@ export interface ProjectFile {
   /** The project's default `padAfter` for every line and text beat that sets none and has no default above it.
    *  Absent = `DEFAULT_PAD_AFTER`. */
   padAfterDefault?: number;
+  /** Localise text lines in dialogue scenes (design/proposals/action-text.md). Off (absent) by default: a
+   *  dialogue scene's text beats (`isDialogueScene`) are then ACTION, left out of the loc files and the
+   *  written word counts, and compiled with `action: true`. On: they're localised and shown as a text
+   *  scene's are. A text scene is localised whatever this says, and an option's prompt always is. */
+  localiseDialogueText?: boolean;
   gameDataFields?: GameDataFields;
   /**
    * The Patter extensions this project takes, by id (ruled 2026-10-18: the project opts in), each pinned to a
@@ -918,6 +952,11 @@ export interface LocaleFile {
   scene: string;
   locale: string;
   default?: boolean;
+  /** A translated shard only: its scene's text beats were action (`textIsAction`) when loc import last wrote
+   *  it, so they aren't in it. Loc export and `patter validate` compare this with the scene now, to report
+   *  text that has dropped out of the loc files or come into them. Absent = shown text, or a shard written
+   *  before the setting existed. */
+  textAction?: true;
   /** beatId -> text. */
   strings: Record<string, string>;
 }
@@ -1165,7 +1204,7 @@ export interface HandoffFile {
 
 /** An editable line as sent. */
 export interface HandoffLine {
-  /** The beat id (a line, a narration beat, or an option prompt). */
+  /** The beat id (a line, a text beat, or an option prompt). */
   id: string;
   kind: "line" | "narration" | "option";
   /** The speaker, speaker qualifier (`gameId`), and direction as sent (spoken lines only). */

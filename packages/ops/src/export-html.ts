@@ -110,7 +110,9 @@ const PLAYER_JS = String.raw`
       resumeSave = null; // what's shown is where the engine is
       if (!s || s.type === "end") { add("end", "The End"); return; } // no step is defensive: never hard-crash
       if (s.type === "choice") { renderChoice(s); return; }
-      timeline.place(s, estimate(s.text));
+      // Action text (a direction for whoever stages the scene, never shown to the player) takes no time of its
+      // own, only its pause, and reads as a direction.
+      timeline.place(s, s.action ? 0 : estimate(s.text));
       if (s.type === "line") {
         // The speaker's label as the runtime resolved it (TAM (O.S.), or a pair's own label): this page never
         // puts a name and a qualifier together itself. (Its bundle always carries the strings, so a line with a
@@ -119,7 +121,7 @@ const PLAYER_JS = String.raw`
         var dir = s.direction ? '<em class="dir">(' + esc(s.direction) + ')</em> ' : "";
         add("line", '<span class="who" style="color:hsl(' + hueOf(s.character || who) + ',55%,38%)">' + esc(who) + '</span>' + dir + esc(s.text));
       } else {
-        add("text", esc(s.text));
+        add(s.action ? "text action" : "text", esc(s.text));
       }
       scrollDown();
       next(readNext());
@@ -170,6 +172,7 @@ const STYLE = String.raw`
   .line .who { font-weight: 700; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 0.8rem; letter-spacing: 0.02em; text-transform: uppercase; margin-right: 0.4rem; }
   .line .dir { color: #9a8f78; font-style: italic; }
   .text { color: #4a4334; }
+  .text.action { color: #9a8f78; font-style: italic; }
   .end { color: #9a8f78; font-style: italic; text-align: center; margin-top: 1.5rem; }
   #controls { margin: 1.25rem 0; display: flex; flex-direction: column; gap: 0.5rem; }
   .choice { font: 1rem Georgia, serif; text-align: left; background: #fff; border: 1px solid #d9cfbb; border-radius: 8px; padding: 0.55rem 0.8rem; cursor: pointer; transition: border-color .15s, background .15s; animation: fade 0.4s ease-out both; }

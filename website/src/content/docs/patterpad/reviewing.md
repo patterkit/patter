@@ -25,7 +25,7 @@ file, never in what ships to your game.
 
 ## Suggested rewrites
 
-Right-click a dialogue or narration beat and choose **Suggest rewrite…** to propose a new line
+Right-click a dialogue or text beat and choose **Suggest rewrite…** to propose a new line
 without touching the original. A pencil in the gutter opens the review, where you can
 **Accept** the proposal (it makes the edit) or **Reject** it. If the original line has changed
 since, the suggestion is flagged **stale**. Bring archived proposals back with **Review ▸ Show
@@ -51,7 +51,7 @@ to add one. Each note has a **class**, and the class decides who receives it:
 
 So a pronunciation note reaches the voice actor and a context note reaches the translator,
 each in the export that's meant for them, without cluttering anyone else's view. Which classes
-you can pick depends on the beat (no VO note on narration or a game event, no localiser note
+you can pick depends on the beat (no VO note on text or a game event, no localiser note
 on a game event). Choose which classes you see while editing under **View ▸ Notes**. A note
 with no class is yours alone: it can never slip into an export.
 

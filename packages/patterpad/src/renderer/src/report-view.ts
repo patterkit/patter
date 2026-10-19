@@ -83,6 +83,9 @@ export function renderReport(host: HTMLElement, data: ReportData): void {
     metaLine([`${num(t.writtenRemaining)} to write`, `${num(t.written.words)} words`])));
   if (data.voiced) cards.append(card("Voiced lines", `${num(t.voicedDone)} / ${num(t.projectedVoiced)}`,
     metaLine([`${num(t.voicedRemaining)} to write`, `${num(t.voiced.words)} words`])));
+  // Action (a dialogue scene's text the project doesn't localise): written, but never shown to the player, so
+  // counted beside the written lines, not in them.
+  if (t.action.count > 0) cards.append(card("Action lines", num(t.action.count), metaLine([`${num(t.action.words)} words`, "not shown to the player"])));
   cards.append(card("Choices", num(t.choices)));
   if (data.voiced) {
     cards.append(card("Ready to record", num(t.voiced.readyToRecord), "voiced lines"));
@@ -107,9 +110,10 @@ export function renderReport(host: HTMLElement, data: ReportData): void {
 
   // Per-scene table. The Status column is text (a rung name), so the numeric styling starts at column 2.
   if (data.scenes.length) {
-    const headers = data.voiced
+    const action = t.action.count > 0;
+    const headers = [...(data.voiced
       ? ["Scene", "Status", "Written", "Voiced", "Choices", "Words"]
-      : ["Scene", "Status", "Written", "Choices", "Words"];
+      : ["Scene", "Status", "Written", "Choices", "Words"]), ...(action ? ["Action words"] : [])];
     const rows = data.scenes.map((s) => {
       // Estimated scenes are guesswork - flag them so their figures read as projections, not actuals.
       const name = el("span", s.estimated ? "rpt-estimated" : undefined, s.estimated ? `${s.name} (est.)` : s.name);
@@ -118,6 +122,7 @@ export function renderReport(host: HTMLElement, data: ReportData): void {
       base.push(written);
       if (data.voiced) base.push(`${num(s.voicedDone)} / ${num(s.voicedDone + s.voicedRemaining)}`);
       base.push(num(s.choices), num(s.written.words));
+      if (action) base.push(num(s.action.words));
       return base;
     });
     host.append(section("Scenes", table(headers, rows, 2)));

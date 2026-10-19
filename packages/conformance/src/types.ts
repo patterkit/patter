@@ -42,7 +42,7 @@ export type ScopeBag = Record<string, ScalarValue>;
  */
 export type TranscriptStep =
   | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter?: number; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
-  | { type: "text"; id: string; text: string; padAfter?: number; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
+  | { type: "text"; id: string; text: string; padAfter?: number; action?: true; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "choice"; groupId: string; options: TranscriptOption[] }
   | { type: "end" };

@@ -40,8 +40,8 @@ These keys have no menu entry; they're how you write on the page:
 | `Enter` | New line in the snippet |
 | `⇧Enter` / `⌘Enter` | New snippet |
 | `Tab` | Turn a plain line into dialogue, accept a name, or close a `(direction)` |
-| `⌘T` / `Alt-T` | Switch the line between dialogue and narration |
-| `Space` (empty name / start) | Turn the line into plain narration |
+| `⌘T` / `Alt-T` | Switch the line between dialogue and text |
+| `Space` (empty name / start) | Turn the line into plain text |
 | `(` … `)` | Open / close an inline `(direction)` |
 | `⌘B` / `⌘I` | Bold / italic the selected words (formatting must be on) |
 | `/` (empty line) | Open the quick menu to add structure |

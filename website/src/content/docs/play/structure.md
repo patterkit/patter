@@ -122,7 +122,7 @@ var cast := engine.cast_for_scene("tavern")               # Godot
 What counts as "in the scene" is **authored**, not played: a speaker behind a condition, inside any
 group, or voicing a choice prompt is in the list, because the question is who *can* speak here. A
 speaker who is only ever in a branch the player skipped is still in it. Names are deduped and ordered
-by first appearance, so the list reads as the scene does. An unknown ref, or a scene of pure narration,
+by first appearance, so the list reads as the scene does. An unknown ref, or a text scene (one where no character speaks),
 returns an empty list.
 
 The caption speaker (`SFX` by default, see [closed captions](/play/closed-captions/)) is a cast member

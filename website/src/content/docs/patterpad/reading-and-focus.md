@@ -36,7 +36,7 @@ You can zoom in and out from the View menu too, alongside full-screen.
 
 Press **⌘F** (or the navigator's **Search…** field) to open a small floating search
 window that stays on top of the editor. It finds a scene or block by title or address, any
-line by its dialogue, narration, or choice text, and a specific line by its **id**, then
+line by its dialogue, text, or choice text, and a specific line by its **id**, then
 jumps you straight there, centred, without losing your place. It also browses lines by
 [writing](/writing-status/) or recording status, by author tag, and finds where a property
 is used.

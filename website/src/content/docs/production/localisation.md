@@ -5,7 +5,7 @@ sidebar:
   label: Localisation
 ---
 
-A Patter project is **ready to translate from the start**: every line, narration, choice
+A Patter project is **ready to translate from the start**: every line, piece of text, choice
 prompt, and character name has a stable **ID** that its translations hang off. Running the
 translation side of a project is one small loop, and one rule keeps it sane: **writers only
 ever see and edit the source language.** Translations live in their own files, never on the
@@ -40,6 +40,72 @@ writing surface, which is also what makes staleness computable (below).
 
 In **Project Settings ▸ Language**, list the languages you'll ship and mark the **default**
 (the one writers author in). That's the whole setup.
+
+## What gets translated
+
+Everything the player reads goes to translators: dialogue, choice prompts, character and qualifier
+names, and the text in a **text scene**, a scene where no character speaks, such as a codex entry or a
+page of a text game. Game events have no words, so they never do.
+
+Text in a scene where characters speak is different. In a screenplay, a line with no speaker in the
+middle of a conversation is **action** (`MARA turns away.`), a direction for whoever stages the scene,
+and Patter reads it the same way. A **dialogue scene** is one with at least one line spoken by a
+character (a spoken option prompt counts), and by default its text lines are action:
+
+- They're left out of every loc export, JSON, Excel, and PO alike, so translators aren't sent words
+  no player will see.
+- They're counted apart in the [production report](/production/tracking-and-reports/#action-text),
+  and left out of its localisation counts.
+- They reach the game marked as action, in the source language whatever the locale, so the game can
+  stage the moment rather than show it as on-screen text (see [Step shapes](/play/engine/#step-shapes)).
+- They're never in a voice script, which takes spoken lines only.
+
+An option's prompt is always translated, whether it's spoken or text, because the player picks from it.
+
+### Why lines are missing from an export
+
+If you count the lines in an export and some text is missing, this is why. Every export says how many
+text lines it left out, and which setting did it, in Patterpad's Localisation dialog and in
+`patter loc-export`'s output alike:
+
+```
+Left out 12 text lines in 3 dialogue scenes: they're action, a direction for whoever stages the
+scene, because "Localise text lines in dialogue scenes" (Project Settings, Language;
+`localiseDialogueText` in the project file) is off. Turn it on to translate them.
+```
+
+Nothing is lost: the lines are still in your scenes, in the source language, and turning the setting
+on puts them in the next export.
+
+If your game does show that text to the player, as a text game does, or one that captions its action,
+turn on **Localise text lines in dialogue scenes** in **Project Settings ▸ Language**. A dialogue
+scene's text is then translated and shown just like a text scene's. The setting is off by default, and
+a text scene is translated whatever it says.
+
+:::caution[Upgrading an existing project]
+A project made before this setting existed picks up the default, off. If your project is localised
+and its dialogue scenes have text lines your players see, turn **Localise text lines in dialogue
+scenes** on before your next export or import. Otherwise those lines leave the loc files, and the next
+import drops their translations.
+:::
+
+### When a scene changes kind
+
+A scene's kind can change as you write: a text scene gains its first spoken line, the last speaking
+line in a scene is cut, or someone switches the setting. Patter tells you, rather than letting text
+slip in or out of translation unnoticed:
+
+- **Export** (Patterpad's Localisation dialog and `patter loc-export` alike) lists every text line
+  that has dropped out of the loc files or come into them, by id and scene, and names the setting
+  that would keep a dropped line in.
+- **Import** drops any translation of a line that's now action, and says how many it dropped and
+  why. A line
+  that's no longer action goes out in the next export as new and untranslated.
+- **`patter validate`** warns, naming the scene, when a scene's kind no longer matches its
+  translations, so you see the change before you export.
+
+Each language's file for a scene notes whether that scene's text was action when an import last wrote
+it, which is how a change is spotted in either direction.
 
 ## The loop: export, translate, import
 
@@ -134,8 +200,8 @@ alongside that character's lines:
 The field is **free text**, because three genders don't cover every language: it auto-suggests the
 everyday values (*male*, *female*, *neuter*) plus any others already used in the cast, so you can name
 a common, animate, or inanimate gender while keeping spellings consistent. Whatever you type is passed
-to translators verbatim. It rides the character's own dialogue and their display name. Lines with no
-speaker (narration) and characters left blank carry nothing, so you only send what you actually know.
+to translators verbatim. It rides the character's own dialogue and their display name. Text, which has no
+speaker, and characters left blank carry nothing, so you only send what you actually know.
 
 Gender is **export-only context**: it is regenerated from the cast on every export, never read back
 on import, and never shipped in the compiled `.patterc` bundle. Change a character's gender and the

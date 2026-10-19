@@ -51,7 +51,10 @@ step carries `qualifier` and `qualifierName` the same way: the line's
 Show `speakerLabel` as the speaker's name: it's localised and already puts the two together the way
 the writer and the translator chose (see [How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)).
 A `"line"` or `"text"` step always carries `"padAfter"`, the writer's pause after it in seconds,
-already resolved; the [timing rules](/play/engine/#step-shapes) say how to play it.
+already resolved; the [timing rules](/play/engine/#step-shapes) say how to play it. A `"text"` step
+with `step["action"]` set to `true` is [action](/play/engine/#step-shapes), a direction for whoever
+stages the scene: stage it, or let it pass, but don't show it as on-screen text. The key is absent on
+shown text, and a replayed prompt is never action.
 
 `open_flow` returns null, with `push_error`, when the address does not resolve: an unknown scene, or
 a block that is not in the scene you named. Nothing opens, and a flow already open under that name

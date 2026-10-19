@@ -2089,7 +2089,7 @@ namespace patter
             };
             r.extensions = beat.extensions;   // Patter extension values, raw, on every kind of beat
             if (beat.kind == "gameEvent") { r.type = StepType::GameEvent; r.id = beat.id; r.gameData = beat.gameData; applyTags(r); return r; }
-            if (beat.kind == "text") { r.type = StepType::Text; r.id = beat.id; r.text = interp(resolveString(beat.id)); r.padAfter = padOf(beat.id); r.gameData = beat.gameData; applyTags(r); return r; }
+            if (beat.kind == "text") { r.type = StepType::Text; r.id = beat.id; r.text = interp(resolveString(beat.id)); r.padAfter = padOf(beat.id); r.action = beat.action; r.gameData = beat.gameData; applyTags(r); return r; }
             // line
             std::string raw = resolveString(beat.id);
             r.type = StepType::Line; r.id = beat.id;

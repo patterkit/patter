@@ -6,6 +6,14 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Action text**: a text step has `Action`, true when the beat is action, a direction for whoever stages the
+  scene that the player never sees. The compiler marks a dialogue scene's text beats as action when the
+  project doesn't localise that text (`action: true` in the bundle, read into `Beat.Action`), and their text is
+  the source in every locale. It's false on shown text and on a prompt spoken back. Pinned by the corpus
+  (version 5).
+
 ## [0.30.0] - 2026-10-18
 
 ### Added

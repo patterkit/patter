@@ -75,6 +75,7 @@ const project = {
   root: "/Users/ian/Projects/the-tavern.patter",
   formatting: true,
   voiced: true, // a voiced demo - audio status / folders / scratch only surface when this is on (#206)
+  localiseDialogueText: false,
   trackAudioStatus: true, // audio-status tracking on (voiced + not opted out) -> the inspector Audio row shows
   cast: ["BARKEEP", "ANNA", "BO"],
   qualifiers: QUALIFIERS,
@@ -344,7 +345,7 @@ const stub = {
   openCoverageWindow: async () => undefined,
   onCoverageNavigate: () => undefined,
   onOpenWorldSettings: () => undefined,
-  readSettings: async () => ({ name: "The Tavern", vcs: "git", start: { scene: "scn_tavern" }, voiced: true, trackAudioStatus: true, formatting: true, padAfterDefault: 0.6, buildBundle: "../patter-dist/the_tavern.patterc", buildLocalisation: "embedded", buildSourceDebug: false, localeDefault: "en", locales: ["en", "fr"],
+  readSettings: async () => ({ name: "The Tavern", vcs: "git", start: { scene: "scn_tavern" }, voiced: true, trackAudioStatus: true, formatting: true, padAfterDefault: 0.6, localiseDialogueText: false, buildBundle: "../patter-dist/the_tavern.patterc", buildLocalisation: "embedded", buildSourceDebug: false, localeDefault: "en", locales: ["en", "fr"],
     gameDataFields: {
       scene: [{ name: "music", type: "text", default: "tavern-loop", purpose: "Background music cue id for this scene." }],
       line: [{ name: "mood", type: "enum", values: ["calm", "tense", "hostile"], purpose: "Facial-animation mood for this line." }],

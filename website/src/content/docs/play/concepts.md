@@ -69,10 +69,14 @@ kinds:
 | Step | Meaning | What it carries |
 |---|---|---|
 | **line** | A character speaks | the speaker, the (localised) display name, the text, direction, the speaker qualifier, the pause after it, Game Data, tags |
-| **text** | Narration the player reads | the text, the pause after it, Game Data, tags |
+| **text** | Prose with no speaker: words the player reads, or action to stage | the text, the pause after it, whether it's action, Game Data, tags |
 | **gameEvent** | A host-facing cue, no spoken text | an id + Game Data (play a sound, move the camera) |
 | **choice** | The player must pick | a list of options (each with prompt text + an `eligible` flag) |
 | **end** | The flow finished |: |
+
+A text step marked **action** is a direction for whoever stages the scene, such as `MARA turns away.`
+in the middle of a conversation. The player never sees it as text; your game stages it, or lets it
+pass. See [Step shapes](/play/engine/#step-shapes).
 
 A minimal loop: advance until a choice or the end, rendering each beat as it comes.
 
@@ -81,7 +85,7 @@ loop:
     step = flow.advance()
     switch step.type:
         "line":   show(step.speakerLabel, step.text)
-        "text":   show(step.text)
+        "text":   if step.action: stage(step) else: show(step.text)
         "gameEvent": doHostCue(step.id, step.gameData)
         "choice": presentOptions(step.options); break   // wait for the player
         "end":    finish(); break

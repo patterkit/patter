@@ -26,7 +26,13 @@ IDs-only build.
 The **Version control** tab picks your version-control system.
 
 The **Language** tab lists the languages your project supports and which one is the
-source.
+source. It also holds **Localise text lines in dialogue scenes**, off by default: "When this is off, a
+text line in a scene where characters speak is action: a direction for whoever stages the scene. It
+isn't translated or shown to the player." Turn it on when your game shows that text, as a text game
+does. A scene with no speaking lines is translated either way; see
+[What gets translated](/production/localisation/#what-gets-translated). A project made before the
+setting existed opens with it off, so if yours is localised and shows players the text in its
+dialogue scenes, turn it on before your next localisation export.
 
 The **Game Data** tab sets out the fields each kind of beat can carry (see
 [Conditions, effects & data](/patterpad/conditions-and-data/)).
@@ -102,9 +108,12 @@ its own page: [Version control](/setup/version-control/).
 folds it back in (also reachable from the Language settings tab):
 
 - **Export** the text for a language, or a blank template for the source, as **JSON**,
-  **Excel (.xlsx)**, or **PO/POT**.
+  **Excel (.xlsx)**, or **PO/POT**. When **Localise text lines in dialogue scenes** is off, the
+  dialog says how many text lines the export left out as action, and why (see [Why lines are
+  missing from an export](/production/localisation/#why-lines-are-missing-from-an-export)), and
+  lists any that have dropped out of the loc files or come into them since.
 - **Import** a translated file back. The language comes from the file (or you set it), and
-  Patterpad tells you how many lines it updated.
+  Patterpad tells you how many lines it updated, and how many translations of action text it dropped.
 
 Patterpad only ever shows and edits the **source** language; the translations live off
 to the side and round-trip through this dialog. The full story is under
@@ -139,7 +148,7 @@ With git (or none), and the default gitignored `patter-dist/` output, it's free 
 ## Spell-check
 
 Patterpad checks your spelling as you write: a red wavy underline appears under words it
-doesn't know in dialogue and narration (character names and your project word list are
+doesn't know in dialogue and text (character names and your project word list are
 left alone). Right-click a flagged word for up to five suggestions, **Add to dictionary**
 (it saves to the project word list), or **Ignore** for the session. Set it up under
 **Project Settings ▸ Dictionary**: pick a built-in dictionary (en-US / en-GB) or import

@@ -12,7 +12,7 @@ through the whole thing.
 
 ## Snippets, cues, and beats
 
-A run of dialogue and narration that plays together is a **snippet**, drawn as a soft
+A run of dialogue and text that plays together is a **snippet**, drawn as a soft
 rounded card. Quiet space sits between snippets, so the shape of a scene is clear at a
 skim without the page turning into boxes and lines.
 
@@ -22,9 +22,17 @@ skim without the page turning into boxes and lines.
 </figure>
 
 Inside a snippet are **beats**, and there are only three kinds. A **line** is someone
-speaking, with their name beside the words. A **text** beat is narration or description,
-with no speaker. A **game event** is a silent cue to your game (play a sound, move the
+speaking, with their name beside the words. A **text** beat is prose with no speaker, such as
+a description or a page the player reads. A **game event** is a silent cue to your game (play a sound, move the
 camera) that the player never sees.
+
+In a scene where characters speak, a text beat is usually **action**, as a screenplay's is:
+`MARA turns away.`, a direction for whoever stages the scene, never shown to the player or translated. The
+surface draws action set apart, in the same muted italic as a direction, so you can see which text
+won't reach the player. In a scene where nobody speaks, text is drawn plainly, since that's what the
+player reads. If your game shows the text in its dialogue scenes too, turn on **Localise text lines
+in dialogue scenes** in **Project Settings ▸ Language** and it's drawn plainly everywhere (see
+[What gets translated](/production/localisation/#what-gets-translated)).
 
 A character's name is a coloured tag, not something you retype each time. Each
 character keeps their own colour, so you can see who's speaking as you skim. An empty
@@ -56,14 +64,14 @@ Runs look after themselves. A new line by a character takes the qualifier of tha
 last line above it in the scene, so a run of thoughts or a radio exchange needs one pick, not one
 per line; pick none to end the run. A line by someone else starts clean. The qualifier is saved on
 each line, so nothing changes later if the lines around it do. **Duplicate** keeps each copied
-line's qualifier as it was, and turning a line into narration (`⌘T`) drops its qualifier, since
-narration has no speaker.
+line's qualifier as it was, and turning a line into text (`⌘T`) drops its qualifier, since
+text has no speaker.
 
 A qualified line is still the same character. The cast, the report, and every count treat `TAM` and
 `TAM (O.S.)` as one. To find every line with a given qualifier, use **Review ▸ Find Lines by
 Qualifier…** (see [Search](/search/#browsing-by-speaker-qualifier)).
 
-## Typing: lines, narration, and directions
+## Typing: lines, text, and directions
 
 Most of writing is just typing. These keys cover the rest:
 
@@ -72,8 +80,8 @@ Most of writing is just typing. These keys cover the rest:
 | **Enter** | A new line in the same snippet |
 | **Shift-Enter** | Start a **new snippet** |
 | **Tab** | Turn a plain line into **dialogue** (and open the name picker); also finishes a name or a `(direction)` |
-| **`⌘T` / `Alt-T`** | Switch the current line between **dialogue and narration**, keeping the words |
-| **Space** at the start of a line | Turn it into plain narration |
+| **`⌘T` / `Alt-T`** | Switch the current line between **dialogue and text**, keeping the words |
+| **Space** at the start of a line | Turn it into plain text |
 | **`(` … `)`** | Add an inline **(direction)** to a spoken line |
 | **`⌘B` / `⌘I`** | **Bold / italic** the selected words |
 
@@ -100,7 +108,7 @@ Pasting a block of dialogue lays each line out as its own beat automatically.
 ## Pauses between lines
 
 How long to wait after a line, and when to let the next line cut in on it, is set in the inspector.
-**Pad after** on a line or a piece of narration is the pause after it, in seconds. A positive pause
+**Pad after** on a line or a text beat is the pause after it, in seconds. A positive pause
 waits, zero follows at once, and a negative one starts the next line that long before this one ends,
 cutting in on it. Leave it empty and the line takes the **Default pad** from the nearest snippet,
 group, block, or scene above it that sets one, then the project's (**Project Settings ▸ General**),

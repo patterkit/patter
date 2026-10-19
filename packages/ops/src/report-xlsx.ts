@@ -22,6 +22,7 @@ export async function runReportXlsx(data: ReportData): Promise<Buffer> {
 
   // --- Scenes ---------------------------------------------------------------
   const scenes = wb.addWorksheet("Scenes");
+  const action = data.totals.action.count > 0;
   scenes.columns = [
     { header: "Scene", key: "name", width: 24 },
     { header: "Status", key: "status", width: 10 },
@@ -29,6 +30,8 @@ export async function runReportXlsx(data: ReportData): Promise<Buffer> {
     { header: "Written", key: "wCount", width: 8 },
     { header: "Words", key: "words", width: 9 },
     { header: "Choices", key: "choices", width: 8 },
+    // Action (a dialogue scene's text the project doesn't localise): beside the written lines, never in them.
+    ...(action ? [{ header: "Action", key: "aCount", width: 8 }, { header: "Action words", key: "aWords", width: 12 }] : []),
     ...data.writingLadder.map((s) => ({ header: s, key: `w:${s}`, width: 10 })),
     ...(v ? [{ header: "Ready record", key: "rr", width: 12 }, { header: "Ready ship", key: "rs", width: 11 }] : []),
     ...(rec ? data.recordingLadder.map((s) => ({ header: `rec ${s}`, key: `r:${s}`, width: 10 })) : []),
@@ -36,9 +39,10 @@ export async function runReportXlsx(data: ReportData): Promise<Buffer> {
     { header: "Written left", key: "wRem", width: 11 },
     ...(v ? [{ header: "Voiced left", key: "vRem", width: 11 }] : []),
   ];
-  const sceneRow = (name: string, s: Pick<SceneReport, "voiced" | "written" | "choices" | "writtenRemaining" | "voicedRemaining"> & { estimate?: number; status?: string }) => ({
+  const sceneRow = (name: string, s: Pick<SceneReport, "voiced" | "written" | "action" | "choices" | "writtenRemaining" | "voicedRemaining"> & { estimate?: number; status?: string }) => ({
     name, status: s.status,
     vCount: s.voiced.count, wCount: s.written.count, words: s.written.words, choices: s.choices,
+    aCount: s.action.count, aWords: s.action.words,
     ...Object.fromEntries(data.writingLadder.map((k) => [`w:${k}`, s.written.byWriting[k] ?? 0])),
     rr: s.voiced.readyToRecord, rs: s.voiced.readyToShip,
     ...Object.fromEntries(data.recordingLadder.map((k) => [`r:${k}`, s.voiced.byRecording[k] ?? 0])),

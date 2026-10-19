@@ -273,6 +273,10 @@ namespace Patterkit.Patterplay
         /// next line cuts in). Null = the nearest `PadAfterDefault` above it, else the project's, else
         /// <see cref="Bundle.DefaultPadAfter"/>.</summary>
         public double? PadAfter;
+        /// <summary>Text only: this beat is action, a direction for whoever stages the scene that the player
+        /// never sees (`action: true`, set by the compiler on a dialogue scene's text when the project doesn't
+        /// localise it; never on an option's prompt). Its text is the source in every locale. False = shown text.</summary>
+        public bool Action;
         public GameData GameData;
         /// <summary>Patter extension values: extension id -> field -> value, raw as authored (editor-only fields
         /// stripped), any JSON as a neutral tree (OrderedMap / List / bool / double / string / null). The engine

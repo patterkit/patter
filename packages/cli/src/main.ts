@@ -21,7 +21,7 @@ import { canonicalStringify, parseSource } from "@patterkit/core";
 import {
   loadProject, runValidate, runExport, runExportHtml, bundleOutputPath, besideBundlePath, runFormat, runPlay, renderPlay, runCoverage, renderCoverageText, proposeCoverageDrivers, runInit, runResolve, runPropertyUsage,
   runReport, renderReportText, runReportXlsx, runPack, runUnpack, runUnpackMerge, runMerge, planBuild, UnsupportedMergeError, SHARD_EXTENSIONS, CONFLICT_SIDECAR,
-  extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
+  extractLoc, applyLoc, describeLocExport, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf, scanAudioStatus,
   planShareScopes, defaultGameScopesDir, GAME_SCOPES_DIR,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, qualifierNamer,
@@ -128,7 +128,7 @@ Usage:
   patter loc-import <file> [path]  Import translated strings back into the project
                  [--locale xx]     (format by extension; --locale overrides the file's)
   patter export-script [path] [-o file.pdf|.docx]  Readable screenplay of the script + flow
-                 (dialogue, narration, choices, jumps). Format from the extension; default
+                 (dialogue, text, choices, jumps). Format from the extension; default
                  beside the bundle, as .pdf. The PDF embeds its fonts and covers any script or emoji.
   patter voice-export [path] -o file.xlsx  The voice (VO) recording script
                  [--all]           Include every voiced line (else only "ready to record")
@@ -589,16 +589,20 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       const loaded = loadProject(positionals[0] ?? ".");
       const locale = typeof flags.locale === "string" ? flags.locale : undefined; // omitted = blank template / POT
       const catalog = extractLoc(loaded, { locale });
+      // The action text it left out, and why, and what dropped out of the loc files or came into them since: told
+      // on stderr when the export is on stdout.
+      const changes = describeLocExport(loaded, { locale });
       if (format === "xlsx") {
         if (flags.o === "-") return usage("loc-export", "-o - is not supported for --format xlsx: a spreadsheet is not text");
         if (!commitBinary(flags.o, await catalogToXlsx(catalog))) return 1;
       } else {
         const content = format === "json" ? catalogToJson(catalog) : catalogToPo(catalog);
-        if (flags.o === "-") { process.stdout.write(content); return 0; } // stdout for pipelines
+        if (flags.o === "-") { process.stdout.write(content); for (const l of changes) console.error(l); return 0; } // stdout for pipelines
         if (!commitWrites([{ path: flags.o, content }])) return 1;
       }
       const n = catalog.entries.length;
       console.log(`wrote ${flags.o} - ${n} string(s)${locale ? `, ${locale}` : " (template)"}`);
+      for (const l of changes) console.log(l);
       return 0;
     }
 
@@ -702,6 +706,7 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       if (writes.length === 0) { console.log("no translations to import"); return 0; }
       if (!commitWrites(writes)) return 1;
       console.log(`imported ${stats.updated} string(s) for ${locale} across ${stats.files} scene(s)`);
+      if (stats.dropped) console.log(`dropped ${stats.dropped} translation(s) of action text, which isn't localised while "Localise text lines in dialogue scenes" (localiseDialogueText) is off`);
       return 0;
     }
 

@@ -1406,6 +1406,7 @@ namespace Patterkit.Patterplay.TestHost
                 case StepType.Text:
                     o["type"] = "text"; o["id"] = s.Id; o["text"] = s.Text;
                     NormalizePad(s, o);
+                    if (s.Action) o["action"] = true;                                   // action text: not shown to the player
                     if (s.GameData != null) o["gameData"] = GameDataToObject(s.GameData);
                     if (s.Extensions != null) o["extensions"] = JsonTreeToObject(s.Extensions); // Patter extension values, raw
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
@@ -1944,6 +1945,7 @@ namespace Patterkit.Patterplay.TestHost
                 Direction = b.TryGetProperty("direction", out var d) ? d.GetString() : null,
                 Qualifier = b.TryGetProperty("qualifier", out var q) ? q.GetString() : null,
                 PadAfter = Num(b, "padAfter"),
+                Action = b.TryGetProperty("action", out var ac) && ac.ValueKind == JsonValueKind.True,
             };
             if (b.TryGetProperty("gameData", out var gd)) beat.GameData = ParseGameData(gd);
             beat.Extensions = ParseNodeExtensions(b);

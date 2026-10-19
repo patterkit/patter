@@ -946,7 +946,7 @@ namespace Patterkit.Patterplay
                 case "gameEvent":
                     return new StepResult { Type = StepType.GameEvent, Id = beat.Id, GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
                 case "text":
-                    return new StepResult { Type = StepType.Text, Id = beat.Id, Text = Interpolate(ResolveString(beat.Id)), PadAfter = PadOf(beat.Id), GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
+                    return new StepResult { Type = StepType.Text, Id = beat.Id, Text = Interpolate(ResolveString(beat.Id)), PadAfter = PadOf(beat.Id), Action = beat.Action, GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
                 case "line":
                 {
                     string raw = ResolveString(beat.Id);

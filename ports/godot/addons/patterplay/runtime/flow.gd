@@ -1115,6 +1115,11 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 		return ra
 	if kind == "text":
 		var rt := {"type": "text", "id": beat["id"], "text": _interp(_resolve_string(beat["id"])), "padAfter": _pad_of(beat["id"])}
+		# Action text: "action": true (absent when not) marks a direction for whoever stages the scene, never
+		# shown to the player (a dialogue scene's text, unless the project localises it). Its text is the source
+		# in every locale; the compiler sees to that. A replayed prompt (_prompt_result) never is.
+		if beat.get("action", false) == true:
+			rt["action"] = true
 		if beat.has("gameData"):
 			rt["gameData"] = _norm_gamedata(beat["gameData"])
 		_put_extensions(rt, beat)

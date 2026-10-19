@@ -14,7 +14,7 @@ performed table-read.
 
 Recording status works just like writing status (an ordered, colour-tinted ladder edited in
 **Project Settings ▸ Recording status**), with two differences. It applies to **dialogue lines
-only** (narration and game event beats never carry one), and the default ladder runs
+only** (text and game event beats never carry one), and the default ladder runs
 **missing → scratch → recorded → final**. A line with no status set reads as the lowest
 stage, **missing**.
 

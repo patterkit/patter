@@ -519,6 +519,8 @@ func _transcript_step(step: Dictionary, ids_only := false) -> Dictionary:
 		return out
 	if kind != "line" and kind != "text":
 		return step
+	# `action` (action text) passes through as the runtime set it: present only when true, as the reference
+	# runner records it, so a stray `false` fails the comparison.
 	var t := _transcript_pad(step.duplicate())
 	if kind == "line":
 		_transcript_label(t, ids_only)

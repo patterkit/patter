@@ -180,6 +180,7 @@ static JsonValue normalize(const StepResult& s, bool idsOnly = false)
         case StepType::Text:
             o.set("type", JsonValue::Str("text")); o.set("id", JsonValue::Str(s.id)); o.set("text", JsonValue::Str(s.text));
             if (s.padAfter != DEFAULT_PAD_AFTER) o.set("padAfter", JsonValue::Num(s.padAfter));
+            if (s.action) o.set("action", JsonValue::Boolean(true)); // action text: not shown to the player
             if (s.gameData) o.set("gameData", gameDataToJson(*s.gameData));
             if (!s.extensions.empty()) o.set("extensions", extensionsToJson(s.extensions));   // Patter extension values, raw
             if (s.hasTags) o.set("tags", tagsToJson(s.tags));

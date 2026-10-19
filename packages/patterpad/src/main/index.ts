@@ -567,7 +567,8 @@ async function exportLoc(request: LocExportRequest): Promise<ExportResult> {
     : [{ name: "JSON", extensions: ["json"] }];
   const r = await dialog.showSaveDialog(win, { title: "Export localisation", defaultPath: out.defaultName, filters });
   if (r.canceled || !r.filePath) return { ok: false, canceled: true };
-  return writeExport(r.filePath, out.content);
+  const res = await writeExport(r.filePath, out.content);
+  return res.ok && out.changes.length ? { ...res, changes: out.changes } : res;
 }
 
 /** Import a translated file through a native Open dialog; applies it (format by extension). */

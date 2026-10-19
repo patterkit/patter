@@ -5,7 +5,7 @@
 // zone model: a dialogue beat's character / direction live in the cue / paren
 // zones (bridging to LineBeat.character / .direction, flow), and a snippet's
 // jump rides as the snippet's `jump` attr (a JSON Jump, bridging to
-// Snippet.jump). Spoken / narration content lives in the `say` zone, bridging to
+// Snippet.jump). Spoken / text content lives in the `say` zone, bridging to
 // the locale string.
 //
 // `fmt` (the project's `formatting` setting) decides whether the say text carries

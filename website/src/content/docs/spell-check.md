@@ -8,7 +8,7 @@ from Word or Google Docs. Misspelled words get a **red wavy underline**, and rig
 corrections, "Add to dictionary", or "Ignore". It checks the language you write in (your project's
 **source language**) and stays out of your finished game, so spelling never reaches the build.
 
-> Only the words a player reads are checked, meaning dialogue, narration, and directions. Character names, ids,
+> Only the words a player reads are checked, meaning dialogue, text, and directions. Character names, ids,
 > and `@property` references are never flagged, and your cast names are always accepted.
 
 ## The dictionary

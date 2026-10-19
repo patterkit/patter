@@ -6,6 +6,20 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Action text.** A new setting on Project Settings' Language tab, "Localise text lines in dialogue scenes", off
+  by default. While it's off, a text line in a scene where characters speak is action: a direction for whoever
+  stages the scene. It isn't translated or shown to the player. The writing surface sets it apart in a muted
+  italic, Play shows it as a direction that takes only its pause, the report counts it apart from the lines the
+  player reads, and the Localisation dialog says how many text lines an export left out as action, and why, and
+  lists any that have dropped out of the loc files or come into them. A project whose players see that text should
+  turn the setting on.
+
+### Changed
+
+- Text lines are called text, not narration, throughout: narration is a spoken line with a narrator.
+
 ## [0.34.0] - 2026-10-18
 
 ### Changed

@@ -61,7 +61,7 @@
       for (;;) {
         const r = flow.advance();
         if (r.type === "line") add("line", `<span class="who">${esc(r.characterName ?? r.character ?? "")}</span> ${esc(r.text)}`);
-        else if (r.type === "text") add("text", esc(r.text));
+        else if (r.type === "text") { if (!r.action) add("text", esc(r.text)); } // action: staged, not shown
         else if (r.type === "gameEvent") add("gameEvent", `[game event ${esc(r.id)}]`);
         else if (r.type === "choice") { renderChoice(r); return; }
         else if (r.type === "end") { add("end", "- The End -"); return; }

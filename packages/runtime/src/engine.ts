@@ -129,10 +129,12 @@ const keys = {
   flowScene: (flowId: string, sceneId: string): string => `patter/flow/${esc(flowId)}/scene/${esc(sceneId)}`,
 };
 
-/** What `Flow.advance()` surfaces to the host at each stop. */
+/** What `Flow.advance()` surfaces to the host at each stop. A text step with `action: true` is action, a
+ *  direction for whoever stages the scene that the player never sees (a dialogue scene's text, unless the
+ *  project localises it): its text is the source in every locale. Absent = shown text. */
 export type StepResult =
   | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter: number; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
-  | { type: "text"; id: string; text: string; padAfter: number; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
+  | { type: "text"; id: string; text: string; padAfter: number; action?: true; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "choice"; groupId: string; options: ChoiceOption[] }
   | { type: "end" };
@@ -837,7 +839,7 @@ export class Engine {
   /**
    * Turn closed captions on/off LIVE (#214). When OFF, subsequent dialogue lines have their caption
    * cues (`[sigh]` etc., between the project's delimiters) and the surrounding whitespace stripped;
-   * narration, choice prompts, and everything else are untouched. Like setLocale this is a presentation
+   * text, choice prompts, and everything else are untouched. Like setLocale this is a presentation
    * toggle - it reaches every open flow at once and isn't part of save state; already-emitted text is
    * not retro-edited. An IDs-only game applies the same rule itself via `flow.stripCaptions`.
    */
@@ -2600,7 +2602,7 @@ export class Flow {
       case "gameEvent":
         return { type: "gameEvent", id: beat.id, gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags };
       case "text":
-        return { type: "text", id: beat.id, text: this.interpolate(this.resolveString(beat.id)), padAfter: this.padOf(beat.id), gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags };
+        return { type: "text", id: beat.id, text: this.interpolate(this.resolveString(beat.id)), padAfter: this.padOf(beat.id), ...(beat.action ? { action: true as const } : {}), gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags };
       case "line": {
         const raw = this.resolveString(beat.id);
         // Closed captions (#214) apply to DIALOGUE lines only: strip cues when captions are off. Two ways a

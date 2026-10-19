@@ -37,6 +37,7 @@
     ],
     "default": "en",
   },
+  "localiseDialogueText": true,
   "project": {
     "id": "proj_sa3v44hd",
     "name": "Patter: Interactive Tour",

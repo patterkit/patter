@@ -67,7 +67,7 @@ export function runResolve(loaded: LoadedProject, query: string): ResolveEntry[]
 
 /**
  * The editor's MAIN search (spec §6): content-oriented, the everyday "go to a thing" path. Matches a
- * query against **Game IDs, scene / block titles, and dialogue / narration / choice text**, with the
+ * query against **Game IDs, scene / block titles, and dialogue / text / choice text**, with the
  * "Go to ID" power-search folded in: paste an opaque id and the node it names is found. Ranking: title /
  * Game-ID, then dialogue / text content, then raw id.
  */

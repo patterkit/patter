@@ -60,6 +60,10 @@ silenced by closed captions keeps its pause.
 When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects. `get_outline()` and `get_beat_sequence()`
 give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the beat sets its own.
 
+A `"text"` step with `action: true` is action: a direction for whoever stages the scene, never shown to the
+player. It's a dialogue scene's text when the project doesn't localise it, and its text is the source in
+every locale. The key is absent on shown text, and a replayed prompt is never action.
+
 To show a line again that your game kept by id (after a load, or a language switch), call
 `flow.step_for(beat_id)`. It gives the step `advance()` would give for that beat right now, built the same
 way: the text in the active locale, interpolated against the flow's values, closed captions applied, and the

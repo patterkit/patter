@@ -63,7 +63,7 @@ Defaults apply even if you never open the tab: `[` / `]` and an `SFX` character.
 
 ## What the runtime does when captions are off
 
-For each **dialogue line** (it never touches narration, choice text, or anything else):
+For each **dialogue line** (it never touches text beats, choice text, or anything else):
 
 1. If the line is spoken by the **caption character**, the whole line is removed.
 2. Otherwise every `open…close` cue is removed, and the surrounding whitespace is collapsed:

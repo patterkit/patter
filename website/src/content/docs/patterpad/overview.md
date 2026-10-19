@@ -37,7 +37,7 @@ choose. **Help ▸ Open an Example** reaches them from inside a project too.
 
 **File ▸ New Project…** (`⌘N` / `Ctrl+N`) shows the kits you can start from, with the
 one you pick described on the right: what you get, and what pressing Play shows. Today
-there's one, the **Starter project**: a scene called `Start` with one line of narration,
+there's one, the **Starter project**: a scene called `Start` with one line of text,
 so the project plays the moment it opens. Under the description you fill in:
 
 - **Project name**: shows a live preview of the `<name>.patter` folder you'll get.

@@ -98,6 +98,7 @@ namespace patter
         bool hasCharacter = false, hasDirection = false; // set, even to "" (absent = unset): a "" is a value
         bool hasQualifier = false; std::string qualifier; // speaker qualifier gameId (`vo`), line only
         bool hasPadAfter = false; double padAfter = 0;    // the pause after it, in seconds (line / text only)
+        bool action = false;                            // a snippet's text beat that is action (bundle only)
         std::shared_ptr<GameData> gameData;             // null = none
         NodeExtensions extensions;                      // Patter extension values, raw; empty = none
         std::vector<std::string> tags;                  // author tags (#215)
