@@ -21,8 +21,10 @@
 // (canonical bytes).
 //
 // EXTENSION data shards (`.patterextension`) merge by the extension's
-// manifest, through `@wildwinter/toolkit/extensions`' type-driven merge. The
-// hand-written mergers below stay (family parity item 6, moving them onto that
+// manifest, through `@wildwinter/toolkit/extensions`' type-driven merge, and
+// the pieces both families share go through the same engine: comment threads,
+// declaration lists in their authored order, and line tags as a set (family
+// parity items 3, 4, and 5). The rest of the hand-written mergers below stay (family parity item 6, moving them onto that
 // engine's `mergeTree`, is still open): the flow merge's ordered-list weave and
 // move conflicts, and the authoring merge's edit-clock last-writer-wins, are
 // behaviours the strategy table has no words for yet.
@@ -30,8 +32,8 @@
 
 import { canonicalStringify, parseSource } from "@patterkit/core";
 import { DEFAULT_QUALIFIERS } from "@patterkit/model";
-import { markUnresolved, mergeExtensionData, unresolvedProblems, withoutMark } from "@wildwinter/toolkit/extensions";
-import type { Conflict as ToolkitConflict, Manifest } from "@wildwinter/toolkit/extensions";
+import { ATOMIC, COMMENTS, SET, keyedBy, mapOf, markUnresolved, mergeExtensionData, mergeTree, objectOf, unresolvedProblems, withoutMark } from "@wildwinter/toolkit/extensions";
+import type { Conflict as ToolkitConflict, Manifest, Strategy } from "@wildwinter/toolkit/extensions";
 
 export type MergeFileType = "flow" | "loc" | "authoring" | "project" | "extension";
 
@@ -217,6 +219,14 @@ function setIf(obj: Obj, key: string, val: Obj | unknown[]): void {
   if (Array.isArray(val) ? val.length > 0 : Object.keys(val).length > 0) obj[key] = val;
 }
 
+/** Merge one value by a strategy both families share (`@wildwinter/toolkit/extensions`), collecting its
+ *  clashes here under `path`. A clash the shared merge files at its root takes `id`. */
+function shared(strategy: Strategy, base: unknown, ours: unknown, theirs: unknown, id: string, path: string, conflicts: Conflict[]): unknown {
+  const r = mergeTree(strategy, base, ours, theirs, { equal: eq });
+  for (const c of r.conflicts) conflicts.push({ ...c, id: c.id || id, path: `${path}${c.path}` });
+  return r.merged;
+}
+
 // --- Locale (`.patterloc`) ---------------------------------------------------
 
 function mergeLoc(base: Obj, ours: Obj, theirs: Obj): MergeResult {
@@ -237,8 +247,8 @@ function mergeAuthoring(base: Obj, ours: Obj, theirs: Obj): MergeResult {
   const merged: Obj = {};
   merged.schema = merge3(base.schema, ours.schema, theirs.schema, "", "schema", conflicts) ?? ours.schema;
 
-  // Comments: append-only union by id (immutable records) - never conflicts.
-  setIf(merged, "comments", mergeComments(asArr(base.comments), asArr(ours.comments), asArr(theirs.comments)));
+  // Comments: threads merged message by message, by the rule both families share (family parity item 5).
+  setIf(merged, "comments", shared(COMMENTS, asArr(base.comments), asArr(ours.comments), asArr(theirs.comments), "", "comments", conflicts) as unknown[]);
 
   // Edits merge first: it is the clock the status LWW reads. Deterministic.
   const edits = mergeEdits(asMap(base.edits), asMap(ours.edits), asMap(theirs.edits));
@@ -296,62 +306,6 @@ function mergeById(base: unknown[], ours: unknown[], theirs: unknown[], path: st
   return Object.values(merged).sort((a, b) => String(asMap(a).ts ?? "").localeCompare(String(asMap(b).ts ?? "")));
 }
 
-/**
- * Merge comment threads by id. A thread is not immutable: replies are appended, a message is deleted as a
- * tombstone (body emptied, `deleted` set), the thread is resolved and reopened, and it goes from the file
- * once every message is deleted. Taking the first copy seen, as this once did, kept BASE's copy of every
- * thread, so a reply on one branch and a resolve on the other both vanished without a conflict.
- *
- * Per thread: the messages are the union of every side's, keyed by author and timestamp, a message either
- * side deleted stays deleted, and a thread one side removed counts as that side deleting the messages it
- * had; `resolved` takes whichever side changed it from base; the thread goes when nothing readable is
- * left, by the same rule the editor applies.
- */
-function mergeComments(base: unknown[], ours: unknown[], theirs: unknown[]): unknown[] {
-  const index = (arr: unknown[]): Map<string, Obj> => {
-    const m = new Map<string, Obj>();
-    for (const c of arr) if (isObj(c) && typeof c.id === "string") m.set(c.id, c);
-    return m;
-  };
-  const b = index(base), o = index(ours), t = index(theirs);
-  const msgKey = (m: Obj): string => `${String(m.author ?? "")}|${String(m.ts ?? "")}`;
-  const out: Obj[] = [];
-  for (const id of new Set([...b.keys(), ...o.keys(), ...t.keys()])) {
-    const bc = b.get(id), oc = o.get(id), tc = t.get(id);
-    const sides = [oc, tc].filter((c): c is Obj => c !== undefined);
-    if (sides.length === 0) continue; // both removed it
-    // A comment with no thread (the shape before threads) has nothing to merge inside it.
-    if (![bc, oc, tc].some((c) => Array.isArray(c?.messages))) { out.push((oc ?? tc)!); continue; }
-    // A side that had the thread in base and no longer has it deleted every message base held.
-    const deletedBy = new Set<string>();
-    for (const c of [oc, tc]) {
-      if (c === undefined && bc) for (const m of asArr(bc.messages)) if (isObj(m)) deletedBy.add(msgKey(m));
-    }
-    const messages = new Map<string, Obj>();
-    for (const c of [bc, ...sides]) {
-      for (const m of asArr(c?.messages)) {
-        if (!isObj(m)) continue;
-        const key = msgKey(m);
-        const seen = messages.get(key);
-        // A tombstone wins over the live copy, wherever it came from.
-        if (!seen || (m.deleted === true && seen.deleted !== true)) messages.set(key, m);
-      }
-    }
-    for (const key of deletedBy) {
-      const m = messages.get(key);
-      if (m && m.deleted !== true) messages.set(key, { ...m, body: "", deleted: true });
-    }
-    const merged = [...messages.values()].sort((x, y) => String(x.ts ?? "").localeCompare(String(y.ts ?? "")));
-    if (merged.length === 0 || merged.every((m) => m.deleted === true)) continue;
-    const was = bc?.resolved === true;
-    const oursSays = oc ? oc.resolved === true : was, theirsSays = tc ? tc.resolved === true : was;
-    const resolved = oursSays !== was ? oursSays : theirsSays;
-    const { resolved: _r, messages: _m, ...rest } = (oc ?? tc)!;
-    out.push({ ...rest, ...(resolved ? { resolved: true } : {}), messages: merged });
-  }
-  return out.sort((x, y) => String(asArr(x.messages).map(asMap)[0]?.ts ?? x.ts ?? "").localeCompare(String(asArr(y.messages).map(asMap)[0]?.ts ?? y.ts ?? "")));
-}
-
 function lastWriterWins(oursEdits: Obj, theirsEdits: Obj): Resolver {
   return (id, _b, o, t) => {
     const om = (asMap(oursEdits[id]).modifiedAt), tm = (asMap(theirsEdits[id]).modifiedAt);
@@ -389,35 +343,25 @@ function mergeEditRecord(o: Obj, t: Obj): Obj {
   return merged;
 }
 
-/** Merge a `name`-keyed array (properties / cast): per-name 3-way, sorted by name. `resolve` may settle an
- *  entry both sides changed differently. */
-function mergeKeyedByName(base: unknown[], ours: unknown[], theirs: unknown[], path: string, conflicts: Conflict[], resolve?: (path: string, conflicts: Conflict[]) => Resolver): unknown[] {
-  const byName = (arr: unknown[]): Obj => {
-    const m: Obj = {};
-    for (const p of arr) if (isObj(p) && typeof p.name === "string") m[p.name] = p;
-    return m;
-  };
-  const merged = mergeMap(byName(base), byName(ours), byName(theirs), path, conflicts, resolve?.(path, conflicts));
-  return Object.keys(merged).sort().map((name) => merged[name]);
-}
+/**
+ * The declaration lists (properties, cast, each node type's gameData fields): keyed by `name`, 3-way per
+ * entry, and kept in the author's order, since the editor's lists offer Move up and Move down (family parity
+ * item 4). The side that reordered the entries both kept wins; both reordering differently is a clash that
+ * keeps ours; the other side's additions go in after the entry they followed there.
+ */
+const DECLS = keyedBy("name", ATOMIC, { order: "preserve" });
 
-/** A cast member both sides changed differently, merged field by field, so one side's display name and the
- *  other's notes both land. Its own labels with qualifiers (`qualifierLabels`) merge per qualifier, so two
- *  sides each labelling a pair both land, and only the same pair labelled two ways is a conflict. A member one
- *  side removed and the other changed stays a conflict over the whole member. */
-function mergeCastMember(path: string, conflicts: Conflict[]): Resolver {
-  return (name, b, o, t) => {
-    if (!isObj(o) || !isObj(t)) return { resolved: false, kind: deletedKind(b, o, t) };
-    const base = asMap(b);
-    const out: Obj = {};
-    for (const f of new Set([...Object.keys(base), ...Object.keys(o), ...Object.keys(t)])) {
-      const v = f === "qualifierLabels"
-        ? mergeMap(asMap(base[f]), asMap(o[f]), asMap(t[f]), `${path}.${name}.${f}`, conflicts)
-        : merge3(base[f], o[f], t[f], name, `${path}.${name}.${f}`, conflicts);
-      if (f === "qualifierLabels" ? Object.keys(v as Obj).length > 0 : v !== undefined) out[f] = v;
-    }
-    return { resolved: true, value: out };
-  };
+/** A cast member both sides changed merges field by field, so one side's display name and the other's notes
+ *  both land, and its own labels with qualifiers (`qualifierLabels`) merge per qualifier, so only the same
+ *  pair labelled two ways is a conflict. A member one side removed and the other changed is a conflict over
+ *  the whole member. */
+const CAST = keyedBy("name", objectOf({ qualifierLabels: mapOf(ATOMIC) }), { order: "preserve" });
+
+/** A list absent on one side is an empty one, so a side that removed every entry still merges per entry. */
+function mergeDecls(strategy: Strategy, base: unknown, ours: unknown, theirs: unknown, path: string, conflicts: Conflict[]): unknown[] {
+  const out = shared(strategy, asArr(base), asArr(ours), asArr(theirs), "", path, conflicts) as unknown[];
+  // Storage is sparse: a member whose labels all went carries none.
+  return out.map((m) => (isObj(m) && isObj(m.qualifierLabels) && Object.keys(m.qualifierLabels).length === 0 ? (({ qualifierLabels: _q, ...rest }) => rest)(m) : m));
 }
 
 // --- Project (`.patterproj`) -------------------------------------------------
@@ -430,10 +374,10 @@ function mergeProject(base: Obj, ours: Obj, theirs: Obj): MergeResult {
   const merged: Obj = {};
   for (const k of new Set([...Object.keys(base), ...Object.keys(ours), ...Object.keys(theirs)])) {
     if (k === "properties") {
-      const v = mergeKeyedByName(asArr(base[k]), asArr(ours[k]), asArr(theirs[k]), k, conflicts);
+      const v = mergeDecls(DECLS, base[k], ours[k], theirs[k], k, conflicts);
       if (v.length > 0) merged[k] = v;
     } else if (k === "cast") {
-      const v = mergeKeyedByName(asArr(base[k]), asArr(ours[k]), asArr(theirs[k]), k, conflicts, mergeCastMember);
+      const v = mergeDecls(CAST, base[k], ours[k], theirs[k], k, conflicts);
       if (v.length > 0) merged[k] = v;
     } else if (k === "gameDataFields") {
       // A per-node-type record of name-keyed field arrays; merge each node type's array independently.
@@ -485,11 +429,11 @@ function mergeProjectExtensions(b: Obj, o: Obj, t: Obj, conflicts: Conflict[]): 
 }
 
 /** gameDataFields: a record of node-type -> name-keyed field array. Merge each node type's array on its
- *  own (a field is identified by its `name` within its node type), 3-way like properties / cast. */
+ *  own (a field is identified by its `name` within its node type), as properties and cast are. */
 function mergeGameDataFields(b: Obj, o: Obj, t: Obj, conflicts: Conflict[]): Obj {
   const out: Obj = {};
   for (const kind of new Set([...Object.keys(b), ...Object.keys(o), ...Object.keys(t)])) {
-    const v = mergeKeyedByName(asArr(b[kind]), asArr(o[kind]), asArr(t[kind]), `gameDataFields.${kind}`, conflicts);
+    const v = mergeDecls(DECLS, b[kind], o[kind], t[kind], `gameDataFields.${kind}`, conflicts);
     if (v.length > 0) out[kind] = v;
   }
   return out;
@@ -591,10 +535,24 @@ function mergeFields(b: Obj, o: Obj, t: Obj, id: string, path: string, conflicts
   for (const k of new Set([...Object.keys(b), ...Object.keys(o), ...Object.keys(t)])) {
     const v = k === "gameData" && [b[k], o[k], t[k]].every((x) => x === undefined || isObj(x))
       ? mergeGameData(asMap(b[k]), asMap(o[k]), asMap(t[k]), id, `${path}.${k}`, conflicts)
-      : merge3(b[k], o[k], t[k], id, `${path}.${k}`, conflicts);
+      : k === "tags" && [b[k], o[k], t[k]].every((x) => x === undefined || Array.isArray(x))
+        ? mergeTags(b[k], o[k], t[k], id, `${path}.${k}`, conflicts)
+        : merge3(b[k], o[k], t[k], id, `${path}.${k}`, conflicts);
     if (v !== undefined) out[k] = v;
   }
   return out;
+}
+
+/**
+ * A node's tags as a set (family parity item 3): one writer adding `loud` and another `sad` both land, and a
+ * tag either side removed stays removed, so tags never clash. A list only one side changed keeps that side's
+ * order; one both changed comes back sorted, by the rule both families share. An absent list is an empty one.
+ */
+function mergeTags(b: unknown, o: unknown, t: unknown, id: string, path: string, conflicts: Conflict[]): unknown {
+  if (eq(o, t) || eq(b, t)) return o;
+  if (eq(b, o)) return t;
+  const v = shared(SET, asArr(b), asArr(o), asArr(t), id, path, conflicts) as unknown[];
+  return v.length > 0 ? v : undefined;
 }
 
 /**

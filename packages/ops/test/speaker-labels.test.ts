@@ -178,14 +178,14 @@ describe("merging the project file", () => {
     const r = runMerge(base,
       proj({ cast: [{ name: "PLAYER", qualifierLabels: { vo: "Your thoughts" }, actor: "Jo" }] }),
       proj({ cast: [{ name: "PLAYER", qualifierLabels: { vo: "Inner voice" } }] }));
-    expect(paths(r)).toEqual(["cast.PLAYER.qualifierLabels.vo:both-changed"]);
+    expect(paths(r)).toEqual(["cast[PLAYER].qualifierLabels.vo:added-both"]);
     expect((r.merged as any).cast[0].actor).toBe("Jo");
   });
 
   it("a member one side removed and the other labelled stays a conflict over the member", () => {
     const base = proj({ cast: [{ name: "PLAYER" }] });
     const r = runMerge(base, proj({ cast: [] }), proj({ cast: [{ name: "PLAYER", qualifierLabels: { vo: "Your thoughts" } }] }));
-    expect(paths(r)).toEqual(["cast.PLAYER:delete-vs-edit"]);
+    expect(paths(r)).toEqual(["cast[PLAYER]:delete-vs-edit"]);
   });
 
   it("the speaker pattern merges as one value: one side's change lands, two different ones conflict", () => {

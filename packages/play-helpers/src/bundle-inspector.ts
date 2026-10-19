@@ -87,8 +87,8 @@ function row(doc: Document, key: string, value: string, valueClass = "pp-bundle-
   return r;
 }
 
-/** A property line: the name, its type, and whether the HOST must supply a value.
- *  "no default" is the part an integrator is actually scanning for. */
+/** A property line: the name, and its type. A bundle compiled since 2026-10-19 resolves every default, host
+ *  scopes' included, so "no default" shows only on an older bundle, where it meant the game supplied it. */
 function propertyRow(doc: Document, p: PropertySummary): HTMLElement {
   const r = el(doc, "div", "pp-bundle-row");
   r.append(el(doc, "span", "pp-bundle-key pp-bundle-addr", p.name));

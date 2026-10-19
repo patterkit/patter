@@ -110,13 +110,21 @@ describe("checking another tool's scopes from the game's folder", () => {
 describe("the project's host scopes against the game's folder", () => {
   const worldCopy: HostScopeRegistry = { version: 1, scopes: [{ token: "world", declarations: [{ name: "threat", type: "number", default: 3 }] }] };
 
-  it("changes nothing without a folder: the same object, the same bundle hash", () => {
+  it("changes nothing without a folder: the same registry, the same bundle hash", () => {
     const p = project({ scopeRegistry: worldCopy });
     expect(projectScopes(p).host).toBe(worldCopy);
     const alone = exportBundle({ project: p, scenes: [scene("@world.threat > 1")] });
     const withNothing = exportBundle({ project: p, scenes: [scene("@world.threat > 1")], gameScopes: undefined });
     expect(withNothing.content.hash).toBe(alone.content.hash);
-    expect(alone.scopeRegistry).toBe(worldCopy);
+    expect(alone.scopeRegistry).toEqual(worldCopy); // every declaration here already has its default
+  });
+
+  // Ruled 2026-10-19: a host scope's declarations ship with their defaults resolved, as every other one does.
+  it("ships a host scope's declarations with their defaults resolved, and hashes the source as written", () => {
+    const bare: HostScopeRegistry = { version: 1, scopes: [{ token: "world", declarations: [{ name: "era", type: "string" }, { name: "threat", type: "number", default: 3 }] }, { token: "story" }] };
+    const b = exportBundle({ project: project({ scopeRegistry: bare }), scenes: [scene("@world.threat > 1")] });
+    expect(b.scopeRegistry).toEqual({ version: 1, scopes: [{ token: "world", declarations: [{ name: "era", type: "string", default: "" }, { name: "threat", type: "number", default: 3 }] }, { token: "story" }] });
+    expect(bare.scopes[0]!.declarations![0]).toEqual({ name: "era", type: "string" });
   });
 
   it("says nothing when the project's copy matches the game's file", () => {

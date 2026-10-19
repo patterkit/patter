@@ -20,7 +20,7 @@ const project: ProjectFile = {
   scopeRegistry: { version: 1, scopes: [
     { token: "world", declarations: [
       { name: "isnight", type: "boolean", default: true },
-      { name: "weather", type: "string" },          // no default: the game MUST supply it
+      { name: "weather", type: "string" },          // no default in source: the bundle resolves it
     ] },
     { token: "game" },                               // opaque
   ] },
@@ -55,12 +55,12 @@ describe("the bundle inspector panel", () => {
     panel.destroy();
   });
 
-  it("names what the host must supply, and marks a property with no default", () => {
+  it("names what the host supplies, every default resolved", () => {
     const panel = mount();
     const host = sectionText(panel.el, "hostScopes");
     expect(host).toContain("@world");
     expect(host).toContain("weather");
-    expect(host).toContain("no default");     // the row an integrator is scanning for
+    expect(host).not.toContain("no default"); // ruled 2026-10-19: host scopes resolve their defaults too
     panel.destroy();
   });
 

@@ -18883,7 +18883,8 @@
                     "opening",
                     "rising",
                     "end"
-                  ]
+                  ],
+                  "default": "opening"
                 }
               ]
             }
@@ -19138,7 +19139,8 @@
                     "opening",
                     "rising",
                     "end"
-                  ]
+                  ],
+                  "default": "opening"
                 }
               ]
             }
@@ -19312,7 +19314,8 @@
                     "arrival",
                     "act-1",
                     "act-2"
-                  ]
+                  ],
+                  "default": "arrival"
                 }
               ]
             }
@@ -26653,7 +26656,8 @@
                 },
                 {
                   "name": "era",
-                  "type": "string"
+                  "type": "string",
+                  "default": ""
                 }
               ]
             },
@@ -26883,7 +26887,8 @@
               {
                 "name": "era",
                 "type": "string",
-                "hasDefault": false,
+                "hasDefault": true,
+                "default": "",
                 "shared": true
               }
             ]

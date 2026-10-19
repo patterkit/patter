@@ -189,8 +189,9 @@ function externalScopesIn(scenes: Record<string, CompiledScene>, external: Reado
  * the kernel's `defaultFor` (false, 0, "", the first enum value, no flags, the first stage). A default is
  * optional in source and resolved here, for properties, scene properties and gameData fields alike (the family's
  * rule, ruled 2026-10-18), so a host always reads one and keeps no defaults table of its own. Only the bundle's
- * own copy is resolved: the content hashes stay over the source as written. A host scope's declarations are not
- * the story's to resolve: the game supplies those values.
+ * own copy is resolved: the content hashes stay over the source as written. A host scope's declarations resolve
+ * too (ruled 2026-10-19, as Storylets resolves its `@world`): a bound resolver still supplies the game's values,
+ * and the default is only the fallback the runtime self-backs with.
  */
 function resolved<D extends { type: string; default?: ScalarValue; values?: string[]; stages?: string[] }>(decls: D[]): D[];
 function resolved<D extends { type: string; default?: ScalarValue; values?: string[]; stages?: string[] }>(decls: D[] | undefined): D[] | undefined;
@@ -325,9 +326,10 @@ export function exportBundle(input: ExportInput): Bundle {
     ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
 
     properties: resolved(project.properties),
-    // A host scope's declarations ship as written: there, "no default" is the game's to supply, and saying
-    // so is what an integrator reads the bundle for.
-    scopeRegistry: hostScopes,
+    scopeRegistry: hostScopes && {
+      ...hostScopes,
+      scopes: hostScopes.scopes.map((s) => (s.declarations ? { ...s, declarations: resolved(s.declarations) } : s)),
+    },
     gameDataFields: project.gameDataFields && Object.fromEntries(
       Object.entries(project.gameDataFields).map(([kind, fields]) => [kind, resolved(fields)]),
     ) as typeof project.gameDataFields,

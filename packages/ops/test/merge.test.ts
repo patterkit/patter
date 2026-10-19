@@ -85,7 +85,7 @@ describe("locale (.patterloc) merge", () => {
 });
 
 describe("authoring (.patterx) merge", () => {
-  it("comments union by id (immutable, append-only) - never conflicts", () => {
+  it("comments from before threads union by id", () => {
     const r = runMerge(
       authoring({ comments: [{ id: "c0", ts: "2026-01-01", body: "base" }] }),
       authoring({ comments: [{ id: "c0", ts: "2026-01-01", body: "base" }, { id: "c1", ts: "2026-02-01", body: "ours" }] }),
@@ -121,6 +121,26 @@ describe("authoring (.patterx) merge", () => {
     );
     expect(threadOf(r).messages.map((m: Obj) => m.body)).toEqual(["Hmm", "theirs", "ours"]);
     expect(threadOf(r).resolved).toBeUndefined();
+  });
+
+  // Family parity item 5: the shared rule merges each message, and each of a thread's own fields, three ways.
+  it("comment threads keep one side's edit to a message, and the other side's move of the anchor", () => {
+    const a = msg("Ann", "2026-01-01T00:00:00Z", "Is this right?");
+    const r = runMerge(
+      authoring({ comments: [thread([a])] }),
+      authoring({ comments: [thread([{ ...a, body: "Is this line right?" }])] }),
+      authoring({ comments: [thread([a], { anchor: "L2" })] }),
+    );
+    expect(r.conflicts).toEqual([]);
+    expect(threadOf(r).messages[0].body).toBe("Is this line right?");
+    expect(threadOf(r).anchor).toBe("L2");
+    const both = runMerge(
+      authoring({ comments: [thread([a])] }),
+      authoring({ comments: [thread([{ ...a, body: "ours" }])] }),
+      authoring({ comments: [thread([{ ...a, body: "theirs" }])] }),
+    );
+    expect(paths(both)).toEqual(["comments[c0].messages[Ann|2026-01-01T00:00:00Z]:both-changed"]);
+    expect(threadOf(both).messages[0].body).toBe("ours");
   });
 
   it("a message deleted on one side stays deleted, and a thread deleted whole goes unless the other side replied", () => {
@@ -262,10 +282,29 @@ describe("project (.patterproj) merge", () => {
     const add = runMerge(base, proj({ properties: [{ name: "hp", type: "number" }, { name: "gold", type: "number" }] }),
       proj({ properties: [{ name: "hp", type: "number" }, { name: "flag", type: "boolean" }] }));
     expect(add.conflicts).toEqual([]);
-    expect((add.merged as any).properties.map((p: any) => p.name)).toEqual(["flag", "gold", "hp"]);
+    // Theirs' addition goes in after the entry it followed there.
+    expect((add.merged as any).properties.map((p: any) => p.name)).toEqual(["hp", "flag", "gold"]);
 
     const conflict = runMerge(base, proj({ properties: [{ name: "hp", type: "string" }] }), proj({ properties: [{ name: "hp", type: "boolean" }] }));
-    expect(paths(conflict)).toEqual(["properties.hp:both-changed"]);
+    expect(paths(conflict)).toEqual(["properties[hp]:both-changed"]);
+  });
+
+  // Family parity item 4: the editor's lists offer Move up and Move down, so a merge keeps the author's order.
+  it("declaration lists keep the author's order: one side's reorder lands, two different reorders clash", () => {
+    const p = (...names: string[]): Obj[] => names.map((name) => ({ name, type: "number" }));
+    const names = (r: any, k = "properties"): string[] => r.merged[k].map((x: any) => x.name);
+    const base = proj({ properties: p("hp", "gold", "xp") });
+    const moved = runMerge(base, proj({ properties: p("xp", "hp", "gold") }), proj({ properties: p("hp", "gold", "xp", "aa") }));
+    expect(moved.conflicts).toEqual([]);
+    expect(names(moved)).toEqual(["xp", "aa", "hp", "gold"]); // "aa" followed "xp" in theirs
+    const clash = runMerge(base, proj({ properties: p("xp", "hp", "gold") }), proj({ properties: p("gold", "hp", "xp") }));
+    expect(paths(clash)).toEqual(["properties:order:both-changed"]);
+    expect(names(clash)).toEqual(["xp", "hp", "gold"]);
+    const cast = runMerge(proj({ cast: [{ name: "B" }, { name: "A" }] }), proj({ cast: [{ name: "B" }, { name: "A" }] }), proj({ cast: [{ name: "A" }, { name: "B" }] }));
+    expect(names(cast, "cast")).toEqual(["A", "B"]);
+    const fields = (...n: string[]) => proj({ gameDataFields: { snippet: n.map((name) => ({ name, type: "text" })) } });
+    const gd = runMerge(fields("mood", "act"), fields("mood", "act"), fields("mood", "act", "beat"));
+    expect((gd.merged as any).gameDataFields.snippet.map((f: any) => f.name)).toEqual(["mood", "act", "beat"]);
   });
 
   it("qualifiers keyed by gameId: each side's addition kept, ours first; the same one changed both ways -> conflict", () => {
@@ -403,5 +442,24 @@ describe("flow merge: gameData per key", () => {
   it("drops a field one side removed, and the whole gameData when none is left", () => {
     expect(merged(runMerge(gd({ act: "arrival", mood: "calm" }), gd({ act: "arrival" }), gd({ act: "arrival", mood: "calm" })))).toEqual({ act: "arrival" });
     expect(merged(runMerge(gd({ act: "arrival" }), gd(), gd({ act: "arrival" })))).toBeUndefined();
+  });
+});
+
+// Family parity item 3: a line's tags are a set, as a Storylets card's are.
+describe("flow merge: tags as a set", () => {
+  const tg = (tags?: string[]): Obj => one([sn("s", tags ? { tags } : {})]);
+  const tags = (r: any): string[] | undefined => r.merged.scene.blocks[0].children[0].tags;
+
+  it("lands two writers' tags on one line, sorted, with no conflict", () => {
+    const r = runMerge(tg(["calm"]), tg(["calm", "loud"]), tg(["calm", "sad"]));
+    expect(r.conflicts).toEqual([]);
+    expect(tags(r)).toEqual(["calm", "loud", "sad"]);
+  });
+
+  it("respects a removal, keeps a one-sided list's order, and drops an empty list", () => {
+    expect(tags(runMerge(tg(["calm", "loud"]), tg(["loud"]), tg(["calm", "loud", "sad"])))).toEqual(["loud", "sad"]);
+    expect(tags(runMerge(tg(["calm"]), tg(["zed", "calm"]), tg(["calm"])))).toEqual(["zed", "calm"]);
+    expect(tags(runMerge(tg(["calm"]), tg(), tg(["calm", "sad"])))).toEqual(["sad"]);
+    expect(tags(runMerge(tg(["calm", "sad"]), tg(["sad"]), tg(["calm"])))).toBeUndefined();
   });
 });
