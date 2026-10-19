@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-10-19
+
 ### Added
 
 - **Pick fields for extensions.** An extension can declare a field whose value is one choice from a mix of
