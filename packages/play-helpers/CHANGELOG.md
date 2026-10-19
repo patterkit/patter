@@ -1,5 +1,11 @@
 # @patterkit/play-helpers
 
+## 0.9.5
+
+### Patch Changes
+
+- 00db6be: Uses `@patterkit/runtime` 0.33.0, the Patterplay 0.33.0 release.
+
 ## 0.9.4
 
 ### Patch Changes
