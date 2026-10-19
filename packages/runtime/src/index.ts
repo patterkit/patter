@@ -17,6 +17,9 @@ export { stageIndex, compareStages, nextStage } from "@wildwinter/expr";
 export type { Bundle } from "@patterkit/model";
 /** The built-in pause after a line, in seconds, when nothing in the project sets one (line padding). */
 export { DEFAULT_PAD_AFTER } from "@patterkit/model";
+// The one rule for a scene reference (its gameId first, then its internal id), for a host or tool that has
+// to land where the engine will without constructing one: the Storylet Engine's pairing check, say.
+export { resolveSceneRef, sceneAddressIndex } from "@patterkit/model";
 // The examiner row listProperties() returns, for the same reason: it is the shared kernel's
 // (@wildwinter/scoperegistry, the property implementation both product families use), and a
 // host typing a row should not have to depend on the kernel to name it.

@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Show Card in Storyletter names the scene by its address.** It named a scene whose internal id was a legal Game
+  ID by that id, but a card finds its scene by address first, so where that id was another scene's address the
+  card landed on the other scene. The address always lands on this one (family parity item 1).
+
 ## [0.35.0] - 2026-10-19
 
 ### Added

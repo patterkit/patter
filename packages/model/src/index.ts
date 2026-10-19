@@ -383,6 +383,29 @@ export function effectiveGameId(entity: { gameId?: string; name: string }): stri
   return g ? g : gameIdify(entity.name);
 }
 
+/** A bundle's scenes by their address (effective gameId), for `resolveSceneRef` to look up in. */
+export function sceneAddressIndex(scenes: Readonly<Record<string, { gameId?: string; name: string }>>): Map<string, string> {
+  const byAddress = new Map<string, string>();
+  for (const [id, scene] of Object.entries(scenes)) byAddress.set(effectiveGameId(scene), id);
+  return byAddress;
+}
+
+/**
+ * THE rule for resolving a scene reference to its internal id: its address (the effective gameId, the
+ * host-facing name, spec §6) first, then its internal id. Undefined when neither names a scene.
+ *
+ * One rule for the runtime's openFlow, goto and every engine lookup, and for every tool that has to land
+ * where the game will (the Storylet Engine's Board and pairing check, Patterpad's Show Card). Each used to
+ * keep a copy, and the copies tried the internal id first, so where one scene's id was another's gameId
+ * they picked a different scene from the one the game opened (family parity item 1). Pass `byAddress`
+ * (from `sceneAddressIndex`) to look up many references in one bundle without rebuilding it.
+ */
+export function resolveSceneRef(
+  scenes: Readonly<Record<string, { gameId?: string; name: string }>>, ref: string, byAddress?: ReadonlyMap<string, string>,
+): string | undefined {
+  return (byAddress ?? sceneAddressIndex(scenes)).get(ref) ?? (Object.hasOwn(scenes, ref) ? ref : undefined);
+}
+
 // ---------------------------------------------------------------------------
 // Project file (.patterproj) - spec §14, schema §6.
 // ---------------------------------------------------------------------------

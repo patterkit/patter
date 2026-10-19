@@ -19,7 +19,7 @@ import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./sce
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
 import { projectQualifiers, usedSpeakerPairs, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
 import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQualifiersInAuthoring, renameQualifiersInHandoff, renameQualifierLabels, moveQualifierKeys, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
-import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD, PROJECT_EXTENSION_STEM } from "@patterkit/model";
+import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD, PROJECT_EXTENSION_STEM } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
 import type { ReviewItem, ProjectStep, ProjectHistoryOutcome } from "../shared/api.js";
@@ -1921,13 +1921,13 @@ export function playCaptionsState(): boolean { return playCaptionsOn; }
  *  playthrough keeps its place; the persisted flag also seeds the next fresh run. */
 export function setPlayCaptions(on: boolean): void { playCaptionsOn = on; engine?.setClosedCaptions(on); }
 
-/** The name a storylet card pairs with this scene by (Show Card in Storyletter). A card finds its
- *  scene by internal id first, then address, as the runtime resolves a reference: so a scene whose id
- *  is itself a legal Game ID (a hand-written one) is named by its id, and any other by its address. */
+/** The name a storylet card pairs with this scene by (Show Card in Storyletter): its address. A card finds
+ *  its scene as the runtime resolves a reference (`resolveSceneRef`: the address first, then the internal
+ *  id), so the address always lands on this scene, where the internal id could land on another scene whose
+ *  address it is (family parity item 1). */
 export function cardNameFor(sceneId: string): string | undefined {
   const scene = loaded?.scenes.find((s) => s.id === sceneId);
-  if (!scene) return undefined;
-  return isValidGameId(scene.id) ? scene.id : effectiveGameId(scene);
+  return scene ? effectiveGameId(scene) : undefined;
 }
 
 /** The host-facing address a run starts from: `<scene>` or `<scene>.<block>` (effective Game IDs). */

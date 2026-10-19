@@ -33,6 +33,13 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **`resolveSceneRef` and `sceneAddressIndex`**, re-exported from the model: the one rule for a scene reference
+  (its address first, then its internal id) that openFlow, goto and every engine lookup already used, now one
+  function the engine calls and a tool can too. The Storylet Engine's pairing check and Patterpad's Show Card take
+  it, rather than copies that tried the internal id first (family parity item 1). Nothing plays differently.
+
 ## [0.31.0] - 2026-10-19
 
 ### Added

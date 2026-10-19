@@ -37,7 +37,7 @@ import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { defaultFor, PropertyBag } from "@wildwinter/scoperegistry";
 import type { LoadMisfit, LogMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
-import { walkNodes, effectiveGameId, castStringKey, qualifierStringKey, speakerLabelKey, formatSpeakerLabel, SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, DEFAULT_PAD_AFTER, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
+import { walkNodes, effectiveGameId, resolveSceneRef, castStringKey, qualifierStringKey, speakerLabelKey, formatSpeakerLabel, SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, DEFAULT_PAD_AFTER, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
 import { buildPadIndex, type BeatPad } from "./pads.js";
 import { SAVE_VERSION } from "@patterkit/model";
@@ -3009,13 +3009,13 @@ function selfBackedDecl(decl: HostScopeDecl, scopeWritable: boolean | undefined)
 /** Split a ref into scope + name against the registry's current tokens (`@scene` is always Patter's).
  *  Memoised per ref; the memo is dropped when the registry's set of scopes moves. */
 /**
- * The ONE rule for resolving a scene address, used by openFlow, goto, and every engine lookup: its gameId
- * (the host-facing address, spec §6) first, then its internal id. openFlow used to try the internal id
- * first and goto the gameId, so the two could land in different scenes when one scene's id was another's
- * gameId.
+ * The ONE rule for resolving a scene address, used by openFlow, goto, and every engine lookup: the model's
+ * `resolveSceneRef` (its gameId first, then its internal id), the same function every tool calls, over the
+ * index the engine built once. openFlow used to try the internal id first and goto the gameId, so the two
+ * could land in different scenes when one scene's id was another's gameId.
  */
 function resolveScene(host: FlowHost, ref: string): string | undefined {
-  return host.sceneGameIdToId.get(ref) ?? (host.bundle.scenes[ref] ? ref : undefined);
+  return resolveSceneRef(host.bundle.scenes, ref, host.sceneGameIdToId);
 }
 
 /** The one rule for a block address, always WITHIN a scene: its gameId there first, then the internal id

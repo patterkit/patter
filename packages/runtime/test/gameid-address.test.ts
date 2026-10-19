@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { Bundle, CompiledScene } from "@patterkit/model";
-import { Engine } from "../src/index.js";
+import { Engine, resolveSceneRef, sceneAddressIndex } from "../src/index.js";
 
 function bundle(scenes: CompiledScene[]): Bundle {
   return {
@@ -51,5 +51,34 @@ describe("runtime gameId addressing", () => {
     expect(eng.sceneAddress("scn_abc")).toBe("the-tavern");   // derived from the name
     expect(eng.blockAddress("blk_cellar")).toBe("the-cellar"); // pinned
     expect(eng.blockAddress("blk_intro")).toBe("intro");       // derived
+  });
+});
+
+// Family parity item 1: one exported rule, so a tool that has to land where the game will (the Storylet
+// Engine's pairing check, Show Card) cannot pick a different scene from the one openFlow opens.
+describe("resolveSceneRef: the one scene rule, exported", () => {
+  // Scene A's internal id is "harbour", which is also scene B's address.
+  const a: CompiledScene = { id: "harbour", type: "scene", name: "Docks",
+    blocks: [{ id: "blk_a", type: "block", name: "A", children: [{ id: "sn_a", type: "snippet", beats: [{ id: "l1", kind: "line" }] }] }] };
+  const b: CompiledScene = { id: "scn_b", type: "scene", name: "Harbour",
+    blocks: [{ id: "blk_b", type: "block", name: "B", children: [{ id: "sn_b", type: "snippet", beats: [{ id: "l2", kind: "line" }] }] }] };
+  const scenes = { [a.id]: a, [b.id]: b };
+
+  it("takes the address first: \"harbour\" is B's address, though it is A's id", () => {
+    expect(resolveSceneRef(scenes, "harbour")).toBe("scn_b");
+    expect(resolveSceneRef(scenes, "docks")).toBe("harbour");
+  });
+
+  it("falls back to the internal id, and is undefined for a name that is neither", () => {
+    expect(resolveSceneRef(scenes, "scn_b")).toBe("scn_b");
+    expect(resolveSceneRef(scenes, "nowhere")).toBeUndefined();
+    expect(resolveSceneRef(scenes, "toString")).toBeUndefined();   // not a key a plain object inherits
+  });
+
+  it("is the rule openFlow plays by, so a tool and the game land in the same scene", () => {
+    const eng = new Engine(bundle([a, b]));
+    const r = eng.openFlow("main", { scene: "harbour" }).advance();
+    expect(r.type === "line" && r.text).toBe("Cellar");   // l2: scene B's line
+    expect(resolveSceneRef(scenes, "harbour", sceneAddressIndex(scenes))).toBe("scn_b");
   });
 });
