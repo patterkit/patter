@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-10-19
+
 ### Changed
 
 - **Merges keep your order and your comments.** A merge (Merge Returned Patterpack, or the structured merge your
