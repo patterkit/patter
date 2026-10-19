@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-19
+
 ### Added
 
 - **Action text**: a text step can be action, `action: true` on the step (absent otherwise). It's a dialogue

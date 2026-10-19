@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-19
+
 ### Added
 
 - **Action text**: a text step can be action, a direction for whoever stages the scene that the player never

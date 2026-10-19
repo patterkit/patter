@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-19
+
 ### Added
 
 - **Action text**: a `"text"` step carries `"action": true` when the beat is action, a direction for whoever
