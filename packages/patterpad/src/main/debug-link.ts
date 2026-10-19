@@ -15,13 +15,17 @@
 //           comparing structure hashes, applies it, and re-hellos with the new build.
 
 //
+// The server itself (loopback, the Origin rule, one game at a time, the hello gate, the build judged, and
+// pushBundle) is the family's, app-shell's live-link (family parity item 14); this file is Patterpad's
+// protocol plugged into it.
+//
 // Which flow the editor follows (the most recent, or one picked in the editor, and the hand-over when the
 // followed flow closes) is shared/debug-follow.ts, which the browser preview's fake link drives too.
 
-import { WebSocketServer, type WebSocket } from "ws";
 import type { DebugStatus } from "../shared/api.js";
 import { createFlowFollower, type DebugFrame } from "../shared/debug-follow.js";
 import { isLocalOrigin } from "@wildwinter/app-shell/util";
+import { createLiveLinkServer } from "@wildwinter/app-shell/live-link";
 
 const DEFAULT_PORT = 4471;
 
@@ -47,7 +51,7 @@ export interface DebugServer {
   isOn(): boolean;
   /** Live bundle refresh: push a freshly compiled bundle to the connected game. No-op when nothing is
    *  connected / handshaken, or when the client already runs this exact build. The client applies it
-   *  and re-hellos with the new build, which updates the match/stale pill on its own. */
+   *  and re-hellos with the new build; until then the pill shows stale. */
   pushBundle(build: string, data: string): void;
 }
 
@@ -64,93 +68,59 @@ export interface DebugServerDeps {
 }
 
 export function createDebugServer(deps: DebugServerDeps): DebugServer {
-  const port = deps.port ?? DEFAULT_PORT;
-  let wss: WebSocketServer | null = null;
-  let client: WebSocket | null = null;
-  let connected: { project?: string; build: "match" | "stale" | "unknown" } | null = null;
-  let authed = false; // a hello must land before any frame is honoured (so we have the build/flow context)
-  let clientBuild: string | null = null; // the build the game reported (last hello) - gates pushBundle
+  // The status pushes only once a game has said hello: before that it is "listening", and nothing the
+  // follower shows has changed.
+  let pushStatus = (): void => {};
+  const follower = createFlowFollower({ onFrame: deps.onFrame, onChange: () => pushStatus() });
 
-  const status = (): DebugStatus => {
-    if (!wss) return { state: "off" };
-    if (!client || !connected) return { state: "listening", port };
-    return { state: "connected", port, project: connected.project, build: connected.build, ...follower.view() };
-  };
-  const push = (): void => deps.onStatus(status());
-  // Pushes only once handshaken: before that the status is "listening" and nothing it shows has changed.
-  const follower = createFlowFollower({ onFrame: deps.onFrame, onChange: () => { if (connected) push(); } });
-
-  const handleMessage = (raw: string): void => {
-    let msg: Record<string, unknown>;
-    try { msg = JSON.parse(raw); } catch { return; }
-    if (msg.t !== "hello" && !authed) return; // ignore everything until the handshake gives us the build/flows
-    switch (msg.t) {
-      case "hello": {
-        authed = true;
-        clientBuild = typeof msg.build === "string" ? msg.build : null;
-        const current = deps.currentBuildHash();
-        const build = current == null ? "unknown" : msg.build === current ? "match" : "stale";
-        connected = { project: typeof msg.project === "string" ? msg.project : undefined, build };
-        // The trail clears first, so a re-hello (after a live bundle refresh) that keeps a flow's last
-        // frame puts the playhead back on it.
-        deps.onReset();
-        follower.hello(Array.isArray(msg.flows) ? msg.flows.filter((f): f is string => typeof f === "string") : []);
-        break;
-      }
-      case "flowOpen": {
-        if (typeof msg.flow === "string") follower.flowOpen(msg.flow);
-        break;
-      }
-      case "flowClose": {
-        if (typeof msg.flow === "string") follower.flowClose(msg.flow);
-        break;
-      }
-      case "frame": {
-        if (typeof msg.flow !== "string") break;
-        follower.frame({
-          flow: msg.flow,
-          sceneId: typeof msg.sceneId === "string" ? msg.sceneId : null,
-          beatId: typeof msg.beatId === "string" ? msg.beatId : null,
-          type: typeof msg.type === "string" ? msg.type : "",
-          choiceId: typeof msg.choiceId === "string" ? msg.choiceId : undefined,
-        });
-        break;
-      }
-    }
-  };
+  const server = createLiveLinkServer({
+    port: deps.port ?? DEFAULT_PORT,
+    currentBuildHash: deps.currentBuildHash,
+    onStatus: deps.onStatus,
+    protocol: (link) => {
+      pushStatus = link.pushStatus;
+      return {
+        hello: ({ msg }) => {
+          // The trail clears first, so a re-hello (after a live bundle refresh) that keeps a flow's last
+          // frame puts the playhead back on it.
+          deps.onReset();
+          follower.hello(Array.isArray(msg.flows) ? msg.flows.filter((f): f is string => typeof f === "string") : []);
+        },
+        message: (msg) => {
+          switch (msg.t) {
+            case "flowOpen": {
+              if (typeof msg.flow === "string") follower.flowOpen(msg.flow);
+              break;
+            }
+            case "flowClose": {
+              if (typeof msg.flow === "string") follower.flowClose(msg.flow);
+              break;
+            }
+            case "frame": {
+              if (typeof msg.flow !== "string") break;
+              follower.frame({
+                flow: msg.flow,
+                sceneId: typeof msg.sceneId === "string" ? msg.sceneId : null,
+                beatId: typeof msg.beatId === "string" ? msg.beatId : null,
+                type: typeof msg.type === "string" ? msg.type : "",
+                choiceId: typeof msg.choiceId === "string" ? msg.choiceId : undefined,
+              });
+              break;
+            }
+          }
+        },
+        reset: () => follower.clear(),
+        describe: () => follower.view(),
+      };
+    },
+  });
 
   return {
-    isOn: (): boolean => wss !== null,
-    status,
+    isOn: () => server.isOn(),
+    status: () => server.status(),
     follow(flowId: string | null): void { follower.follow(flowId); },
-    pushBundle(build: string, data: string): void {
-      if (!client || !authed) return;       // nothing connected / handshaken
-      if (clientBuild === build) return;    // the game already runs this exact build
-      try { client.send(JSON.stringify({ t: "bundle", v: 1, build, data })); } catch { /* socket went away */ }
-    },
-    start(): void {
-      if (wss) return;
-      try {
-        // Bind to loopback only: only processes on this machine can reach it (no pairing token needed).
-        wss = new WebSocketServer({ host: "127.0.0.1", port, verifyClient: (info: { origin?: string }) => isLocalOrigin(info.origin) }, () => push()); // push "listening" once actually bound
-      } catch (e) { deps.onStatus({ state: "error", message: e instanceof Error ? e.message : String(e) }); wss = null; return; }
-      wss.on("error", (e) => { deps.onStatus({ state: "error", message: e instanceof Error ? e.message : String(e) }); });
-      wss.on("connection", (ws) => {
-        // One game at a time: a new connection replaces the old.
-        if (client) { try { client.close(); } catch { /* gone */ } }
-        client = ws; connected = null; authed = false; clientBuild = null; follower.clear();
-        ws.on("message", (data) => handleMessage(data.toString()));
-        ws.on("close", () => { if (client === ws) { client = null; connected = null; authed = false; clientBuild = null; follower.clear(); push(); } });
-        ws.on("error", () => { /* a flaky client shouldn't crash the editor */ });
-        push();
-      });
-    },
-    stop(): void {
-      try { client?.close(); } catch { /* gone */ }
-      client = null; connected = null; authed = false; clientBuild = null; follower.clear();
-      const s = wss; wss = null;
-      try { s?.close(); } catch { /* already closing */ }
-      push();
-    },
+    pushBundle: (build, data) => server.pushBundle(build, data),
+    start: () => server.start(),
+    stop: () => server.stop(),
   };
 }

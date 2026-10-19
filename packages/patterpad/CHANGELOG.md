@@ -22,6 +22,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   Replace button changes just that value. Other field types and a field's default are left alone. Storyletter's
   Replace covers its field values the same way (family parity item 16).
 
+### Changed
+
+- **One Live Link server for the family.** Patterpad's Live Link now runs on the same server as Storyletter's,
+  from the shared editor shell, with Patterpad's own handling of what the game sends plugged in (family parity
+  item 14). Two things change: after a save is pushed to the game, the chip shows a different build until the
+  game confirms it has the new one, and if the port is taken the link stays off, so the next click tries again.
+
 ## [0.36.0] - 2026-10-19
 
 ### Changed
