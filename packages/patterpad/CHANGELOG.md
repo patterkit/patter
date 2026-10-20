@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-10-20
+
 ### Added
 
 - **The Fields window, for a field too big for the inspector.** An extension field that holds a set of
