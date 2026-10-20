@@ -375,6 +375,8 @@ export interface BootState {
   identity: Identity | null;
   panes: PaneState;
   theme: ThemePrefs;
+  /** The fields window follows the selection (remembered; default on). */
+  fieldsFollow: boolean;
 }
 
 /** A property the condition editor offers (project global `@patter` + this scene's `@scene` props).
@@ -969,6 +971,67 @@ export interface PatterCoverageApi {
   onTheme(handler: (theme: ThemePrefs) => void): void;
 }
 
+/** One map of records on the shown node, as the FIELDS window draws it (Pattershot's brief, H1 to H4): the
+ *  field's declaration and value, and what the cells need from the project, sent as data because the
+ *  adapter's functions can't cross to another window. */
+export interface FieldsGrid {
+  extension: string;
+  extensionName: string;
+  field: string;
+  decl: ExtensionFieldDto;
+  value: unknown;
+  /** The sentence when somebody else holds the extension's data here, else null: the grid is read-only. */
+  locked: string | null;
+  /** The nodes the key and the cells offer, by kind. */
+  nodes: Record<string, Array<{ id: string; label: string }>>;
+  /** A held node the choices leave out, by kind then id: its name. */
+  labels: Record<string, Record<string, string>>;
+  /** The extension's project lists a pick offers, by name. */
+  lists: Record<string, string[]>;
+}
+
+/** What the FIELDS window shows: the node and its maps of records, or why there are none. */
+export interface FieldsWinState {
+  hasProject: boolean;
+  /** The node shown, or null with nothing selected (or the held node isn't open any more). */
+  node: { id: string; kind: string; label: string } | null;
+  /** The node can't be written (no id, or the scene is somebody else's). */
+  readOnly: boolean;
+  /** Why, when somebody else holds the scene ("Locked by bo. Read-only until they release it."), else "". */
+  readOnlyWhy: string;
+  grids: FieldsGrid[];
+  /** Where such fields are, for the window to say when it has none to show ("Select a line or text to edit
+   *  Performance here."); empty when the project's extensions have none. */
+  hint: string;
+}
+
+/** The FIELDS window's boot state: the last state the editor sent, and the window's own settings. */
+export interface FieldsWinInfo {
+  state: FieldsWinState;
+  pinned: boolean;
+  /** Following the editor's selection (remembered; default on). Off: it stays on its node. */
+  follow: boolean;
+  theme: ThemePrefs;
+}
+
+/** The detached FIELDS window's bridge (window.patterFields): a map of records edited as a grid, for the
+ *  node the editor has selected. Every edit goes to the editor, which applies it as an undoable step and
+ *  sends the new state back. */
+export interface PatterFieldsApi {
+  info(): Promise<FieldsWinInfo>;
+  /** Set one field of a node's extension entry (the whole map; undefined clears it). */
+  commit(id: string, extension: string, field: string, value: unknown): void;
+  /** Follow the editor's selection, or stay on the node shown. */
+  setFollow(on: boolean): void;
+  setPin(on: boolean): void;
+  close(): void;
+  onState(handler: (state: FieldsWinState) => void): void;
+  /** A different project opened or closed under the window. */
+  onProject(handler: () => void): void;
+  onPin(handler: (on: boolean) => void): void;
+  onTheme(handler: (theme: ThemePrefs) => void): void;
+}
+
 export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "not-in-project" | "spelling" | "game-scopes" | "extensions";
 
 /** A one-click remedy for a problem (spec §4). Extensible discriminated union.
@@ -1298,6 +1361,14 @@ export interface PatterApi {
   onReplaceApplied(handler: (announce: boolean) => void): void;
   /** Open (or focus) the detached COVERAGE results window (#159). */
   openCoverageWindow(): Promise<void>;
+  /** Open (or bring forward) the FIELDS window, where a map of records is edited as a grid. */
+  openFieldsWindow(): Promise<void>;
+  /** What the FIELDS window should show now: sent on every selection or document change. */
+  sendFieldsState(state: FieldsWinState): void;
+  /** The FIELDS window edited a field: apply it (an undoable step, as the inspector's edits are). */
+  onFieldsCommit(handler: (id: string, extension: string, field: string, value: unknown) => void): void;
+  /** The FIELDS window started or stopped following the selection: send the state for its node. */
+  onFieldsFollow(handler: (on: boolean) => void): void;
   /** A row was clicked in the coverage window: jump the editor to that beat (loadScene + reveal). */
   onCoverageNavigate(handler: (sceneId: string, beatId: string) => void): void;
   /** The coverage window's "World Properties…" button: open Project Settings ▸ World Properties. */
@@ -1377,5 +1448,7 @@ declare global {
     patterSearch?: PatterSearchApi;
     /** Present only in the detached coverage window. */
     patterCoverage?: PatterCoverageApi;
+    /** Present only in the detached fields window. */
+    patterFields?: PatterFieldsApi;
   }
 }

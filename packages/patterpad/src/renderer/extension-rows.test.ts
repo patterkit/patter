@@ -243,6 +243,39 @@ describe("the inspector's fold", () => {
   });
 });
 
+// Pattershot's brief, "a map of records edited in a helper window" (H3): with the fields window there, a map of
+// records is a summary and an Edit button in the inspector.
+describe("a map of records in the inspector", () => {
+  it("is a line per key with an Edit button that opens the fields window on the node", () => {
+    const opened: Array<[string, string]> = [];
+    const host = draw(handlersWith({ openFields: (kind, id) => { opened.push([kind, id]); } }),
+      { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: { ANNA: { expression: "frown", look: "at the door" }, BEN: {} } } } });
+    const row = host.querySelector<HTMLElement>(".insp-ext-summary")!;
+    expect(row.querySelector(".shell-fieldrow-label")?.textContent).toBe("perf");
+    expect([...row.querySelectorAll(".insp-ext-summary-line")].map((l) => l.textContent)).toEqual(["ANNA: frown, at the door", "BEN"]);
+    expect(row.querySelector(".shell-valuerow-key")).toBeNull();   // no grid in the column
+    row.querySelector<HTMLButtonElement>(".insp-ext-edit")!.click();
+    expect(opened).toEqual([["line", "L_bell"]]);
+  });
+
+  it("is the Edit button alone with no keys, and folds away when unset", () => {
+    const h = handlersWith({ openFields: noop });
+    const host = draw(h, { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: {} } } });
+    const row = host.querySelector<HTMLElement>(".insp-ext-summary")!;
+    expect(row.querySelector(".insp-ext-summary-lines")).toBeNull();
+    expect(row.querySelector(".insp-ext-edit")).not.toBeNull();
+    inspectorFold.setOpen("probe", false);
+    expect(draw(h, { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: {} } } }).querySelector(".insp-ext-summary")).toBeNull();
+    expect(draw(h, { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: { ANNA: {} } } } }).querySelector(".insp-ext-summary")).not.toBeNull();
+  });
+
+  it("says a problem inside it, so the inspector still shows something is wrong", () => {
+    const host = draw(handlersWith({ openFields: noop }),
+      { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: { ANNA: { expression: "glare" } } } } });
+    expect(host.querySelector(".insp-ext-summary .shell-fieldrow-problem")?.textContent).toBe("Something in here needs a fix: Edit shows where.");
+  });
+});
+
 describe("a pick", () => {
   const shot = parseManifest(JSON.stringify({
     schema: "wildwinter/extension@0", id: "shot", name: "Shot", version: "1.0.0",

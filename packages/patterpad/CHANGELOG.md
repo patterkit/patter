@@ -6,6 +6,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **The Fields window, for a field too big for the inspector.** An extension field that holds a set of
+  records, one per character say (Pattershot's performance: a look, an expression, and a gesture for each
+  character on a line), now shows in the inspector as a line per character, such as "TAM: smile, nod", with an
+  Edit button. Edit opens the Fields window: a grid with a row per character and a column for each part, the
+  same choices as the inspector offers, a menu to add a character and a button to remove one. The window
+  follows what you select in the script, so you can work down a scene without opening and closing it; turn off
+  Follow selection to keep it on one line. Each change is one undo step in the script, as in the inspector, and
+  a scene somebody else holds shows read-only.
+
 ### Changed
 
 - **An extension's fields fold to the ones a node sets.** In the inspector, each extension's section now shows

@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import { el } from "./dom.js";
-import { extensionFold, valueRows } from "@wildwinter/app-shell/value-rows";
+import { extensionFold, isRecordMap, recordMapSummary, valueRows } from "@wildwinter/app-shell/value-rows";
 import type { ValueAdapter, ValueDecl, ValueRows } from "@wildwinter/app-shell/value-rows";
 import { effectiveClaim, entryProblems, pickLists, valueProblems } from "@wildwinter/toolkit/extensions";
 import type { ClaimDecl, TargetDecl, TypeDecl } from "@wildwinter/toolkit/extensions";
@@ -31,6 +31,9 @@ export interface ExtensionHandlers {
   extensionLock: (extension: string) => string | null;
   /** The nodes a reference or a map key may name, and the name of one held outside the choices. */
   extensionAdapter: () => ValueAdapter;
+  /** Open (or bring forward) the fields window on a node, where a map of records is edited as a grid
+   *  (Pattershot's brief, H1). Absent: such a map is drawn in place, as any other field. */
+  openFields?: (kind: string, id: string) => void;
 }
 
 /** The rows, kept across the inspector's redraws (it rebuilds its whole stack), so a value typed into a row
@@ -130,6 +133,8 @@ interface RowsFor {
   readOnly?: boolean;
   /** The row cache: the inspector's, or a Settings section's own, so neither's sweep disposes the other's. */
   cache: ValueRows;
+  /** The fields window's opener: a map of records is then a summary with an Edit button (H3). */
+  openFields?: () => void;
 }
 
 /** One extension's parts for one node: the lock line, a row per field, a heading per group, and any key the
@@ -143,6 +148,7 @@ function extensionParts(o: RowsFor): { fields: readonly ExtensionFieldDto[]; lea
   const lead = o.locked ? [el("p", "insp-ext-lock", o.locked)] : [];
   const disabled = o.id === null || o.locked !== null || o.readOnly === true;
   const row = (decl: ExtensionFieldDto): HTMLElement => {
+    if (o.openFields && isRecordMap(decl as unknown as ValueDecl)) return recordMapSummaryRow(decl, o.entry?.[decl.name], adapter, problems.get(decl.name), o.id === null, o.openFields);
     // A stage the extension has since renamed says so, alone: not also the shell's "not one of the stages".
     const renamed = renamedStage(decl, o.entry?.[decl.name]);
     const problem = problems.get(decl.name);
@@ -168,6 +174,32 @@ function extensionParts(o: RowsFor): { fields: readonly ExtensionFieldDto[]; lea
     tail.push(r);
   }
   return { fields, lead, row, group: (name) => el("div", "insp-ext-group", name), tail };
+}
+
+/**
+ * A map of records in the inspector (Pattershot's brief, H3): too big for the column, so a line per key, the
+ * record's set values, and an Edit button that opens the fields window, where it is edited as a grid. With no
+ * keys, the Edit button alone. A problem inside it is said here too, so the inspector still shows it's there.
+ */
+function recordMapSummaryRow(decl: ExtensionFieldDto, value: unknown, adapter: ValueAdapter, problem: string | undefined, noNode: boolean, open: () => void): HTMLElement {
+  const row = el("div", "shell-fieldrow insp-row insp-gd-row insp-ext-summary");
+  const label = el("span", "shell-fieldrow-label insp-key", decl.label ?? decl.name);
+  const body = el("div", "shell-fieldrow-body");
+  const lines = recordMapSummary(decl as unknown as ValueDecl, value, adapter);
+  if (lines.length) body.append(el("div", "insp-ext-summary-lines", ...lines.map((l) => el("div", "insp-ext-summary-line", l))));
+  const edit = el("button", "btn insp-ext-edit", "Edit");
+  edit.type = "button";
+  edit.dataset["tip"] = `Edit ${decl.label ?? decl.name} in the Fields window`;
+  edit.disabled = noNode;
+  edit.addEventListener("click", open);
+  body.append(edit);
+  const inner = value === undefined ? [] : valueProblems(decl as unknown as TypeDecl, value, {
+    exists: existsOf(adapter), ...(adapter.list ? { list: (name: string) => adapter.list!(name) } : {}),
+  }).filter((p) => p.severity === "error" && p.path !== "");
+  const words = [problem, inner.length ? "Something in here needs a fix: Edit shows where." : undefined].filter(Boolean).join(" ");
+  if (words) { body.append(el("p", "shell-fieldrow-problem", words)); row.classList.add("has-problem"); }
+  row.append(label, body);
+  return row;
 }
 
 /** One extension's rows for one node, every field: its fields in the manifest's order, a heading wherever the
@@ -203,6 +235,7 @@ export function extensionSections(kind: string, id: string | null, ext: Record<s
     const parts = extensionParts({
       extension, kind, id, entry, adapter, locked: h.extensionLock(extension.id), cache: rowCache,
       commit: (field, value) => { if (id) h.setExtensionValue(id, extension.id, field, value); },
+      ...(h.openFields ? { openFields: () => { if (id) h.openFields!(kind, id); } } : {}),
     });
     out.push(inspectorFold.section({
       extension: extension.id, caption: extension.name, node: `${kind}\u0000${id ?? ""}`,

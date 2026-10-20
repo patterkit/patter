@@ -174,6 +174,9 @@ export interface SurfaceHandle {
    *  attr. False when the id isn't a node that carries extension data here, or the edit was refused (the
    *  scene is read-only, or the extension's data here is locked). */
   setExtensionValue(id: string, extension: string, field: string, value: unknown): boolean;
+  /** A node's extension kind and its values, by its id (the scene's id for the scene), for a view held on a
+   *  node the selection has left (the fields window). Null when no node here carries extension data by that id. */
+  extensionsOf(id: string): { kind: string; ext: Record<string, Record<string, unknown>> } | null;
   /** Replace the extensions whose data is locked here (somebody else holds the shard), by extension id.
    *  An edit that would change their data is refused with a sentence naming who holds it; `{}` clears. */
   setLockedExtensions(locks: ExtensionLocks): void;
@@ -1373,6 +1376,17 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       return out;
     },
     anchorFor: (nodeId: string) => { const b = findByModelId(view.state.doc, nodeId); if (!b) return null; const dom = view.nodeDOM(b.pos); return dom instanceof HTMLElement ? dom : null; },
+    extensionsOf(id) {
+      const doc = view.state.doc;
+      const isScene = rawAttr(doc).id === id;
+      const found = isScene ? null : findByModelId(doc, id, (n) => extKindOf(n) !== null);
+      const node = isScene ? doc : found?.node;
+      const kind = isScene ? "scene" : found ? extKindOf(found.node) : null;
+      if (!node || !kind) return null;
+      let ext: Record<string, Record<string, unknown>> = {};
+      try { const v = node.attrs.ext as string; if (v) ext = JSON.parse(v) as typeof ext; } catch { ext = {}; }
+      return { kind, ext };
+    },
     setExtensionValue(id, extension, field, value) {
       const doc = view.state.doc;
       const isScene = rawAttr(doc).id === id;

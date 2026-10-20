@@ -1,0 +1,22 @@
+/* The detached fields window (Pattershot's brief, H1 to H4): the shell's head bar (tool-window.css), then
+ * the node's name and a grid for each map of records it has (controls.css draws the grid). */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body.fields-win {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  overflow: hidden;
+}
+.swin-head { font-size: 14px; }
+.fields-body { flex: 1 1 auto; overflow: auto; padding: 10px 14.5px 16px; }
+.fields-node { margin: 0 0 10px; font: 600 13px/1.3 var(--font-ui); color: var(--ink); }
+.fields-node-kind { color: var(--muted); font-weight: 400; margin-right: 6px; }
+.fields-grid + .fields-grid { margin-top: 18px; }
+.fields-cap { margin: 0 0 4px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
+.fields-lock { margin: 0 0 6px; font: 12.5px/1.4 var(--font-ui); color: var(--danger); }
+.fields-empty { margin: 18px 0; font: 13px/1.4 var(--font-ui); color: var(--muted); }
+.fields-grid select, .fields-grid input { font: 13px var(--font-ui); padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); }

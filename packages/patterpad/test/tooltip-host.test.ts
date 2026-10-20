@@ -55,7 +55,7 @@ describe("every window mounts the tooltip host", () => {
   it("finds the windows from the markup, not from a list here", () => {
     // If this drops below four, the discovery broke and every assertion below is passing on nothing.
     const found = windows().map((w) => w.name).sort();
-    expect(found).toEqual(["coverage", "editor", "play", "search"]);
+    expect(found).toEqual(["coverage", "editor", "fields", "play", "search"]);
   });
 
   for (const { name, entry } of windows()) {

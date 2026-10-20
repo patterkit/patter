@@ -133,6 +133,8 @@ export default defineConfig({
           play: resolve(root, "packages/patterpad/src/renderer/play/index.html"),
           search: resolve(root, "packages/patterpad/src/renderer/search/index.html"),
           coverage: resolve(root, "packages/patterpad/src/renderer/coverage/index.html"),
+          // detached fields window: a map of records as a grid, following the selection.
+          fields: resolve(root, "packages/patterpad/src/renderer/fields/index.html"),
         },
       },
     },

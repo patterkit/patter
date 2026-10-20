@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; font-src 'self' data:" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fields</title>
+  </head>
+  <body class="fields-win">
+    <!-- The window is frameless: the shell's toolWindowHead (title, follow, pin, close) is built in fields.ts. -->
+    <main id="fields-host" class="fields-body"></main>
+    <script type="module" src="./fields.ts"></script>
+  </body>
+</html>

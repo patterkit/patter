@@ -22,7 +22,7 @@ import { contextBridge, ipcRenderer } from "electron";
  * The value is pinned against the shell's own constant by that same test.
  */
 const JOB_PROGRESS = "job:progress";
-import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress, AppPrompt, ProjectStep } from "../shared/api.js";
+import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, PatterFieldsApi, FieldsWinState, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress, AppPrompt, ProjectStep } from "../shared/api.js";
 
 const api: PatterApi = {
   boot: () => ipcRenderer.invoke("project:boot"),
@@ -133,6 +133,10 @@ const api: PatterApi = {
   editorFlushed: () => { void ipcRenderer.invoke("editor:flushed"); },
   onReplaceApplied: (handler) => { ipcRenderer.on("replace:applied", (_e, announce?: boolean) => handler(announce === true)); },
   openCoverageWindow: () => ipcRenderer.invoke("coverage:open"),
+  openFieldsWindow: () => ipcRenderer.invoke("fields:open"),
+  sendFieldsState: (state) => { ipcRenderer.send("fields:state", state); },
+  onFieldsCommit: (handler) => { ipcRenderer.on("fields:commit", (_e, id: string, extension: string, field: string, value: unknown) => handler(id, extension, field, value)); },
+  onFieldsFollow: (handler) => { ipcRenderer.on("fields:follow", (_e, on: boolean) => handler(on)); },
   onCoverageNavigate: (handler) => { ipcRenderer.on("coverage:navigate", (_e, sceneId: string, beatId: string) => handler(sceneId, beatId)); },
   onOpenWorldSettings: (handler) => { ipcRenderer.on("coverage:open-world", () => handler()); },
   applyFix: (fix) => ipcRenderer.invoke("project:applyFix", fix),
@@ -219,12 +223,26 @@ const coverageApi: PatterCoverageApi = {
   onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
 };
 
+// The detached fields window's bridge: a map of records as a grid, every edit applied by the editor.
+const fieldsApi: PatterFieldsApi = {
+  info: () => ipcRenderer.invoke("fieldsWin:info"),
+  commit: (id, extension, field, value) => { void ipcRenderer.invoke("fieldsWin:commit", id, extension, field, value); },
+  setFollow: (on) => { void ipcRenderer.invoke("fieldsWin:setFollow", on); },
+  setPin: (on) => { void ipcRenderer.invoke("fieldsWin:setPin", on); },
+  close: () => { void ipcRenderer.invoke("fieldsWin:close"); },
+  onState: (handler) => { ipcRenderer.on("fieldsWin:state", (_e, state: FieldsWinState) => handler(state)); },
+  onProject: (handler) => { ipcRenderer.on("fieldsWin:project", () => handler()); },
+  onPin: (handler) => { ipcRenderer.on("state:pinned", (_e, on: boolean) => handler(on)); },
+  onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
+};
+
 // Each window gets ITS bridge and no other. The four windows share this one preload, and every bridge was
 // exposed to every window, so the play, search, and coverage windows could also call the editor's whole
 // API (removing a dictionary, saving a scratch take). Which window this is comes from the page it loaded.
 const page = (() => { try { return new URL(location.href).pathname; } catch { return ""; } })();
-const tool = /\/(play|search|coverage)\/index\.html$/.exec(page)?.[1];
+const tool = /\/(play|search|coverage|fields)\/index\.html$/.exec(page)?.[1];
 if (tool === "play") contextBridge.exposeInMainWorld("patterPlay", playApi);
 else if (tool === "search") contextBridge.exposeInMainWorld("patterSearch", searchApi);
 else if (tool === "coverage") contextBridge.exposeInMainWorld("patterCoverage", coverageApi);
+else if (tool === "fields") contextBridge.exposeInMainWorld("patterFields", fieldsApi);
 else contextBridge.exposeInMainWorld("patter", api);

@@ -52,6 +52,7 @@ import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, 
   paintVcBadges, lockControls, createNavHistory, historyNav, mountPaneShell, mountSettingsDialog, revealRowWhenReady,
   askIdentity, confirmDialog, dialogFrame, openContextMenu, type ShardVc, type SettingsSectionHandle, type SettingsSection, type SettingsDialog } from "@wildwinter/app-shell";
 import { extensionAdapter, mountProjectSection, problemSettingsSection, settingsExtensions, settingsSectionId } from "./extension-rows.js";
+import { fieldsState, followTarget, selectedNodes, type FieldsNode } from "./fields-state.js";
 import "@wildwinter/app-shell/vc.css"; // the badge + locked-document chrome
 import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
@@ -217,6 +218,16 @@ function setWelcomeRecents(recents: RecentProject[]): void {
 }
 let lastInspectorCtx: InspectorContext | null = null;
 let lastInspectorSig: string | null = null; // signature of the last-rendered inspector (skip identical rebuilds)
+// The fields window's state (pushFields, below).
+/** Following the selection (remembered in main; default on). */
+let fieldsFollow = bootState.fieldsFollow;
+/** The node the window stays on with Follow selection off. */
+let fieldsHeld: { kind: string; id: string } | null = null;
+/** The node an Edit button named, shown until the selection moves on. */
+let fieldsFocus: { kind: string; id: string; from: string | null } | null = null;
+/** The node last shown, and the state last sent, so an unchanged state isn't sent again. */
+let fieldsShown: { kind: string; id: string } | null = null;
+let fieldsSent = "";
 
 /** View > Notes: toggle whether a documentation-note class surfaces in the editor; remember it + re-surface. */
 function toggleDocClass(cls: string): void {
@@ -853,9 +864,10 @@ async function commitSceneReorder(movedId: string, targetId: string, before: boo
 type SceneVc = ShardVc & { extensions?: SceneVcStatus["extensions"] };
 let vcMap: Map<string, SceneVc> = new Map();
 
-/** What keeps working in an inspector for a scene somebody else holds: the section disclosures, and
- *  the copy buttons that put an id on the clipboard. Both are reading, and reading is never locked. */
-const STAYS_LIVE = ".insp-head, .insp-copy, .insp-rec-play";
+/** What keeps working in an inspector for a scene somebody else holds: the section disclosures, the
+ *  copy buttons that put an id on the clipboard, and a map of records' Edit (the fields window then shows
+ *  it read-only). All are reading, and reading is never locked. */
+const STAYS_LIVE = ".insp-head, .insp-copy, .insp-rec-play, .insp-ext-edit";
 
 /** A scene is read-only to us only when someone ELSE holds it. A not-yet-checked-out (read-only on
  *  disk) file with no other holder is still editable - simple-vc-lib checks it out on save. */
@@ -898,6 +910,7 @@ function applySceneVc(): void {
   const st = currentSceneId ? vcMap.get(currentSceneId) : undefined;
   const ro = isReadOnly(st);
   surface?.setEditable(!ro);
+  pushFields(); // the fields window locks with the scene
   const locks = extensionLocksOf(st);
   surface?.setLockedExtensions(locks);
   const sig = JSON.stringify(locks);
@@ -2015,6 +2028,7 @@ function showInspector(ctx: InspectorContext): void {
   const blockLevel = ctx.levels.find((l) => l.kind === "block");
   highlightNavBlock(blockLevel && "id" in blockLevel ? blockLevel.id : null);
   lastInspectorCtx = ctx; // so the global pills/text toggle can re-render this same view in place
+  pushFields(); // the fields window follows the selection, and every edit (before the early return below)
   // onSelect fires on every selection move AND every doc edit (typing). The inspector only shows a
   // projection of the caret's container stack, so skip the (pill-rebuilding) teardown when nothing it
   // displays has changed - e.g. typing dialogue text doesn't touch the shown fields.
@@ -2080,8 +2094,69 @@ onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e
     setExtensionValue: (id, extension, field, value) => { surface?.setExtensionValue(id, extension, field, value); },
     extensionLock: (extension) => lockedLine(extensionLocksOf(currentSceneId ? vcMap.get(currentSceneId) : undefined)[extension]?.by),
     extensionAdapter: () => currentExtensionAdapter(),
+    openFields: (kind, id) => openFieldsOn(kind, id),
   });
 }
+
+// --- the fields window (Pattershot's brief, "a map of records edited in a helper window") ---------------
+// The window shows a node's maps of records as grids and follows the selection; this side owns the document,
+// so it says what to show (on every selection move and edit, sent only when it changed) and applies each edit.
+
+
+/** A node as the author knows it: a line by its speaker and words, a scene by its name, the rest by the name
+ *  the jump picker gives it, or their words. */
+function fieldsNodeLabel(kind: string, id: string): string {
+  if (kind === "scene") return project?.scenes.find((sc) => sc.id === id)?.name ?? id;
+  if (kind === "line") { const l = surface?.lines().find((x) => x.id === id); if (l) return l.character ? `${l.character}: ${l.text}` : l.text; }
+  return surface?.jumpTargets().find((t) => t.id === id)?.label ?? surface?.sayText(id) ?? id;
+}
+
+function pushFields(): void {
+  const extensions = project?.extensions ?? [];
+  let node: FieldsNode | null = null;
+  const pinned = !fieldsFollow ? fieldsHeld : fieldsFocus && fieldsFocus.from === caretNodeId ? fieldsFocus : null;
+  if (pinned) {
+    const found = surface?.extensionsOf(pinned.id);
+    node = found ? { kind: found.kind, id: pinned.id, ext: found.ext } : null;
+  } else {
+    fieldsFocus = null;
+    node = followTarget(selectedNodes(lastInspectorCtx), extensions);
+  }
+  fieldsShown = node ? { kind: node.kind, id: node.id } : null;
+  const st = currentSceneId ? vcMap.get(currentSceneId) : undefined;
+  const state = fieldsState({
+    hasProject: project !== null,
+    node: node ? { ...node, label: fieldsNodeLabel(node.kind, node.id) } : null,
+    extensions,
+    adapter: currentExtensionAdapter(),
+    lock: (extension) => lockedLine(extensionLocksOf(st)[extension]?.by),
+    readOnly: isReadOnly(st),
+    readOnlyWhy: st?.lockedBy?.length ? `Locked by ${st.lockedBy.join(", ")}. Read-only until they release it.` : "",
+  });
+  const sig = JSON.stringify(state);
+  if (sig === fieldsSent) return;
+  fieldsSent = sig;
+  window.patter.sendFieldsState(state);
+}
+
+/** An inspector section's Edit button: show that node in the window, and bring the window forward. */
+function openFieldsOn(kind: string, id: string): void {
+  if (fieldsFollow) fieldsFocus = { kind, id, from: caretNodeId };
+  else fieldsHeld = { kind, id };
+  pushFields();
+  void window.patter.openFieldsWindow();
+}
+
+window.patter.onFieldsCommit((id, extension, field, value) => {
+  surface?.setExtensionValue(id, extension, field, value);
+  fieldsSent = ""; // a refused edit (a lock) changes nothing: send the state anyway, so the window puts it back
+  pushFields();
+});
+window.patter.onFieldsFollow((on) => {
+  fieldsFollow = on;
+  fieldsHeld = on ? null : fieldsShown;
+  pushFields();
+});
 
 /** What the problems bar needs to word an extension's problem: the extensions, and every node by id with the
  *  label the editor shows (the open scene's as they stand, the rest from the project's index), built only

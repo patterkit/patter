@@ -28,6 +28,17 @@ const flowSource = tavernFlow.replace('direction: "wiping a glass" }', 'directio
 
 // The probe, taken at an older version than its manifest (so the problems bar has a project-level extension
 // problem, which opens its Settings section), with its delivery claim naming the line's `mood` field.
+// The fields window's preview link (fields-dev.ts): this tab plays main's part.
+const fieldsChannel = new BroadcastChannel("patterpad-fields-preview");
+let lastFieldsState: unknown = null;
+let onFieldsCommit: ((id: string, extension: string, field: string, value: unknown) => void) | undefined;
+let onFieldsFollow: ((on: boolean) => void) | undefined;
+fieldsChannel.onmessage = (e: MessageEvent<{ t: string; id?: string; extension?: string; field?: string; value?: unknown; on?: boolean }>) => {
+  const m = e.data;
+  if (m.t === "hello" && lastFieldsState) fieldsChannel.postMessage({ t: "state", state: lastFieldsState });
+  else if (m.t === "commit") onFieldsCommit?.(m.id!, m.extension!, m.field!, m.value);
+  else if (m.t === "follow") onFieldsFollow?.(m.on === true);
+};
 const PROBE_TAKEN = { probe: { version: "1.0.0", settings: { deliveryField: "mood" } } };
 const probeProject = { values: { studio: "Wildwinter" } as Record<string, unknown> };
 const probeDtos = (): ReturnType<typeof extensionDtos> => extensionDtos(
@@ -168,7 +179,7 @@ let castAdded = false;     // preview-only: the add-to-cast quick-fix flips this
 let propDeclared = false;  // preview-only: the declare-property quick-fix flips this so the @strength problem clears
 
 const stub = {
-  boot: async () => ({ open, recents, identity, panes: { nav: true, inspector: true }, theme: { colour: "system", font: "newsreader" } }),
+  boot: async () => ({ open, recents, identity, panes: { nav: true, inspector: true }, theme: { colour: "system", font: "newsreader" }, fieldsFollow: true }),
   appReady: () => {}, // no Electron window to reveal in the browser preview - a no-op keeps the bridge complete
   openDialog: async () => ({ project }),
   saveAs: async () => ({ project }),
@@ -343,6 +354,12 @@ const stub = {
     return { ok: true, project };
   },
   openCoverageWindow: async () => undefined,
+  // The fields window, over a BroadcastChannel: open fields.html in another tab and it shows what this one
+  // sends, and sends its edits back, as main relays them in the app.
+  openFieldsWindow: async () => { fieldsChannel.postMessage({ t: "front" }); },
+  sendFieldsState: (state: unknown) => { lastFieldsState = state; fieldsChannel.postMessage({ t: "state", state }); },
+  onFieldsCommit: (handler: (id: string, extension: string, field: string, value: unknown) => void) => { onFieldsCommit = handler; },
+  onFieldsFollow: (handler: (on: boolean) => void) => { onFieldsFollow = handler; },
   onCoverageNavigate: () => undefined,
   onOpenWorldSettings: () => undefined,
   readSettings: async () => ({ name: "The Tavern", vcs: "git", start: { scene: "scn_tavern" }, voiced: true, trackAudioStatus: true, formatting: true, padAfterDefault: 0.6, localiseDialogueText: false, buildBundle: "../patter-dist/the_tavern.patterc", buildLocalisation: "embedded", buildSourceDebug: false, localeDefault: "en", locales: ["en", "fr"],

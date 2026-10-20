@@ -46,6 +46,9 @@ let searchMode: SearchMode = "content"; // the mode the search window (re)opens 
 let searchSeed: string | undefined; // an initial query to seed the search window with (property-usage deep-link)
 let searchFocus: SearchFocus | undefined; // the editor's last scene + caret, for content-search ranking
 let lastCoverageResult: import("../shared/api.js").CoverageResult | null = null; // session cache (the window shows it on reopen)
+/** What the fields window shows, as the editor last sent it: the window reads it on boot. */
+const NO_FIELDS: import("../shared/api.js").FieldsWinState = { hasProject: false, node: null, readOnly: true, readOnlyWhy: "", grids: [], hint: "" };
+let fieldsState: import("../shared/api.js").FieldsWinState = NO_FIELDS;
 
 // Live debug link (#181): created on first use. Frames for the followed flow ride the existing play:mark
 // path (a choice frame carrying the option taken passes it on, for the editor to mark); status is pushed
@@ -301,6 +304,10 @@ const windows = defineToolWindows<ToolWindowName>([
     ...store.window("search"), channel: "searchWin:project", clear: () => { searchFocus = undefined; } },
   { name: "coverage", title: "Coverage", page: "coverage/index.html", def: { width: 720, height: 620 }, min: { width: 480, height: 360 },
     ...store.window("coverage"), channel: "covWin:project", clear: () => { lastCoverageResult = null; } },
+  // A map of records (Pattershot's performance) edited as a grid, following the editor's selection. The
+  // editor owns the document, so it sends what to show and applies every edit (H1 to H4).
+  { name: "fields", title: "Fields", page: "fields/index.html", def: { width: 640, height: 420 }, min: { width: 420, height: 240 },
+    ...store.window("fields"), channel: "fieldsWin:project", clear: () => { fieldsState = NO_FIELDS; } },
 ], {
   rendererDir: join(here, "../renderer"),
   preload: join(here, "../preload/index.cjs"),
@@ -329,7 +336,7 @@ function openAndRecord(path: string): OpenResult {
 
 function bootState(open: OpenResult | null, openError?: string): BootState {
   const s = store.read();
-  return { open, ...(openError ? { openError } : {}), recents: s.recents, identity: s.identity ?? null, panes: s.panes, theme: s.theme };
+  return { open, ...(openError ? { openError } : {}), recents: s.recents, identity: s.identity ?? null, panes: s.panes, theme: s.theme, fieldsFollow: s.fieldsFollow };
 }
 
 /** A `.patter` package double-clicked in Finder, captured before the window exists (open-file can fire
@@ -989,6 +996,29 @@ function registerIpc(): void {
     return result;
   });
   ipcMain.handle("covWin:cancel", () => { jobs.cancel("coverage"); });
+  // Fields window: the editor sends what it should show and applies what it edits; main only relays.
+  ipcMain.handle("fields:open", () => { windows.open("fields"); });
+  ipcMain.on("fields:state", (_e, state: import("../shared/api.js").FieldsWinState) => {
+    fieldsState = state;
+    const w = windows.get("fields");
+    if (w && !w.isDestroyed()) w.webContents.send("fieldsWin:state", state);
+  });
+  ipcMain.handle("fieldsWin:info", (): import("../shared/api.js").FieldsWinInfo => ({
+    state: fieldsState, pinned: store.window("fields").pinned(), follow: store.read().fieldsFollow, theme: store.read().theme,
+  }));
+  ipcMain.handle("fieldsWin:commit", (_e, id: string, extension: string, field: string, value: unknown) => {
+    if (typeof id !== "string" || typeof extension !== "string" || typeof field !== "string") return;
+    if (win && !win.isDestroyed()) win.webContents.send("fields:commit", id, extension, field, value);
+  });
+  ipcMain.handle("fieldsWin:setFollow", (_e, on: boolean) => {
+    store.setFieldsFollow(on === true);
+    if (win && !win.isDestroyed()) win.webContents.send("fields:follow", on === true);
+  });
+  ipcMain.handle("fieldsWin:setPin", (_e, on: boolean) => {
+    store.window("fields").setPinned(on);
+    pinToolWindow(windows.get("fields"), win, on);
+  });
+  ipcMain.handle("fieldsWin:close", () => { windows.get("fields")?.close(); });
   // The editor's progress strip: stop the running publish-shaped job at its next yield.
   ipcMain.handle("job:cancel", (_e, kind: string) => { jobs.cancel(kind); });
   ipcMain.handle("covWin:reveal", (_e, sceneId: string, beatId: string) => {
