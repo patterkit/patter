@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import { el } from "./dom.js";
-import { valueRows } from "@wildwinter/app-shell/value-rows";
+import { extensionFold, valueRows } from "@wildwinter/app-shell/value-rows";
 import type { ValueAdapter, ValueDecl, ValueRows } from "@wildwinter/app-shell/value-rows";
 import { effectiveClaim, entryProblems, pickLists, valueProblems } from "@wildwinter/toolkit/extensions";
 import type { ClaimDecl, TargetDecl, TypeDecl } from "@wildwinter/toolkit/extensions";
@@ -36,7 +36,7 @@ export interface ExtensionHandlers {
 /** The rows, kept across the inspector's redraws (it rebuilds its whole stack), so a value typed into a row
  *  keeps its focus and caret. Swept at the end of each redraw, beside the game-data rows. */
 const rowCache = valueRows();
-export function sweepExtensionRows(): void { rowCache.sweep(); }
+export function sweepExtensionRows(): void { rowCache.sweep(); inspectorFold.sweep(); }
 
 /** A toolkit message as a sentence. */
 const sentence = (message: string): string => `${message.charAt(0).toUpperCase()}${message.slice(1)}.`;
@@ -132,23 +132,21 @@ interface RowsFor {
   cache: ValueRows;
 }
 
-/** One extension's rows for one node: its fields in the manifest's order, a heading wherever the manifest's
- *  group changes, then any key the node holds that the extension doesn't declare, read-only. */
-function extensionRows(o: RowsFor): HTMLElement[] {
+/** One extension's parts for one node: the lock line, a row per field, a heading per group, and any key the
+ *  node holds that the extension doesn't declare, read-only. The inspector folds them (`extensionSections`);
+ *  Project Settings draws them all (`extensionRows`). */
+function extensionParts(o: RowsFor): { fields: readonly ExtensionFieldDto[]; lead: HTMLElement[]; row: (decl: ExtensionFieldDto) => HTMLElement; group: (name: string) => HTMLElement; tail: HTMLElement[] } {
   const fields = o.extension.targets[o.kind]?.fields ?? [];
   // A project's own rows read its lists as they stand in the entry being edited, not as last saved.
   const adapter = extensionScoped(o.adapter, o.extension, o.kind === "project" ? o.entry ?? {} : o.extension.projectValues);
   const problems = fieldProblems(fields, o.entry, adapter);
-  const out: HTMLElement[] = [];
-  if (o.locked) out.push(el("p", "insp-ext-lock", o.locked));
-  let group: string | undefined;
+  const lead = o.locked ? [el("p", "insp-ext-lock", o.locked)] : [];
   const disabled = o.id === null || o.locked !== null || o.readOnly === true;
-  for (const decl of fields) {
-    if (decl.group !== undefined && decl.group !== group) { group = decl.group; out.push(el("div", "insp-ext-group", group)); }
+  const row = (decl: ExtensionFieldDto): HTMLElement => {
     // A stage the extension has since renamed says so, alone: not also the shell's "not one of the stages".
     const renamed = renamedStage(decl, o.entry?.[decl.name]);
     const problem = problems.get(decl.name);
-    const row = o.cache.row(`${o.extension.id}\u0000${o.kind}\u0000${o.id ?? ""}\u0000${decl.name}`, {
+    return o.cache.row(`${o.extension.id}\u0000${o.kind}\u0000${o.id ?? ""}\u0000${decl.name}`, {
       decl: decl as unknown as ValueDecl,
       value: o.entry?.[decl.name],
       adapter,
@@ -158,23 +156,41 @@ function extensionRows(o: RowsFor): HTMLElement[] {
         : problem ? { problem } : {}),
       className: "insp-row insp-gd-row", labelClassName: "insp-key", controlClassName: "insp-gd-input",
     });
-    out.push(row);
-  }
+  };
   const declared = new Set(fields.map((f) => f.name));
+  const tail: HTMLElement[] = [];
   for (const [k, v] of Object.entries(o.entry ?? {})) {
     if (declared.has(k)) continue;
     const r = el("div", "insp-row insp-ext-undeclared");
     r.append(el("span", "insp-key insp-gd", k), el("span", "insp-val insp-mono", typeof v === "string" ? v : JSON.stringify(v)));
     const said = problems.get(k);
     if (said) r.dataset["tip"] = said; // the shell's tooltip, never a native title
-    out.push(r);
+    tail.push(r);
   }
-  return out;
+  return { fields, lead, row, group: (name) => el("div", "insp-ext-group", name), tail };
 }
+
+/** One extension's rows for one node, every field: its fields in the manifest's order, a heading wherever the
+ *  manifest's group changes, then any key the node holds that the extension doesn't declare. */
+function extensionRows(o: RowsFor): HTMLElement[] {
+  const parts = extensionParts(o);
+  const out: HTMLElement[] = [...parts.lead];
+  let group: string | undefined;
+  for (const decl of parts.fields) {
+    if (decl.group !== undefined && decl.group !== group) { group = decl.group; out.push(parts.group(group)); }
+    out.push(parts.row(decl));
+  }
+  return [...out, ...parts.tail];
+}
+
+/** The inspector's fold, kept across its redraws: each extension's section stays folded or open, as the author
+ *  left it, from node to node (the shell's extensionFold; Pattershot's brief, F4). */
+export const inspectorFold = extensionFold();
 
 /**
  * The inspector's sections for a node: one per extension declaring fields for its kind, each captioned with the
- * extension's name and drawn after the node's Game Data. Empty when no extension targets the kind.
+ * extension's name and drawn after the node's Game Data. Folded to the fields the node sets until the author
+ * opens it (the caption is the disclosure, and counts what's set). Empty when no extension targets the kind.
  */
 export function extensionSections(kind: string, id: string | null, ext: Record<string, Record<string, unknown>> | undefined, h: ExtensionHandlers): HTMLElement[] {
   const all = h.extensions();
@@ -183,13 +199,18 @@ export function extensionSections(kind: string, id: string | null, ext: Record<s
   const out: HTMLElement[] = [];
   for (const extension of all) {
     if (!(extension.targets[kind]?.fields.length)) continue;
-    const sec = el("div", "insp-gd-section insp-ext-section");
-    sec.dataset["extension"] = extension.id;
-    sec.append(el("div", "insp-gd-cap", extension.name), ...extensionRows({
-      extension, kind, id, entry: ext?.[extension.id], adapter, locked: h.extensionLock(extension.id), cache: rowCache,
+    const entry = ext?.[extension.id];
+    const parts = extensionParts({
+      extension, kind, id, entry, adapter, locked: h.extensionLock(extension.id), cache: rowCache,
       commit: (field, value) => { if (id) h.setExtensionValue(id, extension.id, field, value); },
+    });
+    out.push(inspectorFold.section({
+      extension: extension.id, caption: extension.name, node: `${kind}\u0000${id ?? ""}`,
+      fields: parts.fields as unknown as ValueDecl[], entry,
+      row: (decl) => parts.row(decl as unknown as ExtensionFieldDto),
+      group: parts.group, lead: parts.lead, tail: parts.tail,
+      className: "insp-gd-section insp-ext-section", captionClassName: "insp-gd-cap",
     }));
-    out.push(sec);
   }
   return out;
 }

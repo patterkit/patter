@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **An extension's fields fold to the ones a node sets.** In the inspector, each extension's section now shows
+  only the fields the node sets, so an extension you leave alone on most nodes stays out of the way. Click its
+  name to see every field; the caption counts what's set, as "Pattershot (3 set)". A section stays open or folded
+  as you left it while you move between nodes, and a value you clear keeps its row until you move on. Project
+  Settings still shows every field. The fold works on a scene somebody else holds, too.
+
 ## [0.37.0] - 2026-10-19
 
 ### Added

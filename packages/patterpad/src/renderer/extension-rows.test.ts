@@ -7,13 +7,13 @@
 // extension presents it, locks, the inline problems validation would raise, the Settings section, and
 // where a problem about an extension goes.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import probeText from "../../../conformance/fixtures/probe.extension.json?raw";
 import { parseManifest } from "@wildwinter/toolkit/extensions";
 import type { ProjectFile, GameDataField } from "@patterkit/model";
 import type { InspectorContext } from "@patterkit/patterpad-surface/surface";
 import { renderInspector, type InspectorHandlers } from "./src/inspector.js";
-import { extensionAdapter, extensionScoped, fieldProblems, mountProjectSection, problemSettingsSection, renamedStage } from "./src/extension-rows.js";
+import { extensionAdapter, extensionScoped, fieldProblems, inspectorFold, mountProjectSection, problemSettingsSection, renamedStage } from "./src/extension-rows.js";
 import { extensionProblemLine, problemLineFor, type ExtensionProblemContext } from "./src/problem-copy.js";
 import { extensionDtos } from "../shared/extensions.js";
 import type { ExtensionDto, Problem } from "../shared/api.js";
@@ -57,6 +57,9 @@ const draw = (h: InspectorHandlers, ...levels: unknown[]): HTMLElement => { cons
 const sections = (host: HTMLElement): HTMLElement[] => [...host.querySelectorAll<HTMLElement>(".insp-ext-section")];
 const rowOf = (host: ParentNode, caption: string): HTMLElement | undefined =>
   [...host.querySelectorAll<HTMLElement>(".insp-ext-section .shell-fieldrow")].find((r) => r.querySelector(".shell-fieldrow-label")?.textContent === caption);
+
+// Opened, so every field draws; the fold itself is "the inspector's fold" below.
+beforeEach(() => { inspectorFold.setOpen("probe", true); });
 
 describe("extension sections in the inspector", () => {
   it("draws one per level that the extension has fields for, captioned with its name, after Game Data", () => {
@@ -193,6 +196,50 @@ describe("extension sections in the inspector", () => {
     expect([...row.querySelector("select")!.options].map((o) => o.value)).toEqual(["", "calm", "tense", "hostile"]);
     // One it doesn't is refused in the field's words (after the shell's own word on it).
     expect(drawn("shouty").querySelector(".shell-fieldrow-problem")?.textContent).toBe("Probe reads this as calm, tense, or hostile, so it doesn't know “shouty”.");
+  });
+});
+
+// Pattershot's brief, "extension fields folded" (F1 to F9): an extension's section folded to the fields the node
+// sets, by the shell's extensionFold.
+describe("the inspector's fold", () => {
+  beforeEach(() => { inspectorFold.setOpen("probe", false); });
+  const line = (ext?: Record<string, unknown>): unknown => ({ kind: "leaf", beat: "line", id: "L_bell", ...(ext ? { ext: { probe: ext } } : {}) });
+  const shown = (host: HTMLElement): string[] =>
+    [...host.querySelectorAll<HTMLElement>(".insp-ext-section .shell-fold-body > .shell-fieldrow > .shell-fieldrow-label")].map((l) => l.textContent ?? "");
+  const cap = (host: HTMLElement): HTMLButtonElement => host.querySelector<HTMLButtonElement>(".insp-ext-section .insp-gd-cap")!;
+
+  it("is folded to the caption alone where a node sets nothing, defaults included", () => {
+    const host = draw(handlersWith(), line({ marks: [], perf: {} }));
+    expect(shown(host)).toEqual([]);
+    expect(cap(host).textContent).toBe("Probe");
+    expect(cap(host).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("shows only the set fields, counted in the caption, and opens to every field on a click", () => {
+    const host = draw(handlersWith(), line({ tone: "tense", perf: { ANNA: { expression: "frown" } } }));
+    expect(shown(host)).toEqual(["tone", "perf"]);
+    expect(cap(host).textContent).toBe("Probe (2 set)");
+    cap(host).click();
+    expect(shown(host).length).toBeGreaterThan(2);
+    expect(inspectorFold.isOpen("probe")).toBe(true);
+    // Open stays open on the next node.
+    expect(shown(draw(handlersWith(), line())).length).toBeGreaterThan(2);
+  });
+
+  it("keeps a row cleared while folded until the author leaves the node", () => {
+    expect(shown(draw(handlersWith(), line({ tone: "tense" })))).toEqual(["tone"]);
+    expect(shown(draw(handlersWith(), line({})))).toEqual(["tone"]);   // cleared: redrawn, still there
+    const other = { kind: "leaf", beat: "line", id: "L_reply" };
+    draw(handlersWith(), other);
+    expect(shown(draw(handlersWith(), line({})))).toEqual([]);           // left and back: gone
+  });
+
+  it("leaves Project Settings unfolded", () => {
+    const x = probe().find((e) => e.id === "probe")!;
+    const host = document.createElement("div");
+    mountProjectSection(host, { extension: x, adapter, locked: null, onChange: noop });
+    expect(host.querySelector(".shell-fold")).toBeNull();
+    expect(host.querySelectorAll(".shell-fieldrow").length).toBeGreaterThan(0);
   });
 });
 
