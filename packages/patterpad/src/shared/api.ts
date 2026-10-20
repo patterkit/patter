@@ -88,6 +88,9 @@ export interface OpenedProject {
   trackAudioStatus: boolean;
   /** Master cast names (ProjectFile.cast). */
   cast: string[];
+  /** Each cast member's player-facing name in the source language, by cast name, where it has one that
+   *  differs from the cast name (a view extension's project node reads it). */
+  castNames?: Record<string, string>;
   /** The speaker qualifiers a line can pick from, in display order (ProjectFile.qualifiers, else the
    *  defaults): the inspector's Qualifier dropdown, the cue's `(O.S.)`, and the keyboard route's cycle. */
   qualifiers: SpeakerQualifier[];
@@ -161,6 +164,10 @@ export interface ExtensionDto {
   projectNode: string;
   /** The project's own values (`_project.patterextension`), raw. Absent when it sets none. */
   projectValues?: Record<string, unknown>;
+  /** The views its manifest offers in Patterpad (tier 2), by id and name. Absent when it offers none. */
+  views?: { id: string; name: string }[];
+  /** The other extensions whose data its views read, by id. Absent when they read none. */
+  reads?: string[];
 }
 
 export interface ExtensionTargetDto {
@@ -464,6 +471,19 @@ export interface SaveResult {
  *  editor's journal: its id, its label ("Replace"), whether it merged into the step before (the same key,
  *  as a run of edits on the Properties page), and the scenes whose script (flow or strings) or authoring
  *  shard it touched. */
+/** What Add Extension… did: the extension's name and version, whether it updated one the project took at
+ *  another version, the manifest's warnings as sentences, and the refreshed project. */
+export interface AddExtensionResult extends SaveResult {
+  project?: OpenedProject;
+  name?: string;
+  version?: string;
+  /** The version the project took before, when this was an update. */
+  was?: string;
+  warnings?: string[];
+  /** Installing its views on this machine failed, though the project took it: why. */
+  installError?: string;
+}
+
 export interface ProjectStep { id: number; label: string; merged: boolean; scenes: string[]; authoring: string[] }
 
 /** What a project undo or redo came to, and what the editor must refresh. */
@@ -1369,6 +1389,13 @@ export interface PatterApi {
   onFieldsCommit(handler: (id: string, extension: string, field: string, value: unknown) => void): void;
   /** The FIELDS window started or stopped following the selection: send the state for its node. */
   onFieldsFollow(handler: (on: boolean) => void): void;
+  /** File ▸ Add Extension…: main picks a package (a folder or an npm pack .tgz), checks it, writes its manifest
+   *  and pin into the project as one undo step, and installs its views on this machine. Null when cancelled
+   *  or refused (main has said why). */
+  addExtension(): Promise<AddExtensionResult | null>;
+  /** A view extension wrote the project's own values for its extension: replace the project's entry, as one
+   *  step of the project history with the view's label. */
+  writeProjectExtension(extension: string, entry: Record<string, unknown>, label: string): Promise<SaveResult & { project?: OpenedProject }>;
   /** A row was clicked in the coverage window: jump the editor to that beat (loadScene + reveal). */
   onCoverageNavigate(handler: (sceneId: string, beatId: string) => void): void;
   /** The coverage window's "World Properties…" button: open Project Settings ▸ World Properties. */

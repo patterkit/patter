@@ -52,3 +52,54 @@ describe("Edit ▸ Undo and Redo", () => {
     expect(main.webContents.send).not.toHaveBeenCalled();
   });
 });
+
+describe("view extensions in the menus", () => {
+  const main = fakeWindow();
+  const sheet = fakeWindow();
+  const opened: string[] = [];
+  const views = {
+    offers: [
+      { extension: "shot", view: "sheet", name: "Performance sheet", extensionName: "Shot", installed: true },
+      { extension: "probe", view: "inspect", name: "Probe view", extensionName: "Probe", installed: false, why: "Probe isn't installed on this machine." },
+    ],
+    open: (e: string, v: string) => { opened.push(`open ${e}/${v}`); },
+    install: (e: string) => { opened.push(`install ${e}`); },
+    isView: (w: unknown) => w === sheet,
+  };
+  const menu = (label: string): MenuItemConstructorOptions[] =>
+    ((state.template as MenuItemConstructorOptions[]).find((m) => m.label === label)!.submenu as MenuItemConstructorOptions[]);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    opened.length = 0;
+    applyMenu(main as never, [], {} as never, {} as never, [], { hasProject: true, enabled: true, language: "en-US", dictionaries: [] }, false, false, false, false, false, false, views);
+  });
+
+  it("send a view window's Undo and Redo to the editor, whose journal holds its edits", () => {
+    state.focused = sheet;
+    click(editItem("Undo"));
+    click(editItem("Redo"));
+    expect(main.webContents.send.mock.calls).toEqual([["menu", "undo"], ["menu", "redo"]]);
+    expect(sheet.webContents.undo).not.toHaveBeenCalled();
+  });
+
+  it("put Add Extension beside Project Settings", () => {
+    const file = menu("File").map((i) => i.label);
+    expect(file[file.indexOf("Project Settings…") + 1]).toBe("Add Extension…");
+    click(menu("File").find((i) => i.label === "Add Extension…")!);
+    expect(main.webContents.send.mock.calls).toEqual([["menu", "add-extension"]]);
+  });
+
+  it("list the project's views in the Window menu, one not installed here disabled with why, and its Install item", () => {
+    const items = menu("Window");
+    const sheetItem = items.find((i) => i.label === "Performance sheet")!;
+    const probeItem = items.find((i) => i.label === "Probe view")!;
+    expect(sheetItem.enabled).toBe(true);
+    expect(probeItem).toMatchObject({ enabled: false, sublabel: "Probe isn't installed on this machine." });
+    click(sheetItem);
+    click(items.find((i) => i.label === "Install Probe on This Machine…")!);
+    expect(opened).toEqual(["open shot/sheet", "install probe"]);
+    // With no views on offer, the stock Window menu.
+    applyMenu(main as never, [], {} as never, {} as never);
+    expect((state.template as MenuItemConstructorOptions[]).some((m) => m.role === "windowMenu")).toBe(true);
+  });
+});

@@ -19,7 +19,7 @@ import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./sce
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
 import { projectQualifiers, usedSpeakerPairs, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
 import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQualifiersInAuthoring, renameQualifiersInHandoff, renameQualifierLabels, moveQualifierKeys, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
-import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD, PROJECT_EXTENSION_STEM } from "@patterkit/model";
+import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD, PROJECT_EXTENSION_STEM, castStringKey } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
 import type { ReviewItem, ProjectStep, ProjectHistoryOutcome } from "../shared/api.js";
@@ -28,11 +28,11 @@ import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync, prepareToWr
 import { fileSafeName } from "../shared/file-name.js";
 import type { EditableExportRequest, EditableImportRequest, EditableImportSummary, OpenSuggestionDto } from "../shared/api.js";
 import type { ImportPlan } from "@patterkit/ops";
-import { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, renameCastKeys, readProjectManifest } from "@patterkit/ops";
+import { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, renameCastKeys, readProjectManifest, manifestPath, planExtensionUpgrades } from "@patterkit/ops";
 import { createHash, randomUUID } from "node:crypto";
 import type { StageRenameDto } from "../shared/api.js";
 import type { SceneExtensionShards, LiveSceneSource, SceneExtensionSourceDto } from "../shared/api.js";
-import type { ExtensionShard } from "@patterkit/model";
+import type { ExtensionShard, ProjectExtension } from "@patterkit/model";
 import { EXTENSION_SCHEMA } from "@patterkit/model";
 import type { Manifest } from "@wildwinter/toolkit/extensions";
 import { extensionDtos, extensionNodeIndex } from "../shared/extensions.js";
@@ -281,6 +281,7 @@ function summarise(p: LoadedProject): OpenedProject {
     voiced: p.project.voiced ?? false,
     trackAudioStatus: (p.project.voiced ?? false) && (p.project.trackAudioStatus ?? false),
     cast: (p.project.cast ?? []).map((c) => c.name),
+    ...castNamesOf(p),
     qualifiers: projectQualifiers(p.project),
     padAfterDefault: p.project.padAfterDefault ?? DEFAULT_PAD_AFTER,
     localiseDialogueText: p.project.localiseDialogueText ?? false,
@@ -295,6 +296,19 @@ function summarise(p: LoadedProject): OpenedProject {
     scratchStatus: p.project.scratchStatus ?? null,
     ...extensionSummary(p),
   };
+}
+
+/** Each cast member's player-facing name in the source language, where it differs from the cast name: the
+ *  project strings' `cast:<name>`, else the member's own `displayName`. */
+function castNamesOf(p: LoadedProject): Pick<OpenedProject, "castNames"> {
+  const def = p.project.locales.default;
+  const strings = p.locales.find((l) => l.scene === PROJECT_LOCALE_SCENE && (l.locale === def || l.default))?.strings ?? {};
+  const out: Record<string, string> = {};
+  for (const c of p.project.cast ?? []) {
+    const shown = strings[castStringKey(c.name)] ?? c.displayName;
+    if (shown && shown !== c.name) out[c.name] = shown;
+  }
+  return Object.keys(out).length ? { castNames: out } : {};
 }
 
 /** The project's Patter extensions for the editor, read from the project file and the disk (so the landing
@@ -2188,6 +2202,69 @@ export function applyFix(fix: QuickFix): Promise<SaveResult & { step?: ProjectSt
       return res;
     }
     return { ok: false, error: "unknown fix (handled in the renderer?)" }; // e.g. retarget-jump is a surface edit
+  });
+}
+
+// --- taking an extension (tier 2 view extensions, patterkit design/view-extensions.md) ------------------
+
+/**
+ * File ▸ Add Extension…: take an extension's manifest into the project as ONE step of the project history:
+ * the manifest as `extensions/<id>.extension.json` (its own bytes: an extension's manifest is never
+ * formatted) and the project's pin, `extensions.<id>.version`, its settings kept. Taking another version of an
+ * extension the project already takes is `patter format`'s upgrade (ops' `planExtensionUpgrades`): the stages
+ * the new manifest says it renamed are renamed in the extension's data, and the pin moves, in the same step.
+ * `reload` says the step rewrote scene data (the open scene reloads from it).
+ */
+export function takeExtension(manifestText: string, manifest: Manifest): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; was?: string; reload?: boolean }> {
+  return enqueueForProject(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    ensureHydrated(); // the upgrade reads every scene's data for the extension
+    const id = manifest.id;
+    const taken = loaded.project.extensions ?? {};
+    const was = taken[id]?.version;
+    const path = manifestPath(loaded.root, id);
+    // The upgrade over the project as it will be: the new manifest, and this extension alone among the
+    // manifests, so no other extension's pin moves with it. A new extension goes in with no version, which
+    // the upgrade then pins.
+    const planned = planExtensionUpgrades({
+      ...loaded,
+      project: { ...loaded.project, extensions: { ...taken, [id]: taken[id] ?? ({} as ProjectExtension) } },
+      manifests: [{ path, id, manifest }],
+    });
+    const writes = [{ path, content: manifestText }, ...[...planned.writes].map(([p, content]) => ({ path: p, content }))];
+    const label = `${was !== undefined ? "Update" : "Add"} ${manifest.name}`;
+    const res = await projectCommit(label, freshKey("extension"), writes);
+    if (!res.ok) return res;
+    const reload = writes.some((w) => w.path.endsWith(EXTENSION_SHARD));
+    reloadFromDisk();
+    return { ok: true, project: summarise(loaded), reload, ...(was !== undefined ? { was } : {}), ...(res.step ? { step: res.step } : {}) };
+  });
+}
+
+/** The extensions the open project takes whose manifest in the project is sound: each id, the version the
+ *  project pins (absent with none), and the manifest. What the views on offer are read from. */
+export function takenExtensions(): { id: string; pin?: string; manifest: Manifest }[] {
+  if (!loaded) return [];
+  const out: { id: string; pin?: string; manifest: Manifest }[] = [];
+  for (const [id, pin] of Object.entries(loaded.project.extensions ?? {}).sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const manifest = readProjectManifest(loaded.root, id);
+    if (manifest) out.push({ id, ...(pin?.version ? { pin: pin.version } : {}), manifest });
+  }
+  return out;
+}
+
+/** A view extension wrote the project's own values for its extension: the project's entry in its
+ *  `_project.patterextension` replaced by `entry`, as one step of the project history with the view's label. */
+export function saveProjectExtensionValues(id: string, entry: Record<string, unknown>, label: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {
+  return enqueueForProject(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    if (!loaded.project.extensions?.[id]) return { ok: false, error: `This project doesn't take ${id}.` };
+    const writes = projectExtensionWrites({ [id]: entry });
+    if (writes.length === 0) return { ok: true, project: summarise(loaded) };
+    const res = await projectCommit(label, freshKey("view"), writes);
+    if (!res.ok) return res;
+    for (const w of writes) applyExtensionShardAt(loaded, w.path, w.content);
+    return { ok: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
   });
 }
 

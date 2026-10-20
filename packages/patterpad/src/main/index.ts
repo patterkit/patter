@@ -3,8 +3,10 @@
 // lifecycle + window + native dialogs + IPC wiring; the project session lives in project.ts and the
 // open-where-you-left-off / recents / identity store in store.ts.
 
-import { app, autoUpdater, BrowserWindow, dialog, ipcMain, screen, shell, systemPreferences, Menu } from "electron";
+import { app, autoUpdater, BrowserWindow, dialog, ipcMain, protocol, screen, shell, systemPreferences, Menu } from "electron";
 import { guardAllWindows } from "@wildwinter/app-shell/window-guard";
+import { viewSchemePrivileges } from "@wildwinter/app-shell/view-host";
+import { createViewExtensions, viewsDir, VIEW_SCHEME } from "./views.js";
 import { findPairedStorylets, findStoryletter, launchStoryletter } from "./storyletter.js";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -151,8 +153,30 @@ function refreshMenu(): void {
   // The "Live Link" checkbox is ticked while the localhost link is up (listening / connected).
   const dbg = debugServer?.status().state;
   const debugActive = dbg === "listening" || dbg === "connected";
-  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined, project.audioFoldersEnabled());
+  // The Window menu's view extensions: the views the open project offers, as `views.update` last found them.
+  const viewMenu = {
+    offers: views.offers(),
+    open: (extension: string, view: string) => { void views.open(extension, view); },
+    install: (extension: string) => { void views.install(extension); },
+    isView: (w: BrowserWindow | null) => views.isView(w),
+  };
+  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined, project.audioFoldersEnabled(), viewMenu);
 }
+
+// Tier 2 view extensions (views.ts): the views the open project offers, their windows, Add Extension…, and
+// Install <Name> on This Machine…. Each view window is a floating tool window of its own, remembered under
+// `view:<extension>/<view>` as the helper windows are.
+const views = createViewExtensions({
+  dir: viewsDir(),
+  editor: () => win,
+  root: () => project.currentRoot(),
+  taken: () => project.takenExtensions(),
+  slice: (extension, view) => store.viewWindow(extension, view),
+  tell: (title, sub, body) => tellInWindow(title, sub, body),
+  flushEditor: () => flushEditorScene(),
+  take: (text, manifest) => project.takeExtension(text, manifest),
+  refreshMenu: () => refreshMenu(),
+});
 
 // Ask the editor window to flush its open scene to disk, and resolve once it confirms (or after a short
 // timeout if it can't). Used before a project-wide Replace so the open scene's unsaved edits are included
@@ -241,6 +265,7 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     // describes the NEW project: tearing down here left nothing loaded (Open Recent over an open
     // project showed one scene, 2026-09-03). Only a session that is still current is closed for real.
     if (!project.isCurrent(ending)) return;
+    views.closeAll(); // a view of a closed project is a view of nothing
     project.closeProject();
     currentRoot = null;      // the second-instance jump-in-place guard must not point at a closed project
     pairedStorylets = undefined;
@@ -266,6 +291,8 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     try { proj = project.openProject(path, remembered); }
     catch (e) { return { error: `Patterpad couldn't read it: ${e instanceof Error ? e.message : String(e)}` }; }
     currentRoot = proj.root; // this project is now the one shown (see the second-instance jump-in-place guard)
+    views.closeAll();        // a view of the project before is a view of nothing here
+    void views.update();     // the views this one offers, and whether they're installed here
     pairedStorylets = findPairedStorylets(proj.root); // Show Card in Storyletter, when a project there pairs with this one
     // A file-association launch onto a specific scene shard (Finder / argv) lands ON that scene;
     // otherwise (the project root / `.patter` package) fall back to where the author last left off.
@@ -913,6 +940,7 @@ function rescueWindows(): void {
     win.show(); win.focus();
   }
   windows.rescue();
+  views.rescue();
 }
 
 /** Open (or focus + switch the mode of) the detached Find window, anchored at the editor's caret.
@@ -958,6 +986,8 @@ function registerIpc(): void {
   ipcMain.handle("project:close", () => {
     session.closeCurrent();
     for (const w of windows.all()) w.close();
+    views.closeAll();
+    void views.update();
   });
   ipcMain.handle("project:openPath", (_e, path: string): OpenResult => {
     if (!isKnownProjectPath(path)) throw new Error("refused to open an unrecognised path"); // renderer can only reopen known projects
@@ -1019,6 +1049,20 @@ function registerIpc(): void {
     pinToolWindow(windows.get("fields"), win, on);
   });
   ipcMain.handle("fieldsWin:close", () => { windows.get("fields")?.close(); });
+  // View extensions: File ▸ Add Extension…, and a view's write of the project's own values for its extension.
+  ipcMain.handle("extensions:add", async () => {
+    const r = await views.add();
+    // The open scene reloads whether or not its data was rewritten: it opened with the extension's data held
+    // back, untaken, and now takes it.
+    if (r?.ok) { win?.webContents.send("replace:applied"); projectChanged(); }
+    return r;
+  });
+  ipcMain.handle("extensions:writeProject", async (_e, extension: string, entry: Record<string, unknown>, label: string) => {
+    if (typeof extension !== "string" || typeof label !== "string" || !entry || typeof entry !== "object") return { ok: false, error: "That isn't a write." };
+    const r = await project.saveProjectExtensionValues(extension, entry, label);
+    if (r.ok) projectChanged();
+    return r;
+  });
   // The editor's progress strip: stop the running publish-shaped job at its next yield.
   ipcMain.handle("job:cancel", (_e, kind: string) => { jobs.cancel(kind); });
   ipcMain.handle("covWin:reveal", (_e, sceneId: string, beatId: string) => {
@@ -1119,7 +1163,7 @@ function registerIpc(): void {
   // save: a connected game and a running play window hear about it.
   const stepHistory = async (way: "undo" | "redo", id?: number) => {
     const r = await project.stepProjectHistory(way, typeof id === "number" ? id : undefined);
-    if (r.ok) { refreshMenu(); projectChanged(); }
+    if (r.ok) { refreshMenu(); projectChanged(); void views.update(); } // an undone Add Extension takes its views away
     return r;
   };
   ipcMain.handle("project:undo", (_e, id?: number) => stepHistory("undo", id));
@@ -1435,7 +1479,7 @@ function createWindow(): void {
       else if (!self.isDestroyed()) self.close();
     });
   });
-  win.on("closed", () => { ipcMain.removeListener("app:ready", onReady); win = null; for (const w of windows.all()) w.close(); debugServer?.stop(); }); // closing the editor closes its helper windows + the debug link
+  win.on("closed", () => { ipcMain.removeListener("app:ready", onReady); win = null; for (const w of windows.all()) w.close(); views.closeAll(); debugServer?.stop(); }); // closing the editor closes its helper windows, its views, and the debug link
 
   if (process.env["ELECTRON_RENDERER_URL"]) void win.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   else void win.loadFile(join(here, "../renderer/index.html"));
@@ -1487,6 +1531,10 @@ app.setAppUserModelId("com.patterkit.patterpad");
 // window hardening, patterkit design/family-parity-2026-10.md item 12). Nothing it refuses is opened in the
 // browser instead: the only addresses that leave the app are the About links, by ABOUT_LINKS.
 guardAllWindows(app);
+
+// The one privileged-scheme registration Electron keeps (the last call wins), before the app is ready: the
+// scheme view extensions' pages are served on, each view window's own session serving only its package.
+protocol.registerSchemesAsPrivileged([viewSchemePrivileges(VIEW_SCHEME)]);
 
 // Single instance: double-clicking a .patterflow while Patterpad is already open should hand the file to
 // the RUNNING window (second-instance), not spawn a rival. The non-primary launch quits immediately.

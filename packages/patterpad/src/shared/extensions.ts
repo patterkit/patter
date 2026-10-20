@@ -11,7 +11,7 @@
 // disk, so the summary works before the rest of the project has been read.
 // ---------------------------------------------------------------------------
 
-import { resolvedClaims, settingValues } from "@wildwinter/toolkit/extensions";
+import { resolvedClaims, settingValues, viewsFor } from "@wildwinter/toolkit/extensions";
 import type { Manifest } from "@wildwinter/toolkit/extensions";
 import type { Beat, Group, ProjectFile, Scene, Snippet } from "@patterkit/model";
 import type { ExtensionDto, ExtensionFieldDto, ExtensionNodeDto, ExtensionTargetDto } from "./api.js";
@@ -54,9 +54,17 @@ export function extensionDtos(
       settings: (manifest.settings ?? []).map((s) => ({ name: s.name, label: s.label ?? s.name, value: chosen[s.name] ?? s.default })),
       targets, projectNode,
       ...(projectValues && Object.keys(projectValues).length ? { projectValues: { ...projectValues } } : {}),
+      ...viewFacts(manifest),
     });
   }
   return out.length ? out : undefined;
+}
+
+/** What a manifest says about its views in Patterpad: each view's id and name, and the extensions they read. */
+function viewFacts(manifest: Manifest): Pick<ExtensionDto, "views" | "reads"> {
+  const views = viewsFor(manifest, "patter").map((v) => ({ id: v.id, name: v.name }));
+  const reads = Array.isArray(manifest.reads) ? manifest.reads.filter((r): r is string => typeof r === "string") : [];
+  return { ...(views.length ? { views } : {}), ...(reads.length ? { reads } : {}) };
 }
 
 /** The read-only line an extension's Settings section opens with: what the project takes it at, and the

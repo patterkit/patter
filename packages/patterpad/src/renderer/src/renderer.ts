@@ -53,6 +53,9 @@ import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, 
   askIdentity, confirmDialog, dialogFrame, openContextMenu, type ShardVc, type SettingsSectionHandle, type SettingsSection, type SettingsDialog } from "@wildwinter/app-shell";
 import { extensionAdapter, mountProjectSection, problemSettingsSection, settingsExtensions, settingsSectionId } from "./extension-rows.js";
 import { fieldsState, followTarget, selectedNodes, type FieldsNode } from "./fields-state.js";
+import { createViewHost, takeLengths } from "./view-extensions.js";
+import { parseSource } from "@patterkit/core";
+import type { FlowFile, LocaleFile, ExtensionShard } from "@patterkit/model";
 import "@wildwinter/app-shell/vc.css"; // the badge + locked-document chrome
 import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
@@ -338,6 +341,7 @@ function noteStep(step: ProjectStep | undefined): void {
   if (step.merged) { journal.noteMerged(); return; }
   const known = journal.undoEntries.some((e) => e.kind === "project" && e.id === step.id);
   journal.pushProject(step.id, step.label);
+  views.changed("all"); // a project step may have changed anything a view shows
   // Typing straight after the step starts a new event, so it can't join one from before the step and be
   // undone out of order.
   if (!known) surface?.closeHistory();
@@ -911,6 +915,7 @@ function applySceneVc(): void {
   const ro = isReadOnly(st);
   surface?.setEditable(!ro);
   pushFields(); // the fields window locks with the scene
+  views.writable(); // and so does every open view
   const locks = extensionLocksOf(st);
   surface?.setLockedExtensions(locks);
   const sig = JSON.stringify(locks);
@@ -1009,6 +1014,7 @@ let theme: ThemePrefs = { colour: "system", font: "newsreader" };
 function setTheme(patch: Partial<ThemePrefs>): void {
   theme = { ...theme, ...patch };
   applyTheme(theme);
+  views.theme(); // an open view draws in the editor's palette
   // Remember it (this also refreshes the View-menu radio checks) AND hand it to every other open
   // window: the helper windows share this app's palette and cannot see this one's root.
   void window.patter.setTheme(theme);
@@ -1144,8 +1150,9 @@ function selectAllCommand(): void {
 /** Edit > Undo and Redo in the main window: the focused field's own text, or the journal's newest entry
  *  (the open scene's history or the project's), by `undoRoute` (edit-commands.ts). On the Properties page
  *  only a project step: the page's own saves. */
-async function undoCommand(dir: "undo" | "redo"): Promise<void> {
-  const route = undoRoute({
+async function undoCommand(dir: "undo" | "redo", fromView = false): Promise<void> {
+  // A view extension passed its Cmd+Z on: whatever has the focus here, it means the editor's journal.
+  const route = fromView ? (!project ? "none" : !propsDocEl.hidden ? "project" : "journal") : undoRoute({
     active: document.activeElement,
     sceneAreas: [editorEl, inspectorStackEl],
     dialogOpen: !!document.querySelector("dialog[open]"),
@@ -1213,6 +1220,7 @@ async function applyJournalEntry(entry: JournalEntry, way: "undo" | "redo"): Pro
 async function afterProjectHistory(r: ProjectHistoryOutcome): Promise<void> {
   if (!r.project || !project) return;
   project = r.project;
+  views.changed("all");
   projectNameEl.textContent = project.name;
   renderNav();
   const open = surfaceSceneId;
@@ -1694,6 +1702,7 @@ const audioOn = (): boolean => !!project?.trackAudioStatus && !!project?.audioFo
 let audioIndex: Record<string, AudioEntry> = {};
 window.patter.onAudioIndex((snap) => {
   audioIndex = snap;
+  views.changed("all", { saved: false }); // a new take changes a line's length
   const ctx = lastInspectorCtx; // a visible recording chip may now resolve differently
   if (ctx && audioOn()) { lastInspectorSig = null; showInspector(ctx); }
 });
@@ -2029,6 +2038,7 @@ function showInspector(ctx: InspectorContext): void {
   highlightNavBlock(blockLevel && "id" in blockLevel ? blockLevel.id : null);
   lastInspectorCtx = ctx; // so the global pills/text toggle can re-render this same view in place
   pushFields(); // the fields window follows the selection, and every edit (before the early return below)
+  views.selection(); // and so does every open view
   // onSelect fires on every selection move AND every doc edit (typing). The inspector only shows a
   // projection of the caret's container stack, so skip the (pill-rebuilding) teardown when nothing it
   // displays has changed - e.g. typing dialogue text doesn't touch the shown fields.
@@ -2157,6 +2167,96 @@ window.patter.onFieldsFollow((on) => {
   fieldsHeld = on ? null : fieldsShown;
   pushFields();
 });
+
+// --- tier 2 view extensions (patterkit design/view-extensions.md) -------------------------------------
+// A view window's port comes straight here; view-extensions.ts answers it from the project as the writer
+// sees it, and this file tells it what changed (the scene, the selection, the theme, the locks).
+
+/** The label the next new event in the scene's history carries in the journal (a view's write). */
+let sceneStepLabel: string | undefined;
+
+/** A recording's length, read from its file's metadata as Play reads it. Null when it won't load. */
+async function measureTake(id: string): Promise<number | null> {
+  const data = await window.patter.readAudio(id);
+  if (!data) return null;
+  const url = URL.createObjectURL(new Blob([data.bytes as BlobPart], { type: data.mime }));
+  try {
+    const audio = new Audio(url);
+    audio.preload = "metadata";
+    return await new Promise<number | null>((res) => {
+      audio.onloadedmetadata = () => res(audio.duration);
+      audio.onerror = () => res(null);
+    });
+  } finally { URL.revokeObjectURL(url); }
+}
+
+/** Recordings' lengths, by the take's path and its line's text hash: measured once per take. */
+const takeLength = takeLengths(measureTake);
+
+/** A scene's saved source as a view reads it: its model, its strings, and its extension values by node. */
+function sceneFromSource(src: { flowSource: string; locSource: string; extensions: { id: string; source: string; live: boolean }[] }): import("./view-nodes.js").ViewScene {
+  const scene = (parseSource(src.flowSource) as FlowFile).scene;
+  let strings: Record<string, string> = {};
+  try { strings = (parseSource(src.locSource) as LocaleFile).strings ?? {}; } catch { /* no strings yet */ }
+  const ext: Record<string, Record<string, Record<string, unknown>>> = {};
+  for (const x of src.extensions) {
+    if (!x.live || !x.source.trim()) continue;
+    let shard: ExtensionShard;
+    try { shard = parseSource(x.source) as ExtensionShard; } catch { continue; }
+    for (const byNode of Object.values(shard.entries ?? {})) {
+      for (const [node, entry] of Object.entries(byNode ?? {})) (ext[node] ??= {})[x.id] = entry as Record<string, unknown>;
+    }
+  }
+  return { scene, strings, ext };
+}
+
+const isWindows = /Win/i.test(navigator.platform || navigator.userAgent);
+
+// The shell's `hostViews` takes each view window's port as main hands it over (and drops it when the window
+// closes); this is the adapter it answers from.
+const views = createViewHost({
+  project: () => project,
+  openScene: () => (surface && currentSceneId && surfaceSceneId === currentSceneId ? { id: currentSceneId, model: surface.model() } : null),
+  readScene: async (id) => sceneFromSource(await window.patter.readScene(id)),
+  selection: () => (currentSceneId ? lastInspectorCtx : null),
+  sceneLocked: () => {
+    const st = currentSceneId ? vcMap.get(currentSceneId) : undefined;
+    return st?.lockedBy?.length ? `Locked by ${st.lockedBy.join(", ")}. Read-only until they release it.` : null;
+  },
+  extensionLocked: (extension) => {
+    const lock = extensionLocksOf(currentSceneId ? vcMap.get(currentSceneId) : undefined)[extension];
+    return lock ? `${lock.name}'s data here is locked by ${lock.by.join(", ") || "someone else"}.` : null;
+  },
+  projectExtensionLocked: (extension) => lockedLine(projectExtensionVc[extension]?.lockedBy),
+  valueAdapter: () => currentExtensionAdapter(),
+  writeScene: (extension, label, edits) => {
+    if (!surface) return { ok: false, why: "read-only", message: "No scene is open." };
+    sceneStepLabel = label;
+    try { return surface.setExtensionValues(extension, edits); } finally { sceneStepLabel = undefined; }
+  },
+  writeProject: async (extension, entry, label) => {
+    const res = await tracked(window.patter.writeProjectExtension(extension, entry, label));
+    if (res.project) { project = res.project; lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); }
+    return res;
+  },
+  reveal: async (id, sceneId) => {
+    if (sceneId === null) return surface?.revealNode(id) ?? false;
+    await jumpTo({ id, kind: id === sceneId ? "scene" : "beat", sceneId, location: [] });
+    return id === sceneId || currentSceneId === sceneId;
+  },
+  recordedSeconds: (id) => {
+    const entry = audioOn() ? audioIndex[id] : undefined;
+    if (!entry?.path) return Promise.resolve(null);
+    const key = `${entry.path}\0${entry.textHash ?? ""}`;
+    return takeLength(key, id);
+  },
+  key: (combo) => {
+    if (combo === "Mod+Z") void undoCommand("undo", true);
+    else if (combo === "Mod+Shift+Z" || (isWindows && combo === "Mod+Y")) void undoCommand("redo", true);
+  },
+});
+// "Follow System" follows the OS between light and dark, with nothing to say so but the media query.
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => views.theme());
 
 /** What the problems bar needs to word an extension's problem: the extensions, and every node by id with the
  *  label the editor shows (the open scene's as they stand, the rest from the project's index), built only
@@ -2305,7 +2405,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     // Cross-scene jump targets: every scene + its blocks (the surface adds THIS scene with live blocks).
     jumpTargets: project.scenes.map((s) => ({ id: s.id, label: s.name, blocks: s.blocks.map((b) => ({ id: b.id, label: b.name })) })),
     showTitle: true,
-    onChange: () => { if (!mountingScene) { saver.touch(); sceneEdited = true; refreshStaleBadge(); } scheduleValidate(); refreshNavBlocks(); syncSceneName(); },
+    onChange: () => { if (!mountingScene) { saver.touch(); sceneEdited = true; refreshStaleBadge(); views.changed("all", { saved: false }); } scheduleValidate(); refreshNavBlocks(); syncSceneName(); },
     onSelect: showInspector, // drive the detail inspector off the caret's container stack
     onPlayBlock: (blockId) => { if (currentSceneId) void window.patter.openPlay(currentSceneId, blockId); },
     onOpenTarget: (targetId) => void openTarget(targetId), // double-click a jump chip -> follow the divert
@@ -2324,7 +2424,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     // Edit ▸ Undo is the journal's, never the editor's own keys; a new event in the history is a journal
     // entry, and clears the project's redo as ProseMirror has cleared the scene's.
     hostUndo: true,
-    onHistoryStep: () => { if (!mountingScene && journal.pushScene(sceneId)) void window.patter.projectClearRedo(); },
+    onHistoryStep: () => { if (!mountingScene && journal.pushScene(sceneId, sceneStepLabel)) void window.patter.projectClearRedo(); },
   });
   mountingScene = false; // any onChange from here on is a real edit
   currentSceneId = sceneId;
@@ -2346,6 +2446,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
   if (showReviewFeedback) void gatherReview(); // re-show the feedback walk bar (mode persists)
   watchSceneTitle();   // fade "<project>: <scene>" into the topbar once the title scrolls out of view
   flushRemember();     // record the scene now (the caret follows via showInspector, debounced)
+  views.changed("all"); views.writable(); // a view reads another scene now, which may be held by somebody else
 }
 
 // The topbar shows just the project name while the scene's title is visible at the top of the edit pane;
@@ -2447,6 +2548,7 @@ function openQualifierBrowse(): void {
 }
 
 async function showProject(open: OpenResult): Promise<void> {
+  views.closeAll(); // main closes their windows with the project they read
   project = open.project;
   debugLink.setVisible(true); // the bottom-right live-debug-link control is available once a project is open
   projectNameEl.textContent = project.name;
@@ -2728,6 +2830,7 @@ function showWelcome(state: Pick<BootState, "recents">): void {
   closeAnchoredPanel();
   surface?.destroy(); surface = null; project = null; currentSceneId = null; surfaceSceneId = null;
   journal.clear(); // the project's history went with it
+  views.closeAll(); // and so did every view of it
   debugLink.setVisible(false); // no project -> hide the live-debug-link control
   titleObserver?.disconnect(); titleObserver = null; sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = ""; // no scene -> no suffix
   vcMap.clear(); vcsSceneEl.hidden = true; shell.centre.querySelector(":scope > .vc-lock")?.remove(); // no project -> no VC state
@@ -3464,6 +3567,24 @@ async function refreshEditorScopes(): Promise<void> {
   setHostScopeTokens(fresh.hostScopes);
 }
 
+/** File ▸ Add Extension…: main picks and checks the package, takes it into the project as one undo step, and
+ *  installs its views on this machine (then reloads the open scene, which now takes the extension's data).
+ *  Here the project is refreshed, and the writer told what happened. */
+async function addExtension(): Promise<void> {
+  if (!project) return;
+  const r = await window.patter.addExtension();
+  if (!r) return; // cancelled, or refused (main has said why)
+  noteStep(r.step);
+  if (!landed(r, "Couldn't add the extension")) return;
+  if (r.project) { project = r.project; projectNameEl.textContent = project.name; }
+  lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
+  void refreshVcStatus();
+  void refreshProblems();
+  const what = `${r.was !== undefined ? "Updated" : "Added"} ${r.name ?? "the extension"} ${r.version ?? ""}`.trim();
+  if (r.installError) toast(`${what}\nIts views couldn't be installed on this machine: ${r.installError}`, "error");
+  else toast(`${what}${r.warnings?.length ? `\n${r.warnings.join(" ")}` : ""}`, r.warnings?.length ? "info" : "ok");
+}
+
 /** File ▸ Share Scopes with Other Tools: make the game's shared scopes folder (main asks where), then
  *  pick up the folder's scopes in the editors. */
 async function shareScopes(): Promise<void> {
@@ -3754,6 +3875,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "export-patterpack") void exportPatterpack();
   else if (cmd === "merge-patterpack") void mergePatterpack();
   else if (cmd === "share-scopes") void shareScopes();
+  else if (cmd === "add-extension") void addExtension();
   else if (cmd === "find") openSearch();
   else if (cmd === "replace") openSearch("replace");
   else if (cmd === "review-suggestions") { if (project) void window.patter.openSearchWindow("suggestions"); }

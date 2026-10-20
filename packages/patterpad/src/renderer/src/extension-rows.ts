@@ -78,6 +78,14 @@ export function fieldProblems(fields: readonly ExtensionFieldDto[], entry: Recor
   return out;
 }
 
+/** What a value would get wrong in a field, as sentences ("" when it's fine): the toolkit's checks with the
+ *  project's nodes and lists, as a row checks what's typed into it. A view extension's write is held to it. */
+export function valueProblem(decl: ExtensionFieldDto, value: unknown, adapter: ValueAdapter): string {
+  return valueProblems(decl as unknown as TypeDecl, value, {
+    exists: existsOf(adapter), ...(adapter.list ? { list: (name: string) => adapter.list!(name) } : {}),
+  }).filter((p) => p.severity === "error").map((p) => sentence(`${p.message} (${decl.name}${p.path === "" ? "" : p.path.startsWith("[") ? p.path : `.${p.path}`})`)).join(" ");
+}
+
 /** A quality value naming a stage the manifest has since renamed: the old name and the stage it is now. */
 export function renamedStage(decl: ExtensionFieldDto, value: unknown): { from: string; to: string } | undefined {
   if (decl.type !== "quality" || typeof value !== "string" || decl.stages?.includes(value)) return undefined;

@@ -31,6 +31,19 @@ function histories() {
 }
 
 describe("the undo journal", () => {
+  it("names a labelled scene edit in the Edit menu, undone and redone, and says nothing for a plain one", async () => {
+    const j = new UndoJournal();
+    const h = histories();
+    j.pushScene("A"); h.scene.depth++;
+    expect(j.labels()).toEqual({});
+    j.pushScene("A", "Set shot"); h.scene.depth++;
+    expect(j.labels()).toEqual({ undo: "Set shot" });
+    expect(await j.undo(h.apply)).toBe("done");
+    expect(j.labels()).toEqual({ redo: "Set shot" });
+    expect(await j.redo(h.apply)).toBe("done");
+    expect(j.labels()).toEqual({ undo: "Set shot" });
+  });
+
   it("interleaves the two histories: newest first, whichever it lives in", async () => {
     const j = new UndoJournal();
     const h = histories();

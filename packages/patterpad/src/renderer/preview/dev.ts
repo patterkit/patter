@@ -360,6 +360,9 @@ const stub = {
   sendFieldsState: (state: unknown) => { lastFieldsState = state; fieldsChannel.postMessage({ t: "state", state }); },
   onFieldsCommit: (handler: (id: string, extension: string, field: string, value: unknown) => void) => { onFieldsCommit = handler; },
   onFieldsFollow: (handler: (on: boolean) => void) => { onFieldsFollow = handler; },
+  // View extensions need main (a package, a window, a port): the preview has none to offer.
+  addExtension: async () => null,
+  writeProjectExtension: async () => ({ ok: false, error: "The preview can't write the project." }),
   onCoverageNavigate: () => undefined,
   onOpenWorldSettings: () => undefined,
   readSettings: async () => ({ name: "The Tavern", vcs: "git", start: { scene: "scn_tavern" }, voiced: true, trackAudioStatus: true, formatting: true, padAfterDefault: 0.6, localiseDialogueText: false, buildBundle: "../patter-dist/the_tavern.patterc", buildLocalisation: "embedded", buildSourceDebug: false, localeDefault: "en", locales: ["en", "fr"],

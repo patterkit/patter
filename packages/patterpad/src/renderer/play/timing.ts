@@ -132,8 +132,18 @@ export const MAX_RECORDING_SECONDS = 60;
 /** How long a line lasts on the timeline: its recording's length when that's readable, else the duration
  *  estimate (a recording whose length can't be read still plays), capped at a plausible length. */
 export function lineLength(recorded: number | null | undefined, estimate: number): number {
-  if (recorded === null || recorded === undefined || !Number.isFinite(recorded) || recorded <= 0) return estimate;
+  if (!readableLength(recorded)) return estimate;
   return Math.min(recorded, Math.max(MAX_RECORDING_SECONDS, estimate * 4));
+}
+
+/** A recording's length that can be used: a finite number of seconds above none. */
+const readableLength = (recorded: number | null | undefined): recorded is number =>
+  recorded !== null && recorded !== undefined && Number.isFinite(recorded) && recorded > 0;
+
+/** A line's length as a view extension is told it (the view host's `media`): `lineLength`, the rule Play
+ *  times the line by, and whether it came from a recording (`measured`) rather than the estimate. */
+export function lineMedia(recorded: number | null | undefined, estimate: number): { seconds: number; measured: boolean } {
+  return { seconds: lineLength(recorded, estimate), measured: readableLength(recorded) };
 }
 
 /** The whole timeline for beats whose lengths are known: each beat's slot, and when the run ends. */

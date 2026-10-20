@@ -14,10 +14,10 @@ import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { history, undo, redo, undoDepth, redoDepth, isHistoryTransaction, closeHistory } from "prosemirror-history";
 import type { Node as PMNode, MarkType } from "prosemirror-model";
-import type { PropertyDecl } from "@patterkit/model";
+import type { PropertyDecl, Scene } from "@patterkit/model";
 import { openScene, saveScene, type SceneExtensionSource, type SavedScene } from "../src/load.js";
-import { extensionLockGuard, extensionLockLoss, type ExtensionLocks } from "../src/extlock.js";
-import { extKindOf } from "../src/bridge.js";
+import { extensionLockGuard, extensionLockLoss, extensionLockMessage, type ExtensionLocks } from "../src/extlock.js";
+import { extKindOf, docToScene } from "../src/bridge.js";
 import { navKeymap } from "../src/navigation.js";
 import { openDirection, closeDirection } from "../src/direction.js";
 import { enter, endBubble, insertLineBefore } from "../src/lines.js";
@@ -162,6 +162,29 @@ export interface MountOptions {
   hostUndo?: boolean;
 }
 
+/** One field of an extension entry to set on a node, by the node's id (the scene's id for the scene), or to
+ *  clear when `value` is absent. */
+export interface ExtensionEdit {
+  id: string;
+  field: string;
+  value?: unknown;
+}
+
+/** How a batch of extension edits went: applied (`changed` false when every value was already so), or
+ *  refused whole, with why. */
+export type ExtensionWrite =
+  | { ok: true; changed: boolean }
+  | { ok: false; why: "gone" | "read-only" | "held"; message: string };
+
+/** The open scene as a model, as the writer sees it (`SurfaceHandle.model`). */
+export interface SceneModel {
+  scene: Scene;
+  /** The scene's strings in the source language, by beat id. */
+  strings: Record<string, string>;
+  /** Each node's extension values (`{ extension id: entry }`), by node id; absent for a node with none. */
+  ext: Record<string, Record<string, Record<string, unknown>>>;
+}
+
 export interface SurfaceHandle {
   view: EditorView;
   /** Serialize the doc to `.patterflow` + `.patterloc` source. Pass `{ prune: true }` on a real SAVE to
@@ -174,6 +197,14 @@ export interface SurfaceHandle {
    *  attr. False when the id isn't a node that carries extension data here, or the edit was refused (the
    *  scene is read-only, or the extension's data here is locked). */
   setExtensionValue(id: string, extension: string, field: string, value: unknown): boolean;
+  /** Set (or clear) several fields of one extension's entries, on any nodes here, as ONE recorded
+   *  transaction: one event in the scene's history, never joined to the edit before it or after it (a view
+   *  extension's labelled write). Refused whole, changing nothing, when a node isn't here (`gone`), the
+   *  scene is read-only, or somebody holds the extension's data (`held`, with the lock's sentence). */
+  setExtensionValues(extension: string, edits: readonly ExtensionEdit[]): ExtensionWrite;
+  /** The scene as the writer sees it now, unsaved edits included: its model, its source-language strings,
+   *  and each node's extension values by node id (the scene's under its own id). Built once per document. */
+  model(): SceneModel;
   /** A node's extension kind and its values, by its id (the scene's id for the scene), for a view held on a
    *  node the selection has left (the fields window). Null when no node here carries extension data by that id. */
   extensionsOf(id: string): { kind: string; ext: Record<string, Record<string, unknown>> } | null;
@@ -553,6 +584,8 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   let formattingEnabled = opts.formatting ?? true;
   const opened = openScene(opts.flowSource, opts.locSource, formattingEnabled, opts.extensions ?? []);
   let extensionLocks: ExtensionLocks = opts.lockedExtensions ?? {};
+  /** The scene model `model()` last built, and the document it was built from. */
+  let modelCache: { doc: PMNode; model: SceneModel } | null = null;
 
   // The project cast. Seed (recency-ordered) + auto-adopt every speaker the opened scene already
   // names, so an imported file's speakers are first-class. The popup's "add new" prepends here.
@@ -1404,6 +1437,57 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         : view.state.tr.setNodeMarkup(found!.pos, undefined, { ...node.attrs, ext: next });
       view.dispatch(tr);
       return view.state.doc !== doc;
+    },
+    setExtensionValues(extension, edits) {
+      const doc = view.state.doc;
+      if (!isEditable) return { ok: false, why: "read-only", message: "This scene is read-only just now." };
+      const lock = extensionLocks[extension];
+      if (lock) return { ok: false, why: "held", message: extensionLockMessage(lock) };
+      const sceneId = rawAttr(doc).id;
+      // Each node's data, gathered first so several edits to one node make one change to it.
+      const nodes = new Map<string, { pos: number | null; node: PMNode; data: Record<string, Record<string, unknown>> }>();
+      for (const e of edits) {
+        if (nodes.has(e.id)) continue;
+        const isScene = sceneId === e.id;
+        const found = isScene ? null : findByModelId(doc, e.id, (n) => extKindOf(n) !== null);
+        const node = isScene ? doc : found?.node;
+        if (!node) return { ok: false, why: "gone", message: `There's nothing called ${e.id} in this scene now.` };
+        let data: Record<string, Record<string, unknown>> = {};
+        try { const v = node.attrs.ext as string; if (v) data = JSON.parse(v) as typeof data; } catch { data = {}; }
+        nodes.set(e.id, { pos: isScene ? null : found!.pos, node, data });
+      }
+      for (const e of edits) {
+        const { data } = nodes.get(e.id)!;
+        const entry = { ...(data[extension] ?? {}) };
+        if (e.value === undefined) delete entry[e.field]; else entry[e.field] = e.value;
+        if (Object.keys(entry).length) data[extension] = entry; else delete data[extension];
+      }
+      // Attribute changes keep every position, so the steps can go in any order.
+      let tr = view.state.tr;
+      for (const { pos, node, data } of nodes.values()) {
+        const next = Object.keys(data).length ? JSON.stringify(data) : "";
+        if (next === node.attrs.ext) continue;
+        tr = pos === null ? tr.setDocAttribute("ext", next) : tr.setNodeMarkup(pos, undefined, { ...node.attrs, ext: next });
+      }
+      if (!tr.docChanged) return { ok: true, changed: false };
+      // A step of its own: never joined to typing just before it, and typing just after starts another.
+      view.dispatch(closeHistory(tr));
+      if (view.state.doc === doc) return { ok: false, why: "read-only", message: "The editor refused that change." };
+      handle.closeHistory();
+      return { ok: true, changed: true };
+    },
+    model() {
+      const doc = view.state.doc;
+      if (modelCache && modelCache.doc === doc) return modelCache.model;
+      const { scene, strings, ext } = docToScene(doc, formattingEnabled);
+      const byNode: SceneModel["ext"] = {};
+      for (const v of ext) {
+        if (!v.value) continue;
+        try { byNode[v.id] = JSON.parse(v.value) as SceneModel["ext"][string]; } catch { /* not ours to read */ }
+      }
+      const model: SceneModel = { scene, strings, ext: byNode };
+      modelCache = { doc, model };
+      return model;
     },
     setLockedExtensions(locks) { extensionLocks = { ...locks }; },
     historyRefusal(way) {

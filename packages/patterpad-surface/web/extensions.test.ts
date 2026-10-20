@@ -76,6 +76,43 @@ describe("the surface's extension handle", () => {
     expect(s.getSource().extensions).toEqual({ probe: SHARD });
   });
 
+  it("writes several fields on several nodes as one step of their own, and refuses the lot on a held shard", () => {
+    const { s, steps, said } = mount();
+    const depth = s.undoDepth();
+    const done = s.setExtensionValues("probe", [
+      { id: "L_bell", field: "note", value: "Louder" },
+      { id: "L_reply", field: "note", value: "Softer" },
+      { id: "L_bell", field: "weight", value: 3 },
+      { id: "scn_harbour", field: "theme" },
+    ]);
+    expect(done).toEqual({ ok: true, changed: true });
+    expect(steps()).toBe(1);
+    expect(s.undoDepth()).toBe(depth + 1);
+    const line = entries(s.getSource().extensions["probe"])["line"]!;
+    expect(line["L_bell"]).toMatchObject({ note: "Louder", weight: 3 });
+    expect(line["L_reply"]).toEqual({ note: "Softer" });
+    expect(s.model().ext["L_bell"]?.["probe"]).toMatchObject({ note: "Louder", weight: 3 });
+    expect(s.model().ext["scn_harbour"]).toBeUndefined();
+    // Nothing to change is no step; a single setExtensionValue straight after is a step of its own.
+    expect(s.setExtensionValues("probe", [{ id: "L_reply", field: "note", value: "Softer" }])).toEqual({ ok: true, changed: false });
+    expect(s.setExtensionValue("L_reply", "probe", "note", "Again")).toBe(true);
+    expect(s.undoDepth()).toBe(depth + 2);
+    s.undo(); s.undo();
+    expect(s.getSource().extensions).toEqual({ probe: SHARD });
+
+    // A node that isn't here refuses the whole write, as does a held shard, and neither is a step.
+    expect(s.setExtensionValues("probe", [{ id: "L_bell", field: "note", value: "x" }, { id: "nope", field: "note", value: "y" }]))
+      .toMatchObject({ ok: false, why: "gone" });
+    s.setLockedExtensions({ probe: { name: "Probe", by: ["bob"] } });
+    expect(s.setExtensionValues("probe", [{ id: "L_bell", field: "note", value: "x" }]))
+      .toEqual({ ok: false, why: "held", message: "Probe's data here is locked by bob." });
+    s.setLockedExtensions({});
+    s.setEditable(false);
+    expect(s.setExtensionValues("probe", [{ id: "L_bell", field: "note", value: "x" }])).toMatchObject({ ok: false, why: "read-only" });
+    expect(steps()).toBe(2);
+    expect(said).toEqual([]);
+  });
+
   it("offers the scene's nodes of each kind for a reference", () => {
     const { s } = mount();
     expect(s.nodesOfKind("line")).toEqual([

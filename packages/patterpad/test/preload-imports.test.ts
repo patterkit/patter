@@ -12,6 +12,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { JOB_PROGRESS } from "@wildwinter/app-shell/job";
+import { VIEW_PORT_CHANNEL, VIEW_PORT_MESSAGE } from "@wildwinter/app-shell/view-protocol";
 
 const source = readFileSync(fileURLToPath(new URL("../src/preload/index.ts", import.meta.url)), "utf8");
 
@@ -32,5 +33,12 @@ describe("the sandboxed preload's imports", () => {
     // stops the two drifting: main sends on the shell's constant and the bridge listens on the literal.
     const declared = /const JOB_PROGRESS = "([^"]+)"/.exec(source)?.[1];
     expect(declared).toBe(JOB_PROGRESS);
+  });
+
+  it("pins the view port's channel and message against the shell's constants", () => {
+    // Main hands the editor each view window's port on the shell's channel, and the editor's renderer takes it
+    // off the window message: a literal here that drifted would leave every view waiting for the app.
+    expect(/const VIEW_PORT_CHANNEL = "([^"]+)"/.exec(source)?.[1]).toBe(VIEW_PORT_CHANNEL);
+    expect(/const VIEW_PORT_MESSAGE = "([^"]+)"/.exec(source)?.[1]).toBe(VIEW_PORT_MESSAGE);
   });
 });

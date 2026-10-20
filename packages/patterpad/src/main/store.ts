@@ -110,6 +110,8 @@ export interface Store {
    *  helper windows float on top by default (the slice's own default), and nothing here flattens the
    *  shell's record back into named fields any more (ui-review-2026-09, finding 19). */
   window(name: ToolWindowName): WindowSlice;
+  /** A view extension's window, remembered as the helper windows are, under `view:<extension>/<view>`. */
+  viewWindow(extension: string, view: string): WindowSlice;
   /** Reset View's store half: forget every remembered rectangle and re-pin all three, so a window
    *  stranded off-screen comes back centred at its default size on the next open. */
   resetWindows(): void;
@@ -251,6 +253,9 @@ export function createStore(dir: string): Store {
     },
     window(name) {
       return windowSlice(app, name);
+    },
+    viewWindow(extension, view) {
+      return windowSlice(app, `view:${extension}/${view}`);
     },
     resetWindows() {
       resetWindows(app, [...TOOL_WINDOW_NAMES]);

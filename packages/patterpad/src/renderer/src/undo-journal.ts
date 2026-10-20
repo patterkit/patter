@@ -4,14 +4,16 @@
 // main. The journal is the one record of the order they happened in, so Cmd+Z undoes the newest step
 // wherever it lives: a scene edit, then a Replace, then the scene edit before it, in that order.
 //
-// Each entry names its history: `{ kind: "scene", sceneId }` or `{ kind: "project", id }`. Entries made by
+// Each entry names its history: `{ kind: "scene", sceneId }` or `{ kind: "project", id }`. A scene entry may
+// carry a label too (a view extension's write, "Set shot"), which the Edit menu then shows as a project
+// step's is. Entries made by
 // one gesture share a group (a duplicate in the scene and the status it carries to the copies, a project
 // write) and one Cmd+Z takes the whole group. The journal applies nothing itself: the caller hands it a
 // function that sends an entry to its history and says how that went. Pure, so its rules are tested
 // without a DOM.
 
 export type JournalEntry =
-  | { kind: "scene"; sceneId: string; group: number }
+  | { kind: "scene"; sceneId: string; group: number; label?: string }
   | { kind: "project"; id: number; label: string; group: number };
 
 /** How one entry went when it was sent to its history:
@@ -52,9 +54,10 @@ export class UndoJournal {
   /**
    * A new event in the scene's history. Clears both redo journals: ProseMirror has cleared its own, and
    * the caller tells main to clear the project's when this returns true (there was a project step to redo).
+   * `label` names the edit for the Edit menu; a scene edit without one reads plain "Undo".
    */
-  pushScene(sceneId: string): boolean {
-    this.undos.push({ kind: "scene", sceneId, group: this.nextGroup++ });
+  pushScene(sceneId: string, label?: string): boolean {
+    this.undos.push({ kind: "scene", sceneId, group: this.nextGroup++, ...(label ? { label } : {}) });
     return this.clearRedo();
   }
 
@@ -94,10 +97,11 @@ export class UndoJournal {
   peekUndo(): JournalEntry | undefined { return this.undos[this.undos.length - 1]; }
   peekRedo(): JournalEntry | undefined { return this.redos[this.redos.length - 1]; }
 
-  /** The Edit menu's labels: a project step's own ("Replace"); nothing for a scene edit. */
+  /** The Edit menu's labels: a project step's own ("Replace"), or a labelled scene edit's; nothing for a
+   *  plain scene edit. */
   labels(): { undo?: string; redo?: string } {
-    const u = this.peekUndo(), r = this.peekRedo();
-    return { ...(u?.kind === "project" ? { undo: u.label } : {}), ...(r?.kind === "project" ? { redo: r.label } : {}) };
+    const u = this.peekUndo()?.label, r = this.peekRedo()?.label;
+    return { ...(u ? { undo: u } : {}), ...(r ? { redo: r } : {}) };
   }
 
   /** Undo the newest group, newest entry first. Entries their history can no longer take are skipped,

@@ -22,6 +22,9 @@ import { contextBridge, ipcRenderer } from "electron";
  * The value is pinned against the shell's own constant by that same test.
  */
 const JOB_PROGRESS = "job:progress";
+/** The shell's view port channel and window message (`@wildwinter/app-shell/view-protocol`), as literals. */
+const VIEW_PORT_CHANNEL = "wildwinter-view:port";
+const VIEW_PORT_MESSAGE = "wildwinter-view:port";
 import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, PatterFieldsApi, FieldsWinState, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress, AppPrompt, ProjectStep } from "../shared/api.js";
 
 const api: PatterApi = {
@@ -137,6 +140,8 @@ const api: PatterApi = {
   sendFieldsState: (state) => { ipcRenderer.send("fields:state", state); },
   onFieldsCommit: (handler) => { ipcRenderer.on("fields:commit", (_e, id: string, extension: string, field: string, value: unknown) => handler(id, extension, field, value)); },
   onFieldsFollow: (handler) => { ipcRenderer.on("fields:follow", (_e, on: boolean) => handler(on)); },
+  addExtension: () => ipcRenderer.invoke("extensions:add"),
+  writeProjectExtension: (extension, entry, label) => ipcRenderer.invoke("extensions:writeProject", extension, entry, label),
   onCoverageNavigate: (handler) => { ipcRenderer.on("coverage:navigate", (_e, sceneId: string, beatId: string) => handler(sceneId, beatId)); },
   onOpenWorldSettings: (handler) => { ipcRenderer.on("coverage:open-world", () => handler()); },
   applyFix: (fix) => ipcRenderer.invoke("project:applyFix", fix),
@@ -245,4 +250,13 @@ if (tool === "play") contextBridge.exposeInMainWorld("patterPlay", playApi);
 else if (tool === "search") contextBridge.exposeInMainWorld("patterSearch", searchApi);
 else if (tool === "coverage") contextBridge.exposeInMainWorld("patterCoverage", coverageApi);
 else if (tool === "fields") contextBridge.exposeInMainWorld("patterFields", fieldsApi);
-else contextBridge.exposeInMainWorld("patter", api);
+else {
+  contextBridge.exposeInMainWorld("patter", api);
+  // Tier 2 view extensions (app-shell README v0.58): main hands the editor one end of each view window's
+  // port, which page code can't take from ipcRenderer, so it's posted on to the page with its meta. The two
+  // names are the shell's VIEW_PORT_CHANNEL and VIEW_PORT_MESSAGE, as literals: a sandboxed preload imports
+  // electron alone (test/preload-imports.test.ts pins them against the shell's).
+  ipcRenderer.on(VIEW_PORT_CHANNEL, (event, meta: unknown) => {
+    window.postMessage({ type: VIEW_PORT_MESSAGE, meta }, "*", event.ports);
+  });
+}

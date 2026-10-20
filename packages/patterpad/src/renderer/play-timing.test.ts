@@ -2,7 +2,7 @@
 // beat of a played-through run starts, from each line's length and its `padAfter`, and the Speed setting.
 
 import { describe, it, expect } from "vitest";
-import { schedule, Timeline, PlayClock, lineLength, readSpeed, toMs, SPEED_RATE } from "./play/timing.js";
+import { schedule, Timeline, PlayClock, lineLength, lineMedia, readSpeed, toMs, SPEED_RATE } from "./play/timing.js";
 // The playable HTML export's timeline and clock, and the one table of cases both are held to: the renderer
 // can't load @patterkit/ops (a Node package), so it restates the rules and these pin the two together.
 import { createTimeline, createClock } from "../../../ops/src/play-timeline.js";
@@ -101,6 +101,13 @@ describe("Play timing", () => {
     expect(lineLength(45, 2)).toBe(45); // a long, slow read is believed
     expect(lineLength(6 * 3600, 2)).toBe(60); // a broken header claiming hours is not
     expect(lineLength(6 * 3600, 18)).toBe(72); // the cap grows with a long line's estimate
+  });
+
+  it("tells a view a line's length by the same rule, and whether a recording measured it", () => {
+    expect(lineMedia(3.2, 2)).toEqual({ seconds: 3.2, measured: true });
+    expect(lineMedia(undefined, 2)).toEqual({ seconds: 2, measured: false });
+    expect(lineMedia(Number.NaN, 2)).toEqual({ seconds: 2, measured: false });
+    expect(lineMedia(6 * 3600, 2)).toEqual({ seconds: 60, measured: true });
   });
 
   it("reads the stored speed, mapping the old reading paces", () => {

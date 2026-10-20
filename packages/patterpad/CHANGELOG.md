@@ -6,6 +6,30 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Extension views.** An extension can now bring views of its own, such as a timeline of a scene's lines,
+  which open in a floating window beside the script and work on the scene you have open, unsaved changes
+  included. The views the project offers are listed at the foot of the Window menu. A view follows what you
+  select in the script, takes the editor's theme, and selects a line in the script when you pick it there. A
+  change made in a view is one undo step, named after what the view did ("Undo Set shot" in the Edit menu), and
+  Cmd+Z in a view's window undoes it. A view changes only the scene that's open, and shows read-only on a scene
+  somebody else holds.
+- **File ▸ Add Extension…** takes an extension into the project from its package, a folder or an npm package
+  tarball: it adds the extension's manifest and version to the project, as one step you can undo, and installs
+  its views on this machine. Adding a newer version of an extension the project already takes updates it, with
+  any stages that version renamed renamed in your data. A package with a fault in its manifest is refused, with
+  what's wrong.
+- **Install on This Machine.** On a machine without an extension's views, the Window menu shows each view
+  greyed out with the reason, and an Install item that installs them from the extension's package without
+  changing the project. A view whose installed version differs from the project's says so in its window's
+  title, and still opens while the major version matches.
+
+### Fixed
+
+- **Checkboxes and other native controls follow the palette you pick**, not the system's light or dark mode: a
+  dark palette on a light system no longer draws bright white boxes, nor a light palette dark ones.
+
 ## [0.38.0] - 2026-10-20
 
 ### Added
