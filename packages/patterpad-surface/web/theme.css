@@ -21,7 +21,8 @@
 :root {
   /* --- reading size (Medium default; a future S/M/L control swaps this one value) --- */
   font-size: 110%; /* ~17.6px root: the READING size. Only the script surface scales off rem; the chrome is px off a 14px base (design-language §4) */
-  color-scheme: light dark;
+  /* No color-scheme here: the shell's tokens.css sets it from --color-scheme, falling back to
+     "light dark" so Follow System tracks the OS. Each palette block below declares its own. */
 
   /* --- surface palette (LIGHT): warm, cosy, booklike - parchment + paper, a chocolate-caramel
      accent (not a stark red), ink that reads like ink on paper rather than neutral black. --- */
@@ -84,9 +85,14 @@
    tone (the LIGHT set above serves Paper + Mist; the lifted DARK set is defined once below for Slate
    + Night + follow-system-dark). Keep the follow-system-dark block in sync with Night. --- */
 
+/* Paper is the bare :root palette, but an explicit pick still needs its own block so native
+   controls draw light under a dark OS (app-shell's rule: every palette block declares --color-scheme). */
+:root[data-theme="paper"] { --color-scheme: light; }
+
 /* The lifted DARK character set + status colours + accent, shared by every dark palette. */
 :root[data-theme="slate"],
 :root[data-theme="night"] {
+  --color-scheme: dark;
   --accent: #cf9b6a;   /* warm caramel / tan */
   --danger: #e6938a;   /* warm coral red, lifted for the dark surface */
   --warn:   #d8aa63;   /* warm amber, lifted for the dark surface */
@@ -127,6 +133,7 @@
    light theme, so the second light palette leans cool). Overrides only the surface tones; it inherits
    the LIGHT character set + the warm caramel accent (a warm focal point reads well on a cool ground). */
 :root[data-theme="mist"] {
+  --color-scheme: light;
   --bg: #e6ecf3;       /* cool light blue-grey */
   --surface: #f6f9fc;  /* cool near-white */
   --ink: #25303b;      /* cool slate-blue ink (not warm) */
