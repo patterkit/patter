@@ -12,7 +12,7 @@ import { app, dialog, type BrowserWindow } from "electron";
 import { basename, dirname, join } from "node:path";
 import { installExtensionPackage, openViewWindow, planPackageAdd, readExtensionPackage, resolveInstalled } from "@wildwinter/app-shell/view-host";
 import type { ExtensionPackage, ViewWindow } from "@wildwinter/app-shell/view-host";
-import { pinToolWindow, rescueToolWindow, savedWindowRect } from "@wildwinter/app-shell/tool-window";
+import { rescueToolWindow, savedWindowRect } from "@wildwinter/app-shell/tool-window";
 import type { WindowSlice } from "@wildwinter/app-shell/app-store";
 import { MANIFEST_FILE_SUFFIX, missingRequirements, viewsFor } from "@wildwinter/toolkit/extensions";
 import type { Manifest, Problem } from "@wildwinter/toolkit/extensions";
@@ -183,7 +183,7 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
       // A version other than the pinned one opens with the mismatch said where the writer sees it.
       ...(choice.warning ? { title: `${decl.name} (${choice.warning})` } : {}),
       rect: savedWindowRect(slice.bounds(), VIEW_DEFAULT, VIEW_MIN), min: VIEW_MIN,
-      pinTo: () => deps.editor() ?? undefined, pinned: slice.pinned(), remember: slice.remember,
+      pinTo: () => deps.editor() ?? undefined, pinned: slice.pinned(), onPin: slice.setPinned, remember: slice.remember,
       devTools: !app.isPackaged,
       onClosed: () => { if (open.get(keyOf(extension, view)) === opened) open.delete(keyOf(extension, view)); },
     });
@@ -226,7 +226,7 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
       for (const v of open.values()) {
         if (v.window.isDestroyed()) continue;
         rescueToolWindow(v.window, VIEW_DEFAULT);
-        pinToolWindow(v.window, deps.editor(), true);
+        v.setPinned(true); // the window and its head's pin
       }
     },
     isView(w) {
