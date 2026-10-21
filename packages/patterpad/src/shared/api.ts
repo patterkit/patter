@@ -145,8 +145,8 @@ export interface ExtensionNodeDto {
 
 /**
  * One Patter extension as the editor draws it (patterkit design/proposals/patter-storylet-extensions.md,
- * "Tier 1: fields"): its declarations for each node kind it targets, its claims on gameData fields resolved
- * through the project's settings, what the project takes it at, and the project's own values.
+ * "Tier 1: fields"): its declarations for each node kind it targets, what the project takes it at, and the
+ * project's own values.
  */
 export interface ExtensionDto {
   id: string;
@@ -156,8 +156,6 @@ export interface ExtensionDto {
   docs?: string;
   /** The version the project takes it at (`extensions.<id>.version`). */
   taken: string;
-  /** Each of the manifest's settings, with the gameData field the project's choice (or its default) names. */
-  settings: { name: string; label: string; value: string }[];
   /** By node kind: `scene`, `block`, `snippet`, `option`, `line`, `text`, `gameEvent`, `project`. */
   targets: Record<string, ExtensionTargetDto>;
   /** The project's own node id, which its project-level values are keyed by. */
@@ -173,8 +171,6 @@ export interface ExtensionDto {
 export interface ExtensionTargetDto {
   /** The extension's own fields, in the manifest's order (shaped as the shell's value-rows ValueDecl). */
   fields: ExtensionFieldDto[];
-  /** gameData fields this extension presents with its own label, help and values, by the field's name. */
-  claims: { field: string; decl: ExtensionFieldDto }[];
 }
 
 /** An extension field's declaration, as the manifest writes it. */
@@ -1092,7 +1088,7 @@ export interface Problem {
   file?: string;
   /** A one-click fix offered for this problem, when one applies. */
   fix?: QuickFix;
-  /** The Patter extension the problem is about (its data, its manifest, or a claim of its), by id: a
+  /** The Patter extension the problem is about (its data, its manifest, or its pin), by id: a
    *  project-level one opens the extension's section of Project Settings. */
   extension?: string;
 }

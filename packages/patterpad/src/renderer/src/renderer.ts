@@ -3290,7 +3290,7 @@ let settingsExtensionEdits: Record<string, Record<string, unknown>> = {};
 
 /** A section of Project Settings for each Patter extension declaring project fields, in the Project group
  *  after Version control: what the project takes it at, then the project's own values. */
-function extensionSettingsSections(): SettingsSection[] {
+function projectExtensionSections(): SettingsSection[] {
   return settingsExtensions(project?.extensions).map((extension): SettingsSection => ({
     id: settingsSectionId(extension.id), label: extension.name, mount: (host): SettingsSectionHandle => {
       // Mounted fresh on every open, from the project as it now stands (its values may have been saved since
@@ -3363,7 +3363,7 @@ function buildSettingsDialog(): SettingsDialog {
       live.vcs = vcs;
       return {};
     } },
-    ...extensionSettingsSections(),
+    ...projectExtensionSections(),
     { id: "world", label: "World properties", group: "Story data", mount: (host): SettingsSectionHandle => {
       const { s } = settingsRead!;
       const worldHost = el("div"); host.append(worldHost);

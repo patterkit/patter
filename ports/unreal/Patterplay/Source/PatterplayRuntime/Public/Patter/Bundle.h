@@ -197,9 +197,6 @@ namespace patter
         OrderedMap<std::string, std::vector<ExtensionFieldDecl>> fields;
         /** The project node's values, raw, when it has any. */
         std::optional<ExtensionValues> project;
-        /** Every setting the manifest declares, by setting name: the project's value, or else the setting's
-         *  default. Each names a host field. Empty when the manifest declares none. */
-        OrderedMap<std::string, std::string> settings;
     };
 
     // How strings ship + resolve (spec §11): "embedded" (resolve per locale) or "ids" (emit beat IDs);
@@ -390,16 +387,6 @@ namespace patter
         if (!ext) return {};
         const std::vector<ExtensionFieldDecl>* decls = ext->fields.get(kind);
         return decls ? *decls : std::vector<ExtensionFieldDecl>{};
-    }
-
-    /** One extension's settings, by setting name: every setting its manifest declares, the project's value or
-     *  else the setting's default. Each names a host field, so a game reads here which gameData field holds
-     *  what the extension claims. Empty when the bundle has no such extension or it declares no settings. A
-     *  fresh map each call. */
-    inline OrderedMap<std::string, std::string> extensionSettings(const Bundle& bundle, const std::string& extension)
-    {
-        const BundleExtension* ext = bundle.extensions.get(extension);
-        return ext ? ext->settings : OrderedMap<std::string, std::string>{};
     }
 
     namespace extensionsdetail

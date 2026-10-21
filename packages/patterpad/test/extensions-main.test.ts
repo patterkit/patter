@@ -451,15 +451,13 @@ const PROJECT_SHARD = "extensions/probe/_project.patterextension";
 describe("the project's extensions in Patterpad", () => {
   afterEach(() => clearProvider());
 
-  it("are in the summary before the project is read whole, with claims through the project's settings", () => {
+  it("are in the summary before the project is read whole", () => {
     const { dir } = openProbeCopy({ hydrate: false });
     const opened = project.openProject(dir); // landing only
     const probe = opened.extensions?.[0];
     expect(probe?.id).toBe("probe");
     expect(probe?.name).toBe("Probe");
     expect(probe?.taken).toBe("1.1.0");
-    expect(probe?.settings).toEqual([{ name: "deliveryField", label: "Delivery field", value: "delivery" }]);
-    expect(probe?.targets["line"]?.claims.map((c) => [c.field, c.decl.label])).toEqual([["delivery", "Delivery"]]);
     expect(probe?.targets["line"]?.fields.map((f) => f.name)).toContain("perf");
     expect(probe?.targets["project"]?.fields.map((f) => f.name)).toEqual(["studio"]);
     expect(probe?.projectNode).toBe("proj_probe");
@@ -469,18 +467,23 @@ describe("the project's extensions in Patterpad", () => {
     expect(opened.extensionNodes?.["option"]?.some((n) => n.id === "o_stay")).toBe(true);
   });
 
-  it("resolve a claim through the setting the project chose", () => {
+  it("ignore an older pin's settings, which a save of the project file keeps as they are", async () => {
+    // Settings are gone from the extensions spec: the summary has none, validation warns, and Project Settings'
+    // save writes the project file over the pin as it was read, so they stay until somebody deletes them.
     const { dir } = openProbeCopy({
       edit: (d) => {
-        const proj = read(join(d, "probe.patterproj")) as { extensions: { probe: { settings: Obj } } };
-        proj.extensions.probe.settings = { deliveryField: "mood" };
+        const proj = read(join(d, "probe.patterproj")) as { extensions: { probe: Obj } };
+        proj.extensions.probe["settings"] = { deliveryField: "mood" };
         writeFileSync(join(d, "probe.patterproj"), canonicalStringify(proj));
       },
     });
     const opened = project.hydrate()!;
-    expect(dir).toBeTruthy();
-    expect(opened.extensions?.[0]?.targets["line"]?.claims.map((c) => c.field)).toEqual(["mood"]);
-    expect(opened.extensions?.[0]?.settings[0]?.value).toBe("mood");
+    expect(opened.extensions?.[0]).not.toHaveProperty("settings");
+    expect(opened.extensions?.[0]?.targets["line"]).not.toHaveProperty("claims");
+    expect(project.validate().problems.filter((p) => p.message.includes("still has settings")).map((p) => p.extension)).toEqual(["probe"]);
+    const res = await project.saveSettings({ ...project.readSettings()!, name: "Probe Two" });
+    expect(res.ok).toBe(true);
+    expect((read(join(dir, "probe.patterproj"))["extensions"] as Obj)["probe"]).toEqual({ settings: { deliveryField: "mood" }, version: "1.1.0" });
   });
 
   it("are absent for a project that takes none", () => {

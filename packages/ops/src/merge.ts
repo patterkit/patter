@@ -399,9 +399,9 @@ function mergeProject(base: Obj, ours: Obj, theirs: Obj): MergeResult {
   return { type: "project", merged, conflicts, warnings: [] };
 }
 
-/** The extensions the project takes, per id: its pin and each setting merge on their own, so two people
- *  setting different settings both land, and one taking a new version while the other sets a setting both
- *  land too. An extension one side dropped and the other changed merges whole, as a conflict. */
+/** The extensions the project takes, per id: each key of an extension's pin merges on its own, so two people
+ *  taking two extensions both land. An extension one side dropped and the other changed merges whole, as a
+ *  conflict. */
 function mergeProjectExtensions(b: Obj, o: Obj, t: Obj, conflicts: Conflict[]): Obj {
   const out: Obj = {};
   for (const id of new Set([...Object.keys(b), ...Object.keys(o), ...Object.keys(t)])) {
@@ -415,13 +415,8 @@ function mergeProjectExtensions(b: Obj, o: Obj, t: Obj, conflicts: Conflict[]): 
     const bo = asMap(bv);
     const entry: Obj = {};
     for (const f of new Set([...Object.keys(bo), ...Object.keys(ov), ...Object.keys(tv)])) {
-      if (f === "settings" && [bo[f], ov[f], tv[f]].every((x) => x === undefined || isObj(x))) {
-        const settings = mergeMap(asMap(bo[f]), asMap(ov[f]), asMap(tv[f]), `${path}.settings`, conflicts);
-        if (Object.keys(settings).length > 0) entry[f] = settings;
-      } else {
-        const v = merge3(bo[f], ov[f], tv[f], id, `${path}.${f}`, conflicts);
-        if (v !== undefined) entry[f] = v;
-      }
+      const v = merge3(bo[f], ov[f], tv[f], id, `${path}.${f}`, conflicts);
+      if (v !== undefined) entry[f] = v;
     }
     out[id] = entry;
   }

@@ -1,11 +1,10 @@
 // ---------------------------------------------------------------------------
 // Patter extensions in the inspector and Project Settings (patterkit design/proposals/
-// patter-storylet-extensions.md, "Tier 1: fields", "Where fields go" and "Claims on
-// host fields"): an extension's own fields for a node, drawn by the shell's value rows
-// (every type a manifest declares, records, maps and lists included), in a section
-// captioned with the extension's name after the node's Game Data; a claimed gameData
-// field drawn with the extension's label, help and values; and the project's own
-// values in a section of Project Settings.
+// patter-storylet-extensions.md, "Tier 1: fields" and "Where fields go"): an
+// extension's own fields for a node, drawn by the shell's value rows (every type a
+// manifest declares, records, maps and lists included), in a section captioned with
+// the extension's name after the node's Game Data; and the project's own values in a
+// section of Project Settings.
 //
 // A value commits as typed: one transaction on the node's `ext` in the scene's
 // document (the surface's setExtensionValue), so the scene's history undoes it and a
@@ -16,8 +15,8 @@
 import { el } from "./dom.js";
 import { extensionFold, isRecordMap, recordMapSummary, valueRows } from "@wildwinter/app-shell/value-rows";
 import type { ValueAdapter, ValueDecl, ValueRows } from "@wildwinter/app-shell/value-rows";
-import { effectiveClaim, entryProblems, pickLists, valueProblems } from "@wildwinter/toolkit/extensions";
-import type { ClaimDecl, TargetDecl, TypeDecl } from "@wildwinter/toolkit/extensions";
+import { entryProblems, pickLists, valueProblems } from "@wildwinter/toolkit/extensions";
+import type { TargetDecl, TypeDecl } from "@wildwinter/toolkit/extensions";
 import type { ExtensionDto, ExtensionFieldDto, ExtensionNodeDto, Problem } from "../../shared/api.js";
 import { takenLine } from "../../shared/extensions.js";
 
@@ -43,10 +42,6 @@ export function sweepExtensionRows(): void { rowCache.sweep(); inspectorFold.swe
 
 /** A toolkit message as a sentence. */
 const sentence = (message: string): string => `${message.charAt(0).toUpperCase()}${message.slice(1)}.`;
-
-/** "a, b, or c", with the Oxford comma. */
-const orList = (xs: readonly string[]): string =>
-  xs.length <= 2 ? xs.join(" or ") : `${xs.slice(0, -1).join(", ")}, or ${xs[xs.length - 1]}`;
 
 /** The adapter's answer to "does this node exist?", as the toolkit's checks take it. */
 const existsOf = (adapter: ValueAdapter) => (kind: string, id: string): boolean =>
@@ -96,37 +91,6 @@ export function renamedStage(decl: ExtensionFieldDto, value: unknown): { from: s
 /** The one sentence a renamed stage's row says. */
 export const renamedStageSentence = (from: string, to: string, extension: string): string =>
   `“${from}” has been renamed “${to}” by ${extension}. Pick “${to}” to update it.`;
-
-/** The extension claiming a gameData field of this node kind, when one does: its decl for it. */
-export function claimOn(extensions: readonly ExtensionDto[], kind: string, field: string): { extension: ExtensionDto; decl: ExtensionFieldDto } | undefined {
-  for (const extension of extensions) {
-    const claim = extension.targets[kind]?.claims.find((c) => c.field === field);
-    if (claim) return { extension, decl: claim.decl };
-  }
-  return undefined;
-}
-
-/** The host's side of a claim: the gameData field's own declaration, which gives the values, stages and default
- *  a claim leaves out. */
-export interface ClaimHost { readonly type?: string; readonly values?: readonly string[]; readonly stages?: readonly string[]; readonly default?: unknown }
-
-/** A claim as the inspector draws and checks its field: the claim over the gameData field's declaration
- *  (the toolkit's `effectiveClaim`), so a claim that lists no values takes the field's. */
-export function effectiveClaimDecl(claim: { decl: ExtensionFieldDto }, host: ClaimHost): ExtensionFieldDto {
-  return effectiveClaim(claim.decl as unknown as ClaimDecl, host) as unknown as ExtensionFieldDto;
-}
-
-/** What a claim says about a gameData value it refuses, as a sentence; "" when fine. Checked over the gameData
- *  field's declaration (`host`), so a claim with no values of its own checks against the field's. */
-export function claimProblem(claim: { extension: ExtensionDto; decl: ExtensionFieldDto }, value: unknown, host: ClaimHost = {}): string {
-  if (value === undefined) return "";
-  return valueProblems(effectiveClaimDecl(claim, host) as unknown as TypeDecl, value)
-    .filter((p) => p.severity === "error")
-    .map((p) => (p.code === "not-a-value" || p.code === "not-a-stage") && p.options?.length && typeof value === "string"
-      ? `${claim.extension.name} reads this as ${orList(p.options)}, so it doesn't know “${value}”.`
-      : `As ${claim.extension.name} reads it, ${p.message}.`)
-    .join(" ");
-}
 
 interface RowsFor {
   extension: ExtensionDto;

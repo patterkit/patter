@@ -63,11 +63,11 @@ export interface ValidateResult {
    *  error: the compile refuses it), and as warnings a shard for a scene the project lacks, one in a
    *  language it does not declare, or two shards for one scene and language. */
   localisation: GameScopesIssue[];
-  /** The project's Patter extensions: their manifests, the project's pins and settings, claims on gameData
-   *  fields, and every value in the extension data shards against its manifest (the compiler's
-   *  `extensionPass`), with an entry for a node that has gone reported per entry, and an extension file that
-   *  would not load. Errors count against `ok`, and export refuses them; warnings (a missing manifest, an
-   *  orphaned entry, a `.gitattributes` with no merge rule for the data) don't. */
+  /** The project's Patter extensions: their manifests, the project's pins, and every value in the extension
+   *  data shards against its manifest (the compiler's `extensionPass`), with an entry for a node that has gone
+   *  reported per entry, and an extension file that would not load. Errors count against `ok`, and export
+   *  refuses them; warnings (a missing manifest, an orphaned entry, a pin still carrying settings, a
+   *  `.gitattributes` with no merge rule for the data) don't. */
   extensions: ExtensionIssue[];
   /** Only ERRORS count: a warning (another tool's scope, say) never fails a build. */
   ok: boolean;
@@ -149,7 +149,8 @@ export function exportBlockers(loaded: LoadedProject): string[] {
 
 /**
  * Everything wrong with the project's Patter extensions: an extension file that would not load (an error:
- * it is left out of the compile), and the extension pass over the rest, the same pass the compile runs.
+ * it is left out of the compile), a pin still carrying settings, and the extension pass over the rest, the
+ * same pass the compile runs.
  */
 function extensionIssues(loaded: LoadedProject): ExtensionIssue[] {
   const loadIssues = loaded.extensionIssues.map((i): ExtensionIssue => ({ severity: "error", file: i.file, message: i.message }));
@@ -158,7 +159,19 @@ function extensionIssues(loaded: LoadedProject): ExtensionIssue[] {
     project: loaded.project, scenes: loaded.scenes, ...loadedExtensions(loaded),
     projectPath: loaded.projectFile, sceneFiles: loaded.sceneFiles,
   });
-  return [...loadIssues, ...issues];
+  return [...loadIssues, ...pinSettingsIssues(loaded), ...issues];
+}
+
+/**
+ * A pin that still carries `settings`, once per extension: settings named the gameData fields an extension's
+ * claims presented, and both are gone from the extensions spec (2026-10-20), so nothing reads them now. A
+ * warning, since they do no harm; the compile ignores them.
+ */
+function pinSettingsIssues(loaded: LoadedProject): ExtensionIssue[] {
+  return Object.entries(loaded.project.extensions ?? {})
+    .filter(([, pin]) => typeof pin === "object" && pin !== null && Object.prototype.hasOwnProperty.call(pin, "settings"))
+    .map(([id]): ExtensionIssue => ({ severity: "warning", file: loaded.projectFile,
+      message: `the project's pin for "${id}" still has settings, which mean nothing now: extensions no longer have settings, so they're ignored, and you can delete them` }));
 }
 
 /**

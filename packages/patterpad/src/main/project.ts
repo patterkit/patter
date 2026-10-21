@@ -2056,7 +2056,7 @@ function applyLiveSource(p: LoadedProject, live: LiveSceneSource): void {
 }
 
 /** The Patter extension a problem from the extension pass is about: the folder its data is in, the manifest
- *  it names, or (for one in the project file, a claim or a pin) the extension its message names. */
+ *  it names, or (for one in the project file, about its pin) the extension its message names. */
 function extensionOfIssue(file: string | undefined, message: string): string | undefined {
   const dir = extensionsDir();
   if (file && dir) {
@@ -2067,7 +2067,7 @@ function extensionOfIssue(file: string | undefined, message: string): string | u
       if (m) return m[1];
     }
   }
-  const named = /(?:Patter extension|takes) "([a-z][a-z0-9-]*)"/.exec(message);
+  const named = /(?:Patter extension|takes|pin for) "([a-z][a-z0-9-]*)"/.exec(message);
   return named?.[1];
 }
 
@@ -2162,9 +2162,9 @@ export function validate(live?: LiveSceneSource): ProblemsDto {
       // Loc shards that disagree stop the build; a shard nothing reads (an unknown scene or language, a
       // second file for one) is a warning, as a shard outside the layout is.
       ...r.localisation.map((i): Problem => ({ category: i.severity === "error" ? "structure" : "not-in-project", severity: i.severity, message: i.message, file: i.file })),
-      // The project's extensions: a value its manifest refuses, a claim on a gameData field declared with
-      // another type, or a file that won't load is an error (export refuses it); a missing manifest, an
-      // entry for a node that has gone, or a .gitattributes with no merge rule for the data, a warning.
+      // The project's extensions: a value its manifest refuses, or a file that won't load is an error (export
+      // refuses it); a missing manifest, an entry for a node that has gone, a pin still carrying settings, or
+      // a .gitattributes with no merge rule for the data, a warning.
       ...r.extensions.map((i): Problem => {
         const extension = extensionOfIssue(i.file, i.message);
         return {

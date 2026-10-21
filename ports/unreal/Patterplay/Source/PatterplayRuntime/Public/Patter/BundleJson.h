@@ -170,8 +170,8 @@ namespace patter
                     out.gameDataKinds.push_back(kind);
                 });
 
-            // The Patter extensions the project takes: each one's declarations by node kind, the project node's
-            // values and its settings. Every other node's values sit on the node, under `extensions`, read below.
+            // The Patter extensions the project takes: each one's declarations by node kind, and the project node's
+            // values. Every other node's values sit on the node, under `extensions`, read below.
             if (const J* exts = field(root, "extensions"))
                 eachField(*exts, [&](const std::string& id, const J& e)
                 {
@@ -186,8 +186,6 @@ namespace patter
                             ext.fields.set(kind, std::move(decls));
                         });
                     if (const J* p = field(e, "project")) if (T::isObject(*p)) ext.project = extensionValues(*p);
-                    if (const J* p = field(e, "settings"))
-                        eachField(*p, [&](const std::string& name, const J& v) { ext.settings.set(name, text(v)); });
                     out.extensions.set(id, std::move(ext));
                 });
 

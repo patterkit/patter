@@ -130,8 +130,6 @@ const API = [
   // `expectNodeExtensions` script op: an extension's declarations for a node kind, and any node's values.
   { on: "Bundle", js: "extensionDecls", unity: "ExtensionDecls", godot: "extension_decls", unreal: "extensionDecls", bp: "ExtensionDecls" },
   { on: "Bundle", js: "extensionsOf", unity: "ExtensionsOf", godot: "extensions_of", unreal: "extensionsOf", bp: "ExtensionsOf" },
-  // An extension's settings, resolved, corpus-gated by the `expectExtensionSettings` script op (corpus 4).
-  { on: "Bundle", js: "extensionSettings", unity: "ExtensionSettings", godot: "extension_settings", unreal: "extensionSettings", bp: "ExtensionSettings" },
 
   // Cast: who is declared, and who speaks in a scope. Static structure queries, corpus-gated by the
   // `expectCast` script op (declaration order for the project, first-appearance order for a scope).

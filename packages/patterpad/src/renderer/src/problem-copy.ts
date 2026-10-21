@@ -18,7 +18,7 @@
 
 import { defaultProblemCopy, describeProblem, problemName, type ProblemCopyTable, type ProblemLike } from "@wildwinter/app-shell";
 import { PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
-import { entryProblemLine, extensionLine, quoted, valueProblemSentence } from "@wildwinter/app-shell/extension-copy";
+import { entryProblemLine, extensionLine, quoted } from "@wildwinter/app-shell/extension-copy";
 import type { ExtensionDto, Problem } from "../../shared/api.js";
 
 /** The sentence for each code, in Patter nouns (snippet, scene, choice, fallback, cast, prompt),
@@ -195,27 +195,16 @@ export function extensionProblemLine(p: Pick<Problem, "message" | "detail" | "ex
     });
   }
 
-  // A claimed gameData value: "<kind> '<id>' gameData "<field>", as the Patter extension "<x>" claims it: ...".
-  const claim = /^(\w+) '([^']+)' gameData "([^"]+)", as the Patter extension "[^"]+" claims it: (.*)$/.exec(m);
-  if (claim) {
-    const [, kind, id, f, said] = claim as unknown as [string, string, string, string, string];
-    const label = x?.targets[kind]?.claims.find((c) => c.field === f)?.decl.label ?? f;
-    return say(valueProblemSentence(p.detail, `"${f}" ${said.replace(/^the value /, "")}`, {
-      extension: name, node: nodePhrase(kind, id, ctx), field: label, place: PLACE, kindWord,
-    }));
-  }
-
-  // The project's side: its pin, its manifest, and its claims on gameData fields.
+  // The project's side: its pin and its manifest.
   const noManifest = /^the project takes the Patter extension "([^"]+)", but has no manifest for it/.exec(m);
   if (noManifest) return `This project takes the extension ${quoted(noManifest[1]!)}, but its manifest isn't in the extensions folder. Its data is kept, but your game won't get it.`;
   const version = /^the project takes "[^"]+" (?:at version (\S+)|with no version), but its manifest is version ([^;]+);/.exec(m);
   if (version) {
     return say({ text: version[1] ? `The project takes version ${version[1]}, but the manifest is version ${version[2]}.` : `The project doesn't say which version it takes, and the manifest is version ${version[2]}.`, next: "Run patter format to take the manifest's version." });
   }
-  const clash = /^the Patter extension "[^"]+" claims the (\w+) gameData field "([^"]+)" as (\w+), but the project declares it as (\w+)$/.exec(m);
-  if (clash) return say({ text: `It reads the ${kindWord(clash[1]!)} game data field ${quoted(clash[2]!)} as ${clash[3]}, but the project declares it as ${clash[4]}.`, next: "Change the field's type in Project Settings ▸ Game Data so they agree." });
-  const undeclared = /^the Patter extension "[^"]+" claims the (\w+) gameData field "([^"]+)", which the project doesn't declare$/.exec(m);
-  if (undeclared) return say({ text: `It reads the ${kindWord(undeclared[1]!)} game data field ${quoted(undeclared[2]!)}, which the project doesn't declare.`, next: "Add it in Project Settings ▸ Game Data." });
+  if (/^the project's pin for "[^"]+" still has settings/.test(m)) {
+    return say({ text: "The project file still gives it settings, which extensions no longer have.", next: "They're ignored, and you can delete them from the project file." });
+  }
   // A name two of a pick's sources hold: "the Patter extension "<x>": "<name>" is <sources>, so a value naming it is ambiguous".
   const pickClash = /^the Patter extension "[^"]+": "([^"]*)" is (.+), so a value naming it is ambiguous$/.exec(m);
   if (pickClash) {

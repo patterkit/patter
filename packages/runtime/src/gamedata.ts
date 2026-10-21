@@ -7,7 +7,7 @@
 // Patter extension values follow the same rule (patterkit design/proposals/patter-storylet-extensions.md,
 // "At runtime"): raw on the node, declarations with every default resolved in the bundle's `extensions`
 // section, and the SAME two helpers fill them in, given `extensionDecls`. `extensionsOf` reads any node's
-// values off the bundle, by the address a game already uses, and `extensionSettings` an extension's settings.
+// values off the bundle, by the address a game already uses.
 
 import { effectiveGameId } from "@patterkit/model";
 import type {
@@ -54,17 +54,6 @@ export function effectiveGameData(fields: readonly Declared[], node: Readonly<Re
 export function extensionDecls(bundle: Pick<Bundle, "extensions">, extension: string, kind: string): ExtensionFieldDecl[] {
   const ext = bundle.extensions !== undefined && own(bundle.extensions, extension) ? bundle.extensions[extension] : undefined;
   return ext !== undefined && own(ext.fields, kind) ? ext.fields[kind] ?? [] : [];
-}
-
-/**
- * One extension's settings, by setting name: every setting its manifest declares, the project's value or else
- * the setting's default. Each names a host field, so a game reads here which gameData field holds what the
- * extension claims. `{}` when the bundle has no such extension or it declares no settings. A fresh object each
- * call.
- */
-export function extensionSettings(bundle: Pick<Bundle, "extensions">, extension: string): Record<string, string> {
-  const ext = bundle.extensions !== undefined && own(bundle.extensions, extension) ? bundle.extensions[extension] : undefined;
-  return { ...(ext?.settings ?? {}) };
 }
 
 /**

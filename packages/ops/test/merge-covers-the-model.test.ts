@@ -105,7 +105,7 @@ describe("the authoring merger names no field the model has lost", () => {
 
 // The project merger's special keys, held to ProjectFile the same way: one it names that the model has
 // lost is a strategy for nothing, and `extensions` (the extensions a project takes) must be among them,
-// or two people setting different settings of one extension would be a conflict over the whole entry.
+// or two people taking two different extensions would be a conflict over the whole block.
 describe("the project merger names no field the model has lost", () => {
   it("has every specially-handled key on ProjectFile", () => {
     const fields = new Set(modelFields("ProjectFile"));
@@ -114,19 +114,20 @@ describe("the project merger names no field the model has lost", () => {
     expect(PROJECT_HANDLED.has("extensions")).toBe(true);
   });
 
-  it("merges the extensions a project takes per id: the pin and each setting on their own", () => {
+  it("merges the extensions a project takes per id, each key of a pin on its own", () => {
     const proj = (extensions: unknown) => ({ schema: "patter/project@0", project: { id: "p", name: "P" }, extensions });
-    const base = proj({ probe: { version: "1.0.0", settings: { deliveryField: "delivery" } } });
-    const ours = proj({ probe: { version: "1.1.0", settings: { deliveryField: "delivery" } } });
-    const theirs = proj({ probe: { version: "1.0.0", settings: { deliveryField: "mood", other: "x" } }, second: { version: "2.0.0" } });
+    const base = proj({ probe: { version: "1.0.0" } });
+    const ours = proj({ probe: { version: "1.1.0" } });
+    const theirs = proj({ probe: { version: "1.0.0" }, second: { version: "2.0.0" } });
     const r = runMerge(base, ours, theirs);
     expect(r.conflicts).toEqual([]);
-    expect(r.merged["extensions"]).toEqual({
-      probe: { version: "1.1.0", settings: { deliveryField: "mood", other: "x" } },
-      second: { version: "2.0.0" },
-    });
-    const clash = runMerge(base, proj({ probe: { version: "1.0.0", settings: { deliveryField: "a" } } }),
-      proj({ probe: { version: "1.0.0", settings: { deliveryField: "b" } } }));
-    expect(clash.conflicts.map((c) => c.path)).toEqual(["extensions.probe.settings.deliveryField"]);
+    expect(r.merged["extensions"]).toEqual({ probe: { version: "1.1.0" }, second: { version: "2.0.0" } });
+    const clash = runMerge(base, proj({ probe: { version: "1.1.0" } }), proj({ probe: { version: "1.2.0" } }));
+    expect(clash.conflicts.map((c) => c.path)).toEqual(["extensions.probe.version"]);
+    // An older pin's settings (gone from the spec, and ignored) merge as one value: one side dropping them wins.
+    const old = proj({ probe: { version: "1.0.0", settings: { deliveryField: "delivery" } } });
+    const dropped = runMerge(old, old, proj({ probe: { version: "1.0.0" } }));
+    expect(dropped.conflicts).toEqual([]);
+    expect(dropped.merged["extensions"]).toEqual({ probe: { version: "1.0.0" } });
   });
 });

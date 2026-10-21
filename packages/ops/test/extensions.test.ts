@@ -119,46 +119,15 @@ describe("the probe project", () => {
 });
 
 describe("validation, driven by the manifest", () => {
-  it("errors on a claimed field the project declares with another type, and export refuses it", () => {
+  it("warns once per extension of a pin that still has settings, ignores them, and stays ok", () => {
     const { dir, result, blockers } = validateAfter((d) => editProject(d, (p) => {
-      p.gameDataFields = { line: [{ name: "delivery", type: "text" }] };
+      (p.extensions!["probe"] as unknown as Record<string, unknown>)["settings"] = { deliveryField: "delivery", other: "x" };
     }));
-    expect(result.ok).toBe(false);
-    expect(said(dir, result.extensions, "error")).toEqual([
-      `${PROJECT}: the Patter extension "probe" claims the line gameData field "delivery" as enum, but the project declares it as text`,
-    ]);
-    expect(blockers.some((b) => b.startsWith("[extension]") && b.includes("as enum, but the project declares it as text"))).toBe(true);
-  });
-
-  it("warns of a claimed field the project doesn't declare, and stays ok", () => {
-    const { dir, result } = validateAfter((d) => {
-      editProject(d, (p) => { delete p.gameDataFields; });
-      const flow = read<FlowFile>(d, FLOW);
-      const beats = (flow.scene.blocks[0]!.children[0] as { beats: Array<{ gameData?: unknown }> }).beats;
-      delete beats[0]!.gameData;
-      write(d, FLOW, flow);
-    });
     expect(result.ok).toBe(true);
-    expect(said(dir, result.extensions, "warning")).toContain(
-      `${PROJECT}: the Patter extension "probe" claims the line gameData field "delivery", which the project doesn't declare`);
-  });
-
-  it("follows the project's setting for the claimed field's name, and checks its values against the claim", () => {
-    const { result } = validateAfter((d) => {
-      editProject(d, (p) => {
-        p.gameDataFields = { line: [{ name: "temper", type: "enum", values: ["calm", "tense", "wild"], default: "calm" }] };
-        p.extensions!["probe"]!.settings = { deliveryField: "temper" };
-      });
-      const flow = read<FlowFile>(d, FLOW);
-      (flow.scene.blocks[0]!.children[0] as { beats: Array<{ gameData?: unknown }> }).beats[0]!.gameData = { temper: "wild" };
-      write(d, FLOW, flow);
-    });
-    expect(result.ok).toBe(false);
-    const errors = result.extensions.filter((i) => i.severity === "error");
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatchObject({ node: "L_bell" });
-    expect(errors[0]!.file.endsWith(FLOW)).toBe(true);
-    expect(errors[0]!.message).toContain(`line 'L_bell' gameData "temper", as the Patter extension "probe" claims it`);
+    expect(said(dir, result.extensions, "warning").filter((m) => m.startsWith(PROJECT))).toEqual([
+      `${PROJECT}: the project's pin for "probe" still has settings, which mean nothing now: extensions no longer have settings, so they're ignored, and you can delete them`,
+    ]);
+    expect(blockers).toEqual([]);
   });
 
   it("opens a project whose manifest is missing with a warning, and leaves its data uncompiled and untouched", () => {
@@ -372,7 +341,7 @@ describe("taking a new extension version", () => {
       applyWrites(changed.map((r) => r.write!));
 
       expect(readFileSync(join(dir, MANIFEST), "utf8")).toBe(manifestBefore);
-      expect(read<ProjectFile>(dir, PROJECT).extensions!["probe"]).toEqual({ version: "1.1.0", settings: { deliveryField: "delivery" } });
+      expect(read<ProjectFile>(dir, PROJECT).extensions!["probe"]).toEqual({ version: "1.1.0" });
       expect(read<ExtensionShard>(dir, SHARD).entries["line"]!["L_bell"]!["act"]).toBe("setup");
       const after = runValidate(loadProject(dir));
       expect(after.ok).toBe(true);

@@ -1088,17 +1088,6 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                         throw std::runtime_error("expectNodeExtensions " + scope + ": expected " + dump(want) + ", got " + dump(produced));
                     ++extensionReads;
                 }
-                // One extension's settings, read off the case's BUNDLE by the core helper extensionSettings (corpus 4).
-                else if (kind == "expectExtensionSettings")
-                {
-                    const std::string ext = op.at("extension").str;
-                    JsonValue produced = JsonValue::Obj();
-                    for (const auto& kv : extensionSettings(bundle, ext)) produced.set(kv.first, JsonValue::Str(kv.second));
-                    const JsonValue& want = op.at("expectResult");
-                    if (!matchValue(produced, want))
-                        throw std::runtime_error("expectExtensionSettings " + ext + ": expected " + dump(want) + ", got " + dump(produced));
-                    ++extensionReads;
-                }
                 // The state inspector's rows, as JSON: each shared @patter property in declaration order.
                 else if (kind == "expectProperties")
                 {
@@ -3309,7 +3298,7 @@ int main(int argc, char** argv)
 
     std::cout << "  [envelope] scripted save/load round-trips: " << envelopeRoundTrips << "\n";
     std::cout << "  [gameData] scripted scene / block gameData reads: " << gameDataReads << "\n";
-    std::cout << "  [extensions] scripted extension reads (expectExtensions, expectNodeExtensions, expectExtensionSettings): " << extensionReads << "\n";
+    std::cout << "  [extensions] scripted extension reads (expectExtensions, expectNodeExtensions): " << extensionReads << "\n";
     std::cout << "  [properties] scripted listProperties reads: " << propertyReads << "\n";
     std::cout << "expressions: " << e << "  specificity: " << sp << "  runtime: " << r << "  scripted: " << s << "  gameData: " << g << "\n";
 

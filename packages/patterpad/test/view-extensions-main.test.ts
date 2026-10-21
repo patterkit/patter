@@ -60,10 +60,10 @@ describe("Add Extension's project write", () => {
     expect(r.ok).toBe(true);
     expect(r.was).toBeUndefined();
     expect(r.step?.label).toBe("Add Shot");
-    // The manifest byte for byte, and the pin beside the probe's (its settings kept).
+    // The manifest byte for byte, and the pin beside the probe's.
     expect(readFileSync(join(dir, "extensions/shot.extension.json"), "utf8")).toBe(manifestText(pkg));
     expect((read(join(dir, "probe.patterproj"))["extensions"] as Obj)).toEqual({
-      probe: { settings: { deliveryField: "delivery" }, version: "1.1.0" }, shot: { version: "0.3.0" },
+      probe: { version: "1.1.0" }, shot: { version: "0.3.0" },
     });
     expect(r.project?.extensions?.map((x) => x.id)).toEqual(["probe", "shot"]);
     expect(r.project?.extensions?.find((x) => x.id === "shot")?.views).toEqual([{ id: "sheet", name: "Performance sheet" }]);
@@ -88,7 +88,7 @@ describe("Add Extension's project write", () => {
     expect(r.step?.label).toBe("Update Probe");
     expect(r.reload).toBe(true);
     expect(lineOf()["act"]).toBe("setup");
-    expect((read(join(dir, "probe.patterproj"))["extensions"] as Obj)["probe"]).toEqual({ settings: { deliveryField: "delivery" }, version: "1.2.0" });
+    expect((read(join(dir, "probe.patterproj"))["extensions"] as Obj)["probe"]).toEqual({ version: "1.2.0" });
     expect((read(join(dir, "extensions/probe.extension.json")))["version"]).toBe("1.2.0");
 
     expect((await project.stepProjectHistory("undo", r.step!.id)).ok).toBe(true);

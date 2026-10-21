@@ -193,7 +193,8 @@ describe("a view, answered over its port", () => {
 
   it("welcomes it, and answers the project, a node, the selection, and media", async () => {
     const { s, h, v, welcome } = await connect();
-    expect(welcome).toMatchObject({ t: "welcome", api: VIEW_API, host: "patter", extension: { id: "probe", version: "1.1.0", pinned: "1.1.0" }, view: "inspect", settings: { deliveryField: "delivery" }, writable: { readOnly: false } });
+    expect(welcome).toMatchObject({ t: "welcome", api: VIEW_API, host: "patter", extension: { id: "probe", version: "1.1.0", pinned: "1.1.0" }, view: "inspect", writable: { readOnly: false } });
+    expect(welcome).not.toHaveProperty("settings");
     expect(value(await v.ask("project", {}))).toMatchObject({ kind: "project", ext: { probe: { studio: expect.any(String) } } });
     const line = value(await v.ask("node", { id: "L_bell" })) as ViewNode;
     expect(line).toMatchObject({ kind: "line", label: "ANNA: Ring the bell.", ext: { probe: { note: "Ring it twice." } } });

@@ -5,8 +5,7 @@
 // "At runtime"): raw on the node, declarations with every default resolved in the bundle's Extensions section,
 // and the same two helpers fill them in, given ExtensionDecls. Values are the neutral JSON tree (OrderedMap /
 // List / bool / double / string / null), so a JSON null is a real value: a field set to null stays null, as a
-// null default does. ExtensionsOf reads any node's values off the bundle, by the address a game already uses,
-// and ExtensionSettings an extension's settings.
+// null default does. ExtensionsOf reads any node's values off the bundle, by the address a game already uses.
 
 using System.Collections.Generic;
 using Wildwinter.Expr;
@@ -89,17 +88,6 @@ namespace Patterkit.Patterplay
         {
             if (bundle.Extensions == null || extension == null || !bundle.Extensions.TryGetValue(extension, out var ext)) return new List<ExtensionFieldDecl>();
             return kind != null && ext.Fields.TryGetValue(kind, out var decls) && decls != null ? decls : new List<ExtensionFieldDecl>();
-        }
-
-        /// <summary>One extension's settings, by setting name: every setting its manifest declares, the project's
-        /// value or else the setting's default. Each names a host field, so a game reads here which gameData field
-        /// holds what the extension claims. Empty when the bundle has no such extension or it declares no
-        /// settings. A fresh dictionary each call.</summary>
-        public static Dictionary<string, string> ExtensionSettings(Bundle bundle, string extension)
-        {
-            if (bundle.Extensions == null || extension == null || !bundle.Extensions.TryGetValue(extension, out var ext) || ext.Settings == null)
-                return new Dictionary<string, string>();
-            return new Dictionary<string, string>(ext.Settings);
         }
 
         /// <summary>

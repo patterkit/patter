@@ -6,8 +6,7 @@
 // meaning. Everything about the shape is `@wildwinter/toolkit/extensions`' (the
 // manifest's checks, the value checks, what a bundle carries of a declaration
 // and of a value); what is Patter's is where the data sits (one shard per
-// extension per scene, and one for the project), which nodes there are, and how
-// a claim meets the gameData fields the project declares.
+// extension per scene, and one for the project), and which nodes there are.
 //
 // Pure, and a function of the source alone: export compiles the values onto
 // the nodes, and validate reports the issues.
@@ -18,10 +17,9 @@ import type {
   BundleExtension, ExtensionFieldDecl, ExtensionShard, GameData, Group, NodeExtensions, ProjectFile, Scene, Snippet,
 } from "@patterkit/model";
 import {
-  HOSTS, claimClashes, compileEntry, compiledTarget, effectiveClaim, entryProblems, manifestProblems, orphanedEntries, pickClashes,
-  pickLists, resolvedClaims, settingValues, targetOf, valueProblems,
+  HOSTS, compileEntry, compiledTarget, entryProblems, manifestProblems, orphanedEntries, pickClashes, pickLists, targetOf,
 } from "@wildwinter/toolkit/extensions";
-import type { Manifest, Problem, ResolvedClaim, TypeDecl, ValueContext } from "@wildwinter/toolkit/extensions";
+import type { Manifest, Problem, TypeDecl, ValueContext } from "@wildwinter/toolkit/extensions";
 
 /** One extension's manifest, as a project keeps it (`extensions/<id>.extension.json`). */
 export interface ExtensionManifestFile {
@@ -131,7 +129,6 @@ const own = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.c
 /** The extensions a project takes and the manifests it has, matched up. */
 interface Taken {
   readonly id: string;
-  readonly settings: Readonly<Record<string, unknown>>;
   /** The manifest, when the project has a sound one. */
   readonly manifest?: Manifest;
 }
@@ -171,39 +168,24 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
   for (const [id, entry] of Object.entries(taken)) {
     const m = manifests.get(id);
     const version = typeof entry?.version === "string" ? entry.version : "";
-    const settings = (entry?.settings ?? {}) as Record<string, unknown>;
     if (m === undefined) {
       issues.push({ severity: "warning", file: projectPath,
         message: `the project takes the Patter extension "${id}", but has no manifest for it at ${EXTENSIONS_DIR}/${id}${MANIFEST_EXTENSION}; its data is left as it is, and not compiled` });
-      takenList.push({ id, settings });
+      takenList.push({ id });
       continue;
     }
-    if (!m.sound) { takenList.push({ id, settings }); continue; }
+    if (!m.sound) { takenList.push({ id }); continue; }
     const manifest = m.manifest as Manifest;
     if (version !== manifest.version) {
       issues.push({ severity: "warning", file: projectPath,
         message: `the project takes "${id}" ${version === "" ? "with no version" : `at version ${version}`}, but its manifest is version ${manifest.version}; run \`patter format\` to take it (renamed stages are renamed in the data as it does)` });
     }
-    const known = new Set((manifest.settings ?? []).map((s) => s.name));
-    for (const [name, value] of Object.entries(settings)) {
-      if (!known.has(name)) {
-        issues.push({ severity: "warning", file: projectPath, message: `"${id}" has no setting "${name}"; it's ignored` });
-      } else if (typeof value !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
-        issues.push({ severity: "error", file: projectPath,
-          message: `"${id}"'s setting "${name}" names a gameData field, so it's a field name, not ${JSON.stringify(value)}` });
-      }
-    }
-    takenList.push({ id, settings, manifest });
+    takenList.push({ id, manifest });
   }
   const sound = new Map(takenList.filter((t) => t.manifest !== undefined).map((t) => [t.id, t.manifest!]));
 
-  // --- claims on gameData fields --------------------------------------------------------
-  const nodes = extensionNodes(project, scenes);
-  const claims: ResolvedClaim[] = takenList.flatMap((t) => (t.manifest ? resolvedClaims(t.manifest, "patter", t.settings) : []));
-  for (const p of claimClashes(claims)) issues.push({ severity: p.severity, file: projectPath, code: p.code, message: p.message });
-  issues.push(...claimIssues(input, nodes, claims));
-
   // --- the data ---------------------------------------------------------------------------
+  const nodes = extensionNodes(project, scenes);
   const exists = (kind: string, id: string): boolean =>
     kind === "cast" ? (project.cast ?? []).some((c) => c.name === id) : nodes.get(id)?.kind === kind;
   // A pick's choices: the cast and the project's nodes by kind, and each extension's own project lists, read
@@ -297,7 +279,6 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
 
   // --- the bundle's section ---------------------------------------------------------------
   const bundle: Record<string, BundleExtension> = {};
-  const chosen = new Map(takenList.map((t) => [t.id, t.settings]));
   for (const [id, manifest] of [...sound.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
     const fields: Record<string, ExtensionFieldDecl[]> = {};
     for (const kind of Object.keys(manifest.targets.patter ?? {}).sort()) {
@@ -305,14 +286,7 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
       if (target !== undefined) fields[kind] = compiledTarget(target) as unknown as ExtensionFieldDecl[];
     }
     const projectEntry = projectValues.get(id);
-    // Every setting the manifest declares, the project's value or else its default, so a game can read which
-    // host field a claim presents. Only when the manifest declares settings.
-    const settings = (manifest.settings ?? []).length > 0 ? sortRecord(settingValues(manifest, chosen.get(id))) : undefined;
-    bundle[id] = {
-      version: manifest.version, fields,
-      ...(projectEntry !== undefined ? { project: projectEntry } : {}),
-      ...(settings !== undefined ? { settings } : {}),
-    };
+    bundle[id] = { version: manifest.version, fields, ...(projectEntry !== undefined ? { project: projectEntry } : {}) };
   }
   const sortedNodes = new Map([...values.entries()].map(([id, v]) => [id, sortRecord(v)]));
   return { issues, compiled: { bundle, nodes: sortedNodes } };
@@ -333,41 +307,4 @@ function pickDecls(manifest: Manifest): TypeDecl[] {
 /** A record with its keys in order: the same values, whatever order the shards were read in. */
 function sortRecord<T>(r: Record<string, T>): Record<string, T> {
   return Object.fromEntries(Object.keys(r).sort().map((k) => [k, r[k]!]));
-}
-
-/**
- * Claims against the project's gameData fields. A claim on a field the project doesn't declare for that node
- * kind is a warning (the field may be on its way); one the project declares with another type is an error.
- * Every value the field holds on a node of that kind is checked against the claim too, over the project's
- * declaration (`effectiveClaim`): a claim that lists no values or stages takes the field's.
- */
-function claimIssues(input: ExtensionPassInput, nodes: ReadonlyMap<string, ExtensionNode>, claims: readonly ResolvedClaim[]): ExtensionIssue[] {
-  const issues: ExtensionIssue[] = [];
-  const projectPath = input.projectPath ?? "";
-  const declared = input.project.gameDataFields ?? {};
-  for (const claim of claims) {
-    const decl = (declared[claim.kind as keyof typeof declared] ?? []).find((d) => d.name === claim.field);
-    if (decl === undefined) {
-      issues.push({ severity: "warning", file: projectPath,
-        message: `the Patter extension "${claim.extension}" claims the ${claim.kind} gameData field "${claim.field}", which the project doesn't declare` });
-      continue;
-    }
-    if (decl.type !== claim.claim.type) {
-      issues.push({ severity: "error", file: projectPath,
-        message: `the Patter extension "${claim.extension}" claims the ${claim.kind} gameData field "${claim.field}" as ${claim.claim.type}, but the project declares it as ${decl.type}` });
-      continue;
-    }
-    // The claim over the project's declaration: a claim that leaves out an enum's or flags' values, or a
-    // quality's stages, takes the field's own, so its values are checked against the project's vocabulary.
-    const effective = effectiveClaim(claim.claim, decl);
-    for (const [id, node] of nodes) {
-      if (node.kind !== claim.kind || node.gameData === undefined || !own(node.gameData, claim.field)) continue;
-      const file = (node.scene !== undefined ? input.sceneFiles?.[node.scene] : undefined) ?? projectPath;
-      for (const p of valueProblems(effective, node.gameData[claim.field])) {
-        issues.push({ severity: p.severity, file, node: id, code: p.code,
-          message: `${claim.kind} '${id}' gameData "${claim.field}", as the Patter extension "${claim.extension}" claims it: ${p.message}` });
-      }
-    }
-  }
-  return issues;
 }

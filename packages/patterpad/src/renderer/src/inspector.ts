@@ -11,8 +11,7 @@ import type { GameData, GameDataField, GameDataNodeKind, PropertyDecl, DocLine, 
 import { RERECORD_STATUS_DECL, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import { colourIndex } from "@patterkit/patterpad-surface/colour";
 import { el } from "./dom.js";
-import { claimOn, claimProblem, effectiveClaimDecl, extensionSections, sweepExtensionRows, type ExtensionHandlers } from "./extension-rows.js";
-import type { ExtensionDto, ExtensionFieldDto } from "../../shared/api.js";
+import { extensionSections, sweepExtensionRows, type ExtensionHandlers } from "./extension-rows.js";
 
 type Reveal = (id: string) => void;
 /** Open the visual condition editor for the node `id`, seeded with `src`, anchored to `anchor`. */
@@ -68,10 +67,7 @@ function gameDataFieldRows(kind: GameDataNodeKind, id: string | null, gd: GameDa
   const fields = h.gameDataFields(kind);
   const rows: HTMLElement[] = [];
   const defined = new Set<string>();
-  // A field a Patter extension claims keeps its own value and type, drawn with the extension's label, help
-  // and values (the proposal's "Claims on host fields").
-  const extensions = h.extensions();
-  for (const f of fields) { defined.add(f.name); rows.push(gameDataFieldRow(f, id, gd?.[f.name], h, kind, claimOn(extensions, kind, f.name))); }
+  for (const f of fields) { defined.add(f.name); rows.push(gameDataFieldRow(f, id, gd?.[f.name], h, kind)); }
   for (const [k, v] of Object.entries(gd ?? {})) {
     if (!defined.has(k)) { const r = el("div", "insp-row"); r.append(el("span", "insp-key insp-gd", k), el("span", "insp-val insp-mono", typeof v === "string" ? v : JSON.stringify(v))); rows.push(r); }
   }
@@ -100,22 +96,9 @@ const fieldRowCache = fieldRows();
  *  family. Read-only when there is no node to write to. */
 export function gameDataFieldRow(
   f: GameDataField, id: string | null, current: unknown, h: Pick<InspectorHandlers, "setGameData">, kind = "",
-  claim?: { extension: ExtensionDto; decl: ExtensionFieldDto },
 ): HTMLElement {
-  // The claim over the field's own declaration: a claim with no values draws and checks the field's.
-  const c = claim ? effectiveClaimDecl(claim, f) : undefined;
-  const decl: GameDataField = !c ? f : {
-    ...f,
-    ...(c.help !== undefined ? { purpose: c.help } : {}),
-    ...(c.values !== undefined && f.values === undefined ? { values: c.values } : {}),
-    ...(c.valueHelp !== undefined ? { valueHelp: c.valueHelp } : {}),
-  } as GameDataField;
-  const problem = claim ? claimProblem(claim, current ?? undefined, f) : "";
   return fieldRowCache.row(`${kind}\u0000${id ?? ""}\u0000${f.name}`, {
-    decl, value: current ?? undefined, disabled: id === null,
-    ...(c?.label !== undefined ? { label: c.label } : {}),
-    // The claim's sentence says what the row's own check would, in the extension's words: it stands alone.
-    ...(problem ? { replaceProblem: problem } : {}),
+    decl: f, value: current ?? undefined, disabled: id === null,
     onCommit: (v) => { if (id) h.setGameData(id, f.name, v); },
     className: "insp-row insp-gd-row", labelClassName: "insp-key", controlClassName: "insp-gd-input",
   });

@@ -131,8 +131,7 @@ static func _declared_value(v):
 # Patter extension values follow gameData's rule (patterkit design/proposals/patter-storylet-extensions.md,
 # "At runtime"): raw on the node, declarations with every default resolved in the bundle's "extensions"
 # section, and the SAME two helpers above fill them in, given extension_decls. extensions_of reads any
-# node's values off the bundle, by the address a game already uses, and extension_settings an extension's
-# settings.
+# node's values off the bundle, by the address a game already uses.
 
 ## One extension's declarations for a node kind ("project", "scene", "block", "snippet", "line", "text",
 ## "gameEvent", "option"), every default resolved. Empty when the bundle has no such extension or it
@@ -145,22 +144,6 @@ static func extension_decls(bundle: Dictionary, extension: String, kind: String)
 	if not (fields is Dictionary) or not (fields.get(kind) is Array):
 		return []
 	return fields[kind]
-
-
-## One extension's settings, by setting name: every setting its manifest declares, the project's value or
-## else the setting's default. Each names a host field, so a game reads here which gameData field holds what
-## the extension claims. {} when the bundle has no such extension or it declares no settings. A fresh
-## Dictionary each call.
-static func extension_settings(bundle: Dictionary, extension: String) -> Dictionary:
-	var out := {}
-	var exts = bundle.get("extensions")
-	if not (exts is Dictionary) or not (exts.get(extension) is Dictionary):
-		return out
-	var settings = exts[extension].get("settings")
-	if settings is Dictionary:
-		for name in settings:
-			out[str(name)] = str(settings[name])
-	return out
 
 
 ## A node's Patter extension values, by extension id, raw; {} when it has none or the address names

@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Removed
+
+- `GameDataHelpers.ExtensionSettings(bundle, extension)` and `BundleExtension.Settings`: extension settings named
+  the gameData field a claim presented, and claims and settings are gone from the extensions spec. A bundle an
+  older compiler wrote still loads, its settings ignored. Pinned by the corpus (version 7).
+
 ## [0.33.0] - 2026-10-19
 
 ### Added

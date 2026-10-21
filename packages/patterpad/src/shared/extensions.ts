@@ -1,17 +1,15 @@
 // ---------------------------------------------------------------------------
 // Patter extensions as the editor is told them (patterkit design/proposals/
-// patter-storylet-extensions.md, "Tier 1: fields" and "Claims on host fields"):
-// each extension the project takes and has a sound manifest for, its
-// declarations by node kind, its claims on gameData fields resolved through the
-// project's settings, and the project's own values. An extension whose manifest
-// is missing or broken is left out: its data is untouched, and validation says
-// why.
+// patter-storylet-extensions.md, "Tier 1: fields"): each extension the project
+// takes and has a sound manifest for, its declarations by node kind, and the
+// project's own values. An extension whose manifest is missing or broken is left
+// out: its data is untouched, and validation says why.
 //
 // Pure: main hands in the manifests and the project-level shards it read from
 // disk, so the summary works before the rest of the project has been read.
 // ---------------------------------------------------------------------------
 
-import { resolvedClaims, settingValues, viewsFor } from "@wildwinter/toolkit/extensions";
+import { viewsFor } from "@wildwinter/toolkit/extensions";
 import type { Manifest } from "@wildwinter/toolkit/extensions";
 import type { Beat, Group, ProjectFile, Scene, Snippet } from "@patterkit/model";
 import type { ExtensionDto, ExtensionFieldDto, ExtensionNodeDto, ExtensionTargetDto } from "./api.js";
@@ -35,14 +33,9 @@ export function extensionDtos(
     const manifest = manifests.get(id);
     if (manifest === undefined) continue;
     const pin = taken[id];
-    const chosen = settingValues(manifest, pin?.settings);
-    const claims = resolvedClaims(manifest, "patter", pin?.settings);
     const targets: Record<string, ExtensionTargetDto> = {};
     for (const [kind, target] of Object.entries(manifest.targets.patter ?? {})) {
-      targets[kind] = {
-        fields: (target.fields ?? []) as unknown as ExtensionFieldDto[],
-        claims: claims.filter((c) => c.kind === kind).map((c) => ({ field: c.field, decl: { ...c.claim, name: c.field } as unknown as ExtensionFieldDto })),
-      };
+      targets[kind] = { fields: (target.fields ?? []) as unknown as ExtensionFieldDto[] };
     }
     const shard = projectShards.get(id);
     const entries = isObject(shard) && isObject(shard["entries"]) ? shard["entries"] : undefined;
@@ -51,7 +44,6 @@ export function extensionDtos(
     out.push({
       id, name: manifest.name, version: manifest.version, ...(manifest.docs ? { docs: manifest.docs } : {}),
       taken: pin?.version ?? "",
-      settings: (manifest.settings ?? []).map((s) => ({ name: s.name, label: s.label ?? s.name, value: chosen[s.name] ?? s.default })),
       targets, projectNode,
       ...(projectValues && Object.keys(projectValues).length ? { projectValues: { ...projectValues } } : {}),
       ...viewFacts(manifest),
@@ -67,11 +59,10 @@ function viewFacts(manifest: Manifest): Pick<ExtensionDto, "views" | "reads"> {
   return { ...(views.length ? { views } : {}), ...(reads.length ? { reads } : {}) };
 }
 
-/** The read-only line an extension's Settings section opens with: what the project takes it at, and the
- *  gameData field each of its settings names. "Taken at 1.1.0. Delivery field: delivery." */
-export function takenLine(x: Pick<ExtensionDto, "taken" | "version" | "settings">): string {
-  const at = x.taken ? `Taken at ${x.taken}.` : `Taken with no version (the manifest is ${x.version}).`;
-  return [at, ...x.settings.map((s) => `${s.label}: ${s.value}.`)].join(" ");
+/** The read-only line an extension's Settings section opens with: what the project takes it at.
+ *  "Taken at 1.1.0." */
+export function takenLine(x: Pick<ExtensionDto, "taken" | "version">): string {
+  return x.taken ? `Taken at ${x.taken}.` : `Taken with no version (the manifest is ${x.version}).`;
 }
 
 /** Words to show for a node: trimmed to a line. */

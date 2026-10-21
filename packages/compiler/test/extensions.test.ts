@@ -101,50 +101,28 @@ describe("extensionPass", () => {
     expect(compiled.bundle).toEqual({});
   });
 
-  it("warns of a version mismatch and an unknown setting, and refuses a setting that isn't a field name", () => {
-    const { issues } = pass({ project: project({ extensions: { probe: { version: "1.0.0", settings: { nope: "x", deliveryField: "not a name" } } } }) });
-    const text = messages(issues).join("\n");
-    expect(text).toContain(`warning: the project takes "probe" at version 1.0.0, but its manifest is version 1.1.0`);
-    expect(text).toContain(`warning: "probe" has no setting "nope"`);
-    expect(text).toContain(`error: "probe"'s setting "deliveryField" names a gameData field`);
-  });
-
-  it("warns of a claim on a field the project doesn't declare, and refuses one declared with another type", () => {
-    expect(messages(pass({ project: project({ gameDataFields: {} }) }).issues)).toEqual([
-      `warning: the Patter extension "probe" claims the line gameData field "delivery", which the project doesn't declare`,
-    ]);
-    expect(messages(pass({ project: project({ gameDataFields: { line: [{ name: "delivery", type: "text" }] } }) }).issues)).toEqual([
-      `error: the Patter extension "probe" claims the line gameData field "delivery" as enum, but the project declares it as text`,
+  it("warns of a version mismatch", () => {
+    const { issues } = pass({ project: project({ extensions: { probe: { version: "1.0.0" } } }) });
+    expect(messages(issues)).toEqual([
+      `warning: the project takes "probe" at version 1.0.0, but its manifest is version 1.1.0; run \`patter format\` to take it (renamed stages are renamed in the data as it does)`,
     ]);
   });
 
-  it("checks a claimed field's values on that kind's nodes", () => {
-    const issues = pass().issues;
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ severity: "error", node: "L2" });
-    expect(issues[0]!.message).toContain(`line 'L2' gameData "delivery", as the Patter extension "probe" claims it`);
-  });
-
-  it("checks a claim that lists no values against the project's own field (toolkit 0.2.1's effectiveClaim)", () => {
-    // The probe's claim with its values left out, and value help for one the project doesn't declare.
-    const open = JSON.parse(JSON.stringify(probe)) as { targets: { patter: { line: { claims: Record<string, unknown>[] } } } };
-    const claim = open.targets.patter.line.claims[0]!;
-    delete claim.values;
-    claim.valueHelp = { calm: "Unhurried.", whisper: "Barely there." };
-    const openManifests = [{ path: "extensions/probe.extension.json", id: "probe", manifest: open }];
-    // The project's vocabulary is the claim's: "tense" passes, "shouty" doesn't, and the help for "whisper" is fine.
-    const issues = pass({ manifests: openManifests }).issues;
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ severity: "error", node: "L2", code: "not-a-value" });
-    expect(issues[0]!.message).toContain(`line 'L2' gameData "delivery", as the Patter extension "probe" claims it`);
-    // A project that declares "shouty" takes it.
-    expect(pass({ manifests: openManifests,
-      project: project({ gameDataFields: { line: [{ name: "delivery", type: "enum", values: ["calm", "tense", "shouty"] }] } }) }).issues).toEqual([]);
-    // The type clash and the undeclared field are reported as before.
-    expect(messages(pass({ manifests: openManifests, project: project({ gameDataFields: { line: [{ name: "delivery", type: "text" }] } }) }).issues))
-      .toEqual([`error: the Patter extension "probe" claims the line gameData field "delivery" as enum, but the project declares it as text`]);
-    expect(messages(pass({ manifests: openManifests, project: project({ gameDataFields: {} }) }).issues))
-      .toEqual([`warning: the Patter extension "probe" claims the line gameData field "delivery", which the project doesn't declare`]);
+  it("ignores a pin's settings, and a manifest's settings and claims, which the spec no longer has", () => {
+    // An old manifest still carrying settings and a claim: the toolkit warns of each removed key, and the pass
+    // compiles the rest as before, with nothing of either in the bundle.
+    const old = JSON.parse(JSON.stringify(probe)) as { settings?: unknown; targets: { patter: { line: { claims?: unknown } } } };
+    old.settings = [{ name: "deliveryField", label: "Delivery field", default: "delivery" }];
+    old.targets.patter.line.claims = [{ setting: "deliveryField", type: "enum", values: ["calm", "tense"] }];
+    const { issues, compiled } = pass({
+      manifests: [{ path: "extensions/probe.extension.json", id: "probe", manifest: old }],
+      project: project({ extensions: { probe: { version: "1.1.0", settings: { deliveryField: "not a name" } } as never } }),
+    });
+    expect(issues.map((i) => i.code)).toEqual(["removed-key", "removed-key"]);
+    expect(issues.every((i) => i.severity === "warning")).toBe(true);
+    expect(Object.keys(compiled.bundle["probe"]!).sort()).toEqual(["fields", "version"]);
+    // gameData is the project's own: a value its declaration doesn't allow isn't the extension pass's to report.
+    expect(pass().issues).toEqual([]);
   });
 
   it("reports orphans, a wrong-scene entry, an unknown kind, and a bad value, per entry", () => {

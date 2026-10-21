@@ -25,6 +25,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   changing the project. A view whose installed version differs from the project's says so in its window's
   title, and still opens while the major version matches.
 
+### Removed
+
+- **Extensions no longer present a project's Game Data fields.** An extension used to be able to draw one of
+  your Game Data fields with its own label, help, and choices, through a setting naming the field. Extensions
+  now keep their values in fields of their own, so a Game Data field is always drawn as the project declares
+  it, and an extension's section of Project Settings no longer lists settings. A project file that still gives
+  an extension settings opens as before: they're ignored, the problems bar says so, and saving the project
+  file keeps them until you delete them.
+
 ### Fixed
 
 - **Checkboxes and other native controls follow the palette you pick**, not the system's light or dark mode: a

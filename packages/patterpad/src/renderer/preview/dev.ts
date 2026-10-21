@@ -22,12 +22,11 @@ const DICT_BYTES: Record<string, { aff: string; dic: string }> = {
 };
 
 // The fixture with one speaker qualifier on a line, so the preview shows the cue's BARKEEP (O.S.), the
-// inspector's Qualifier dropdown, and the run rule (a new BARKEEP line after it takes O.S. too).
-// Its mood is one the probe's claim on the field doesn't allow, so the claimed Delivery row shows a problem.
+// inspector's Qualifier dropdown, and the run rule (a new BARKEEP line after it takes O.S. too), and a mood.
 const flowSource = tavernFlow.replace('direction: "wiping a glass" }', 'direction: "wiping a glass", qualifier: "os", gameData: { mood: "hostile" } }');
 
 // The probe, taken at an older version than its manifest (so the problems bar has a project-level extension
-// problem, which opens its Settings section), with its delivery claim naming the line's `mood` field.
+// problem, which opens its Settings section).
 // The fields window's preview link (fields-dev.ts): this tab plays main's part.
 const fieldsChannel = new BroadcastChannel("patterpad-fields-preview");
 let lastFieldsState: unknown = null;
@@ -39,7 +38,7 @@ fieldsChannel.onmessage = (e: MessageEvent<{ t: string; id?: string; extension?:
   else if (m.t === "commit") onFieldsCommit?.(m.id!, m.extension!, m.field!, m.value);
   else if (m.t === "follow") onFieldsFollow?.(m.on === true);
 };
-const PROBE_TAKEN = { probe: { version: "1.0.0", settings: { deliveryField: "mood" } } };
+const PROBE_TAKEN = { probe: { version: "1.0.0" } };
 const probeProject = { values: { studio: "Wildwinter" } as Record<string, unknown> };
 const probeDtos = (): ReturnType<typeof extensionDtos> => extensionDtos(
   { project: { id: "proj_tavern", name: "The Tavern" }, extensions: PROBE_TAKEN } as unknown as ProjectFile,

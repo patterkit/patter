@@ -33,6 +33,13 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Removed
+
+- **`extensionSettings(bundle, extension)`** and the bundle's `extensions[id].settings`: extension settings named
+  the gameData field a claim presented, and claims and settings are gone from the extensions spec (2026-10-20). A
+  bundle an older compiler wrote still loads, its settings ignored. On all four runtimes, in the API parity check
+  and the conformance corpus (version 7: the op `expectExtensionSettings` and its cases are gone).
+
 ## [0.33.0] - 2026-10-19
 
 ### Added

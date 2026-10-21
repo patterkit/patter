@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "expressions": [
     {
       "name": "number comparison",
@@ -21976,8 +21976,8 @@
         "schema": "patter/bundle@0",
         "content": {
           "project": "conf",
-          "hash": "1mbibkk",
-          "structureHash": "1hukrts"
+          "hash": "1bpqu2h",
+          "structureHash": "0gwi7zd"
         },
         "voiced": false,
         "locales": {
@@ -22208,9 +22208,6 @@
             },
             "project": {
               "studio": "Wildwinter"
-            },
-            "settings": {
-              "deliveryField": "delivery"
             }
           }
         },
@@ -22997,23 +22994,6 @@
           "kind": "line",
           "address": "nowhere",
           "expectResult": {}
-        },
-        {
-          "op": "expectExtensionSettings",
-          "extension": "probe",
-          "expectResult": {
-            "deliveryField": "delivery"
-          }
-        },
-        {
-          "op": "expectExtensionSettings",
-          "extension": "other",
-          "expectResult": {}
-        },
-        {
-          "op": "expectExtensionSettings",
-          "extension": "nowhere",
-          "expectResult": {}
         }
       ]
     },
@@ -23023,8 +23003,8 @@
         "schema": "patter/bundle@0",
         "content": {
           "project": "conf",
-          "hash": "1dh77tt",
-          "structureHash": "1yndfgu"
+          "hash": "16ny7lo",
+          "structureHash": "01tq2z9"
         },
         "voiced": false,
         "locales": {
@@ -23240,9 +23220,6 @@
                   "default": ""
                 }
               ]
-            },
-            "settings": {
-              "deliveryField": "delivery"
             }
           }
         },
@@ -23492,316 +23469,6 @@
       ]
     },
     {
-      "name": "an extension's settings reach the game resolved: the project's value, else the setting's default",
-      "bundle": {
-        "schema": "patter/bundle@0",
-        "content": {
-          "project": "conf",
-          "hash": "0ozqheo",
-          "structureHash": "17ehafa"
-        },
-        "voiced": false,
-        "locales": {
-          "default": "en",
-          "included": [
-            "en"
-          ]
-        },
-        "cast": [
-          {
-            "name": "ANNA"
-          },
-          {
-            "name": "BO"
-          }
-        ],
-        "gameDataFields": {
-          "line": [
-            {
-              "name": "mood",
-              "type": "enum",
-              "values": [
-                "calm",
-                "tense"
-              ],
-              "default": "calm"
-            }
-          ]
-        },
-        "extensions": {
-          "probe": {
-            "version": "1.1.0",
-            "fields": {
-              "block": [
-                {
-                  "name": "pace",
-                  "type": "number",
-                  "default": 0
-                }
-              ],
-              "gameEvent": [
-                {
-                  "name": "cue",
-                  "type": "text",
-                  "default": ""
-                }
-              ],
-              "line": [
-                {
-                  "name": "note",
-                  "type": "text",
-                  "default": ""
-                },
-                {
-                  "name": "weight",
-                  "type": "number",
-                  "min": 0,
-                  "max": 10,
-                  "default": 1
-                },
-                {
-                  "name": "loud",
-                  "type": "boolean",
-                  "default": false
-                },
-                {
-                  "name": "tone",
-                  "type": "enum",
-                  "values": [
-                    "calm",
-                    "tense"
-                  ],
-                  "default": "calm"
-                },
-                {
-                  "name": "marks",
-                  "type": "flags",
-                  "values": [
-                    "night",
-                    "rain"
-                  ],
-                  "default": []
-                },
-                {
-                  "name": "act",
-                  "type": "quality",
-                  "stages": [
-                    "setup",
-                    "turn",
-                    "close"
-                  ],
-                  "default": "setup"
-                },
-                {
-                  "name": "next",
-                  "type": "reference",
-                  "to": "line",
-                  "default": ""
-                },
-                {
-                  "name": "cue",
-                  "type": "record",
-                  "fields": [
-                    {
-                      "name": "sound",
-                      "type": "text",
-                      "required": true,
-                      "default": ""
-                    },
-                    {
-                      "name": "gain",
-                      "type": "number",
-                      "min": 0,
-                      "max": 1,
-                      "default": 0
-                    }
-                  ],
-                  "default": {
-                    "sound": "",
-                    "gain": 0
-                  }
-                },
-                {
-                  "name": "perf",
-                  "type": "map",
-                  "key": {
-                    "type": "reference",
-                    "to": "cast"
-                  },
-                  "of": {
-                    "type": "record",
-                    "fields": [
-                      {
-                        "name": "expression",
-                        "type": "enum",
-                        "values": [
-                          "smile",
-                          "frown"
-                        ],
-                        "default": "smile"
-                      },
-                      {
-                        "name": "look",
-                        "type": "text",
-                        "default": ""
-                      }
-                    ]
-                  },
-                  "default": {}
-                },
-                {
-                  "name": "beats",
-                  "type": "list",
-                  "id": "id",
-                  "of": {
-                    "type": "record",
-                    "fields": [
-                      {
-                        "name": "id",
-                        "type": "text",
-                        "default": ""
-                      },
-                      {
-                        "name": "at",
-                        "type": "number",
-                        "default": 0
-                      }
-                    ]
-                  },
-                  "default": []
-                },
-                {
-                  "name": "words",
-                  "type": "list",
-                  "of": {
-                    "type": "text"
-                  },
-                  "default": []
-                }
-              ],
-              "option": [
-                {
-                  "name": "icon",
-                  "type": "text",
-                  "default": ""
-                }
-              ],
-              "project": [
-                {
-                  "name": "studio",
-                  "type": "text",
-                  "default": ""
-                }
-              ],
-              "scene": [
-                {
-                  "name": "theme",
-                  "type": "text",
-                  "default": ""
-                }
-              ],
-              "snippet": [
-                {
-                  "name": "weight",
-                  "type": "number",
-                  "default": 0
-                }
-              ],
-              "text": [
-                {
-                  "name": "style",
-                  "type": "text",
-                  "default": ""
-                }
-              ]
-            },
-            "settings": {
-              "deliveryField": "mood"
-            }
-          }
-        },
-        "scenes": {
-          "s_set": {
-            "id": "s_set",
-            "type": "scene",
-            "name": "Settings",
-            "blocks": [
-              {
-                "id": "b_set",
-                "type": "block",
-                "name": "B",
-                "children": [
-                  {
-                    "id": "sn_set",
-                    "type": "snippet",
-                    "beats": [
-                      {
-                        "id": "L_set",
-                        "kind": "line",
-                        "character": "ANNA",
-                        "gameData": {
-                          "mood": "tense"
-                        }
-                      }
-                    ],
-                    "jump": {
-                      "to": "END"
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        "strings": {
-          "en": {
-            "L_set": "Steady."
-          }
-        }
-      },
-      "script": [
-        {
-          "op": "openFlow",
-          "flow": "main",
-          "scene": "s_set"
-        },
-        {
-          "op": "advance",
-          "expect": [
-            {
-              "type": "line",
-              "id": "L_set",
-              "text": "Steady.",
-              "character": "ANNA",
-              "gameData": {
-                "mood": "tense"
-              }
-            }
-          ]
-        },
-        {
-          "op": "advance",
-          "expect": [
-            {
-              "type": "end"
-            }
-          ]
-        },
-        {
-          "op": "expectExtensionSettings",
-          "extension": "probe",
-          "expectResult": {
-            "deliveryField": "mood"
-          }
-        },
-        {
-          "op": "expectExtensionSettings",
-          "extension": "other",
-          "expectResult": {}
-        }
-      ]
-    },
-    {
       "name": "a bundle with no extensions hands back none, and the helpers read nothing",
       "bundle": {
         "schema": "patter/bundle@0",
@@ -23990,11 +23657,6 @@
           "op": "expectNodeExtensions",
           "kind": "nothing",
           "address": "L_none",
-          "expectResult": {}
-        },
-        {
-          "op": "expectExtensionSettings",
-          "extension": "probe",
           "expectResult": {}
         }
       ]
@@ -27634,8 +27296,8 @@
         "schema": "patter/bundle@0",
         "content": {
           "project": "conf",
-          "hash": "1mbibkk",
-          "structureHash": "1hukrts"
+          "hash": "1bpqu2h",
+          "structureHash": "0gwi7zd"
         },
         "voiced": false,
         "locales": {
@@ -27866,9 +27528,6 @@
             },
             "project": {
               "studio": "Wildwinter"
-            },
-            "settings": {
-              "deliveryField": "delivery"
             }
           }
         },

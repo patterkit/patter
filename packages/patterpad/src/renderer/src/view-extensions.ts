@@ -259,9 +259,6 @@ export function createViewHost(deps: ViewHostDeps, target?: Window): ViewHost {
       return at ? deps.reveal(id, at.sceneId) : false;
     },
     writable,
-    settings(extension) {
-      return Object.fromEntries((extensionOf(extension)?.settings ?? []).map((s) => [s.name, s.value]));
-    },
     key: (combo) => deps.key(combo),
   };
   };

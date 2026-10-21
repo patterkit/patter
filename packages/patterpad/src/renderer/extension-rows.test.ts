@@ -3,9 +3,8 @@
 // conformance suite's probe manifest: a section per extension for each level that has fields, the shell's
 // rows for every type (help, value help and "default (x)" included), a reference's choices and a held
 // node named from the project's index, a pick over the cast and the extension's own project lists, commits
-// to the surface, a claimed gameData field drawn as the
-// extension presents it, locks, the inline problems validation would raise, the Settings section, and
-// where a problem about an extension goes.
+// to the surface, a gameData field drawn as the project declares it, locks, the inline problems validation
+// would raise, the Settings section, and where a problem about an extension goes.
 
 import { describe, it, expect, beforeEach } from "vitest";
 import probeText from "../../../conformance/fixtures/probe.extension.json?raw";
@@ -19,8 +18,8 @@ import { extensionDtos } from "../shared/extensions.js";
 import type { ExtensionDto, Problem } from "../shared/api.js";
 
 const manifest = parseManifest(probeText);
-const probe = (settings: Record<string, string> = { deliveryField: "mood" }, projectValues?: Record<string, unknown>): ExtensionDto[] => extensionDtos(
-  { project: { id: "proj_t", name: "T" }, extensions: { probe: { version: "1.1.0", settings } } } as unknown as ProjectFile,
+const probe = (projectValues?: Record<string, unknown>): ExtensionDto[] => extensionDtos(
+  { project: { id: "proj_t", name: "T" }, extensions: { probe: { version: "1.1.0" } } } as unknown as ProjectFile,
   new Map([["probe", manifest]]),
   projectValues ? new Map([["probe", { entries: { project: { proj_t: projectValues } } }]]) : new Map(),
 )!;
@@ -156,46 +155,18 @@ describe("extension sections in the inspector", () => {
     expect(fieldProblems(fields, undefined).size).toBe(0);
   });
 
-  it("draws a claimed gameData field with the extension's label, help and value help, and its problem", () => {
+  it("draws a gameData field as the project declares it, beside the extensions the project takes", () => {
     const fields: GameDataField[] = [{ name: "mood", type: "enum", values: ["calm", "tense", "hostile"] } as GameDataField];
     const set: unknown[] = [];
     const h = handlersWith({ gameDataFields: (k) => (k === "line" ? fields : []), setGameData: (_id, _k, v) => { set.push(v); } });
     const host = draw(h, { kind: "leaf", beat: "line", id: "L_1", gameData: { mood: "hostile" } });
     const row = host.querySelector<HTMLElement>(".insp-gd-section:not(.insp-ext-section) .insp-gd-row")!;
-    expect(row.querySelector(".shell-fieldrow-label")?.textContent).toBe("Delivery");
-    expect(row.querySelector(".shell-fieldrow-purpose")?.textContent).toBe("The line's delivery, as the probe reads it.");
-    expect(row.querySelector(".shell-fieldrow-problem")?.textContent).toBe("Probe reads this as calm or tense, so it doesn't know “hostile”.");
-    // Still the gameData field: its own values, and a change goes to setGameData.
+    expect(row.querySelector(".shell-fieldrow-label")?.textContent).toBe("mood");
+    expect(row.querySelector(".shell-fieldrow-problem")?.textContent ?? "").toBe("");
     const sel = row.querySelector("select")!;
     expect([...sel.options].map((o) => o.value)).toEqual(["", "calm", "tense", "hostile"]);
     sel.value = "calm"; sel.dispatchEvent(new Event("change", { bubbles: true }));
     expect(set).toEqual(["calm"]);
-    // The claim follows the setting: with the default, `delivery`, the mood field is the project's own.
-    const plain = draw(handlersWith({ gameDataFields: () => fields, extensions: () => probe({}) }), { kind: "leaf", beat: "line", id: "L_1", gameData: { mood: "hostile" } });
-    expect(plain.querySelector(".insp-gd-row .shell-fieldrow-label")?.textContent).toBe("mood");
-  });
-
-  it("draws and checks a claim that lists no values through the gameData field's own (toolkit's effectiveClaim)", () => {
-    // The probe's claim with its values left out, and value help for one the field doesn't declare.
-    const open = JSON.parse(probeText) as { targets: { patter: { line: { claims: Record<string, unknown>[] } } } };
-    const claim = open.targets.patter.line.claims[0]!;
-    delete claim.values;
-    claim.valueHelp = { calm: "Unhurried.", whisper: "Barely there." };
-    const openProbe = extensionDtos(
-      { project: { id: "proj_t", name: "T" }, extensions: { probe: { version: "1.1.0", settings: { deliveryField: "mood" } } } } as unknown as ProjectFile,
-      new Map([["probe", parseManifest(JSON.stringify(open))]]), new Map(),
-    )!;
-    const fields: GameDataField[] = [{ name: "mood", type: "enum", values: ["calm", "tense", "hostile"] } as GameDataField];
-    const drawn = (mood: string): HTMLElement => draw(handlersWith({ gameDataFields: (k) => (k === "line" ? fields : []), extensions: () => openProbe }),
-      { kind: "leaf", beat: "line", id: "L_1", gameData: { mood } }).querySelector<HTMLElement>(".insp-gd-section:not(.insp-ext-section) .insp-gd-row")!;
-    // A value the field declares is fine, drawn with the claim's label and help over the field's values.
-    const row = drawn("hostile");
-    expect(row.querySelector(".shell-fieldrow-label")?.textContent).toBe("Delivery");
-    expect(row.querySelector(".shell-fieldrow-purpose")?.textContent).toBe("The line's delivery, as the probe reads it.");
-    expect(row.querySelector(".shell-fieldrow-problem")?.textContent ?? "").toBe("");
-    expect([...row.querySelector("select")!.options].map((o) => o.value)).toEqual(["", "calm", "tense", "hostile"]);
-    // One it doesn't is refused in the field's words (after the shell's own word on it).
-    expect(drawn("shouty").querySelector(".shell-fieldrow-problem")?.textContent).toBe("Probe reads this as calm, tense, or hostile, so it doesn't know “shouty”.");
   });
 });
 
@@ -317,11 +288,11 @@ describe("a pick", () => {
 
 describe("an extension's section of Project Settings", () => {
   it("says what the project takes it at, draws the project's fields, and hands back the whole entry", () => {
-    const [x] = probe({ deliveryField: "mood" }, { studio: "Wildwinter" });
+    const [x] = probe({ studio: "Wildwinter" });
     const host = document.createElement("div");
     const seen: Array<Record<string, unknown>> = [];
     mountProjectSection(host, { extension: x!, adapter, locked: null, onChange: (e) => seen.push(e) });
-    expect(host.querySelector(".settings-ext-taken")?.textContent).toBe("Taken at 1.1.0. Delivery field: mood.");
+    expect(host.querySelector(".settings-ext-taken")?.textContent).toBe("Taken at 1.1.0.");
     const input = host.querySelector<HTMLInputElement>(".settings-ext-rows input")!;
     expect(input.value).toBe("Wildwinter");
     input.value = "Northwind"; input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -331,7 +302,7 @@ describe("an extension's section of Project Settings", () => {
   });
 
   it("keeps its rows through inspector redraws while the dialog is open", async () => {
-    const [x] = probe({}, { studio: "Wildwinter" });
+    const [x] = probe({ studio: "Wildwinter" });
     const host = document.createElement("div");
     document.body.append(host);
     mountProjectSection(host, { extension: x!, adapter, locked: null, onChange: noop });
@@ -421,18 +392,14 @@ describe("an extension's problem in the problems bar", () => {
     expect(line("entries.project.proj_t.studio: \"studio\" should be text, not a number", "wrong-type")).toBe("Probe: Studio on the project isn't the kind of value Probe expects. Set it again in the inspector.");
   });
 
-  it("words the pass's own checks: orphans, the wrong scene, the manifest, the pin, and claims", () => {
+  it("words the pass's own checks: orphans, the wrong scene, the manifest, and the pin", () => {
     expect(line("entries.line.L_gone: an entry for line \"L_gone\", which no longer exists; it is kept, and not compiled", "orphan")).toBe("Probe: There are values for a line that isn't in the project any more. They're kept, but your game won't get them.");
     expect(line("entries.line.L_greet belongs in scene \"scn_b\"'s shard; it's compiled from here all the same")).toBe("Probe: The values for “What'll it be, stranger?” are kept in another scene's file. They're used all the same.");
     expect(extensionProblemLine({ message: "the project takes the Patter extension \"lights\", but has no manifest for it at extensions/lights.extension.json; its data is left as it is, and not compiled", extension: "lights" }, ctx))
       .toBe("This project takes the extension “lights”, but its manifest isn't in the extensions folder. Its data is kept, but your game won't get it.");
     expect(line("the project takes \"probe\" at version 1.0.0, but its manifest is version 1.1.0; run `patter format` to take it (renamed stages are renamed in the data as it does)")).toBe("Probe: The project takes version 1.0.0, but the manifest is version 1.1.0. Run patter format to take the manifest's version.");
-    expect(line("the Patter extension \"probe\" claims the line gameData field \"mood\" as enum, but the project declares it as text")).toBe("Probe: It reads the line game data field “mood” as enum, but the project declares it as text. Change the field's type in Project Settings ▸ Game Data so they agree.");
-    expect(line("the Patter extension \"probe\" claims the line gameData field \"delivery\", which the project doesn't declare")).toBe("Probe: It reads the line game data field “delivery”, which the project doesn't declare. Add it in Project Settings ▸ Game Data.");
-    // A claimed value: the field by the claim's label.
-    const claimed: ExtensionProblemContext = { ...ctx, extension: (id) => probe({ deliveryField: "mood" }).find((x) => x.id === id) };
-    expect(extensionProblemLine({ message: "line 'L_greet' gameData \"mood\", as the Patter extension \"probe\" claims it: the value is \"hostile\", which is not one of its values", detail: "not-a-value", extension: "probe" }, claimed))
-      .toBe("Probe: Delivery on “What'll it be, stranger?” is “hostile”, which isn't one of its choices. Pick one in the inspector.");
+    expect(line("the project's pin for \"probe\" still has settings, which mean nothing now: extensions no longer have settings, so they're ignored, and you can delete them"))
+      .toBe("Probe: The project file still gives it settings, which extensions no longer have. They're ignored, and you can delete them from the project file.");
   });
 
   it("words a pick's missing and ambiguous values, and a name two of its sources hold", () => {

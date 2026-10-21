@@ -928,11 +928,10 @@ export interface ProjectFile {
   gameDataFields?: GameDataFields;
   /**
    * The Patter extensions this project takes, by id (ruled 2026-10-18: the project opts in), each pinned to a
-   * version, with its settings (the host fields its claims present, by setting name). The manifest itself
-   * sits in `extensions/<id>.extension.json`, and the data in `.patterextension` shards. Authoring config:
-   * the bundle carries each one's compiled declarations, values, and resolved settings
-   * (`BundleExtension.settings`), never this block itself. An extension named here whose manifest is missing
-   * is a warning, and its data is left untouched.
+   * version. The manifest itself sits in `extensions/<id>.extension.json`, and the data in `.patterextension`
+   * shards. Authoring config: the bundle carries each one's compiled declarations and values, never this
+   * block itself. An extension named here whose manifest is missing is a warning, and its data is left
+   * untouched.
    */
   extensions?: Record<string, ProjectExtension>;
   /** Ordered writing-status ladder (not-done -> done); default `DEFAULT_WRITING_STATUSES`. */
@@ -1374,9 +1373,9 @@ export interface Bundle {
   gameDataFields?: GameDataFields;
   /**
    * The extensions the project takes, by id: each one's version and its compiled declarations by node kind,
-   * every default resolved (what `extensionDecls` reads), the project node's own values, and its settings,
-   * resolved (what `extensionSettings` reads). A node's values sit on the node, under `extensions`. Absent
-   * when the project takes none, so a bundle without them is byte for byte what it was.
+   * every default resolved (what `extensionDecls` reads), and the project node's own values. A node's values
+   * sit on the node, under `extensions`. Absent when the project takes none, so a bundle without them is byte
+   * for byte what it was.
    */
   extensions?: Record<string, BundleExtension>;
   scenes: Record<string, CompiledScene>;
@@ -1635,12 +1634,12 @@ export const MANIFEST_EXTENSION = ".extension.json";
 export const EXTENSIONS_DIR = "extensions";
 
 /**
- * The extensions a project takes (`ProjectFile.extensions`), one each: the version it is pinned to and its
- * settings (the host fields its claims present, by setting name).
+ * The extensions a project takes (`ProjectFile.extensions`), one each: the version it is pinned to. An older
+ * pin may still carry `settings`, which named the host fields claims presented; claims and settings are gone
+ * from the extensions spec (2026-10-20), so they're ignored, and `patter validate` says so.
  */
 export interface ProjectExtension {
   version: string;
-  settings?: Record<string, string>;
 }
 
 /**
@@ -1675,13 +1674,6 @@ export interface BundleExtension {
   fields: Record<string, ExtensionFieldDecl[]>;
   /** The project node's values, raw, when it has any. */
   project?: Record<string, unknown>;
-  /**
-   * Every setting the manifest declares, by setting name, keys sorted: the project's value (`ProjectExtension.
-   * settings`), or else the setting's default (`@wildwinter/toolkit/extensions`' `settingValues`). A setting
-   * names a host field, so a game reads here which gameData field holds what the extension claims. Present
-   * only when the manifest declares settings.
-   */
-  settings?: Record<string, string>;
 }
 
 /**

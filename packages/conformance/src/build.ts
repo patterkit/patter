@@ -30,8 +30,11 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  No earlier expectation changed.
  *  6: `expectExtensions` with `snippet` (and no `scene`): a snippet's own values, `extensionsForSnippet`.
  *  No earlier expectation changed.
+ *  7: claims and settings are gone from the extensions spec (2026-10-20), so version 4's go: the bundle carries
+ *  no `extensions[id].settings`, and the op `expectExtensionSettings` and its cases are removed. A runner
+ *  ignores an older bundle's settings. No other expectation changed.
  */
-export const CORPUS_VERSION = 6;
+export const CORPUS_VERSION = 7;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at

@@ -13,7 +13,7 @@ import { fieldsHint, fieldsState, followTarget, recordMapFields, selectedNodes }
 import { extensionDtos } from "../shared/extensions.js";
 
 const extensions = extensionDtos(
-  { project: { id: "proj_t", name: "T" }, extensions: { probe: { version: "1.1.0", settings: { deliveryField: "mood" } } } } as unknown as ProjectFile,
+  { project: { id: "proj_t", name: "T" }, extensions: { probe: { version: "1.1.0" } } } as unknown as ProjectFile,
   new Map([["probe", parseManifest(probeText)]]),
   new Map(),
 )!;

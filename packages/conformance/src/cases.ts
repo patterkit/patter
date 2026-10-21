@@ -3660,33 +3660,6 @@ const scriptedExtensions: ScriptedFixture = {
     // A node of another kind, or no node at all, reads as none.
     { op: "expectNodeExtensions", kind: "line", address: "T_one", expectResult: {} },
     { op: "expectNodeExtensions", kind: "line", address: "nowhere", expectResult: {} },
-    // The project leaves the probe's setting out, so the bundle carries its default; "other" declares none.
-    { op: "expectExtensionSettings", extension: "probe", expectResult: { deliveryField: "delivery" } },
-    { op: "expectExtensionSettings", extension: "other", expectResult: {} },
-    { op: "expectExtensionSettings", extension: "nowhere", expectResult: {} },
-  ],
-};
-
-// An extension's settings reach the bundle resolved (corpus 4): the project's value where it gives one, so a game
-// reads which gameData field the probe's delivery claim presents. Here the project points it at "mood".
-const scriptedExtensionSettings: ScriptedFixture = {
-  name: "an extension's settings reach the game resolved: the project's value, else the setting's default",
-  project: probeProject({
-    gameDataFields: { line: [{ name: "mood", type: "enum", values: ["calm", "tense"] }] },
-    extensions: { probe: { version: "1.1.0", settings: { deliveryField: "mood" } } },
-  }),
-  scenes: [{ id: "s_set", type: "scene", name: "Settings", blocks: [{ id: "b_set", type: "block", name: "B", children: [
-    { id: "sn_set", type: "snippet", beats: [{ id: "L_set", kind: "line", character: "ANNA", gameData: { mood: "tense" } }], jump: { to: "END" } },
-  ] }] }],
-  locales: [loc("s_set", { L_set: "Steady." })],
-  extensionManifests: [probeManifest],
-  extensionShards: [],
-  script: [
-    { op: "openFlow", flow: "main", scene: "s_set" },
-    { op: "advance", expect: [{ type: "line", id: "L_set", text: "Steady.", character: "ANNA", gameData: { mood: "tense" } }] },
-    { op: "advance", expect: [{ type: "end" }] },
-    { op: "expectExtensionSettings", extension: "probe", expectResult: { deliveryField: "mood" } },
-    { op: "expectExtensionSettings", extension: "other", expectResult: {} },
   ],
 };
 
@@ -3760,8 +3733,6 @@ const scriptedNoExtensions: ScriptedFixture = {
     { op: "expectNodeExtensions", kind: "project", effective: { extension: "probe" }, expectResult: {} },
     { op: "expectNodeExtensions", kind: "scene", address: "nowhere", expectResult: {} },
     { op: "expectNodeExtensions", kind: "nothing", address: "L_none", expectResult: {} },
-    // No extensions section at all: no settings for any extension.
-    { op: "expectExtensionSettings", extension: "probe", expectResult: {} },
   ],
 };
 
@@ -3903,7 +3874,7 @@ export const cases: Fixtures = {
     scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties, scriptedStages,
     scriptedWorldQuality, scriptedStoryQuality, scriptedQualityDeletedStage, scriptedEnumDeletedValue,
     scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited,
-    scriptedExtensions, scriptedExtensionsCompile, scriptedExtensionSettings, scriptedNoExtensions],
+    scriptedExtensions, scriptedExtensionsCompile, scriptedNoExtensions],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults, gameDataQuality, gameDataQualityDefaults, gameDataOption, gameDataOptionDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),
