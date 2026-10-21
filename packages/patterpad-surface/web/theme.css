@@ -29,7 +29,7 @@
   --bg: #f1ebe0;       /* parchment */
   --surface: #fbf7f0;  /* warm paper / vellum (not stark white) */
   --ink: #312b22;      /* soft chocolate ink (warm near-black) */
-  --muted: #9c9286;    /* warm taupe-grey */
+  --muted: #72695e;    /* warm taupe-grey: the lightest that passes AA as text on --bg and --surface (2026-10-21; was #9c9286, 2.6:1) */
   --line: #e6dccd;     /* parchment line */
   --accent: #8a5a34;   /* chocolate / caramel - warm and cosy, not red */
   --on-accent: #fff;   /* the label on a caramel button */
@@ -38,7 +38,7 @@
      squiggles, the problem bar, VCS lock/stale badges, and invalid inputs (design-language §4
      "coherent to the edges"). Two semantics only - "danger" covers error / lock / destructive. --- */
   --danger: #b23b2f;   /* warm brick red - errors, locks, destructive actions */
-  --warn:   #a9772b;   /* warm amber / ochre - warnings, stale */
+  --warn:   #89632c;   /* warm amber / ochre - warnings, stale; dark enough to pass AA as text in Paper and Mist (was #a9772b, 3.3:1) */
   --ok:     #3f7d49;   /* warm green - success, live / in-sync (matches --char-4) */
   /* derived reading inks (theme-agnostic: mix the live ink/muted) */
   --ink-soft: color-mix(in oklab, var(--ink) 70%, var(--muted)); /* text */
@@ -109,7 +109,7 @@
   --on-accent: var(--bg); /* the accent is a light tan on the dark palettes: dark ink on it, not white */
   --surface: #272320;  /* warm dark brown-grey */
   --ink: #e9e4da;      /* warm off-white */
-  --muted: #877f73;    /* warm grey */
+  --muted: #918a7e;    /* warm grey: passes AA on --surface too (was #877f73, 3.9:1 there) */
   --line: #38332c;     /* warm line */
 }
 :root[data-theme="slate"] {
@@ -121,7 +121,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg: #1b1916; --surface: #272320; --ink: #e9e4da; --muted: #877f73; --line: #38332c;
+    --bg: #1b1916; --surface: #272320; --ink: #e9e4da; --muted: #918a7e; --line: #38332c;
     --accent: #cf9b6a; --danger: #e6938a; --warn: #d8aa63; --ok: #79bd80; --on-accent: var(--bg);
     --char-0:  #e08282; --char-1:  #e0a064; --char-2:  #cdb061; --char-3:  #abb56b;
     --char-4:  #79bd80; --char-5:  #5cb6a3; --char-6:  #61b1c9; --char-7:  #7ba6d9;
@@ -137,7 +137,7 @@
   --bg: #e6ecf3;       /* cool light blue-grey */
   --surface: #f6f9fc;  /* cool near-white */
   --ink: #25303b;      /* cool slate-blue ink (not warm) */
-  --muted: #84919e;    /* cool blue-grey */
+  --muted: #606c79;    /* cool blue-grey: passes AA as text (was #84919e, 2.7:1) */
   --line: #d9e1ea;     /* cool line */
 }
 

@@ -287,10 +287,10 @@
 .insp-status { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 6.5px; min-width: 0; }
 /* Text is full --ink and the fill is a soft tint (mixed toward --bg inline via statusTint), so the rung name
    stays readable on every palette; a saturated --char-N fill would swallow the text. */
-.insp-status-select { font: 11.5px var(--font-ui); color: var(--ink); background: var(--muted); border: none; border-radius: var(--radius-sm); padding: 1.5px 6.5px; max-width: 176px; cursor: pointer; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
+.insp-status-select { font: 11.5px var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--bg)); border: none; border-radius: var(--radius-sm); padding: 1.5px 6.5px; max-width: 176px; cursor: pointer; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
 .insp-status-select:focus-visible { box-shadow: 0 0 0 1px var(--accent); outline-offset: 0; }
 /* Audio Folders mode (#206): read-only recording status chip (the status is derived from files on disk). */
-.insp-rec-chip { font: 11.5px var(--font-ui); color: var(--ink); background: var(--muted); border-radius: var(--radius-sm); padding: 1.5px 6.5px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
+.insp-rec-chip { font: 11.5px var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--bg)); border-radius: var(--radius-sm); padding: 1.5px 6.5px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
 .insp-rec-play { flex: none; display: inline-flex; align-items: center; line-height: 1; color: var(--accent); background: none; border: none; cursor: pointer; padding: 2.5px 3px; border-radius: var(--radius-sm); }
 .insp-rec-play:hover { background: color-mix(in oklab, var(--accent) 16%, transparent); }
 /* Softly pulse the ▶ button while its clip is sounding, so it's clear which line you're hearing. */
@@ -538,13 +538,13 @@
 .settings-panel .shell-labelled > input:not([type=checkbox]):not([type=radio]) { flex: 1; min-width: 0; }
 .settings-note { margin: 0; color: var(--muted); font-size: 12px; }
 
-/* Placeholder text everywhere: faded well below real input so a prompt can't read as content. The
-   prompt strings themselves are wrapped in <angle brackets> to reinforce "this is a hint, not a value".
-   The family's rule (from-storylets/microcopy-sentences): the fade lives in the COLOUR, with opacity
-   pinned at 1, because a browser that applies its own placeholder opacity would otherwise fade an
-   already-faded colour twice. */
+/* Placeholder text everywhere: --muted and italic, so a prompt can't read as content, and the prompt
+   strings themselves are wrapped in <angle brackets> to say "this is a hint, not a value". No further fade:
+   --muted is the faintest grey that still passes AA, and a placeholder is text the writer reads (it was
+   --muted at 70%, 2:1 in Paper, until 2026-10-21). The family's rule (from-storylets/microcopy-sentences):
+   opacity pinned at 1, because a browser that applies its own placeholder opacity would fade it again. */
 input::placeholder, textarea::placeholder {
-  color: color-mix(in oklab, var(--muted) 70%, transparent);
+  color: var(--muted);
   font-style: italic;
   opacity: 1;
 }
