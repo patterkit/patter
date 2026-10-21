@@ -24,6 +24,7 @@ const NAMED = namedMenuItems({
 });
 import { manualCheckForUpdates } from "@wildwinter/app-shell/updater";
 import type { PaneState, RecentProject, ThemePrefs } from "../shared/api.js";
+import { viewMenuLabel } from "@wildwinter/app-shell/view-host";
 import type { ViewOffer } from "./views.js";
 
 const isMac = process.platform === "darwin";
@@ -58,32 +59,24 @@ export function setUndoLabels(labels: { undo?: string; redo?: string }): boolean
 export interface ViewMenu {
   offers: readonly ViewOffer[];
   open(extension: string, view: string): void;
-  install(extension: string): void;
+  /** Add Extension… for an extension the project takes, whose view isn't installed here. */
+  add(extension: string): void;
   /** A view window, whose Edit ▸ Undo is the editor's. */
   isView(w: BrowserWindow | null): boolean;
 }
 
-/** The Window menu's items for the views on offer: each view by name, opening its window, or disabled with
- *  why when it isn't installed here, followed by its extension's Install item. Empty when there are none. */
+/** The Window menu's items for the views on offer: each view by name, opening its window, or, when it isn't
+ *  installed here, "<name> (not installed)…" with why, opening Add Extension for its package. Empty when there
+ *  are none. */
 export function viewMenuItems(views: ViewMenu | undefined): MenuItemConstructorOptions[] {
   const offers = views?.offers ?? [];
   if (!views || offers.length === 0) return [];
-  const items: MenuItemConstructorOptions[] = [];
-  const installs = new Set<string>();
-  for (const o of offers) {
-    items.push({
-      label: o.name, enabled: o.installed,
-      // Why it's off: under the label where the platform shows one, and as the item's tooltip on macOS.
-      ...(o.why ? { sublabel: o.why, toolTip: o.why } : {}),
-      click: () => views.open(o.extension, o.view),
-    });
-  }
-  for (const o of offers) {
-    if (o.installed || installs.has(o.extension)) continue;
-    installs.add(o.extension);
-    items.push({ label: `Install ${o.extensionName} on This Machine…`, click: () => views.install(o.extension) });
-  }
-  return items;
+  return offers.map((o) => ({
+    label: viewMenuLabel(o.name, o.installed),
+    // Why it doesn't open: under the label where the platform shows one, and as the item's tooltip on macOS.
+    ...(o.why ? { sublabel: o.why, toolTip: o.why } : {}),
+    click: () => (o.installed ? views.open(o.extension, o.view) : views.add(o.extension)),
+  }));
 }
 
 export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: PaneState, theme: ThemePrefs, lineStatuses: string[] = [], spelling?: SpellingMenu, voiced = false, debugActive = false, audioTracked = false, autoRebuild = false,

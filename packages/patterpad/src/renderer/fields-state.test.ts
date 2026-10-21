@@ -9,7 +9,7 @@ import { parseManifest } from "@wildwinter/toolkit/extensions";
 import type { ProjectFile } from "@patterkit/model";
 import type { InspectorContext } from "@patterkit/patterpad-surface/surface";
 import { extensionAdapter } from "./src/extension-rows.js";
-import { fieldsHint, fieldsState, followTarget, recordMapFields, selectedNodes } from "./src/fields-state.js";
+import { fieldsHint, fieldsState, followTarget, recordMapFields, selectedNodes, withoutViewEdited } from "./src/fields-state.js";
 import { extensionDtos } from "../shared/extensions.js";
 
 const extensions = extensionDtos(
@@ -71,5 +71,21 @@ describe("the state sent", () => {
 
   it("has no hint without a map of records anywhere", () => {
     expect(fieldsHint([])).toBe("");
+  });
+});
+
+describe("a map a view edits", () => {
+  it("is left out of the window while its view is installed here, and only then", () => {
+    const m = JSON.parse(probeText) as { targets: { patter: { line: { fields: { name: string; editor?: string }[] } } }; views?: unknown[] };
+    m.views = [{ id: "sheet", name: "Performance sheet", entry: "view/sheet.js", element: "probe-sheet" }];
+    for (const f of m.targets.patter.line.fields) if (f.name === "perf") f.editor = "sheet";
+    const xs = extensionDtos(
+      { project: { id: "proj_t", name: "T" }, extensions: { probe: { version: "1.1.0" } } } as unknown as ProjectFile,
+      new Map([["probe", parseManifest(JSON.stringify(m))]]), new Map(),
+    )!;
+    const names = (list: typeof xs) => list[0]!.targets["line"]!.fields.map((f) => f.name);
+    expect(names(withoutViewEdited(xs, () => true))).not.toContain("perf");
+    expect(names(withoutViewEdited(xs, () => false))).toContain("perf");
+    expect(withoutViewEdited(extensions, () => true)).toEqual(extensions); // no editor: untouched
   });
 });

@@ -48,6 +48,10 @@ export interface ViewHostDeps {
   reveal(id: string, sceneId: string | null): Promise<boolean>;
   /** A line's recording's length in seconds, when it has one this machine can read. */
   recordedSeconds(id: string): Promise<number | null>;
+  /** Play a beat's take as the inspector's ▶ does: whether it plays, or null when the project has no audio. */
+  play(id: string): Promise<boolean | null>;
+  /** Stop the take sounding: whether one was. */
+  stop(): boolean;
   /** Run a key combination the view passed on. */
   key(combo: string): void;
 }
@@ -83,6 +87,8 @@ export interface ViewHost {
   selection(): void;
   theme(): void;
   writable(): void;
+  /** The take sounding in the editor, by its beat's id, or null when it stops or ends. */
+  playing(id: string | null): void;
   /** How many views are open (for tests). */
   readonly size: number;
 }
@@ -252,6 +258,15 @@ export function createViewHost(deps: ViewHostDeps, target?: Window): ViewHost {
       if (done.ok) return undefined;
       return refuse(done.why, done.message);
     },
+    async play(id) {
+      const at = await locate(id);
+      const kind = at?.index.get(id)?.node.kind;
+      if (!at || (kind !== "line" && kind !== "text")) return refuse("gone", `There's no line called ${id} in this project now.`);
+      const played = await deps.play(id);
+      if (played === null) return refuse("unsupported", "Patterpad plays recordings in Audio Folders mode only: turn it on in Project Settings to hear takes.");
+      return played;
+    },
+    stop: () => deps.stop(),
     async select(id) {
       const open = openIndex();
       if (open?.index.has(id)) return deps.reveal(id, null);
@@ -259,6 +274,7 @@ export function createViewHost(deps: ViewHostDeps, target?: Window): ViewHost {
       return at ? deps.reveal(id, at.sceneId) : false;
     },
     writable,
+    missing: (extension) => extensionOf(extension)?.missing ?? [],
     key: (combo) => deps.key(combo),
   };
   };
@@ -281,9 +297,12 @@ export function createViewHost(deps: ViewHostDeps, target?: Window): ViewHost {
       if (opts?.saved !== false) saved = new Map();
       live = null;
       views.changed(nodes);
+      // An extension taken or undone may meet a view's requirement, or take it away.
+      views.missing();
     },
     selection: () => views.selection(),
     theme: () => views.theme(),
+    playing: (id) => views.playing(id),
     // A lock came or went: the scene's is `writable`, a shard's is each node's `held`, so both are told. Version
     // control is polled, so only a lock that changed (or a scene switched to) is news.
     writable: () => {

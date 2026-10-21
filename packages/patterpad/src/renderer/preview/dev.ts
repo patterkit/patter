@@ -361,6 +361,8 @@ const stub = {
   onFieldsFollow: (handler: (on: boolean) => void) => { onFieldsFollow = handler; },
   // View extensions need main (a package, a window, a port): the preview has none to offer.
   addExtension: async () => null,
+  openView: async () => {},
+  onViewOffers: () => {},
   writeProjectExtension: async () => ({ ok: false, error: "The preview can't write the project." }),
   onCoverageNavigate: () => undefined,
   onOpenWorldSettings: () => undefined,

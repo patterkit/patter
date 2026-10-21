@@ -63,7 +63,7 @@ describe("view extensions in the menus", () => {
       { extension: "probe", view: "inspect", name: "Probe view", extensionName: "Probe", installed: false, why: "Probe isn't installed on this machine." },
     ],
     open: (e: string, v: string) => { opened.push(`open ${e}/${v}`); },
-    install: (e: string) => { opened.push(`install ${e}`); },
+    add: (e: string) => { opened.push(`add ${e}`); },
     isView: (w: unknown) => w === sheet,
   };
   const menu = (label: string): MenuItemConstructorOptions[] =>
@@ -89,15 +89,17 @@ describe("view extensions in the menus", () => {
     expect(main.webContents.send.mock.calls).toEqual([["menu", "add-extension"]]);
   });
 
-  it("list the project's views in the Window menu, one not installed here disabled with why, and its Install item", () => {
+  it("list the project's views in the Window menu, one not installed here marked so with why, opening Add Extension", () => {
     const items = menu("Window");
     const sheetItem = items.find((i) => i.label === "Performance sheet")!;
-    const probeItem = items.find((i) => i.label === "Probe view")!;
-    expect(sheetItem.enabled).toBe(true);
-    expect(probeItem).toMatchObject({ enabled: false, sublabel: "Probe isn't installed on this machine." });
+    const probeItem = items.find((i) => i.label === "Probe view (not installed)…")!;
+    expect(sheetItem.enabled).not.toBe(false);
+    expect(probeItem).toMatchObject({ sublabel: "Probe isn't installed on this machine." });
+    expect(probeItem.enabled).not.toBe(false);
+    expect(items.some((i) => i.label?.includes("on This Machine"))).toBe(false);
     click(sheetItem);
-    click(items.find((i) => i.label === "Install Probe on This Machine…")!);
-    expect(opened).toEqual(["open shot/sheet", "install probe"]);
+    click(probeItem);
+    expect(opened).toEqual(["open shot/sheet", "add probe"]);
     // With no views on offer, the stock Window menu.
     applyMenu(main as never, [], {} as never, {} as never);
     expect((state.template as MenuItemConstructorOptions[]).some((m) => m.role === "windowMenu")).toBe(true);

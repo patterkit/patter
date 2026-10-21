@@ -240,6 +240,33 @@ describe("a map of records in the inspector", () => {
     expect(draw(h, { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: { ANNA: {} } } } }).querySelector(".insp-ext-summary")).not.toBeNull();
   });
 
+  it("opens the view its field names as editor, once installed here, else the fields window, saying so", () => {
+    // The probe with a view, named as perf's editor.
+    const m = JSON.parse(probeText) as { targets: { patter: { line: { fields: { name: string; editor?: string }[] } } }; views?: unknown[] };
+    m.views = [{ id: "sheet", name: "Performance sheet", entry: "view/sheet.js", element: "probe-sheet" }];
+    for (const f of m.targets.patter.line.fields) if (f.name === "perf") f.editor = "sheet";
+    const withView = extensionDtos(
+      { project: { id: "proj_t", name: "T" }, extensions: { probe: { version: "1.1.0" } } } as unknown as ProjectFile,
+      new Map([["probe", parseManifest(JSON.stringify(m))]]), new Map(),
+    )!;
+    const fields: string[] = [];
+    const views: string[] = [];
+    const handlers = (installed: boolean) => handlersWith({
+      extensions: () => withView, openFields: (kind, id) => { fields.push(`${kind} ${id}`); },
+      viewInstalled: (x, v) => installed && x === "probe" && v === "sheet",
+      openView: (x, v, kind, id) => { views.push(`${x}/${v} ${kind} ${id}`); },
+    });
+    const line = { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: { ANNA: {} } } } };
+    const there = draw(handlers(true), line).querySelector<HTMLButtonElement>(".insp-ext-summary .insp-ext-edit")!;
+    expect(there.dataset["tip"]).toBe("Edit perf in the Performance sheet");
+    there.click();
+    const absent = draw(handlers(false), line).querySelector<HTMLButtonElement>(".insp-ext-summary .insp-ext-edit")!;
+    expect(absent.dataset["tip"]).toBe("Edit perf in the Fields window. The Performance sheet opens here instead once Probe is installed on this machine (File ▸ Add Extension…).");
+    absent.click();
+    expect(views).toEqual(["probe/sheet line L_bell"]);
+    expect(fields).toEqual(["line L_bell"]);
+  });
+
   it("says a problem inside it, so the inspector still shows something is wrong", () => {
     const host = draw(handlersWith({ openFields: noop }),
       { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: { ANNA: { expression: "glare" } } } } });

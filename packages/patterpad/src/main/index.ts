@@ -157,15 +157,15 @@ function refreshMenu(): void {
   const viewMenu = {
     offers: views.offers(),
     open: (extension: string, view: string) => { void views.open(extension, view); },
-    install: (extension: string) => { void views.install(extension); },
+    add: (extension: string) => { if (win && !win.isDestroyed()) win.webContents.send("menu", `add-extension:${extension}`); },
     isView: (w: BrowserWindow | null) => views.isView(w),
   };
   if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined, project.audioFoldersEnabled(), viewMenu);
 }
 
-// Tier 2 view extensions (views.ts): the views the open project offers, their windows, Add Extension…, and
-// Install <Name> on This Machine…. Each view window is a floating tool window of its own, remembered under
-// `view:<extension>/<view>` as the helper windows are.
+// Tier 2 view extensions (views.ts): the views the open project offers, their windows, and Add Extension…,
+// which a view not installed here opens for its package. Each view window is a floating tool window of its
+// own, remembered under `view:<extension>/<view>` as the helper windows are.
 const views = createViewExtensions({
   dir: viewsDir(),
   editor: () => win,
@@ -174,8 +174,13 @@ const views = createViewExtensions({
   slice: (extension, view) => store.viewWindow(extension, view),
   tell: (title, sub, body) => tellInWindow(title, sub, body),
   flushEditor: () => flushEditorScene(),
-  take: (text, manifest) => project.takeExtension(text, manifest),
-  refreshMenu: () => refreshMenu(),
+  take: (items) => project.takeExtensions(items),
+  ask: (message, detail, buttons) => askInWindow({ title: message, sub: detail, buttons, defaultId: 0, cancelId: buttons.length - 1 }),
+  refreshMenu: () => {
+    refreshMenu();
+    // The editor draws a field's Edit for the view that edits it only while that view opens here.
+    if (win && !win.isDestroyed()) win.webContents.send("views:offers", views.offers().map((o) => ({ extension: o.extension, view: o.view, installed: o.installed })));
+  },
 });
 
 // Ask the editor window to flush its open scene to disk, and resolve once it confirms (or after a short
@@ -1050,12 +1055,15 @@ function registerIpc(): void {
   });
   ipcMain.handle("fieldsWin:close", () => { windows.get("fields")?.close(); });
   // View extensions: File ▸ Add Extension…, and a view's write of the project's own values for its extension.
-  ipcMain.handle("extensions:add", async () => {
-    const r = await views.add();
+  ipcMain.handle("extensions:add", async (_e, expect?: unknown) => {
+    const r = await views.add(typeof expect === "string" ? expect : undefined);
     // The open scene reloads whether or not its data was rewritten: it opened with the extension's data held
-    // back, untaken, and now takes it.
-    if (r?.ok) { win?.webContents.send("replace:applied"); projectChanged(); }
+    // back, untaken, and now takes it. Views installed alone leave the project as it was.
+    if (r?.ok && !r.installedOnly) { win?.webContents.send("replace:applied"); projectChanged(); }
     return r;
+  });
+  ipcMain.handle("views:open", async (_e, extension: unknown, view: unknown) => {
+    if (typeof extension === "string" && typeof view === "string") await views.open(extension, view);
   });
   ipcMain.handle("extensions:writeProject", async (_e, extension: string, entry: Record<string, unknown>, label: string) => {
     if (typeof extension !== "string" || typeof label !== "string" || !entry || typeof entry !== "object") return { ok: false, error: "That isn't a write." };

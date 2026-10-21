@@ -25,7 +25,7 @@ const JOB_PROGRESS = "job:progress";
 /** The shell's view port channel and window message (`@wildwinter/app-shell/view-protocol`), as literals. */
 const VIEW_PORT_CHANNEL = "wildwinter-view:port";
 const VIEW_PORT_MESSAGE = "wildwinter-view:port";
-import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, PatterFieldsApi, FieldsWinState, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress, AppPrompt, ProjectStep } from "../shared/api.js";
+import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, PatterFieldsApi, FieldsWinState, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress, AppPrompt, ProjectStep, ViewOfferDto } from "../shared/api.js";
 
 const api: PatterApi = {
   boot: () => ipcRenderer.invoke("project:boot"),
@@ -140,7 +140,9 @@ const api: PatterApi = {
   sendFieldsState: (state) => { ipcRenderer.send("fields:state", state); },
   onFieldsCommit: (handler) => { ipcRenderer.on("fields:commit", (_e, id: string, extension: string, field: string, value: unknown) => handler(id, extension, field, value)); },
   onFieldsFollow: (handler) => { ipcRenderer.on("fields:follow", (_e, on: boolean) => handler(on)); },
-  addExtension: () => ipcRenderer.invoke("extensions:add"),
+  addExtension: (expect?: string) => ipcRenderer.invoke("extensions:add", expect),
+  openView: (extension, view) => ipcRenderer.invoke("views:open", extension, view),
+  onViewOffers: (handler) => { ipcRenderer.on("views:offers", (_e, offers: ViewOfferDto[]) => handler(offers)); },
   writeProjectExtension: (extension, entry, label) => ipcRenderer.invoke("extensions:writeProject", extension, entry, label),
   onCoverageNavigate: (handler) => { ipcRenderer.on("coverage:navigate", (_e, sceneId: string, beatId: string) => handler(sceneId, beatId)); },
   onOpenWorldSettings: (handler) => { ipcRenderer.on("coverage:open-world", () => handler()); },

@@ -17,7 +17,8 @@ import type {
   BundleExtension, ExtensionFieldDecl, ExtensionShard, GameData, Group, NodeExtensions, ProjectFile, Scene, Snippet,
 } from "@patterkit/model";
 import {
-  HOSTS, compileEntry, compiledTarget, entryProblems, manifestProblems, orphanedEntries, pickClashes, pickLists, targetOf,
+  HOSTS, compileEntry, compiledTarget, entryProblems, manifestProblems, missingRequirements, orphanedEntries, pickClashes, pickLists,
+  targetOf,
 } from "@wildwinter/toolkit/extensions";
 import type { Manifest, Problem, TypeDecl, ValueContext } from "@wildwinter/toolkit/extensions";
 
@@ -183,6 +184,14 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
     takenList.push({ id, manifest });
   }
   const sound = new Map(takenList.filter((t) => t.manifest !== undefined).map((t) => [t.id, t.manifest!]));
+  // An extension that requires another the project doesn't take can't do its work in the game (Pattershot's
+  // runner attaches to Patterstage's Director). A warning: the data is sound, and compiles as it stands.
+  for (const [id, manifest] of sound) {
+    for (const req of missingRequirements(manifest, Object.keys(taken))) {
+      issues.push({ severity: "warning", file: projectPath, code: "requires-missing",
+        message: `the project takes "${id}", which requires the extension "${req}", but doesn't take it; add "${req}" to the project, or ${manifest.name} won't work in the game` });
+    }
+  }
 
   // --- the data ---------------------------------------------------------------------------
   const nodes = extensionNodes(project, scenes);

@@ -101,6 +101,20 @@ describe("extensionPass", () => {
     expect(compiled.bundle).toEqual({});
   });
 
+  it("warns of an extension whose requirement the project doesn't take", () => {
+    const needy = { ...(probe as Record<string, unknown>), requires: ["patterstage"] };
+    const run = (extensions: ProjectFile["extensions"]) => pass({
+      project: project({ extensions }), manifests: [{ path: "extensions/probe.extension.json", id: "probe", manifest: needy }],
+    });
+    const { issues } = run({ probe: { version: "1.1.0" } });
+    expect(messages(issues)).toEqual([
+      `warning: the project takes "probe", which requires the extension "patterstage", but doesn't take it; add "patterstage" to the project, or Probe won't work in the game`,
+    ]);
+    expect(issues[0]).toMatchObject({ file: "p.patterproj", code: "requires-missing" });
+    // Taken (even with its manifest missing, which is warned of on its own), the requirement is met.
+    expect(messages(run({ probe: { version: "1.1.0" }, patterstage: { version: "0.5.0" } }).issues).join("\n")).not.toContain("requires");
+  });
+
   it("warns of a version mismatch", () => {
     const { issues } = pass({ project: project({ extensions: { probe: { version: "1.0.0" } } }) });
     expect(messages(issues)).toEqual([

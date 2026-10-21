@@ -166,6 +166,8 @@ export interface ExtensionDto {
   views?: { id: string; name: string }[];
   /** The other extensions whose data its views read, by id. Absent when they read none. */
   reads?: string[];
+  /** The extensions its manifest requires that the project doesn't take, by id. Absent when none. */
+  missing?: string[];
 }
 
 export interface ExtensionTargetDto {
@@ -197,6 +199,8 @@ export interface ExtensionFieldDto {
   max?: number;
   required?: boolean;
   editorOnly?: boolean;
+  /** One of the extension's views, by id, that edits this field (a map of records) in place of the grid. */
+  editor?: string;
 }
 
 /** The project-level settings the Project Settings modal edits (General section, v1). Project-wide
@@ -478,7 +482,17 @@ export interface AddExtensionResult extends SaveResult {
   warnings?: string[];
   /** Installing its views on this machine failed, though the project took it: why. */
   installError?: string;
+  /** The project already took this version or a newer one (or the writer chose not to update it): only the views
+   *  were installed on this machine. */
+  installedOnly?: true;
+  /** A sentence to show: the project keeps a newer version than the package. */
+  note?: string;
+  /** The extensions it requires, added with it in the same step. */
+  also?: { name: string; version: string }[];
 }
+
+/** A view the open project offers, as the editor needs it: whether it opens on this machine. */
+export interface ViewOfferDto { extension: string; view: string; installed: boolean }
 
 export interface ProjectStep { id: number; label: string; merged: boolean; scenes: string[]; authoring: string[] }
 
@@ -1388,7 +1402,13 @@ export interface PatterApi {
   /** File ▸ Add Extension…: main picks a package (a folder or an npm pack .tgz), checks it, writes its manifest
    *  and pin into the project as one undo step, and installs its views on this machine. Null when cancelled
    *  or refused (main has said why). */
-  addExtension(): Promise<AddExtensionResult | null>;
+  /** File ▸ Add Extension…; with `expect`, the package of that extension, which the project takes but this
+   *  machine lacks the views of. */
+  addExtension(expect?: string): Promise<AddExtensionResult | null>;
+  /** Open (or bring forward) a view's window: a field's editor, from the inspector's Edit. */
+  openView(extension: string, view: string): Promise<void>;
+  /** The views the project offers, and which are installed here, each time main works them out again. */
+  onViewOffers(handler: (offers: ViewOfferDto[]) => void): void;
   /** A view extension wrote the project's own values for its extension: replace the project's entry, as one
    *  step of the project history with the view's label. */
   writeProjectExtension(extension: string, entry: Record<string, unknown>, label: string): Promise<SaveResult & { project?: OpenedProject }>;

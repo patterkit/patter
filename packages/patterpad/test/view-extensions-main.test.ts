@@ -75,6 +75,24 @@ describe("Add Extension's project write", () => {
     expect(readFileSync(join(dir, "probe.patterproj"), "utf8")).toBe(before);
   });
 
+  it("takes an extension and the one it requires as one step, which one undo takes back", async () => {
+    const dir = openProbe();
+    const stage = pkgOf({ schema: "wildwinter/extension@0", id: "stage", name: "Stage", version: "1.0.0", targets: { patter: { line: { fields: [{ name: "mark", type: "text" }] } } } });
+    const shot = pkgOf({ ...SHOT, requires: ["stage"] });
+    const before = readFileSync(join(dir, "probe.patterproj"), "utf8");
+    const r = await project.takeExtensions([stage, shot].map((p) => ({ text: manifestText(p), manifest: p.manifest })));
+    expect(r.ok).toBe(true);
+    expect(r.step?.label).toBe("Add Stage and Shot");
+    expect((read(join(dir, "probe.patterproj"))["extensions"] as Obj)).toEqual({
+      probe: { version: "1.1.0" }, shot: { version: "0.3.0" }, stage: { version: "1.0.0" },
+    });
+    const undone = await project.stepProjectHistory("undo", r.step!.id);
+    expect(undone.ok).toBe(true);
+    expect(existsSync(join(dir, "extensions/stage.extension.json"))).toBe(false);
+    expect(existsSync(join(dir, "extensions/shot.extension.json"))).toBe(false);
+    expect(readFileSync(join(dir, "probe.patterproj"), "utf8")).toBe(before);
+  });
+
   it("takes another version of an extension the project takes as format's upgrade: renamed stages and the pin, in one step", async () => {
     const dir = openProbe();
     const shard = join(dir, "extensions/probe/harbour.patterextension");

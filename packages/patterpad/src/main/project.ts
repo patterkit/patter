@@ -2216,23 +2216,38 @@ export function applyFix(fix: QuickFix): Promise<SaveResult & { step?: ProjectSt
  * `reload` says the step rewrote scene data (the open scene reloads from it).
  */
 export function takeExtension(manifestText: string, manifest: Manifest): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; was?: string; reload?: boolean }> {
+  return takeExtensions([{ text: manifestText, manifest }]);
+}
+
+/**
+ * Take several manifests as ONE step, as `takeExtension` takes one: an extension and the ones it requires,
+ * so undoing never leaves one without the other. The last is the one asked for: `was` is its old pin, and
+ * the step's label names them all ("Add Patterstage and Pattershot").
+ */
+export function takeExtensions(items: readonly { text: string; manifest: Manifest }[]): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; was?: string; reload?: boolean }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
+    if (items.length === 0) return { ok: false, error: "nothing to take" };
     ensureHydrated(); // the upgrade reads every scene's data for the extension
-    const id = manifest.id;
+    const root = loaded.root;
     const taken = loaded.project.extensions ?? {};
-    const was = taken[id]?.version;
-    const path = manifestPath(loaded.root, id);
-    // The upgrade over the project as it will be: the new manifest, and this extension alone among the
-    // manifests, so no other extension's pin moves with it. A new extension goes in with no version, which
-    // the upgrade then pins.
-    const planned = planExtensionUpgrades({
-      ...loaded,
-      project: { ...loaded.project, extensions: { ...taken, [id]: taken[id] ?? ({} as ProjectExtension) } },
-      manifests: [{ path, id, manifest }],
+    const main = items[items.length - 1]!.manifest;
+    const was = taken[main.id]?.version;
+    const extensions = { ...taken };
+    const manifests = items.map(({ manifest }) => {
+      extensions[manifest.id] ??= {} as ProjectExtension;
+      return { path: manifestPath(root, manifest.id), id: manifest.id, manifest };
     });
-    const writes = [{ path, content: manifestText }, ...[...planned.writes].map(([p, content]) => ({ path: p, content }))];
-    const label = `${was !== undefined ? "Update" : "Add"} ${manifest.name}`;
+    // The upgrade over the project as it will be: the new manifests, and these extensions alone among the
+    // manifests, so no other extension's pin moves with them. A new extension goes in with no version, which
+    // the upgrade then pins.
+    const planned = planExtensionUpgrades({ ...loaded, project: { ...loaded.project, extensions }, manifests });
+    const writes = [
+      ...items.map(({ text, manifest }) => ({ path: manifestPath(root, manifest.id), content: text })),
+      ...[...planned.writes].map(([p, content]) => ({ path: p, content })),
+    ];
+    const names = items.map(({ manifest }) => manifest.name);
+    const label = `${was !== undefined && items.length === 1 ? "Update" : "Add"} ${names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0]}`;
     const res = await projectCommit(label, freshKey("extension"), writes);
     if (!res.ok) return res;
     const reload = writes.some((w) => w.path.endsWith(EXTENSION_SHARD));

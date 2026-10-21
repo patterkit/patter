@@ -122,7 +122,8 @@ function mount(): SurfaceHandle {
 
 /** The editor's side, as renderer.ts wires it, over a mounted surface; `state` is what the test changes. */
 function host(s: SurfaceHandle) {
-  const state = { project, sceneLocked: null as string | null, held: null as string | null, revealed: [] as string[], keys: [] as string[], labels: [] as string[] };
+  const state = { project, sceneLocked: null as string | null, held: null as string | null, revealed: [] as string[], keys: [] as string[], labels: [] as string[],
+    audio: true, played: [] as string[], stops: 0 };
   const deps: ViewHostDeps = {
     project: () => state.project,
     openScene: () => ({ id: "scn_harbour", model: s.model() }),
@@ -140,6 +141,8 @@ function host(s: SurfaceHandle) {
     writeProject: async () => ({ ok: true }),
     reveal: async (id) => { state.revealed.push(id); return s.revealNode(id); },
     recordedSeconds: async (id) => (id === "L_bell" ? 2.5 : null),
+    play: async (id) => (!state.audio ? null : id === "L_bell" ? (state.played.push(id), true) : false),
+    stop: () => { state.stops++; return true; },
     key: (combo) => state.keys.push(combo),
   };
   // Where main's ports arrive, as the editor preload posts them on the window: the shell's hostViews listens.
@@ -217,6 +220,38 @@ describe("a view, answered over its port", () => {
     v.key("Mod+Z");
     await v.ask("selection", {}); // requests are answered in order: the key has been heard
     expect(h.state.keys).toEqual(["Mod+Z"]);
+    h.views.closeAll();
+  });
+
+  it("says which requirements the project lacks, in the welcome and again when that changes", async () => {
+    const s = mount();
+    const h = host(s);
+    const needing = (missing?: string[]) => ({ ...project, extensions: project.extensions!.map((x) => (x.id === "probe" ? { ...x, ...(missing ? { missing } : {}) } : x)) });
+    h.state.project = needing(["patterstage"]);
+    const { port1, port2 } = new MessageChannel();
+    h.arrive(META, port1 as unknown as MessagePort);
+    const v = view(port2 as unknown as MessagePort);
+    expect(await v.hello()).toMatchObject({ t: "welcome", missing: ["patterstage"] });
+    h.state.project = needing(); // Patterstage added
+    const told = v.nextEvent();
+    h.views.changed("all");
+    expect(await told).toEqual({ t: "event", name: "missing", value: { extensions: [] } });
+    h.views.closeAll();
+  });
+
+  it("plays a line's take in the editor, says false for one without, and refuses with no audio or no line", async () => {
+    const { h, v } = await connect();
+    expect(value(await v.ask("play", { id: "L_bell" }))).toBe(true);
+    expect(value(await v.ask("play", { id: "L_reply" }))).toBe(false);
+    expect(refusal(await v.ask("play", { id: "E_horn" }))).toMatchObject({ code: "gone" });
+    expect(refusal(await v.ask("play", { id: "nope" }))).toMatchObject({ code: "gone" });
+    const told = v.nextEvent();
+    h.views.playing("L_bell");
+    expect(await told).toEqual({ t: "event", name: "playing", value: { id: "L_bell" } });
+    expect(value(await v.ask("stop", {}))).toBe(true);
+    h.state.audio = false;
+    expect(refusal(await v.ask("play", { id: "L_bell" }))).toMatchObject({ code: "unsupported" });
+    expect(h.state.played).toEqual(["L_bell"]);
     h.views.closeAll();
   });
 

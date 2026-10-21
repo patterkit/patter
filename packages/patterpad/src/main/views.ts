@@ -1,7 +1,8 @@
 // Tier 2 view extensions in Patterpad's main process (patterkit design/view-extensions.md): which views the
 // open project offers and whether each is installed on this machine, opening a view in a sandboxed floating
 // window of its own (the shell's `openViewWindow`, which hands the view and the editor a port each and then
-// stays out of the path), File ▸ Add Extension…, and Install <Name> on This Machine….
+// stays out of the path), and File ▸ Add Extension…, the one way in: it takes an extension into the project, or,
+// for one the project already takes, installs its views on this machine and offers a newer version.
 //
 // A view's code is never run from the project folder: the project holds the extension's manifest and pin,
 // and the package (the manifest and its view files) is installed under userData/view-extensions/<id>/<version>.
@@ -9,11 +10,11 @@
 
 import { app, dialog, type BrowserWindow } from "electron";
 import { basename, dirname, join } from "node:path";
-import { installExtensionPackage, openViewWindow, readExtensionPackage, resolveInstalled } from "@wildwinter/app-shell/view-host";
+import { installExtensionPackage, openViewWindow, planPackageAdd, readExtensionPackage, resolveInstalled } from "@wildwinter/app-shell/view-host";
 import type { ExtensionPackage, ViewWindow } from "@wildwinter/app-shell/view-host";
 import { pinToolWindow, rescueToolWindow, savedWindowRect } from "@wildwinter/app-shell/tool-window";
 import type { WindowSlice } from "@wildwinter/app-shell/app-store";
-import { MANIFEST_FILE_SUFFIX, viewsFor } from "@wildwinter/toolkit/extensions";
+import { MANIFEST_FILE_SUFFIX, missingRequirements, viewsFor } from "@wildwinter/toolkit/extensions";
 import type { Manifest, Problem } from "@wildwinter/toolkit/extensions";
 import type { AddExtensionResult, OpenedProject, ProjectStep, SaveResult } from "../shared/api.js";
 
@@ -51,8 +52,10 @@ export interface ViewDeps {
   tell(title: string, sub: string, body?: string[]): Promise<unknown>;
   /** Save the open scene before a write that may rewrite it. */
   flushEditor(): Promise<void>;
-  /** Take a manifest into the project as one undo step (project.ts `takeExtension`). */
-  take(text: string, manifest: Manifest): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; was?: string; reload?: boolean }>;
+  /** Take manifests into the project as one undo step, the one asked for last (project.ts `takeExtensions`). */
+  take(items: { text: string; manifest: Manifest }[]): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; was?: string; reload?: boolean }>;
+  /** Ask the writer a question with buttons; the button chosen, by index. */
+  ask(message: string, detail: string, buttons: string[]): Promise<number>;
   /** The menu changed (the views on offer, or what's installed). */
   refreshMenu(): void;
 }
@@ -79,6 +82,10 @@ export function packageRefusal(pkg: ExtensionPackage): { title: string; sub: str
   }
   return null;
 }
+
+/** A package's extension's name, for a sentence. */
+const nameOf = (pkg: ExtensionPackage): string =>
+  typeof pkg.manifest.name === "string" && pkg.manifest.name ? pkg.manifest.name : pkg.manifest.id;
 
 /** The manifest's own text, as the package holds it (the project keeps it byte for byte). */
 export function manifestText(pkg: ExtensionPackage): string {
@@ -117,10 +124,8 @@ export interface ViewExtensions {
   rescue(): void;
   /** A view window: Edit ▸ Undo there is the editor's. */
   isView(w: BrowserWindow | null | undefined): boolean;
-  /** File ▸ Add Extension…. */
-  add(): Promise<AddExtensionResult | null>;
-  /** Install <Name> on This Machine…. */
-  install(extension: string): Promise<void>;
+  /** File ▸ Add Extension…, or, with an extension the project takes, its package for a view not installed here. */
+  add(expect?: string): Promise<AddExtensionResult | null>;
 }
 
 /** Ask for an extension's package: a folder or an npm pack tarball. Off macOS a dialog picks files or folders,
@@ -168,7 +173,7 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
     const asked = generation;
     const choice = await resolveInstalled(deps.dir, extension, x.pin, x.manifest.name);
     if (asked !== generation) return; // the project closed or changed meanwhile
-    if (!choice.installed) { await deps.tell(`${x.manifest.name} isn't installed here`, choice.why ?? "", [`Choose Window ▸ Install ${x.manifest.name} on This Machine… to install it.`]); return; }
+    if (!choice.installed) { await deps.tell(`${x.manifest.name} isn't installed here`, choice.why ?? "", [`Choose File ▸ Add Extension… and ${x.manifest.name}'s package to install it.`]); return; }
     const decl = viewsFor(choice.installed.manifest, "patter").find((v) => v.id === view);
     if (!decl) { await deps.tell(`${x.manifest.name} has no such view`, `The version installed here (${choice.installed.version}) doesn't offer it.`); return; }
     const slice = deps.slice(extension, view);
@@ -229,42 +234,90 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
       for (const v of open.values()) if (v.window === w) return true;
       return false;
     },
-    async add() {
+    async add(expect) {
       const win = deps.editor();
       if (!win || !deps.root()) return null;
-      const pkg = await readPackage("Add Extension", "Choose an extension's package: its folder, or an npm package tarball (.tgz).");
+      const wanted = expect !== undefined ? deps.taken().find((t) => t.id === expect) : undefined;
+      if (expect !== undefined && !wanted) return null;
+      const pkg = wanted
+        ? await readPackage(`Install ${wanted.manifest.name}`, `Choose ${wanted.manifest.name}'s package: its folder, or an npm package tarball (.tgz).`)
+        : await readPackage("Add Extension", "Choose an extension's package: its folder, or an npm package tarball (.tgz).");
       if (!pkg) return null;
+      if (wanted && pkg.manifest.id !== wanted.id) {
+        await deps.tell(`That isn't ${wanted.manifest.name}`, `The package you chose is ${nameOf(pkg)}, so nothing was installed.`);
+        return null;
+      }
       const refused = packageRefusal(pkg);
       if (refused) { await deps.tell(refused.title, refused.sub, refused.body); return null; }
-      // Renaming a stage the new version renamed rewrites scene data, the open scene's among it.
-      await deps.flushEditor();
-      const taken = await deps.take(manifestText(pkg), pkg.manifest);
-      if (!taken.ok) return taken;
-      const installed = await installExtensionPackage(pkg, deps.dir);
+      const name = nameOf(pkg);
+      const plan = planPackageAdd(pkg.manifest, deps.taken());
+      // A project that takes an older version is offered this one; either way the views install here.
+      let take = plan.project === "take";
+      if (plan.project === "update") {
+        take = await deps.ask(`Update ${name} in this project?`,
+          `This project takes ${name}${plan.pinned ? ` ${plan.pinned}` : ""}, and this package is ${plan.version}. Updating takes it into the project as one step you can undo. Its views are installed on this machine either way.`,
+          [`Update to ${plan.version}`, "Not Now"]) === 0;
+      }
+      // What it requires and the project lacks goes in with it, in the same step, or nothing does.
+      const required: ExtensionPackage[] = [];
+      if (take && plan.missing.length > 0) {
+        const got = await requirementsFor(pkg, plan.missing);
+        if (!got) return null;
+        required.push(...got);
+      }
+      let taken: Awaited<ReturnType<ViewDeps["take"]>> | null = null;
+      if (take) {
+        // Renaming a stage the new version renamed rewrites scene data, the open scene's among it.
+        await deps.flushEditor();
+        taken = await deps.take([...required, pkg].map((p) => ({ text: manifestText(p), manifest: p.manifest })));
+        if (!taken.ok) return taken;
+      }
+      const installErrors: string[] = [];
+      for (const p of [...required.filter((r) => viewsFor(r.manifest, "patter").length > 0), pkg]) {
+        const installed = await installExtensionPackage(p, deps.dir);
+        if (!installed.ok) installErrors.push(installed.why);
+      }
       await self.update();
       const warnings = pkg.problems.filter((p) => p.severity === "warning").map(problemSentence);
       return {
-        ...taken, name: pkg.manifest.name, version: pkg.manifest.version,
+        ...(taken ?? { ok: true }), name, version: pkg.manifest.version,
+        ...(take ? {} : { installedOnly: true as const }),
+        ...(plan.note ? { note: plan.note } : {}),
+        ...(required.length ? { also: required.map((r) => ({ name: nameOf(r), version: r.manifest.version })) } : {}),
         ...(warnings.length ? { warnings } : {}),
-        ...(installed.ok ? {} : { installError: installed.why }),
+        ...(installErrors.length ? { installError: installErrors.join(" ") } : {}),
       };
     },
-    async install(extension) {
-      const x = deps.taken().find((t) => t.id === extension);
-      if (!x) return;
-      const pkg = await readPackage(`Install ${x.manifest.name} on This Machine`, `Choose ${x.manifest.name}'s package: its folder, or an npm package tarball (.tgz).`);
-      if (!pkg) return;
-      if (pkg.manifest.id !== extension) {
-        const name = typeof pkg.manifest.name === "string" && pkg.manifest.name ? pkg.manifest.name : pkg.manifest.id;
-        await deps.tell(`That isn't ${x.manifest.name}`, `The package you chose is ${name}, so it wasn't installed.`);
-        return;
+  };
+
+  /** The packages of the extensions `pkg` requires that the project lacks, chosen by the writer one by one, in
+   *  order; null when they cancel or a package won't do (said why). */
+  const requirementsFor = async (pkg: ExtensionPackage, missing: readonly string[]): Promise<ExtensionPackage[] | null> => {
+    const name = nameOf(pkg);
+    const out: ExtensionPackage[] = [];
+    for (const id of missing) {
+      const go = await deps.ask(`${name} needs “${id}”`,
+        `${name} works only in a project that also takes the extension “${id}”, which this one doesn't. Choose its package to add both, as one step you can undo.`,
+        [`Choose “${id}” Package…`, "Cancel"]);
+      if (go !== 0) return null;
+      const req = await readPackage(`Add “${id}”`, `Choose the package of “${id}”, which ${name} needs: its folder, or an npm package tarball (.tgz).`);
+      if (!req) return null;
+      if (req.manifest.id !== id) {
+        await deps.tell(`That isn't “${id}”`, `The package you chose is ${nameOf(req)}, so ${name} wasn't added.`);
+        return null;
       }
-      const refused = packageRefusal(pkg);
-      if (refused) { await deps.tell(refused.title.replace("can't be added", "can't be installed"), refused.sub, refused.body); return; }
-      const installed = await installExtensionPackage(pkg, deps.dir);
-      if (!installed.ok) { await deps.tell(`${x.manifest.name} couldn't be installed`, installed.why); return; }
-      await self.update();
-    },
+      const refused = packageRefusal(req);
+      if (refused) { await deps.tell(refused.title, refused.sub, refused.body); return null; }
+      // One level: what the requirement needs in turn must be in the project, or among what's being added.
+      const have = [...deps.taken().map((t) => t.id), pkg.manifest.id, ...missing];
+      const further = missingRequirements(req.manifest, have);
+      if (further.length > 0) {
+        await deps.tell(`${name} wasn't added`, `${nameOf(req)} needs ${further.map((f) => `“${f}”`).join(" and ")} too, which this project doesn't take. Add ${further.length > 1 ? "them" : "it"} first, then ${name}.`);
+        return null;
+      }
+      out.push(req);
+    }
+    return out;
   };
   return self;
 }

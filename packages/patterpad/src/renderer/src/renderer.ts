@@ -52,7 +52,7 @@ import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, 
   paintVcBadges, lockControls, createNavHistory, historyNav, mountPaneShell, mountSettingsDialog, revealRowWhenReady,
   askIdentity, confirmDialog, dialogFrame, openContextMenu, type ShardVc, type SettingsSectionHandle, type SettingsSection, type SettingsDialog } from "@wildwinter/app-shell";
 import { extensionAdapter, mountProjectSection, problemSettingsSection, settingsExtensions, settingsSectionId } from "./extension-rows.js";
-import { fieldsState, followTarget, selectedNodes, type FieldsNode } from "./fields-state.js";
+import { fieldsState, followTarget, selectedNodes, withoutViewEdited, type FieldsNode } from "./fields-state.js";
 import { createViewHost, takeLengths } from "./view-extensions.js";
 import { parseSource } from "@patterkit/core";
 import type { FlowFile, LocaleFile, ExtensionShard } from "@patterkit/model";
@@ -1710,16 +1710,17 @@ window.patter.onAudioIndex((snap) => {
 // Fire-and-forget playback of a line's audio (the inspector ▶ button, folder mode). Fetches the bytes from
 // main, wraps them in a Blob, and plays - one clip at a time (a new click stops the previous). The clicked
 // button pulses (.playing) while its clip sounds, so it's clear which line you're hearing - and clicking
-// it AGAIN while its clip is sounding stops it (the ▶ doubles as an abort).
+// it AGAIN while its clip is sounding stops it (the ▶ doubles as an abort). A view asks for the same player
+// (Y1), and every open view hears which take is sounding, whoever started it. Returns whether it plays.
 let inspectorAudio: HTMLAudioElement | null = null;
 let inspectorPlayBtn: HTMLButtonElement | null = null;
-async function playLineAudio(id: string, btn?: HTMLButtonElement): Promise<void> {
+async function playLineAudio(id: string, btn?: HTMLButtonElement): Promise<boolean> {
   if (btn && btn === inspectorPlayBtn && inspectorAudio && !inspectorAudio.paused) {
     inspectorAudio.pause(); // second click on the sounding clip's own button = stop, not restart
-    return;
+    return false;
   }
   const data = await window.patter.readAudio(id);
-  if (!data) return; // no file (shouldn't happen - the button only shows when one resolved)
+  if (!data) return false; // no file (the button only shows when one resolved; a view may ask for any line)
   inspectorAudio?.pause();                       // stop any current clip...
   inspectorPlayBtn?.classList.remove("playing"); // ...and drop its pulse
   const url = URL.createObjectURL(new Blob([data.bytes as BlobPart], { type: data.mime }));
@@ -1727,10 +1728,23 @@ async function playLineAudio(id: string, btn?: HTMLButtonElement): Promise<void>
   inspectorAudio = audio; inspectorPlayBtn = btn ?? null;
   btn?.classList.add("playing");
   if (btn) btn.dataset.tip = "Stop audio";
-  const stop = (): void => { URL.revokeObjectURL(url); btn?.classList.remove("playing"); if (btn) btn.dataset.tip = "Play audio"; };
+  views.playing(id);
+  const stop = (): void => {
+    URL.revokeObjectURL(url); btn?.classList.remove("playing"); if (btn) btn.dataset.tip = "Play audio";
+    // The old clip's pause arrives after the next one started: only the clip still current says it stopped.
+    if (inspectorAudio === audio) { inspectorAudio = null; views.playing(null); }
+  };
   audio.addEventListener("ended", stop);
   audio.addEventListener("pause", stop); // a new click (or the abort above) pauses this one
   void audio.play().catch(stop);
+  return true;
+}
+
+/** Stop the clip sounding, if any: whether one was. */
+function stopLineAudio(): boolean {
+  if (!inspectorAudio || inspectorAudio.paused) return false;
+  inspectorAudio.pause();
+  return true;
 }
 
 // Scratch recording (#224): open the blocking overlay for a line, then (on save) re-pull the folder index
@@ -2105,8 +2119,25 @@ onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e
     extensionLock: (extension) => lockedLine(extensionLocksOf(currentSceneId ? vcMap.get(currentSceneId) : undefined)[extension]?.by),
     extensionAdapter: () => currentExtensionAdapter(),
     openFields: (kind, id) => openFieldsOn(kind, id),
+    viewInstalled,
+    openView: (extension, view, kind, id) => {
+      // The view opens on the selection: the node whose field it edits (the project's is no node to select).
+      if (kind !== "project") surface?.revealNode(id);
+      void window.patter.openView(extension, view);
+    },
   });
 }
+
+
+/** The views that open on this machine, by `extension/view`, as main last worked them out. */
+let installedViews = new Set<string>();
+function viewInstalled(extension: string, view: string): boolean { return installedViews.has(`${extension}/${view}`); }
+window.patter.onViewOffers((offers) => {
+  installedViews = new Set(offers.filter((o) => o.installed).map((o) => `${o.extension}/${o.view}`));
+  // A field's Edit goes to its view, or to the fields window, by what's installed.
+  lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
+  pushFields();
+});
 
 // --- the fields window (Pattershot's brief, "a map of records edited in a helper window") ---------------
 // The window shows a node's maps of records as grids and follows the selection; this side owns the document,
@@ -2122,7 +2153,8 @@ function fieldsNodeLabel(kind: string, id: string): string {
 }
 
 function pushFields(): void {
-  const extensions = project?.extensions ?? [];
+  // A map a view edits here is the view's, not the window's (Y5).
+  const extensions = withoutViewEdited(project?.extensions ?? [], viewInstalled);
   let node: FieldsNode | null = null;
   const pinned = !fieldsFollow ? fieldsHeld : fieldsFocus && fieldsFocus.from === caretNodeId ? fieldsFocus : null;
   if (pinned) {
@@ -2250,6 +2282,13 @@ const views = createViewHost({
     const key = `${entry.path}\0${entry.textHash ?? ""}`;
     return takeLength(key, id);
   },
+  // The take plays in the editor, as the inspector's ▶ plays it; with Audio Folders off there's no audio here.
+  play: async (id) => {
+    if (!audioOn()) return null;
+    if (!audioIndex[id]?.path) return false;
+    return playLineAudio(id);
+  },
+  stop: () => stopLineAudio(),
   key: (combo) => {
     if (combo === "Mod+Z") void undoCommand("undo", true);
     else if (combo === "Mod+Shift+Z" || (isWindows && combo === "Mod+Y")) void undoCommand("redo", true);
@@ -3567,20 +3606,30 @@ async function refreshEditorScopes(): Promise<void> {
   setHostScopeTokens(fresh.hostScopes);
 }
 
-/** File ▸ Add Extension…: main picks and checks the package, takes it into the project as one undo step, and
- *  installs its views on this machine (then reloads the open scene, which now takes the extension's data).
+/** File ▸ Add Extension…: main picks and checks the package, takes it into the project as one undo step (with
+ *  any extension it requires that the project lacks), and installs its views on this machine (then reloads the
+ *  open scene, which now takes the extension's data). For an extension the project takes already, main installs
+ *  its views and offers a newer version (`expect`, from a view "(not installed)…" in the Window menu, says which).
  *  Here the project is refreshed, and the writer told what happened. */
-async function addExtension(): Promise<void> {
+async function addExtension(expect?: string): Promise<void> {
   if (!project) return;
-  const r = await window.patter.addExtension();
+  const r = await window.patter.addExtension(expect);
   if (!r) return; // cancelled, or refused (main has said why)
+  if (r.ok && r.installedOnly) {
+    const what = `${r.name ?? "The extension"} ${r.version ?? ""}`.trim();
+    if (r.installError) toast(`${what}'s views couldn't be installed on this machine: ${r.installError}`, "error");
+    else toast(`${what}'s views are installed on this machine.${r.note ? `\n${r.note}` : ""}`, r.note ? "info" : "ok");
+    return;
+  }
   noteStep(r.step);
   if (!landed(r, "Couldn't add the extension")) return;
   if (r.project) { project = r.project; projectNameEl.textContent = project.name; }
+  views.changed("all"); // over the project as it is now: a view's requirement may be met
   lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
   void refreshVcStatus();
   void refreshProblems();
-  const what = `${r.was !== undefined ? "Updated" : "Added"} ${r.name ?? "the extension"} ${r.version ?? ""}`.trim();
+  const also = (r.also ?? []).map((a) => `${a.name} ${a.version}`);
+  const what = `${r.was !== undefined ? "Updated" : "Added"} ${[...also, `${r.name ?? "the extension"} ${r.version ?? ""}`.trim()].join(" and ")}`;
   if (r.installError) toast(`${what}\nIts views couldn't be installed on this machine: ${r.installError}`, "error");
   else toast(`${what}${r.warnings?.length ? `\n${r.warnings.join(" ")}` : ""}`, r.warnings?.length ? "info" : "ok");
 }
@@ -3876,6 +3925,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "merge-patterpack") void mergePatterpack();
   else if (cmd === "share-scopes") void shareScopes();
   else if (cmd === "add-extension") void addExtension();
+  else if (cmd.startsWith("add-extension:")) void addExtension(cmd.slice("add-extension:".length));
   else if (cmd === "find") openSearch();
   else if (cmd === "replace") openSearch("replace");
   else if (cmd === "review-suggestions") { if (project) void window.patter.openSearchWindow("suggestions"); }
