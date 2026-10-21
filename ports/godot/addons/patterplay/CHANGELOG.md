@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-21
+
 ### Removed
 
 - `PatterBundle.extension_settings(bundle, extension)`: extension settings named the gameData field a claim

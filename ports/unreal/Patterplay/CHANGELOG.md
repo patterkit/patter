@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-21
+
 ### Removed
 
 - `UPatterGameData::ExtensionSettings` (Blueprint) and `patter::extensionSettings` and `BundleExtension::settings`

@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-21
+
 ### Removed
 
 - **`extensionSettings(bundle, extension)`** and the bundle's `extensions[id].settings`: extension settings named
