@@ -1,5 +1,13 @@
 # @patterkit/play-helpers
 
+## 0.9.6
+
+### Patch Changes
+
+- eb11df2: Uses `@patterkit/runtime` 0.34.0, the Patterplay 0.34.0 release.
+- Updated dependencies [af73dcf]
+  - @patterkit/model@0.20.0
+
 ## 0.9.5
 
 ### Patch Changes
