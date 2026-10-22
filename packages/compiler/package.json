@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/compiler",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Patter compiler: compile condition/effect expressions, validate them, and export source to the runtime bundle.",
   "type": "module",
   "license": "MIT",
@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@patterkit/model": "0.20.0",
-    "@patterkit/core": "0.9.5",
+    "@patterkit/core": "0.9.6",
     "@patterkit/dialect": "0.2.17",
     "@wildwinter/expr": "^0.6.0",
     "@wildwinter/toolkit": "^0.3.1"

@@ -1,5 +1,11 @@
 # @patterkit/core
 
+## 0.9.6
+
+### Patch Changes
+
+- 4452407: An extension's manifest can say which other extensions it requires (`requires`, with `@wildwinter/toolkit` 0.3.1). The extension pass, and so `patter validate`, warns of a project that takes an extension without one it requires (`requires-missing`), naming what to add. A field of an extension can name one of its views as its `editor`, which the toolkit checks.
+
 ## 0.9.5
 
 ### Patch Changes
