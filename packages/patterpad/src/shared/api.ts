@@ -473,6 +473,15 @@ export interface SaveResult {
  *  shard it touched. */
 /** What Add Extension… did: the extension's name and version, whether it updated one the project took at
  *  another version, the manifest's warnings as sentences, and the refreshed project. */
+/** Remove from Project… in the Extensions window: the project step, as Add's is. */
+export interface RemoveExtensionResult extends SaveResult {
+  project?: OpenedProject;
+  step?: ProjectStep;
+  /** The open scene's extension data changed shape: reload it. */
+  reload?: boolean;
+  name?: string;
+}
+
 export interface AddExtensionResult extends SaveResult {
   project?: OpenedProject;
   name?: string;
@@ -1044,6 +1053,37 @@ export interface FieldsWinInfo {
   theme: ThemePrefs;
 }
 
+/** What the Extensions window draws (the shell's `extensionsPanel`). */
+export interface ExtensionsWinState {
+  rows: import("@wildwinter/app-shell").ExtensionRow[];
+  hasProject: boolean;
+  /** An extension to bring into view (the Window menu's "(not installed)…"). */
+  focus?: string;
+}
+
+export interface ExtensionsWinInfo {
+  state: ExtensionsWinState;
+  pinned: boolean;
+  theme: ThemePrefs;
+}
+
+/** The Extensions window's bridge (window.patterExtensions; patterkit design/extensions-window.md). Add, Install
+ *  and Remove go to the editor, where the project's undo lives; Uninstall is this machine's, done in main. */
+export interface PatterExtensionsApi {
+  info(): Promise<ExtensionsWinInfo>;
+  add(): void;
+  install(id: string): void;
+  remove(id: string): void;
+  uninstall(id: string, version: string): void;
+  setPin(on: boolean): void;
+  close(): void;
+  onState(handler: (state: ExtensionsWinState) => void): void;
+  /** A different project opened or closed under the window. */
+  onProject(handler: () => void): void;
+  onPin(handler: (on: boolean) => void): void;
+  onTheme(handler: (theme: ThemePrefs) => void): void;
+}
+
 /** The detached FIELDS window's bridge (window.patterFields): a map of records edited as a grid, for the
  *  node the editor has selected. Every edit goes to the editor, which applies it as an undoable step and
  *  sends the new state back. */
@@ -1405,6 +1445,11 @@ export interface PatterApi {
   /** File ▸ Add Extension…; with `expect`, the package of that extension, which the project takes but this
    *  machine lacks the views of. */
   addExtension(expect?: string): Promise<AddExtensionResult | null>;
+  /** File ▸ Extensions…: open (or bring forward) the Extensions window, on one extension when `focus` names it. */
+  openExtensions(focus?: string): Promise<void>;
+  /** Remove from Project… (asked for in the Extensions window): main asks first, then takes it out as one step
+   *  that keeps its data. Null when refused or cancelled. */
+  removeExtension(id: string): Promise<RemoveExtensionResult | null>;
   /** Open (or bring forward) a view's window: a field's editor, from the inspector's Edit. */
   openView(extension: string, view: string): Promise<void>;
   /** The views the project offers, and which are installed here, each time main works them out again. */
@@ -1493,5 +1538,6 @@ declare global {
     patterCoverage?: PatterCoverageApi;
     /** Present only in the detached fields window. */
     patterFields?: PatterFieldsApi;
+    patterExtensions?: PatterExtensionsApi;
   }
 }

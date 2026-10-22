@@ -40,8 +40,8 @@ export interface SessionState {
 }
 
 /** The helper windows, by the key each remembers its bounds and pin under. */
-export type ToolWindowName = "play" | "search" | "coverage" | "fields";
-export const TOOL_WINDOW_NAMES: readonly ToolWindowName[] = ["play", "search", "coverage", "fields"];
+export type ToolWindowName = "play" | "search" | "coverage" | "fields" | "extensions";
+export const TOOL_WINDOW_NAMES: readonly ToolWindowName[] = ["play", "search", "coverage", "fields", "extensions"];
 
 /** Where the author was in one project. The shell keeps `places` opaque and keyed by project path;
  *  this is what Patterpad puts in the slot, and `read()` fans it back out into the parallel

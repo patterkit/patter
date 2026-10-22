@@ -2268,6 +2268,48 @@ export function takenExtensions(): { id: string; pin?: string; manifest: Manifes
   return out;
 }
 
+/** How many nodes carry an extension's data in the open project, across every scene's shard and the project's:
+ *  what Remove from Project says it keeps. */
+export function extensionDataCount(id: string): number {
+  if (!loaded) return 0;
+  ensureHydrated(); // every scene's shards
+  const nodes = new Set<string>();
+  for (const shard of loaded.extensionShards) {
+    if (shard.extension !== id) continue;
+    for (const [kind, byNode] of Object.entries(shard.entries ?? {})) for (const node of Object.keys(byNode ?? {})) nodes.add(`${kind}\u0000${node}`);
+  }
+  return nodes.size;
+}
+
+/**
+ * Remove from Project (patterkit design/extensions-window.md, D2): the project stops taking an extension, as ONE
+ * step ("Remove Pattershot"): its pin goes from the project file and its manifest copy from `extensions/`. Its
+ * data shards stay where they are, unused (validation says so) until the extension is taken again, which undo
+ * does too. The caller checks first that no other extension the project takes requires it.
+ */
+export function untakeExtension(id: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; reload?: boolean }> {
+  return enqueueForProject(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    const taken = loaded.project.extensions ?? {};
+    if (!taken[id]) return { ok: false, error: `This project doesn't take ${id}.` };
+    const name = readProjectManifest(loaded.root, id)?.name || id;
+    const { [id]: _gone, ...rest } = taken;
+    // From the file as it is, not the loaded model, as the upgrade does: a merge's mark, say, is kept.
+    const file = parseSource(readFileSync(loaded.projectFile, "utf8")) as Record<string, unknown>;
+    const { extensions: _was, ...others } = file;
+    const next = Object.keys(rest).length > 0 ? { ...others, extensions: rest } : others;
+    const manifest = manifestPath(loaded.root, id);
+    const writes: StepWrite[] = [
+      { path: loaded.projectFile, content: canonicalStringify(next) },
+      ...(existsSync(manifest) ? [{ path: manifest, content: null }] : []),
+    ];
+    const res = await projectCommit(`Remove ${name}`, freshKey("extension"), writes);
+    if (!res.ok) return res;
+    reloadFromDisk();
+    return { ok: true, project: summarise(loaded), reload: true, ...(res.step ? { step: res.step } : {}) };
+  });
+}
+
 /** A view extension wrote the project's own values for its extension: the project's entry in its
  *  `_project.patterextension` replaced by `entry`, as one step of the project history with the view's label. */
 export function saveProjectExtensionValues(id: string, entry: Record<string, unknown>, label: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {

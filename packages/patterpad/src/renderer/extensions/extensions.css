@@ -1,0 +1,15 @@
+/* The Extensions window (patterkit design/extensions-window.md): the shell's head bar (tool-window.css), then the
+ * shell's panel (extensions-window.css). Only the page's frame is here. */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body.ext-win {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  overflow: hidden;
+}
+.swin-head { font-size: 14px; }
+.ext-body { flex: 1 1 auto; overflow: auto; }

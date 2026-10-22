@@ -19,7 +19,7 @@ import * as dictionaries from "./dictionaries.js";
 import { createStore, type ToolWindowName } from "./store.js";
 import { applyMenu, setUndoLabels } from "./menu.js";
 import { createDebugServer, type DebugServer } from "./debug-link.js";
-import { centeredOnPrimary, defineToolWindows, pinToolWindow } from "@wildwinter/app-shell/tool-window";
+import { centeredOnPrimary, defineToolWindows, frontForModal, pinToolWindow } from "@wildwinter/app-shell/tool-window";
 import { plural } from "@wildwinter/app-shell/util";
 // The updater is the shell's. It IS this app's, generalised: the stall watchdog,
 // the retry budget, the surfaced background error and the live progress that
@@ -157,14 +157,16 @@ function refreshMenu(): void {
   const viewMenu = {
     offers: views.offers(),
     open: (extension: string, view: string) => { void views.open(extension, view); },
-    add: (extension: string) => { if (win && !win.isDestroyed()) win.webContents.send("menu", `add-extension:${extension}`); },
+    // A view not installed here opens the Extensions window on its extension, where Install on this machine… is.
+    add: (extension: string) => { openExtensionsWindow(extension); },
     isView: (w: BrowserWindow | null) => views.isView(w),
   };
   if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined, project.audioFoldersEnabled(), viewMenu);
 }
 
-// Tier 2 view extensions (views.ts): the views the open project offers, their windows, and Add Extension…,
-// which a view not installed here opens for its package. Each view window is a floating tool window of its
+// Tier 2 view extensions (views.ts): the views the open project offers, their windows, and the Extensions
+// window's Add, Remove from Project and Uninstall (patterkit design/extensions-window.md), which a view not
+// installed here opens on its extension. Each view window is a floating tool window of its
 // own, remembered under `view:<extension>/<view>` as the helper windows are.
 const views = createViewExtensions({
   dir: viewsDir(),
@@ -175,6 +177,9 @@ const views = createViewExtensions({
   tell: (title, sub, body) => tellInWindow(title, sub, body),
   flushEditor: () => flushEditorScene(),
   take: (items) => project.takeExtensions(items),
+  untake: (id) => project.untakeExtension(id),
+  dataCount: (id) => project.extensionDataCount(id),
+  listChanged: () => { void sendExtensionsState(); },
   ask: (message, detail, buttons) => askInWindow({ title: message, sub: detail, buttons, defaultId: 0, cancelId: buttons.length - 1 }),
   refreshMenu: () => {
     refreshMenu();
@@ -340,6 +345,10 @@ const windows = defineToolWindows<ToolWindowName>([
   // editor owns the document, so it sends what to show and applies every edit (H1 to H4).
   { name: "fields", title: "Fields", page: "fields/index.html", def: { width: 640, height: 420 }, min: { width: 420, height: 240 },
     ...store.window("fields"), channel: "fieldsWin:project", clear: () => { fieldsState = NO_FIELDS; } },
+  // What the project takes and this machine has installed: Add, Remove from Project and Uninstall
+  // (patterkit design/extensions-window.md). It lists a new project when main sends its rows again.
+  { name: "extensions", title: "Extensions", page: "extensions/index.html", def: { width: 560, height: 520 }, min: { width: 420, height: 300 },
+    ...store.window("extensions"), channel: "extWin:project", clear: () => { extensionsFocus = undefined; } },
 ], {
   rendererDir: join(here, "../renderer"),
   preload: join(here, "../preload/index.cjs"),
@@ -347,8 +356,35 @@ const windows = defineToolWindows<ToolWindowName>([
   session: { addSatellite: session.addSatellite, channel: "state:project" },
   resetStore: () => store.resetWindows(),
   // Closing the play window clears the editor's playhead + visited trail.
-  onOpened: (w, name) => { if (name === "play") w.on("closed", () => { win?.webContents.send("play:reset"); }); },
+  onOpened: (w, name) => {
+    if (name === "play") w.on("closed", () => { win?.webContents.send("play:reset"); });
+    if (name === "extensions") w.on("closed", () => { extensionsFocus = undefined; });
+  },
 });
+
+// --- the Extensions window -------------------------------------------------------
+/** The extension the window was last opened on (the Window menu's "(not installed)…"), marked until it closes
+ *  or the project changes. */
+let extensionsFocus: string | undefined;
+
+async function extensionsState(): Promise<import("../shared/api.js").ExtensionsWinState> {
+  return { rows: await views.rows(), hasProject: project.currentRoot() !== null, ...(extensionsFocus ? { focus: extensionsFocus } : {}) };
+}
+
+/** Send the open Extensions window its rows again: something it lists changed. */
+async function sendExtensionsState(): Promise<void> {
+  const w = windows.get("extensions");
+  if (!w || w.isDestroyed()) return;
+  const state = await extensionsState();
+  if (!w.isDestroyed()) w.webContents.send("extWin:state", state);
+}
+
+/** File ▸ Extensions…, or a view not installed here: open (or bring forward) the window, on `focus` if given. */
+function openExtensionsWindow(focus?: string): void {
+  extensionsFocus = focus;
+  windows.open("extensions");
+  void sendExtensionsState();
+}
 
 /** Paths the renderer is allowed to ask us to open: ones the app already knows about (the last project,
  *  recents). A fresh path only enters via the NATIVE open / create dialogs (driven here in main, where the
@@ -1054,14 +1090,45 @@ function registerIpc(): void {
     pinToolWindow(windows.get("fields"), win, on);
   });
   ipcMain.handle("fieldsWin:close", () => { windows.get("fields")?.close(); });
-  // View extensions: File ▸ Add Extension…, and a view's write of the project's own values for its extension.
+  // View extensions: the Extensions window's Add, Remove from Project and Uninstall, and a view's write of the
+  // project's own values for its extension. While one of them asks, the editor comes in front of the pinned
+  // windows, the Extensions window among them, so its question is never hidden under one.
+  ipcMain.handle("extensions:open", (_e, focus?: unknown) => { openExtensionsWindow(typeof focus === "string" ? focus : undefined); });
   ipcMain.handle("extensions:add", async (_e, expect?: unknown) => {
-    const r = await views.add(typeof expect === "string" ? expect : undefined);
+    const release = win ? frontForModal(win) : () => {};
+    const r = await views.add(typeof expect === "string" ? expect : undefined).finally(release);
     // The open scene reloads whether or not its data was rewritten: it opened with the extension's data held
     // back, untaken, and now takes it. Views installed alone leave the project as it was.
     if (r?.ok && !r.installedOnly) { win?.webContents.send("replace:applied"); projectChanged(); }
     return r;
   });
+  ipcMain.handle("extensions:remove", async (_e, id: unknown) => {
+    if (typeof id !== "string") return null;
+    const release = win ? frontForModal(win) : () => {};
+    const r = await views.remove(id).finally(release);
+    // Its data shards stay, but the open scene's data for it is now another extension's leftovers: reload it.
+    if (r?.ok) { win?.webContents.send("replace:applied"); projectChanged(); }
+    return r;
+  });
+  ipcMain.handle("extWin:info", async (): Promise<import("../shared/api.js").ExtensionsWinInfo> => ({
+    state: await extensionsState(), pinned: store.window("extensions").pinned(), theme: store.read().theme,
+  }));
+  // Add, Install and Remove are project steps, so they go through the editor, where undo lives.
+  const toEditor = (cmd: string): void => { if (win && !win.isDestroyed()) win.webContents.send("menu", cmd); };
+  ipcMain.handle("extWin:add", () => { toEditor("add-extension"); });
+  ipcMain.handle("extWin:install", (_e, id: unknown) => { if (typeof id === "string") toEditor(`add-extension:${id}`); });
+  ipcMain.handle("extWin:remove", (_e, id: unknown) => { if (typeof id === "string") toEditor(`remove-extension:${id}`); });
+  // Uninstall is this machine's, not the project's: no undo step, so main does it.
+  ipcMain.handle("extWin:uninstall", async (_e, id: unknown, version: unknown) => {
+    if (typeof id !== "string" || typeof version !== "string") return;
+    const release = win ? frontForModal(win) : () => {};
+    await views.uninstall(id, version).finally(release);
+  });
+  ipcMain.handle("extWin:setPin", (_e, on: boolean) => {
+    store.window("extensions").setPinned(on);
+    pinToolWindow(windows.get("extensions"), win, on);
+  });
+  ipcMain.handle("extWin:close", () => { windows.get("extensions")?.close(); });
   ipcMain.handle("views:open", async (_e, extension: unknown, view: unknown) => {
     if (typeof extension === "string" && typeof view === "string") await views.open(extension, view);
   });

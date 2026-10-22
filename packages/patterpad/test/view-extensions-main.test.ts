@@ -1,4 +1,5 @@
-// Tier 2 view extensions in Patterpad's main process (patterkit design/view-extensions.md): File ▸ Add
+// Tier 2 view extensions in Patterpad's main process (patterkit design/view-extensions.md): Remove from Project
+// (design/extensions-window.md) takes the pin and manifest out as one step and keeps the data; Add
 // Extension… takes a package's manifest into the project as ONE step of the project history (the manifest
 // and the pin together, or, for another version of one the project takes, `patter format`'s upgrade with its
 // stage renames), a package that can't be taken is refused with sentences, and the Window menu offers each
@@ -50,6 +51,31 @@ const SHOT = {
   targets: { patter: { line: { fields: [{ name: "camera", type: "text" }] } } },
   views: [{ id: "sheet", name: "Performance sheet", entry: "view/sheet.js", element: "shot-sheet" }],
 };
+
+describe("Remove from Project's project write", () => {
+  it("takes the pin and the manifest out as one step, keeps the data, and one undo puts both back", async () => {
+    const dir = openProbe();
+    const proj = join(dir, "probe.patterproj"), manifest = join(dir, "extensions/probe.extension.json");
+    const shard = join(dir, "extensions/probe/harbour.patterextension");
+    const before = { proj: readFileSync(proj, "utf8"), manifest: readFileSync(manifest, "utf8"), shard: readFileSync(shard, "utf8") };
+    expect(project.extensionDataCount("probe")).toBeGreaterThan(0);
+    expect(project.extensionDataCount("nope")).toBe(0);
+    const r = await project.untakeExtension("probe");
+    expect(r.ok).toBe(true);
+    expect(r.step?.label).toBe("Remove Probe");
+    expect(read(proj)["extensions"]).toBeUndefined(); // it was the only one
+    expect(existsSync(manifest)).toBe(false);
+    expect(readFileSync(shard, "utf8")).toBe(before.shard); // the data stays
+    expect(project.takenExtensions()).toEqual([]);
+    expect((await project.untakeExtension("probe")).ok).toBe(false);
+
+    const undone = await project.stepProjectHistory("undo", r.step!.id);
+    expect(undone.ok).toBe(true);
+    expect(readFileSync(proj, "utf8")).toBe(before.proj);
+    expect(readFileSync(manifest, "utf8")).toBe(before.manifest);
+    expect(project.takenExtensions().map((x) => x.id)).toEqual(["probe"]);
+  });
+});
 
 describe("Add Extension's project write", () => {
   it("writes the manifest and the pin as one step, which one undo takes back", async () => {

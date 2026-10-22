@@ -3606,7 +3606,7 @@ async function refreshEditorScopes(): Promise<void> {
   setHostScopeTokens(fresh.hostScopes);
 }
 
-/** File ▸ Add Extension…: main picks and checks the package, takes it into the project as one undo step (with
+/** Add extension… (the Extensions window, or a view's "(not installed)…"): main picks and checks the package, takes it into the project as one undo step (with
  *  any extension it requires that the project lacks), and installs its views on this machine (then reloads the
  *  open scene, which now takes the extension's data). For an extension the project takes already, main installs
  *  its views and offers a newer version (`expect`, from a view "(not installed)…" in the Window menu, says which).
@@ -3632,6 +3632,23 @@ async function addExtension(expect?: string): Promise<void> {
   const what = `${r.was !== undefined ? "Updated" : "Added"} ${[...also, `${r.name ?? "the extension"} ${r.version ?? ""}`.trim()].join(" and ")}`;
   if (r.installError) toast(`${what}\nIts views couldn't be installed on this machine: ${r.installError}`, "error");
   else toast(`${what}${r.warnings?.length ? `\n${r.warnings.join(" ")}` : ""}`, r.warnings?.length ? "info" : "ok");
+}
+
+/** Remove from Project…, asked for in the Extensions window (patterkit design/extensions-window.md): main refuses
+ *  while another extension needs it, asks first, and takes it out of the project as one undo step that keeps its
+ *  data. Here the step is noted and the project refreshed, as for Add. */
+async function removeExtension(id: string): Promise<void> {
+  if (!project) return;
+  const r = await window.patter.removeExtension(id);
+  if (!r) return; // refused or cancelled (main has said why)
+  noteStep(r.step);
+  if (!landed(r, "Couldn't remove the extension")) return;
+  if (r.project) { project = r.project; projectNameEl.textContent = project.name; }
+  views.changed("all");
+  lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
+  void refreshVcStatus();
+  void refreshProblems();
+  toast(`Removed ${r.name ?? "the extension"}`, "ok");
 }
 
 /** File ▸ Share Scopes with Other Tools: make the game's shared scopes folder (main asks where), then
@@ -3924,6 +3941,8 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "export-patterpack") void exportPatterpack();
   else if (cmd === "merge-patterpack") void mergePatterpack();
   else if (cmd === "share-scopes") void shareScopes();
+  else if (cmd === "extensions") void window.patter.openExtensions();
+  else if (cmd.startsWith("remove-extension:")) void removeExtension(cmd.slice("remove-extension:".length));
   else if (cmd === "add-extension") void addExtension();
   else if (cmd.startsWith("add-extension:")) void addExtension(cmd.slice("add-extension:".length));
   else if (cmd === "find") openSearch();

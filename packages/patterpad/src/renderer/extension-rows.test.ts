@@ -261,7 +261,7 @@ describe("a map of records in the inspector", () => {
     expect(there.dataset["tip"]).toBe("Edit perf in the Performance sheet");
     there.click();
     const absent = draw(handlers(false), line).querySelector<HTMLButtonElement>(".insp-ext-summary .insp-ext-edit")!;
-    expect(absent.dataset["tip"]).toBe("Edit perf in the Fields window. The Performance sheet opens here instead once Probe is installed on this machine (File ▸ Add Extension…).");
+    expect(absent.dataset["tip"]).toBe("Edit perf in the Fields window. The Performance sheet opens here instead once Probe is installed on this machine (File ▸ Extensions…).");
     absent.click();
     expect(views).toEqual(["probe/sheet line L_bell"]);
     expect(fields).toEqual(["line L_bell"]);

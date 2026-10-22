@@ -135,6 +135,8 @@ export default defineConfig({
           coverage: resolve(root, "packages/patterpad/src/renderer/coverage/index.html"),
           // detached fields window: a map of records as a grid, following the selection.
           fields: resolve(root, "packages/patterpad/src/renderer/fields/index.html"),
+          // The Extensions window: what the project takes and this machine has installed.
+          extensions: resolve(root, "packages/patterpad/src/renderer/extensions/index.html"),
         },
       },
     },

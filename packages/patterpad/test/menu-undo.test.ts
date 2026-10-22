@@ -82,14 +82,18 @@ describe("view extensions in the menus", () => {
     expect(sheet.webContents.undo).not.toHaveBeenCalled();
   });
 
-  it("put Add Extension beside Project Settings", () => {
-    const file = menu("File").map((i) => i.label);
-    expect(file[file.indexOf("Project Settings…") + 1]).toBe("Add Extension…");
-    click(menu("File").find((i) => i.label === "Add Extension…")!);
-    expect(main.webContents.send.mock.calls).toEqual([["menu", "add-extension"]]);
+  it("put Extensions beside Project Settings, open with no project too", () => {
+    const file = menu("File");
+    const labels = file.map((i) => i.label);
+    expect(labels[labels.indexOf("Project Settings…") + 1]).toBe("Extensions…");
+    expect(labels).not.toContain("Add Extension…");
+    const item = file.find((i) => i.label === "Extensions…")!;
+    expect(item.enabled).not.toBe(false);
+    click(item);
+    expect(main.webContents.send.mock.calls).toEqual([["menu", "extensions"]]);
   });
 
-  it("list the project's views in the Window menu, one not installed here marked so with why, opening Add Extension", () => {
+  it("list the project's views in the Window menu, one not installed here marked so with why, opening the Extensions window on it", () => {
     const items = menu("Window");
     const sheetItem = items.find((i) => i.label === "Performance sheet")!;
     const probeItem = items.find((i) => i.label === "Probe view (not installed)…")!;

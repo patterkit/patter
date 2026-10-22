@@ -178,7 +178,7 @@ function recordMapSummaryRow(decl: ExtensionFieldDto, value: unknown, adapter: V
   edit.type = "button";
   const what = decl.label ?? decl.name;
   edit.dataset["tip"] = editor?.open ? `Edit ${what} in the ${editor.name}`
-    : editor ? `Edit ${what} in the Fields window. The ${editor.name} opens here instead once ${extensionName} is installed on this machine (File ▸ Add Extension…).`
+    : editor ? `Edit ${what} in the Fields window. The ${editor.name} opens here instead once ${extensionName} is installed on this machine (File ▸ Extensions…).`
       : `Edit ${what} in the Fields window`;
   edit.disabled = noNode;
   edit.addEventListener("click", editor?.open ?? open);

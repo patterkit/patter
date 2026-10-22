@@ -25,7 +25,7 @@ const JOB_PROGRESS = "job:progress";
 /** The shell's view port channel and window message (`@wildwinter/app-shell/view-protocol`), as literals. */
 const VIEW_PORT_CHANNEL = "wildwinter-view:port";
 const VIEW_PORT_MESSAGE = "wildwinter-view:port";
-import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, PatterFieldsApi, FieldsWinState, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress, AppPrompt, ProjectStep, ViewOfferDto } from "../shared/api.js";
+import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, PatterFieldsApi, FieldsWinState, PatterExtensionsApi, ExtensionsWinState, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress, AppPrompt, ProjectStep, ViewOfferDto } from "../shared/api.js";
 
 const api: PatterApi = {
   boot: () => ipcRenderer.invoke("project:boot"),
@@ -141,6 +141,8 @@ const api: PatterApi = {
   onFieldsCommit: (handler) => { ipcRenderer.on("fields:commit", (_e, id: string, extension: string, field: string, value: unknown) => handler(id, extension, field, value)); },
   onFieldsFollow: (handler) => { ipcRenderer.on("fields:follow", (_e, on: boolean) => handler(on)); },
   addExtension: (expect?: string) => ipcRenderer.invoke("extensions:add", expect),
+  openExtensions: (focus?: string) => ipcRenderer.invoke("extensions:open", focus),
+  removeExtension: (id: string) => ipcRenderer.invoke("extensions:remove", id),
   openView: (extension, view) => ipcRenderer.invoke("views:open", extension, view),
   onViewOffers: (handler) => { ipcRenderer.on("views:offers", (_e, offers: ViewOfferDto[]) => handler(offers)); },
   writeProjectExtension: (extension, entry, label) => ipcRenderer.invoke("extensions:writeProject", extension, entry, label),
@@ -243,15 +245,31 @@ const fieldsApi: PatterFieldsApi = {
   onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
 };
 
+// The Extensions window's bridge: Add, Install and Remove go to the editor (where undo lives), Uninstall to main.
+const extensionsApi: PatterExtensionsApi = {
+  info: () => ipcRenderer.invoke("extWin:info"),
+  add: () => { void ipcRenderer.invoke("extWin:add"); },
+  install: (id) => { void ipcRenderer.invoke("extWin:install", id); },
+  remove: (id) => { void ipcRenderer.invoke("extWin:remove", id); },
+  uninstall: (id, version) => { void ipcRenderer.invoke("extWin:uninstall", id, version); },
+  setPin: (on) => { void ipcRenderer.invoke("extWin:setPin", on); },
+  close: () => { void ipcRenderer.invoke("extWin:close"); },
+  onState: (handler) => { ipcRenderer.on("extWin:state", (_e, state: ExtensionsWinState) => handler(state)); },
+  onProject: (handler) => { ipcRenderer.on("extWin:project", () => handler()); },
+  onPin: (handler) => { ipcRenderer.on("state:pinned", (_e, on: boolean) => handler(on)); },
+  onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
+};
+
 // Each window gets ITS bridge and no other. The four windows share this one preload, and every bridge was
 // exposed to every window, so the play, search, and coverage windows could also call the editor's whole
 // API (removing a dictionary, saving a scratch take). Which window this is comes from the page it loaded.
 const page = (() => { try { return new URL(location.href).pathname; } catch { return ""; } })();
-const tool = /\/(play|search|coverage|fields)\/index\.html$/.exec(page)?.[1];
+const tool = /\/(play|search|coverage|fields|extensions)\/index\.html$/.exec(page)?.[1];
 if (tool === "play") contextBridge.exposeInMainWorld("patterPlay", playApi);
 else if (tool === "search") contextBridge.exposeInMainWorld("patterSearch", searchApi);
 else if (tool === "coverage") contextBridge.exposeInMainWorld("patterCoverage", coverageApi);
 else if (tool === "fields") contextBridge.exposeInMainWorld("patterFields", fieldsApi);
+else if (tool === "extensions") contextBridge.exposeInMainWorld("patterExtensions", extensionsApi);
 else {
   contextBridge.exposeInMainWorld("patter", api);
   // Tier 2 view extensions (app-shell README v0.58): main hands the editor one end of each view window's

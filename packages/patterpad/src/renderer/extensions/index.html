@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; font-src 'self' data:" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Extensions</title>
+  </head>
+  <body class="ext-win">
+    <!-- The window is frameless: the shell's toolWindowHead (title, pin, close) is built in extensions.ts. -->
+    <main id="ext-host" class="ext-body"></main>
+    <script type="module" src="./extensions.ts"></script>
+  </body>
+</html>

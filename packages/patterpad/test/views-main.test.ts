@@ -38,7 +38,7 @@ function make() {
   const views = createViewExtensions({
     dir: "/tmp/views", editor: () => ({}) as never, root: () => "/p", taken: () => taken,
     slice: () => ({ bounds: () => undefined, remember: vi.fn(), pinned: () => true, setPinned: vi.fn() }),
-    tell: async () => {}, flushEditor: async () => {}, take: vi.fn(), refreshMenu: vi.fn(), ask: async () => 1,
+    tell: async () => {}, flushEditor: async () => {}, take: vi.fn(), untake: vi.fn(), dataCount: () => 0, refreshMenu: vi.fn(), ask: async () => 1,
   });
   return { views, untake: () => { taken = []; } };
 }

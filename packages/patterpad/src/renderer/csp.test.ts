@@ -15,6 +15,7 @@ const EXPECTED: Record<string, string> = {
   "search/index.html": familyCsp(FONTS),
   "coverage/index.html": familyCsp(FONTS),
   "fields/index.html": familyCsp(FONTS),
+  "extensions/index.html": familyCsp(FONTS),
 };
 
 describe("each window's content security policy", () => {

@@ -59,14 +59,14 @@ export function setUndoLabels(labels: { undo?: string; redo?: string }): boolean
 export interface ViewMenu {
   offers: readonly ViewOffer[];
   open(extension: string, view: string): void;
-  /** Add Extension… for an extension the project takes, whose view isn't installed here. */
+  /** The Extensions window, on an extension the project takes whose view isn't installed here. */
   add(extension: string): void;
   /** A view window, whose Edit ▸ Undo is the editor's. */
   isView(w: BrowserWindow | null): boolean;
 }
 
 /** The Window menu's items for the views on offer: each view by name, opening its window, or, when it isn't
- *  installed here, "<name> (not installed)…" with why, opening Add Extension for its package. Empty when there
+ *  installed here, "<name> (not installed)…" with why, opening the Extensions window on it. Empty when there
  *  are none. */
 export function viewMenuItems(views: ViewMenu | undefined): MenuItemConstructorOptions[] {
   const offers = views?.offers ?? [];
@@ -147,9 +147,10 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { label: "Delete Scene…", enabled: hasProject, click: () => send("delete-scene") },
         { type: "separator" },
         { ...FILE_MENU.projectSettings, enabled: hasProject, click: () => send("project-settings") },
-        // Take an extension into the project from its package, and install its views on this machine
-        // (patterkit design/view-extensions.md): one undoable project step, then the install.
-        { label: "Add Extension…", enabled: hasProject, click: () => send("add-extension") },
+        // What the project takes and this machine has installed: Add, Remove from Project, and Uninstall per
+        // version (patterkit design/extensions-window.md). Open with no project too: it then lists what's
+        // installed and offers only Uninstall.
+        { label: "Extensions…", click: () => send("extensions") },
         // Make the game's shared scopes folder, so the game's other editing tools and this project check
         // each other's names (patterkit/design/shared-scopes.md). Needs an open project.
         { label: "Share Scopes with Other Tools…", enabled: hasProject, click: () => send("share-scopes") },

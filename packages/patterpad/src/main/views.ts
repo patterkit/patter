@@ -1,8 +1,10 @@
 // Tier 2 view extensions in Patterpad's main process (patterkit design/view-extensions.md): which views the
 // open project offers and whether each is installed on this machine, opening a view in a sandboxed floating
 // window of its own (the shell's `openViewWindow`, which hands the view and the editor a port each and then
-// stays out of the path), and File ▸ Add Extension…, the one way in: it takes an extension into the project, or,
-// for one the project already takes, installs its views on this machine and offers a newer version.
+// stays out of the path), and the Extensions window (patterkit design/extensions-window.md): Add Extension, the
+// one way in, which takes an extension into the project or, for one the project already takes, installs its views
+// on this machine and offers a newer version; Remove from Project, which keeps its data; and Uninstall, per
+// version, from this machine.
 //
 // A view's code is never run from the project folder: the project holds the extension's manifest and pin,
 // and the package (the manifest and its view files) is installed under userData/view-extensions/<id>/<version>.
@@ -10,13 +12,16 @@
 
 import { app, dialog, type BrowserWindow } from "electron";
 import { basename, dirname, join } from "node:path";
-import { installExtensionPackage, openViewWindow, planPackageAdd, readExtensionPackage, resolveInstalled } from "@wildwinter/app-shell/view-host";
-import type { ExtensionPackage, ViewWindow } from "@wildwinter/app-shell/view-host";
+import {
+  extensionRows, installExtensionPackage, installedExtensions, openViewWindow, planPackageAdd, planProjectRemoval,
+  readExtensionPackage, resolveInstalled, uninstallViews,
+} from "@wildwinter/app-shell/view-host";
+import type { ExtensionPackage, ExtensionRow, ViewWindow } from "@wildwinter/app-shell/view-host";
 import { rescueToolWindow, savedWindowRect } from "@wildwinter/app-shell/tool-window";
 import type { WindowSlice } from "@wildwinter/app-shell/app-store";
 import { MANIFEST_FILE_SUFFIX, missingRequirements, viewsFor } from "@wildwinter/toolkit/extensions";
 import type { Manifest, Problem } from "@wildwinter/toolkit/extensions";
-import type { AddExtensionResult, OpenedProject, ProjectStep, SaveResult } from "../shared/api.js";
+import type { AddExtensionResult, OpenedProject, ProjectStep, RemoveExtensionResult, SaveResult } from "../shared/api.js";
 
 /** The scheme view pages are served on, registered privileged before the app is ready (index.ts). */
 export const VIEW_SCHEME = "patter-view";
@@ -56,8 +61,14 @@ export interface ViewDeps {
   take(items: { text: string; manifest: Manifest }[]): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; was?: string; reload?: boolean }>;
   /** Ask the writer a question with buttons; the button chosen, by index. */
   ask(message: string, detail: string, buttons: string[]): Promise<number>;
+  /** Take an extension out of the project as one undo step, keeping its data (project.ts `untakeExtension`). */
+  untake(id: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; reload?: boolean }>;
+  /** How many nodes carry an extension's data in the open project. */
+  dataCount(id: string): number;
   /** The menu changed (the views on offer, or what's installed). */
   refreshMenu(): void;
+  /** What the Extensions window lists may have changed: send it the rows again. */
+  listChanged?(): void;
 }
 
 /** A manifest problem as a sentence: its message, capitalised, with where it is. */
@@ -124,8 +135,16 @@ export interface ViewExtensions {
   rescue(): void;
   /** A view window: Edit ▸ Undo there is the editor's. */
   isView(w: BrowserWindow | null | undefined): boolean;
-  /** File ▸ Add Extension…, or, with an extension the project takes, its package for a view not installed here. */
+  /** Add Extension…, or, with an extension the project takes, its package for a view not installed here. */
   add(expect?: string): Promise<AddExtensionResult | null>;
+  /** The Extensions window's rows: what the open project takes and what this machine has installed. */
+  rows(): Promise<ExtensionRow[]>;
+  /** Remove from Project…: refused while another extension needs it, asked first with how much data it has, then
+   *  one undo step that keeps the data. Null when refused or cancelled. */
+  remove(id: string): Promise<RemoveExtensionResult | null>;
+  /** Uninstall one version of an extension's views from this machine, asked first; its open view windows close.
+   *  Whether it went. */
+  uninstall(id: string, version: string): Promise<boolean>;
 }
 
 /** Ask for an extension's package: a folder or an npm pack tarball. Off macOS a dialog picks files or folders,
@@ -173,7 +192,7 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
     const asked = generation;
     const choice = await resolveInstalled(deps.dir, extension, x.pin, x.manifest.name);
     if (asked !== generation) return; // the project closed or changed meanwhile
-    if (!choice.installed) { await deps.tell(`${x.manifest.name} isn't installed here`, choice.why ?? "", [`Choose File ▸ Add Extension… and ${x.manifest.name}'s package to install it.`]); return; }
+    if (!choice.installed) { await deps.tell(`${x.manifest.name} isn't installed here`, choice.why ?? "", [`Choose File ▸ Extensions… and Install on this machine… to install it from ${x.manifest.name}'s package.`]); return; }
     const decl = viewsFor(choice.installed.manifest, "patter").find((v) => v.id === view);
     if (!decl) { await deps.tell(`${x.manifest.name} has no such view`, `The version installed here (${choice.installed.version}) doesn't offer it.`); return; }
     const slice = deps.slice(extension, view);
@@ -206,6 +225,7 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
         open.delete(key);
       }
       deps.refreshMenu();
+      deps.listChanged?.();
     },
     open(extension, view) {
       // One window per view: a second click while the first is still on its way joins it.
@@ -233,6 +253,47 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
       if (!w) return false;
       for (const v of open.values()) if (v.window === w) return true;
       return false;
+    },
+    async rows() {
+      return extensionRows(deps.root() ? deps.taken() : [], await installedExtensions(deps.dir), "patter");
+    },
+    async remove(id) {
+      if (!deps.root()) return null;
+      const plan = planProjectRemoval(id, deps.taken());
+      if (!plan.ok) { await deps.tell("This extension can't be removed yet", plan.why); return null; }
+      const { name } = plan;
+      const n = deps.dataCount(id);
+      const data = n > 0
+        ? `${name} has data in ${n} ${n === 1 ? "place" : "places"} in this project. It stays, unused, and comes back into use if you add ${name} again.`
+        : `Nothing in this project has ${name} data yet.`;
+      const go = await deps.ask(`Remove ${name} from this project?`,
+        `${data} Its views stay installed on this machine. You can undo this.`, [`Remove ${name}`, "Cancel"]);
+      if (go !== 0) return null;
+      await deps.flushEditor();
+      const r = await deps.untake(id);
+      if (r.ok) await self.update(); // its views go from the Window menu, and an open one closes
+      return { ...r, name };
+    },
+    async uninstall(id, version) {
+      const installed = await installedExtensions(deps.dir);
+      const mine = installed.filter((i) => i.id === id);
+      const at = mine.find((i) => i.version === version);
+      if (!at) return false;
+      const name = at.manifest.name || id;
+      const taken = deps.root() ? deps.taken().find((t) => t.id === id) : undefined;
+      const last = mine.length === 1;
+      const parts = [
+        ...(taken ? [`This project takes ${name}${last ? `, so its views will show as not installed until you install them again` : ""}.`] : []),
+        "Other projects on this machine that use this version lose its views too.",
+        last ? `${name}'s views keep their own settings on this machine, and those go too.` : "The other installed versions keep their views' settings.",
+      ];
+      const go = await deps.ask(`Uninstall ${name} ${version} from this machine?`, parts.join(" "), [`Uninstall ${version}`, "Cancel"]);
+      if (go !== 0) return false;
+      // Its windows close before its files go: a view left open would run on what's being removed.
+      for (const [key, v] of [...open]) if (key.startsWith(`${id}/`)) { v.close(); open.delete(key); }
+      await uninstallViews(deps.dir, id, version);
+      await self.update();
+      return true;
     },
     async add(expect) {
       const win = deps.editor();
