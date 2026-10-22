@@ -15,23 +15,44 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   change made in a view is one undo step, named after what the view did ("Undo Set shot" in the Edit menu), and
   Cmd+Z in a view's window undoes it. A view changes only the scene that's open, and shows read-only on a scene
   somebody else holds. A view can play a line's recording, through the same player as the inspector's play
-  button, in Audio Folders mode.
-- **File ▸ Add Extension…** takes an extension into the project from its package, a folder or an npm package
-  tarball: it adds the extension's manifest and version to the project, as one step you can undo, and installs
-  its views on this machine. It's the one way in, whoever you are: for an extension the project already takes,
-  it installs the views on this machine, and offers to update the project when the package is newer (with any
-  stages that version renamed renamed in your data). An older package never takes the project back. An
-  extension that needs another the project doesn't take asks for that one's package too, and adds both as one
-  step. A package with a fault in its manifest is refused, with what's wrong.
+  button, in Audio Folders mode. A view's window has the same title bar as the tool windows, with a pin that
+  stays as you left it, and Escape closes it. A view keeps its own preferences across a restart.
+- **File ▸ Extensions…** opens a tool window listing every extension the project takes or this machine has
+  installed: the version the project uses, its views, and each version installed here. You can stay in it while
+  you work, and it follows the project you have open.
+  - **Add Extension…** takes an extension into the project from its package, a folder or an npm package
+    tarball: it adds the extension's manifest and version to the project, as one step you can undo, and
+    installs its views on this machine. It's the one way in, whoever you are: for an extension the project
+    already takes, it installs the views on this machine, and offers to update the project when the package is
+    newer (with any stages that version renamed renamed in your data). An older package never takes the project
+    back. An extension that needs another the project doesn't take asks for that one's package too, and adds
+    both as one step. A package with a fault in its manifest is refused, with what's wrong.
+  - **Update…** asks for an extension's package and says what will happen before doing it. A newer version
+    says what changes (fields gained or lost, views, what it newly needs), and is taken as one undo step and
+    installed. The same version reinstalls the views, and takes the package's manifest into the project too if
+    it differs from the project's copy. An older version, or another extension's package, is refused.
+  - **Remove from Project…** stops the project taking an extension, as one undo step. It asks first, saying how
+    many nodes carry the extension's data, and keeps that data, so adding the extension back restores it. An
+    extension another one needs can't be removed first.
+  - **Uninstall** removes one installed version of an extension's views from this machine, after asking. Its
+    open view windows close; uninstalling the last version also clears its views' saved preferences.
 - **Views not installed here.** On a machine without an extension's views, the Window menu lists each view as
-  "(not installed)…" with the reason, and choosing it opens Add Extension for that extension's package, which
-  installs the views without changing the project. A view whose installed version differs from the project's
-  says so in its window's title, and still opens while the major version matches.
+  "(not installed)…" with the reason, and choosing it opens the Extensions window on that extension, where
+  Install on This Machine… installs the views without changing the project. A view whose installed version
+  differs from the project's says so in its window's title, and still opens while the major version matches.
 - **A view as a field's editor.** An extension can name one of its views as the editor of a field holding a
   list of records by name. Its Edit button in the inspector then opens that view on the node, and the Fields
   window leaves the field out; until the view is installed here, Edit opens the Fields window as before.
 - **Missing extensions said.** An extension that needs another the project doesn't take is warned of in the
   problems bar, and its views are told, so they can say so rather than show something misleading.
+- **Increase Contrast.** With macOS's Increase Contrast turned on, grey text and dividing lines darken in
+  every palette, so they're easier to read.
+
+### Changed
+
+- **Easier-to-read grey text.** Secondary text in Paper, Mist, and Night, and warnings in the light palettes,
+  are darker or brighter so they meet the usual contrast guideline for text, and placeholder text in fields is
+  no longer faded further.
 
 ### Removed
 
