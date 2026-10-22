@@ -261,6 +261,28 @@ straight from CI: the release is staged as a draft while the OS matrix uploads, 
 final job flips it live once all three builds succeeded (a half-built release is never
 visible).
 
+- **`notes`** creates the draft, with the changelog section as its body, and hands the
+  draft's id to the other jobs.
+- **`build`** checks the tag against the manifest, builds and signs with electron-builder's
+  `--publish never`, and uploads the installers, their blockmaps and the updater feeds
+  (`latest-mac.yml`, `latest.yml`, `latest-linux.yml`) to the draft **by its id**.
+- **`publish`** checks the draft holds all ten files, the three feeds among them, flips it
+  live and marks it Latest.
+
+**Why by id.** electron-builder used to publish, finding the draft by listing the releases.
+On 0.39.0 (2026-10-22) that list didn't show the notes draft: each OS build made a draft of
+its own, the files split across four, and publish made the notes draft live with only the
+Windows files, so Mac and Linux updates found no feed. Storyletter hit the same on its 0.26.0
+and moved to this shape first; the two workflows match. If a build fails, fix it and re-run
+the failed jobs: they reuse the first run's draft id, and an upload replaces a file of the
+same name already there.
+
+**Rehearsing the pipeline.** A tag with a hyphen, such as `v0.39.1-rehearsal.1`, runs every
+job but `publish`: the ten files land on a draft marked pre-release, which never goes live
+or takes "Latest". Make it on a commit off main that sets Patterpad's version to match and
+dates a changelog section for it, push only the tag, check the draft, then delete the draft.
+The tag stays: this repo's tag ruleset forbids deleting one.
+
 The **Patterpad release** workflow builds + signs Patterpad on mac/win/linux and
 publishes the installers (dmg/zip, nsis, AppImage) plus the electron-updater feeds to
 the GitHub Release; the app self-updates from there. macOS signing/notarization needs
