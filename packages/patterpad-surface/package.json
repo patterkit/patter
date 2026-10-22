@@ -30,7 +30,7 @@
     "@ibm/plex-sans": "1.0.0",
     "@patterkit/core": "0.9.5",
     "@patterkit/model": "0.20.0",
-    "@wildwinter/app-shell": "^0.61.0",
+    "@wildwinter/app-shell": "^0.62.0",
     "prosemirror-commands": "^1.6.0",
     "prosemirror-history": "^1.4.0",
     "prosemirror-inputrules": "^1.4.0",
