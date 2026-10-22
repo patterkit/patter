@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.39.1-rehearsal.1] - 2026-10-22
+
+### Changed
+
+- Rehearsal of the release pipeline (uploads by draft id). Never published.
+
 ## [0.39.0] - 2026-10-22
 
 ### Added
