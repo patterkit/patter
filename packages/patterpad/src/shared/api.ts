@@ -498,6 +498,8 @@ export interface AddExtensionResult extends SaveResult {
   note?: string;
   /** The extensions it requires, added with it in the same step. */
   also?: { name: string; version: string }[];
+  /** Update… with the same version: its files were reinstalled on this machine. */
+  reinstalled?: true;
 }
 
 /** A view the open project offers, as the editor needs it: whether it opens on this machine. */
@@ -1075,6 +1077,7 @@ export interface PatterExtensionsApi {
   install(id: string): void;
   remove(id: string): void;
   uninstall(id: string, version: string): void;
+  update(id: string): void;
   setPin(on: boolean): void;
   close(): void;
   onState(handler: (state: ExtensionsWinState) => void): void;
@@ -1450,6 +1453,9 @@ export interface PatterApi {
   /** Remove from Project… (asked for in the Extensions window): main asks first, then takes it out as one step
    *  that keeps its data. Null when refused or cancelled. */
   removeExtension(id: string): Promise<RemoveExtensionResult | null>;
+  /** Update… (asked for in the Extensions window): main asks for the package, says what will happen, and does it.
+   *  Null when refused, cancelled, or there was nothing to do. */
+  updateExtension(id: string): Promise<AddExtensionResult | null>;
   /** Open (or bring forward) a view's window: a field's editor, from the inspector's Edit. */
   openView(extension: string, view: string): Promise<void>;
   /** The views the project offers, and which are installed here, each time main works them out again. */

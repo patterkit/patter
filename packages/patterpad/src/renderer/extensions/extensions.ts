@@ -23,6 +23,7 @@ const panel = extensionsPanel({
   install: (id) => api.install(id),
   remove: (id) => api.remove(id),
   uninstall: (id, version) => api.uninstall(id, version),
+  update: (id) => api.update(id),
 });
 host.append(panel.el);
 const render = (state: ExtensionsWinState): void => panel.render({ ...state, app: "Patterpad" });

@@ -13,8 +13,8 @@
 import { app, dialog, type BrowserWindow } from "electron";
 import { basename, dirname, join } from "node:path";
 import {
-  extensionRows, installExtensionPackage, installedExtensions, openViewWindow, planPackageAdd, planProjectRemoval,
-  readExtensionPackage, resolveInstalled, uninstallViews,
+  extensionRows, installExtensionPackage, installedExtensions, openViewWindow, planPackageAdd, planPackageUpdate,
+  planProjectRemoval, readExtensionPackage, resolveInstalled, sameAsInstalled, uninstallViews,
 } from "@wildwinter/app-shell/view-host";
 import type { ExtensionPackage, ExtensionRow, ViewWindow } from "@wildwinter/app-shell/view-host";
 import { rescueToolWindow, savedWindowRect } from "@wildwinter/app-shell/tool-window";
@@ -145,6 +145,10 @@ export interface ViewExtensions {
   /** Uninstall one version of an extension's views from this machine, asked first; its open view windows close.
    *  Whether it went. */
   uninstall(id: string, version: string): Promise<boolean>;
+  /** Update…: its package, then what will happen, asked first: a newer version taken (one undo step) and
+   *  installed, the same version reinstalled, an older version or another extension's package refused. Null when
+   *  refused, cancelled, or there was nothing to do. */
+  upgrade(id: string): Promise<AddExtensionResult | null>;
 }
 
 /** Ask for an extension's package: a folder or an npm pack tarball. Off macOS a dialog picks files or folders,
@@ -273,6 +277,87 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
       const r = await deps.untake(id);
       if (r.ok) await self.update(); // its views go from the Window menu, and an open one closes
       return { ...r, name };
+    },
+    async upgrade(id) {
+      const row = (await self.rows()).find((r) => r.id === id);
+      if (!row) return null;
+      const pkg = await readPackage(`Update ${row.name}`, `Choose ${row.name}'s package: its folder, or an npm package tarball (.tgz).`);
+      if (!pkg) return null;
+      const taken = deps.root() ? deps.taken() : [];
+      const mine = taken.find((t) => t.id === id);
+      const installed = (await installedExtensions(deps.dir)).filter((i) => i.id === id);
+      const current = mine?.manifest ?? installed[installed.length - 1]?.manifest;
+      const plan = planPackageUpdate(row, pkg.manifest, current, "patter", taken.map((t) => t.id));
+      if (plan.kind === "refused") { await deps.tell("Nothing was updated", plan.why); return null; }
+      const refused = packageRefusal(pkg);
+      if (refused) { await deps.tell(refused.title, refused.sub, refused.body); return null; }
+      const name = nameOf(pkg);
+      // Its windows close before its files are replaced: a view left open would run on the old ones.
+      const closeViews = (): void => { for (const [key, v] of [...open]) if (key.startsWith(`${id}/`)) { v.close(); open.delete(key); } };
+
+      if (plan.kind === "same") {
+        const v = plan.version;
+        const there = installed.find((i) => i.version === v);
+        // The project's copy of the manifest, when this package's differs at the same version (a rebuilt
+        // development version): the reinstall puts it in the project too, as one step.
+        const differs = mine !== undefined && JSON.stringify(mine.manifest) !== JSON.stringify(pkg.manifest);
+        if (there && !differs && await sameAsInstalled(pkg, there.root)) {
+          await deps.tell(`${name} ${v} is already installed`, "This package's files are the same as the ones installed on this machine, so there's nothing to do.");
+          return null;
+        }
+        const what = differs
+          ? `Reinstalling replaces its installed files on this machine, and the project's copy of its manifest, which this package changes. You can undo the project's part.`
+          : `Reinstalling replaces its installed files on this machine. The project stays as it is.`;
+        const go = await deps.ask(`Reinstall ${name} ${v}?`, `This package is ${name} ${v}, the version ${mine ? "this project takes" : "installed here"}. ${what} Its open views close.`, [`Reinstall ${v}`, "Cancel"]);
+        if (go !== 0) return null;
+        closeViews();
+        let taken0: Awaited<ReturnType<ViewDeps["take"]>> | null = null;
+        if (differs) {
+          await deps.flushEditor();
+          taken0 = await deps.take([{ text: manifestText(pkg), manifest: pkg.manifest }]);
+          if (!taken0.ok) return taken0;
+        }
+        const r = viewsFor(pkg.manifest, "patter").length > 0 || there ? await installExtensionPackage(pkg, deps.dir) : { ok: true as const };
+        await self.update();
+        return {
+          ...(taken0 ?? { ok: true }), name, version: v, reinstalled: true,
+          ...(differs ? {} : { installedOnly: true as const }),
+          ...(r.ok ? {} : { installError: r.why }),
+        };
+      }
+
+      const lines = plan.changes.length ? plan.changes : ["No fields or views change."];
+      const how = mine
+        ? "The project takes it as one step you can undo, and its views install on this machine."
+        : "Its views install on this machine. No project changes.";
+      const go = await deps.ask(`Update ${name}${plan.from ? ` from ${plan.from}` : ""} to ${plan.to}?`,
+        `${lines.join(" ")} ${how} Values it no longer accepts show among the problems afterwards.`, [`Update to ${plan.to}`, "Cancel"]);
+      if (go !== 0) return null;
+      const required: ExtensionPackage[] = [];
+      if (mine && plan.missing.length > 0) {
+        const got = await requirementsFor(pkg, plan.missing);
+        if (!got) return null;
+        required.push(...got);
+      }
+      closeViews();
+      let taken1: Awaited<ReturnType<ViewDeps["take"]>> | null = null;
+      if (mine) {
+        await deps.flushEditor(); // renamed stages rewrite scene data, the open scene's among it
+        taken1 = await deps.take([...required, pkg].map((p) => ({ text: manifestText(p), manifest: p.manifest })));
+        if (!taken1.ok) return taken1;
+      }
+      const installErrors: string[] = [];
+      for (const p of [...required.filter((r) => viewsFor(r.manifest, "patter").length > 0), pkg]) {
+        const installed1 = await installExtensionPackage(p, deps.dir);
+        if (!installed1.ok) installErrors.push(installed1.why);
+      }
+      await self.update();
+      return {
+        ...(taken1 ?? { ok: true }), name, version: plan.to,
+        ...(mine ? {} : { installedOnly: true as const }),
+        ...(required.length ? { also: required.map((r) => ({ name: nameOf(r), version: r.manifest.version })) } : {}),
+        ...(installErrors.length ? { installError: installErrors.join(" ") } : {}),
+      };
     },
     async uninstall(id, version) {
       const installed = await installedExtensions(deps.dir);

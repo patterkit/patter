@@ -363,6 +363,7 @@ const stub = {
   addExtension: async () => null,
   openExtensions: async () => { window.open("./extensions.html", "_blank"); },
   removeExtension: async () => null,
+  updateExtension: async () => null,
   openView: async () => {},
   onViewOffers: () => {},
   writeProjectExtension: async () => ({ ok: false, error: "The preview can't write the project." }),

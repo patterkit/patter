@@ -25,6 +25,7 @@ const stub: PatterExtensionsApi = {
     state = { ...state, rows: state.rows.map((r) => (r.id === id ? { ...r, installed: r.installed.filter((v) => v !== version) } : r)) };
     onState?.(state);
   },
+  update: (id) => console.log("update", id),
   setPin: (on) => console.log("setPin", on),
   close: () => console.log("close"),
   onState: (handler) => { onState = handler; },

@@ -1110,6 +1110,13 @@ function registerIpc(): void {
     if (r?.ok) { win?.webContents.send("replace:applied"); projectChanged(); }
     return r;
   });
+  ipcMain.handle("extensions:update", async (_e, id: unknown) => {
+    if (typeof id !== "string") return null;
+    const release = win ? frontForModal(win) : () => {};
+    const r = await views.upgrade(id).finally(release);
+    if (r?.ok && !r.installedOnly) { win?.webContents.send("replace:applied"); projectChanged(); }
+    return r;
+  });
   ipcMain.handle("extWin:info", async (): Promise<import("../shared/api.js").ExtensionsWinInfo> => ({
     state: await extensionsState(), pinned: store.window("extensions").pinned(), theme: store.read().theme,
   }));
@@ -1118,6 +1125,13 @@ function registerIpc(): void {
   ipcMain.handle("extWin:add", () => { toEditor("add-extension"); });
   ipcMain.handle("extWin:install", (_e, id: unknown) => { if (typeof id === "string") toEditor(`add-extension:${id}`); });
   ipcMain.handle("extWin:remove", (_e, id: unknown) => { if (typeof id === "string") toEditor(`remove-extension:${id}`); });
+  // Update… is a project step when a project is open (the editor runs it); with none, only this machine changes.
+  ipcMain.handle("extWin:update", async (_e, id: unknown) => {
+    if (typeof id !== "string") return;
+    if (project.currentRoot() !== null) { toEditor(`update-extension:${id}`); return; }
+    const release = win ? frontForModal(win) : () => {};
+    await views.upgrade(id).finally(release);
+  });
   // Uninstall is this machine's, not the project's: no undo step, so main does it.
   ipcMain.handle("extWin:uninstall", async (_e, id: unknown, version: unknown) => {
     if (typeof id !== "string" || typeof version !== "string") return;

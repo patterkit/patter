@@ -5,7 +5,7 @@
 // Over real packages in folders, the shell's real reading, planning and installing, and a fake project.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseManifest } from "@wildwinter/toolkit/extensions";
@@ -201,5 +201,72 @@ describe("the Extensions window", () => {
     await t.views.add();
     expect(await t.views.uninstall("shot", "0.3.0")).toBe(false);
     expect(t.installed()).toEqual(["shot@0.3.0"]);
+  });
+});
+
+describe("Update…", () => {
+  beforeEach(() => { picks.paths.length = 0; picks.cleared.length = 0; });
+
+  it("refuses another extension's package and an older version, naming them, and changes nothing", async () => {
+    const t = make(shotAt("0.3.0"));
+    picks.paths.push(packageDir({ ...STAGE }));
+    expect(await t.views.upgrade("shot")).toBeNull();
+    picks.paths.push(packageDir({ ...SHOT, version: "0.2.0" }));
+    expect(await t.views.upgrade("shot")).toBeNull();
+    expect(t.told).toEqual(["Nothing was updated", "Nothing was updated"]);
+    expect(t.details).toEqual([
+      "That package is Stage (\u201cstage\u201d), not Shot (\u201cshot\u201d), so nothing changed.",
+      "This project takes Shot 0.3.0, newer than this package's 0.2.0, so nothing changed: an update never goes back to an older version.",
+    ]);
+    expect(t.take).not.toHaveBeenCalled();
+    expect(t.installed()).toEqual([]);
+  });
+
+  it("says there's nothing to do for the same files, and reinstalls a rebuilt same version, asked first", async () => {
+    const t = make(shotAt("0.3.0"), [0]);
+    const pkg = packageDir(SHOT);
+    picks.paths.push(pkg);
+    await t.views.add(); // installs 0.3.0: the project takes that version already
+    picks.paths.push(pkg);
+    expect(await t.views.upgrade("shot")).toBeNull();
+    expect(t.told).toEqual(["Shot 0.3.0 is already installed"]);
+    writeFileSync(join(pkg, "view/sheet.js"), "customElements.define('shot-sheet', class extends HTMLElement { rebuilt = true; });");
+    picks.paths.push(pkg);
+    expect(await t.views.upgrade("shot")).toMatchObject({ ok: true, reinstalled: true, installedOnly: true, version: "0.3.0" });
+    expect(t.asked).toEqual(["Reinstall Shot 0.3.0?"]);
+    expect(t.take).not.toHaveBeenCalled();
+    expect(readFileSync(join(t.dir, "shot/0.3.0/view/sheet.js"), "utf8")).toContain("rebuilt");
+  });
+
+  it("puts a changed manifest at the same version into the project too, as one step", async () => {
+    const t = make(shotAt("0.3.0"), [0]);
+    picks.paths.push(packageDir({ ...SHOT, targets: { patter: { line: { fields: [{ name: "camera", type: "text" }, { name: "lens", type: "text" }] } } } }));
+    expect(await t.views.upgrade("shot")).toMatchObject({ ok: true, reinstalled: true });
+    expect(t.takenIds()).toEqual([["shot"]]);
+    expect(t.details.at(-1)).toContain("and the project's copy of its manifest, which this package changes.");
+  });
+
+  it("says what a newer version changes, then takes it as one step and installs it", async () => {
+    const t = make(shotAt("0.3.0"), [1, 0]);
+    const next = { ...SHOT, version: "0.4.0", targets: { patter: { line: { fields: [{ name: "camera", type: "text" }, { name: "lens", label: "Lens", type: "text" }] } } } };
+    picks.paths.push(packageDir(next));
+    expect(await t.views.upgrade("shot")).toBeNull(); // cancelled
+    expect(t.take).not.toHaveBeenCalled();
+    picks.paths.push(packageDir(next));
+    expect(await t.views.upgrade("shot")).toMatchObject({ ok: true, version: "0.4.0" });
+    expect(t.asked).toEqual(["Update Shot from 0.3.0 to 0.4.0?", "Update Shot from 0.3.0 to 0.4.0?"]);
+    expect(t.details[1]).toBe("Line: adds \u201cLens\u201d. The project takes it as one step you can undo, and its views install on this machine. Values it no longer accepts show among the problems afterwards.");
+    expect(t.takenIds()).toEqual([["shot"]]);
+    expect(t.installed()).toEqual(["shot@0.4.0"]);
+  });
+
+  it("updates an extension installed here but not in the project on this machine alone", async () => {
+    const t = make([], [0]);
+    picks.paths.push(packageDir(SHOT));
+    await t.views.add(); // takes it into the (fake) project; the fake still says it takes nothing
+    picks.paths.push(packageDir({ ...SHOT, version: "0.4.0" }));
+    expect(await t.views.upgrade("shot")).toMatchObject({ ok: true, installedOnly: true, version: "0.4.0" });
+    expect(t.details.at(-1)).toContain("Its views install on this machine. No project changes.");
+    expect(t.installed()).toEqual(["shot@0.3.0", "shot@0.4.0"]);
   });
 });

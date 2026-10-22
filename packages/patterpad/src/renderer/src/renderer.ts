@@ -96,7 +96,7 @@ import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from 
 import type { PropertyDecl, DocLine, Comment, Suggestion } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES, DEFAULT_PAD_AFTER, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import { openValuePicker, qualifierRows } from "./value-picker.js";
-import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt, SceneVcStatus, VcStatusDto } from "../../shared/api.js";
+import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt, SceneVcStatus, VcStatusDto, AddExtensionResult } from "../../shared/api.js";
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
 import { textHash } from "./wav.js";
 import { mountDebugLink } from "./debug-panel.js";
@@ -3613,8 +3613,26 @@ async function refreshEditorScopes(): Promise<void> {
  *  Here the project is refreshed, and the writer told what happened. */
 async function addExtension(expect?: string): Promise<void> {
   if (!project) return;
-  const r = await window.patter.addExtension(expect);
+  landExtension(await window.patter.addExtension(expect));
+}
+
+/** Update… in the Extensions window: main asks for the package and says what will happen (a newer version taken
+ *  as one undo step and installed, the same version reinstalled, an older one or another extension refused). The
+ *  result lands as Add's does. */
+async function updateExtension(id: string): Promise<void> {
+  if (!project) return;
+  landExtension(await window.patter.updateExtension(id));
+}
+
+/** What Add or Update did: the step noted, the project refreshed, and the writer told. */
+function landExtension(r: AddExtensionResult | null): void {
   if (!r) return; // cancelled, or refused (main has said why)
+  if (r.ok && r.reinstalled && r.installedOnly) {
+    const what = `${r.name ?? "The extension"} ${r.version ?? ""}`.trim();
+    if (r.installError) toast(`${what} couldn't be reinstalled on this machine: ${r.installError}`, "error");
+    else toast(`Reinstalled ${what} on this machine`, "ok");
+    return;
+  }
   if (r.ok && r.installedOnly) {
     const what = `${r.name ?? "The extension"} ${r.version ?? ""}`.trim();
     if (r.installError) toast(`${what}'s views couldn't be installed on this machine: ${r.installError}`, "error");
@@ -3629,7 +3647,8 @@ async function addExtension(expect?: string): Promise<void> {
   void refreshVcStatus();
   void refreshProblems();
   const also = (r.also ?? []).map((a) => `${a.name} ${a.version}`);
-  const what = `${r.was !== undefined ? "Updated" : "Added"} ${[...also, `${r.name ?? "the extension"} ${r.version ?? ""}`.trim()].join(" and ")}`;
+  const done = r.reinstalled ? "Reinstalled" : r.was !== undefined ? "Updated" : "Added";
+  const what = `${done} ${[...also, `${r.name ?? "the extension"} ${r.version ?? ""}`.trim()].join(" and ")}`;
   if (r.installError) toast(`${what}\nIts views couldn't be installed on this machine: ${r.installError}`, "error");
   else toast(`${what}${r.warnings?.length ? `\n${r.warnings.join(" ")}` : ""}`, r.warnings?.length ? "info" : "ok");
 }
@@ -3943,6 +3962,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "share-scopes") void shareScopes();
   else if (cmd === "extensions") void window.patter.openExtensions();
   else if (cmd.startsWith("remove-extension:")) void removeExtension(cmd.slice("remove-extension:".length));
+  else if (cmd.startsWith("update-extension:")) void updateExtension(cmd.slice("update-extension:".length));
   else if (cmd === "add-extension") void addExtension();
   else if (cmd.startsWith("add-extension:")) void addExtension(cmd.slice("add-extension:".length));
   else if (cmd === "find") openSearch();
