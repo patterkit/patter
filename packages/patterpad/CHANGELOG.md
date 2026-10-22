@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-10-22
+
 ### Added
 
 - **Extension views.** An extension can now bring views of its own, such as a timeline of a scene's lines,
