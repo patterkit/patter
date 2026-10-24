@@ -138,12 +138,10 @@
 .vcs-scene[hidden] { display: none; } /* an explicit display would otherwise defeat the `hidden` attribute */
 .vcs-scene.locked { color: var(--danger); }
 
-/* Read-only scene (locked by another): dim + lock out the inspector edits; the surface is set
-   non-editable in JS. Reading stays available. */
-/* A locked scene's inspector. The DIM is ours; what is disabled underneath is the shell's
-   `lockControls`, which turns off the editing controls one at a time and leaves the reading ones alone,
-   where this used to drop `pointer-events: none` over the lot and take the disclosures with it. */
-#inspector-stack.vc-readonly { opacity: 0.55; }
+/* A locked scene's inspector draws nothing of its own: the shell's `lockControls` turns off the editing
+   controls one at a time, and its vc.css shows each as locked while its value stays readable. The whole
+   stack used to dim to 55%, which took even --ink under AA in the light palettes (2026-10-24, as
+   Storyletter's inspector already was). */
 
 /* Threaded comments (#148) are the shell's popover now (openComments), and its
    `.shell-cmt-*` styles come with it in comments.css. What survives here is the

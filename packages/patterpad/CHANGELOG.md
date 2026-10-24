@@ -8,6 +8,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
+- **A scene somebody else holds is easier to read.** Its locked fields and buttons keep their text at full
+  strength, so you can read every value; they show they're locked with a dashed edge and a no-entry cursor,
+  and the notice above the document still says who holds it. The inspector is no longer dimmed as a whole.
 - **Green status text is a touch darker in the light palettes** (Paper and Mist), so words such as "Saved" and the
   Live Link status meet the usual contrast guideline for text.
 
