@@ -13,9 +13,9 @@ const TEXT = ["--ink", "--ink-read", "--ink-soft", "--muted", "--danger", "--war
 const fmt = (s: { palette: string; token: string; ground: string; ratio: number }): string =>
   `${s.palette} ${s.token} on ${s.ground}: ${s.ratio}`;
 
-/** Known and not yet ruled on: --ok as text in the light palettes (4.1 to 4.2 on the board, and on a card, which is the board). Each entry must
- *  still fail, so fixing one means taking it off this list. */
-const PENDING = ["default --ok on --bg", "default --ok on --card", "mist --ok on --bg", "mist --ok on --card", "paper --ok on --bg", "paper --ok on --card"];
+/** Known shortfalls not yet fixed. Each entry must still fail, so fixing one means taking it off this list. Empty since the
+ *  light --ok went to #3a7544 (2026-10-24). */
+const PENDING: string[] = [];
 
 describe("text contrast", () => {
   it("reads all five palettes and every token", () => {

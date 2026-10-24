@@ -6,6 +6,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **Green status text is a touch darker in the light palettes** (Paper and Mist), so words such as "Saved" and the
+  Live Link status meet the usual contrast guideline for text.
+
 ## [0.39.0] - 2026-10-22
 
 ### Added
