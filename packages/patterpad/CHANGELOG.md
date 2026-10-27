@@ -22,8 +22,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   scene above them fold to one line saying what they set, and Patterpad remembers which you keep open. An
   option's Sticky, Fallback, and Secret are one row of buttons.
 - **More room for the script.** The editor's margins are narrower, a snippet's drag handle sits outside it,
-  and a jump reads "Jump to" or "Call" in words. A choice's options are marked by a small diamond on their
+  and a jump sits at the text's left edge, drawn as an arrow and its target (a call has its own loop
+  icon). A choice's options are marked by a small diamond on their
   line instead of a tinted box and an "Option" label.
+- **Renaming a scene looks like editing.** While you're in the scene's title, a blue line runs under it,
+  instead of the system's focus box in your Mac's accent colour.
 - **Change several snippets at once.** When you select more than one snippet, the inspector shows what
   they share: their condition, jump, default pause, and tags, with "Mixed" where they differ. A change there
   applies to all of them, and one Undo takes it back. A tag only some of them carry shows how many, and you

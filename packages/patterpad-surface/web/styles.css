@@ -55,7 +55,12 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .scene-title {
   max-width: 42rem; margin: 0 auto 0.4rem; padding-top: 0.2rem;
   font: 600 1.6rem/1.2 var(--font-read); color: var(--ink);
+  border-bottom: 1.5px solid transparent;
 }
+/* The title is where you rename the scene. While you're in it, a blue-pencil line under it says so, as a
+   field shows focus with its accent edge, in place of the system's focus ring, which comes in the Mac's
+   own accent colour (orange, say) and boxes the heading. */
+.scene-title:focus { outline: none; border-bottom-color: var(--accent); }
 .block { position: relative; }
 /* RENDER VIRTUALIZATION (Patterpad §9 "virtualized rendering of long scenes"). The browser SKIPS
    layout + paint for off-screen BLOCKS - the section unit, and the bulk of a long scene - so a
@@ -149,15 +154,16 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   color: var(--accent); margin-bottom: 0.3rem; user-select: none;
 }
 .bubble:not(.has-cond) > .bubble-cond { display: none; } /* no empty row when there's no condition */
-/* read-only jump chip (bottom-right, only when a jump is set; the space appears with it) */
-/* At the text's left edge, where the eye returns, and in the accent because it's a link. */
+/* read-only jump chip (only when a jump is set; the space appears with it): the drawn arrow, or a call's
+   loop, and the target, at the text's left edge where the eye returns, in the accent because it's a link. */
 .bubble-jump {
   display: flex; justify-content: flex-start; align-items: center;
   margin-top: 0.45rem; color: var(--accent);
   font: 500 0.78rem var(--font-ui); user-select: none;
 }
 .bubble:not(.has-jump) > .bubble-jump { display: none; }
-.bubble-jump { cursor: pointer; border-radius: var(--radius-sm); padding: 0.05rem 0.25rem; }
+.bubble-jump { cursor: pointer; border-radius: var(--radius-sm); padding: 0.05rem 0.25rem; gap: 0.3rem; align-self: flex-start; }
+.bubble-jump > svg { flex: none; }
 .bubble-jump:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); }
 /* Selected object (PM node-selection): a snippet / jump / action reads as "the current thing".
    PM's default outline is replaced with a themed accent ring + a faint wash. The ring is INSET (drawn
@@ -259,7 +265,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   margin-bottom: 0.5rem;
 }
 .bubble.is-empty.has-jump > .bubble-after { display: none; }              /* no add-after gap on a divert row */
-/* The divert chip keeps its size AND its right-hand position (same as a jump chip in a normal snippet).
+/* The divert chip keeps its size and sits at the right, clear of the "add a line" hint.
    The "add a line" hint sits ON THE SAME LINE, off to the left where added content would begin - reserved
    at rest so revealing it on hover / focus doesn't shift the row (no vertical "pop"); clicking it grows
    the row into a real bubble. */

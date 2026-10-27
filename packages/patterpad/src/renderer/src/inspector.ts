@@ -543,6 +543,13 @@ function flagsRow(label: string, flags: Array<{ name: string; on: boolean; tip: 
   return r;
 }
 
+/** A jump's value as the script draws it: the arrow (or a call's out-and-back loop) and the target. */
+function paintJump(btn: HTMLElement, jump: { mode?: string; to: string }, h: InspectorHandlers): void {
+  const call = jump.mode === "call";
+  btn.classList.add("insp-jump");
+  btn.replaceChildren(iconNode(call ? "call" : "jump", 13), el("span", "", h.jumpLabel(jump.to)));
+}
+
 /** An editable Jump row: a chip showing the target's READABLE label (or "+ Set jump"); click
  *  opens the picker. Storage is the internal id; `h.jumpLabel` resolves it to a name / gameId. */
 function jumpRow(id: string | null, jump: SnippetLevel["jump"], h: InspectorHandlers): HTMLElement {
@@ -550,7 +557,7 @@ function jumpRow(id: string | null, jump: SnippetLevel["jump"], h: InspectorHand
   r.append(el("span", "insp-key", "Jump"));
   const btn = el("button", `insp-cond${jump ? "" : " muted"}`);
   btn.type = "button";
-  btn.textContent = jump ? `${jump.mode === "call" ? "Call" : "Jump to"} ${h.jumpLabel(jump.to)}` : "None";
+  if (jump) paintJump(btn, jump, h); else btn.textContent = "None";
   if (id) { btn.dataset.tip = "Set jump target"; btn.setAttribute("aria-label", "Set jump target"); btn.addEventListener("click", () => h.editJump(id, jump?.to ?? "", btn)); }
   else btn.disabled = true;
   const val = el("div", "insp-jumpval");
@@ -770,7 +777,8 @@ function multiLevelView(lv: MultiLevel, h: InspectorHandlers): HTMLElement {
     const jumpBtn = el("button", `insp-cond${jump.shared && jump.value ? "" : " muted"}`) as HTMLButtonElement;
     jumpBtn.type = "button";
     if (!jump.shared) jumpBtn.append(el("span", "insp-mixed", "Mixed"));
-    else jumpBtn.textContent = first ? `${first.mode === "call" ? "Call" : "Jump to"} ${h.jumpLabel(first.to)}` : "None";
+    else if (first) paintJump(jumpBtn, first, h);
+    else jumpBtn.textContent = "None";
     jumpBtn.dataset.tip = `Set the jump on all ${lv.count}`;
     jumpBtn.setAttribute("aria-label", jumpBtn.dataset.tip);
     jumpBtn.addEventListener("click", () => h.editJumpMany(ids, jumpBtn));

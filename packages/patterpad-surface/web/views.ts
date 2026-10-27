@@ -416,9 +416,14 @@ const snippetView: NodeViewConstructor = (node, view, getPos) => {
     if (raw) {
       const d = JSON.parse(raw) as { to?: string; mode?: string };
       jumpTo = String(d.to ?? "");
-      jump.textContent = `${d.mode === "call" ? "Call" : "Jump to"} ${resolveJumpLabel(jumpTo)}`; // words, as the inspector says it
-      jump.dataset.tip = jumpTo && jumpTo !== "END" ? "Double-click to go to the target" : "";
-    } else { jumpTo = ""; jump.textContent = ""; jump.dataset.tip = ""; }
+      // The drawn arrow (or the out-and-back loop for a call) and the target, at the text's left edge
+      // (the October 2026 review's END marker); the words are for a screen reader.
+      const call = d.mode === "call", label = resolveJumpLabel(jumpTo);
+      const name = document.createElement("span"); name.className = "bubble-jump-to"; name.textContent = label;
+      jump.replaceChildren(iconNode(call ? "call" : "jump", 13), name);
+      jump.setAttribute("aria-label", `${call ? "Call" : "Jump to"} ${label}`);
+      jump.dataset.tip = jumpTo && jumpTo !== "END" ? `${call ? "Call" : "Jump to"} ${label}. Double-click to go there` : `Jump to ${label}`;
+    } else { jumpTo = ""; jump.replaceChildren(); jump.removeAttribute("aria-label"); jump.dataset.tip = ""; }
   };
   // Double-click the jump chip -> follow the divert to its target (the host switches scene if needed).
   jump.addEventListener("dblclick", (e) => { if (!jumpTo || jumpTo === "END") return; e.preventDefault(); e.stopPropagation(); jumpNav?.(jumpTo); });
