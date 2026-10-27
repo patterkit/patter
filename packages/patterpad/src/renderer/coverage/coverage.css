@@ -11,20 +11,20 @@ body.coverage-win {
   /* Chrome base (design-language §4 "Chrome has its own scale"): this window is all chrome, so its
      unstyled text is 14px whatever the root is (it used to inherit the 110% reading root). The literal
      stands in for the shell's `--chrome-size` until it exists. */
-  font-size: 14px;
+  font-size: var(--chrome-size);
   overflow: hidden;
 }
-.swin-head { font-size: 14px; }
+.swin-head { font-size: var(--chrome-size); }
 
 /* Options row */
 .cov-opts { flex: 0 0 auto; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 11px; border-bottom: 1px solid var(--line); background: var(--surface); padding: 9.5px 14.5px; }
-.cov-opt { display: flex; flex-direction: column; gap: 3px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.cov-opt input, .cov-opt select { width: 104px; font: 13px var(--font-ui); padding: 5px 6.5px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); }
+.cov-opt { display: flex; flex-direction: column; gap: 3px; font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); }
+.cov-opt input, .cov-opt select { width: 104px; font: var(--text-md) var(--font-ui); padding: 5px 6.5px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); }
 .cov-bar-spacer { flex: 1 1 auto; }
 /* The bar's buttons are the shell's `.btn` / `.btn.primary` (controls.css). */
 
-.cov-drivers { flex: 0 0 auto; margin: 0; padding: 6.5px 14.5px 0; font: 12px var(--font-ui); color: var(--ink-soft); }
-.cov-status { flex: 0 0 auto; margin: 0; padding: 8px 14.5px; color: var(--muted); font: 13px var(--font-ui); }
+.cov-drivers { flex: 0 0 auto; margin: 0; padding: 6.5px 14.5px 0; font: var(--text-sm) var(--font-ui); color: var(--ink-soft); }
+.cov-status { flex: 0 0 auto; margin: 0; padding: 8px 14.5px; color: var(--muted); font: var(--text-md) var(--font-ui); }
 
 /* The long-job strip sits between the drivers note and the results (app-shell's job.css draws it). */
 #cov-job { flex: 0 0 auto; padding: 0 14.5px; }
@@ -35,19 +35,19 @@ body.coverage-win {
    the live one. Kept non-interactive for the same reason. */
 .cov-results.stale { opacity: 0.5; pointer-events: none; transition: opacity var(--dur-quick) ease; }
 .cov-stats { display: flex; gap: 25.5px; }
-.cov-stat-big { font: 700 25.5px var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
-.cov-stat-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.cov-meta { display: flex; flex-direction: column; gap: 1.5px; font: 12px var(--font-ui); color: var(--ink-soft); }
+.cov-stat-big { font: 600 25.5px var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cov-stat-label { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); }
+.cov-meta { display: flex; flex-direction: column; gap: 1.5px; font: var(--text-sm) var(--font-ui); color: var(--ink-soft); }
 .cov-meta-ended { color: var(--muted); } /* how the runs ended, softer than the parameters above it */
 /* A cancelled sweep: the numbers are real, the sample is short. Said as a pill so it is not read as
    part of the run parameters underneath it. */
 .cov-stopped {
   align-self: flex-start; margin-bottom: 2.5px; padding: 1px 6.5px;
   border: 1px solid var(--warn, var(--accent)); border-radius: var(--radius-sm, 4px);
-  font: 600 12.5px/1.2 var(--font-ui);
+  font: 600 var(--text-sm)/1.2 var(--font-ui);
   color: var(--warn, var(--accent));
 }
-.cov-note { margin: 0; font: 12.5px var(--font-ui); color: var(--ink-soft); }
+.cov-note { margin: 0; font: var(--text-sm) var(--font-ui); color: var(--ink-soft); }
 .cov-note-input { color: var(--warn, var(--accent)); }
 .cov-note-dry { color: var(--danger); }
 
@@ -56,7 +56,7 @@ body.coverage-win {
 .cov-dry-item {
   display: flex; align-items: baseline; gap: 9.5px; width: 100%;
   padding: 4.5px 8px; border: 0; border-radius: var(--radius-sm, 4px); cursor: pointer;
-  font: 13px var(--font-ui); text-align: left; color: var(--ink);
+  font: var(--text-md) var(--font-ui); text-align: left; color: var(--ink);
   background: color-mix(in oklab, var(--danger) 9%, transparent);
 }
 .cov-dry-item:hover { background: color-mix(in oklab, var(--danger) 15%, transparent); }
@@ -64,22 +64,22 @@ body.coverage-win {
 .cov-dry-scene { font-weight: 600; color: var(--danger); }
 .cov-dry-id { color: var(--ink-soft); font-family: var(--font-mono, monospace); }
 .cov-dry-count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
-.cov-empty { color: var(--muted); font: 13.5px var(--font-ui); }
-.cov-scene-cap { display: flex; align-items: baseline; gap: 9.5px; margin: 8px 0 0; font: 600 12.5px var(--font-ui); color: var(--accent); }
-.cov-scene-dead { font: 600 12.5px/1.2 var(--font-ui); color: var(--danger); }
-.cov-table { width: 100%; border-collapse: collapse; font: 13px var(--font-ui); }
+.cov-empty { color: var(--muted); font: var(--text-md) var(--font-ui); }
+.cov-scene-cap { display: flex; align-items: baseline; gap: 9.5px; margin: 8px 0 0; font: 600 var(--text-sm) var(--font-ui); color: var(--accent); }
+.cov-scene-dead { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--danger); }
+.cov-table { width: 100%; border-collapse: collapse; font: var(--text-md) var(--font-ui); }
 .cov-table td { padding: 5px 8px; border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent); color: var(--ink); vertical-align: baseline; }
 .cov-table tr { cursor: pointer; }
 .cov-table tr:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 .cov-table tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .cov-row-dead { background: color-mix(in oklab, var(--danger) 9%, transparent); }
 .cov-row-input { background: color-mix(in oklab, var(--warn, var(--accent)) 9%, transparent); }
-.cov-mark { width: 19px; text-align: center; font-weight: 700; color: var(--danger); }
+.cov-mark { width: 19px; text-align: center; font-weight: 600; color: var(--danger); }
 .cov-mark [data-icon] { margin: 0 auto; } /* the drawn warning centres like the "?" text does */
 .cov-row-input .cov-mark { color: var(--warn, var(--accent)); }
-.cov-kind { display: inline-block; min-width: 72px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.cov-gate { display: block; margin-top: 1.5px; font: italic 11.5px var(--font-ui); color: var(--ink-soft); }
-.cov-gate-ref { font: 11.5px var(--font-mono); color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.cov-kind { display: inline-block; min-width: 72px; font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); }
+.cov-gate { display: block; margin-top: 1.5px; font: italic var(--text-xs) var(--font-ui); color: var(--ink-soft); }
+.cov-gate-ref { font: var(--text-xs) var(--font-mono); color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .cov-gate-ref:hover { filter: brightness(1.15); }
 .cov-gate-blocked { color: var(--warn, var(--accent)); }
 .cov-n { text-align: right; font-variant-numeric: tabular-nums; }
@@ -88,16 +88,16 @@ body.coverage-win {
 /* The order switch above the beat table (the family's .seg), and the table's column headings. */
 .cov-order { display: flex; align-items: center; gap: 9.5px; margin: 6px 0 0; }
 .cov-tables { display: flex; flex-direction: column; gap: 8px; }
-.cov-table thead th { padding: 4px 8px; border-bottom: 1px solid var(--line); font: 600 12px/1.2 var(--font-ui); color: var(--muted); text-align: left; cursor: default; }
+.cov-table thead th { padding: 4px 8px; border-bottom: 1px solid var(--line); font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); text-align: left; cursor: default; }
 .cov-table thead th.cov-n { text-align: right; }
 .cov-table thead tr { cursor: default; }
 .cov-table thead tr:hover { background: none; }
 /* Reached, but rarely: a quiet tag and the faintest tint, well short of the never-reached warnings. */
 .cov-row-rare { background: color-mix(in oklab, var(--warn, var(--accent)) 4%, transparent); }
-.cov-rare { display: inline-block; margin-left: 8px; padding: 0 5px; border-radius: var(--radius-sm); font: 600 11px/1.5 var(--font-ui); color: var(--warn, var(--accent)); background: color-mix(in oklab, var(--warn, var(--accent)) 12%, transparent); }
-.cov-scene-rare { font: 600 12.5px/1.2 var(--font-ui); color: var(--warn, var(--accent)); }
+.cov-rare { display: inline-block; margin-left: 8px; padding: 0 5px; border-radius: var(--radius-sm); font: 600 var(--text-xs)/1.5 var(--font-ui); color: var(--warn, var(--accent)); background: color-mix(in oklab, var(--warn, var(--accent)) 12%, transparent); }
+.cov-scene-rare { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--warn, var(--accent)); }
 /* In the least-reached list, which scene a row belongs to (only when there are several). */
-.cov-row-scene { display: block; margin-top: 1.5px; font: 11.5px var(--font-ui); color: var(--muted); }
+.cov-row-scene { display: block; margin-top: 1.5px; font: var(--text-xs) var(--font-ui); color: var(--muted); }
 
 /* A Runs or Max steps value the sweep cannot take: marked, and Run held until it is fixed. */
 .cov-opt input.invalid { border-color: var(--danger); }

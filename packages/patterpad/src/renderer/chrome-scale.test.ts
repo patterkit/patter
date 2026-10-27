@@ -63,8 +63,8 @@ describe("chrome scale: the surface's mixed sheet", () => {
     for (const sel of ["#hintbar", ".action-menu", ".action-mi", ".slash-menu", ".slash-item", ".target-picker", ".tp-row", ".cue-ac", ".note-icon", ".comment-bubble", ".status-pill"]) {
       expect(rule(surface, sel), sel).not.toMatch(REM);
     }
-    expect(rule(surface, "#hintbar")).toContain("font: 12px var(--font-ui)");
-    expect(rule(surface, "#hintbar")).toContain("min-height: 30.5px");
+    expect(rule(surface, "#hintbar")).toContain("font: var(--text-xs) var(--font-ui)");
+    expect(rule(surface, "#hintbar")).toContain("min-height: 28px");
   });
 
   it("reading rules keep rem", () => {
@@ -77,24 +77,24 @@ describe("chrome scale: the surface's mixed sheet", () => {
 });
 
 describe("chrome scale: the sizes the family measures", () => {
-  it("the chrome hosts pin the 14px base", () => {
-    expect(rule(shell, ".topbar, .pane-nav, .pane-inspector, .stepbar, .welcome")).toContain("font-size: 14px");
-    expect(rule(coverage, "body.coverage-win")).toContain("font-size: 14px");
-    expect(rule(play, ".swin-head")).toContain("font-size: 14px");
-    expect(rule(search, ".swin-head")).toContain("font-size: 14px");
+  it("the chrome hosts pin the shell's chrome base (13px, 14px on Windows, since October 2026)", () => {
+    expect(rule(shell, ".topbar, .pane-nav, .pane-inspector, .stepbar, .welcome")).toContain("font-size: var(--chrome-size)");
+    expect(rule(coverage, "body.coverage-win")).toContain("font-size: var(--chrome-size)");
+    expect(rule(play, ".swin-head")).toContain("font-size: var(--chrome-size)");
+    expect(rule(search, ".swin-head")).toContain("font-size: var(--chrome-size)");
   });
 
-  it("the navigator rows and the Find button are px (rem x 16, half-px rounding)", () => {
-    expect(rule(shell, ".nav-item")).toContain("font: 600 13.5px var(--font-ui)");
-    expect(rule(shell, ".nav-item")).toContain("padding: 6.5px 9.5px");
-    expect(rule(shell, ".nav-block")).toContain("font: 500 13px var(--font-ui)");
-    expect(rule(shell, ".nav-search")).toContain("font: 600 12.5px var(--font-ui)");
-    expect(rule(shell, ".insp-row")).toContain("grid-template-columns: 104px 1fr");
+  it("the navigator rows and the Find button sit on the shell's chrome scale", () => {
+    expect(rule(shell, ".nav-item")).toContain("font: var(--weight-regular) var(--text-md) var(--font-ui)");
+    expect(rule(shell, ".nav-item")).toContain("min-height: 28px");
+    expect(rule(shell, ".nav-block")).toContain("font: var(--weight-regular) var(--text-sm) var(--font-ui)");
+    expect(rule(shell, ".nav-search")).toContain("font: var(--weight-regular) var(--text-md) var(--font-ui)");
+    expect(rule(shell, ".insp-row")).toContain("grid-template-columns: 96px 1fr");
   });
 
   it("the pane widths handed to the shell are px", () => {
     expect(renderer).toContain('nav: { defaultWidth: "224px"');
-    expect(renderer).toContain('inspector: { defaultWidth: "384px"');
+    expect(renderer).toContain('inspector: { defaultWidth: "320px"');
     expect(renderer).not.toMatch(/defaultWidth: "\d+rem"/);
   });
 });

@@ -123,9 +123,7 @@ describe("family style: icons are drawn", () => {
 
   it("draws nothing from a symbol font in CSS content either", () => {
     const CONTENT = /(^|[;{\s])content:\s*["'][^"']*([^\x20-\x7e]|\\[0-9a-f]{2,6})/i;
-    hold("glyph in CSS content", lineHits(CONTENT, ["css"]), [
-      { file: SURFACE, match: 'content: "◇"', why: "the diamond option marker on .option-prompt::before, the same mark grouplabel.ts types" },
-    ], []);
+    hold("glyph in CSS content", lineHits(CONTENT, ["css"]), [], []); // the option's ◇ is drawn now (October 2026)
   });
 });
 
@@ -214,7 +212,7 @@ describe("family style: chrome has its own scale", () => {
     // play.css: the rendered walk.
     "body.play", ".play-transcript", ".pline", ".pline.gameEvent", ".pcue", ".pdir", ".play-choices", ".pchoice",
     // styles.css: the script column and everything set in it.
-    "body", "#editor", ".ProseMirror", ".scene-title", ".block-head", ".doc-underhead", ".doc-underhead-indent",
+    "body", "#editor", ".ProseMirror", ".block", ".scene-title", ".block-head", ".doc-underhead", ".doc-underhead-indent",
     ".doc-underhead-line", ".doc-underhead-cls", ".block-name", ".block-after", ".block-ctl", ".bubble", ".bubble-drag",
     ".bubble-menu", ".bubble-cond", ".bubble-jump", ".bubble-after", ".bubble-after::before", ".bubble-after::after",
     ".block.is-empty > .ghost-snippet, .group-rail.is-empty > .ghost-snippet", ".group-rail.is-empty > .ghost-snippet",

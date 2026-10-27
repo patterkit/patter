@@ -27,23 +27,23 @@ header {
   padding: 11px 19px; border-bottom: 1px solid var(--line);
   font-family: var(--font-ui);
 }
-header .hint { color: var(--muted); font-size: 12.5px; }
+header .hint { color: var(--muted); font-size: var(--text-sm); }
 /* TEMP in-session header toggle (theme preview) - far right, not persisted; see main.ts */
 .hdr-tools { margin-left: auto; display: flex; gap: 8px; }
 .hdr-toggle {
   background: none; cursor: pointer;
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 3px 9px;
-  color: var(--muted); font: 600 11px var(--font-ui); letter-spacing: 0.03em;
+  color: var(--muted); font: 600 var(--text-xs) var(--font-ui); letter-spacing: 0.03em;
   transition: color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
 }
 .hdr-toggle:hover { color: var(--accent); border-color: var(--accent); }
 main { display: grid; grid-template-columns: 1fr 416px; gap: 0; flex: 1; min-height: 0; }
 /* tall bottom padding gives the last lines room to rise to the middle (typewriter
    scrolling in main.ts), so we are never forced to edit at the very page bottom. */
-#editor { overflow: auto; padding: 2.5rem clamp(1rem, 8vw, 5rem) 55vh; position: relative; } /* relative: the note-gutter overlay positions against it */
+#editor { overflow: auto; padding: 2.5rem clamp(1rem, 4vw, 3rem) 55vh; position: relative; } /* relative: the note-gutter overlay positions against it */
 aside { border-left: 1px solid var(--line); overflow: auto; background: var(--surface); }
-.aside-label { padding: 9.5px 16px; color: var(--muted); font: 11.5px var(--font-ui); border-bottom: 1px solid var(--line); }
-#source { margin: 0; padding: 16px; font: 12px/1.5 var(--font-mono); color: var(--muted); white-space: pre-wrap; }
+.aside-label { padding: 9.5px 16px; color: var(--muted); font: var(--text-xs) var(--font-ui); border-bottom: 1px solid var(--line); }
+#source { margin: 0; padding: 16px; font: var(--text-sm)/1.5 var(--font-mono); color: var(--muted); white-space: pre-wrap; }
 
 /* the script surface. pre-wrap is load-bearing: prosemirror-view expects it on the editable element
    (cursor placement around spaces goes wrong under normal collapsing, and it warns in the console). */
@@ -54,7 +54,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    no indent; blocks just title the page, groups do the nesting. */
 .scene-title {
   max-width: 42rem; margin: 0 auto 0.4rem; padding-top: 0.2rem;
-  font: 700 1.6rem/1.2 var(--font-read); color: var(--ink);
+  font: 600 1.6rem/1.2 var(--font-read); color: var(--ink);
 }
 .block { position: relative; }
 /* RENDER VIRTUALIZATION (Patterpad §9 "virtualized rendering of long scenes"). The browser SKIPS
@@ -65,6 +65,9 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    length is only the first guess for a block that has never been seen. The block holding the caret
    is always rendered (the browser force-renders the subtree that contains the selection). */
 .block { content-visibility: auto; contain-intrinsic-block-size: auto 320px; }
+/* `content-visibility` clips a block's paint to its own box, and a snippet's drag grip sits in the gutter
+   LEFT of its card, so the block's box reaches 1.5rem into that gutter (and its content stays put). */
+.block { margin-left: -1.5rem; padding-left: 1.5rem; }
 /* On-screen, scope a keystroke's reflow to its OWN bubble (layout containment), so typing stays
    instant no matter how long the scene is. NOT size containment - the bubble still sizes to its
    content, so its real geometry is available for drag-and-drop and the caret recentre. */
@@ -91,7 +94,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    which cut long section names off with the rest of the row sitting empty (#23). It runs up to the ⋯. */
 .block-name {
   flex: 1 1 auto; min-width: 6rem; background: none; border: 0; padding: 0;
-  font: 700 1.05rem var(--font-ui); color: var(--ink); letter-spacing: 0.01em;
+  font: 600 1.05rem var(--font-ui); color: var(--ink); letter-spacing: 0.01em;
 }
 .block-name:focus { outline: none; border-bottom: 1px solid var(--accent); }
 .block-name::placeholder { color: var(--line); font-style: italic; }
@@ -108,12 +111,14 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .block-ctl:hover { color: var(--accent); }
 
 /* a snippet = a bubble. Chrome collapsed: no permanent top header / bottom foot; the ⋯
-   menu rides the first text line (right padding reserves its space), the drag grip sits
-   in the left gutter, and the read-only condition / jump tags appear only when set. */
+   menu rides over the first text line on a plate, the drag grip sits OUTSIDE the card in the
+   editor's gutter, and the read-only condition / jump tags appear only when set. The card
+   reserves no room for its chrome, so the script gets the width (the October 2026 UI review,
+   3-composition.md proposal 3). */
 .bubble {
   background: var(--card);
   border-radius: var(--radius-lg);
-  padding: 0.75rem 2rem 0.75rem 1.8rem;   /* right reserves the ⋯; left is the drag gutter */
+  padding: 0.75rem 1rem;
   margin: 0 0 1.1rem;
   /* A "soft raised surface" (Patterpad §2), NOT a framed card: no border, just a single faint lift
      at rest, so the page reads as breathing script pages rather than a stack of bordered cards. The
@@ -127,7 +132,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .bubble-drag {
   /* The grab AREA is the full-height left-gutter strip (a tall, easy target that scales with the
      bubble); the glyph itself stays small and centred - just a hint, not a bigger handle. */
-  position: absolute; left: 0; top: 0; bottom: 0; width: 1.5rem;
+  position: absolute; left: -1.5rem; top: 0; bottom: 0; width: 1.5rem;
   display: flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
 }
@@ -135,8 +140,9 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    full when you actually hover the grip to grab it. */
 .bubble:hover > .bubble-drag, .bubble:focus-within > .bubble-drag { opacity: 0.35; }
 .bubble > .bubble-drag:hover { opacity: 1; }
-/* the ⋯ action control rides the top-right, level with the first text line. */
-.bubble-menu { position: absolute; top: 0.5rem; right: 0.55rem; }
+/* the ⋯ action control rides the top-right over the text, on a plate of the chrome tier so it reads
+   over whatever line runs under it. */
+.bubble-menu { position: absolute; top: 0.4rem; right: 0.4rem; background: var(--surface); border-radius: var(--radius-sm); }
 /* read-only condition tag (top, only when a condition is set) */
 .bubble-cond {
   font: 600 0.66rem var(--font-ui); letter-spacing: 0.03em;
@@ -144,10 +150,11 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 }
 .bubble:not(.has-cond) > .bubble-cond { display: none; } /* no empty row when there's no condition */
 /* read-only jump chip (bottom-right, only when a jump is set; the space appears with it) */
+/* At the text's left edge, where the eye returns, and in the accent because it's a link. */
 .bubble-jump {
-  display: flex; justify-content: flex-end; align-items: center;
+  display: flex; justify-content: flex-start; align-items: center;
   margin-top: 0.45rem; color: var(--accent);
-  font: 600 0.7rem var(--font-ui); letter-spacing: 0.04em; user-select: none;
+  font: 500 0.78rem var(--font-ui); user-select: none;
 }
 .bubble:not(.has-jump) > .bubble-jump { display: none; }
 .bubble-jump { cursor: pointer; border-radius: var(--radius-sm); padding: 0.05rem 0.25rem; }
@@ -411,7 +418,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* Inline formatting marks (project-gated, §formatting). The mark toDOM emits <strong>/<em>; make the
    effect explicit and colour-inheriting so bold / italic read in the dialogue + text ink. The
    author only ever sees this effect, never the <b>/<i> markup it round-trips to. */
-.zone strong { font-weight: 700; }
+.zone strong { font-weight: 600; }
 .zone em { font-style: italic; }
 /* Play-mode step markers live as gutter dots, NEXT TO the line, so the path play took stays readable
    without disturbing the prose. Both the visited trail and the playhead anchor to the beat (relative)
@@ -449,7 +456,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .suggestion-count {
   position: absolute; top: -3px; right: -5px; min-width: 13.5px; height: 13.5px;
   display: inline-flex; align-items: center; justify-content: center; padding: 0 2.5px;
-  font: 600 9px var(--font-ui); line-height: 1; border-radius: 0.5rem;
+  font: 600 var(--text-xs) var(--font-ui); line-height: 1; border-radius: 0.5rem;
   background: var(--accent); color: var(--on-accent);
 }
 .beat.has-suggestion .zone.say { background: color-mix(in oklab, var(--accent) 7%, transparent); border-radius: 3px; }
@@ -475,7 +482,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   white-space: nowrap; max-width: 112px; overflow: hidden; text-overflow: ellipsis;
   padding: 0.5px 6.5px; border-radius: var(--radius-pill); border: 1px solid var(--line);
   background: var(--card); color: var(--muted);
-  font: 600 12.5px/1.2 var(--font-ui);
+  font: 600 var(--text-sm)/1.2 var(--font-ui);
 }
 /* The colour swatch shown beside a rung's name in the "Status" submenu + the inspector dropdown. */
 .status-swatch {
@@ -589,13 +596,13 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    Nesting reads as nested rails. The label is persistent (structure the author must
    see); manipulation controls come later. */
 .group-rail {
-  border-left: 2px solid var(--line);
+  border-left: 1px solid var(--line);
   margin: 0 0 0.5rem; padding-left: 0.7rem;   /* bottom-only: in a flex body, a top margin would double the gap */
   transition: margin var(--dur-base) var(--ease-standard);              /* eases the drag make-room gap open / closed */
 }
-/* the rails are a quiet structural cue, not a loud frame - they read like the neutral sequence/run
-   rail (plain --line); the label, the option PROMPT cell, and condition tags carry the identity. */
-.group-rail.is-choice { border-left-color: var(--line); }
+/* the rails are a quiet structural cue, not a loud frame. A choice draws none of its own: its options'
+   rails, each with a diamond at its prompt, are the structure (October 2026 UI review, proposal 4). */
+.group-rail.is-choice { border-left-color: transparent; padding-left: 0; }
 /* The persistent structural label on the rail: the caption form in the reading column, so it is sized
    in rem with the script it labels rather than in the chrome's px. Its is-choice / is-option variants
    below re-colour it. */
@@ -608,24 +615,25 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    rail) - the label sits to its right. Hover-revealed; holds its space so nothing shifts. */
 .rail-drag { opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); }
 .group-rail:hover > .group-rail-head > .rail-drag, .group-rail:focus-within > .group-rail-head > .rail-drag { opacity: 1; }
-.group-rail.is-choice > .group-rail-head { color: color-mix(in oklab, var(--accent) 32%, var(--muted)); }
+.group-rail.is-choice > .group-rail-head { color: var(--muted); }
 .group-rail.is-option > .group-rail-head { color: var(--ink); }
 /* an option's rail stays neutral too - its PROMPT cell (the accent-tinted box below) is the anchor */
 .group-rail.is-option { border-left-color: var(--line); }
-/* a choice option's PROMPT cell (groups §13.10): the tied choice-text line at the top of the option
-   - the option's ANCHOR, the confident label its contained content hangs off. A SOLID, accent-tinted
-   cell (never dashed - dashes are reserved for uncertain / placeholder content, §ghosts). */
+/* a choice option's PROMPT (groups §13.10): the tied choice-text line at the top of the option - the
+   option's ANCHOR, the confident label its contained content hangs off. Unboxed since the October 2026
+   UI review: its weight and the diamond on the rail mark it, not a tinted cell. */
 .option-prompt {
-  display: flex; align-items: baseline; gap: 0.5rem;   /* the ◇ marker, then the choice text */
-  margin: 0 0 0.5rem; padding: 0.4rem 0.7rem;
-  border: 1px solid color-mix(in oklab, var(--accent) 26%, var(--line)); border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+  position: relative; display: flex; align-items: baseline;
+  margin: 0 0 0.5rem; padding: 0.15rem 0;
 }
-/* The option marker (◇) lives ON the prompt cell now, with the choice text it marks - not on the
-   rail label. Generated chrome, not editable, not selectable. */
+/* The option marker: a drawn diamond sitting ON the option's rail, level with the prompt's first line,
+   so the rail reads as a timeline with one node per option. Its ground masks the rail behind it.
+   Generated chrome, not editable, not selectable. */
 .option-prompt::before {
-  content: "◇"; flex: 0 0 auto; color: var(--accent);
-  font: 0.8rem var(--font-ui); line-height: 1; user-select: none;
+  content: ""; position: absolute; left: calc(-4.5px - 0.7rem); top: 0.62em;
+  width: 7px; height: 7px; box-sizing: border-box;
+  border: 1.25px solid var(--accent); background: var(--bg);
+  transform: rotate(45deg); user-select: none;
 }
 /* A prompt the play marks have reached (the live debug link marks the option a game took by its prompt):
    the playhead or visited dot falls where the marker sits, so the dot takes the marker's place rather
@@ -640,7 +648,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* The option prompt is a confident ANCHOR, so its text stays full ink (not the eased reading inks),
    for both a text and a dialogue prompt. Higher specificity than the reading-ink rules above. */
 .option-prompt .beat.kind-prose .zone.say,
-.option-prompt .beat.kind-line .zone.say { color: var(--ink); font-style: normal; }
+.option-prompt .beat.kind-line .zone.say { color: var(--ink); font-style: normal; font-weight: 600; }
 /* "+ option" lives CENTRED in the gap after each option (mirroring "+ block"), giving a
    little padding between options. Hidden on non-option groups; hover-revealed otherwise. */
 /* "+ option" sits in the gap after an option, LEFT-aligned against the rail (the controls
@@ -684,7 +692,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   display: block; width: 100%; /* stack vertically even when the container is display:block */
   text-align: left; background: none; border: 0; cursor: pointer;
   padding: 5px 9.5px; border-radius: var(--radius-sm); color: var(--ink);
-  font: 600 11.5px var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase;
+  font: 600 var(--text-xs) var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase;
 }
 /* Only the ACTIVE row is highlighted - hovering SETS the active row (one highlight, keyboard + mouse
    share it), so there's never a separate :hover highlight competing with the keyboard selection. */
@@ -692,14 +700,14 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* the search "field" at the top of the dropdown (shows what's being typed) */
 .cue-ac-field {
   padding: 5px 9.5px; margin-bottom: 2.5px; border-bottom: 1px solid var(--line);
-  font: 600 11.5px var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink);
+  font: 600 var(--text-xs) var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink);
 }
 .cue-ac-field.placeholder { font-weight: 400; font-style: italic; letter-spacing: normal; text-transform: none; color: var(--muted); }
 /* the "Add new character" row - the one place a name is authored */
 .cue-ac-add {
   display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
   padding: 5px 9.5px; border-radius: var(--radius-sm); color: var(--accent);
-  font: 600 11.5px var(--font-ui);
+  font: 600 var(--text-xs) var(--font-ui);
 }
 .cue-ac-add.active { background: color-mix(in oklab, var(--accent) 12%, transparent); }
 
@@ -715,13 +723,13 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 }
 .tp-field {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none;
-  padding: 5px 8px; margin-bottom: 3px; color: var(--ink); font: 13px var(--font-ui);
+  padding: 5px 8px; margin-bottom: 3px; color: var(--ink); font: var(--text-md) var(--font-ui);
 }
 .tp-field:focus { border-color: color-mix(in oklab, var(--accent) 55%, var(--line)); }
 .tp-list { overflow: auto; display: flex; flex-direction: column; min-height: 0; }
 .tp-row {
   display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
-  padding: 4.5px 9px; border-radius: var(--radius-sm); color: var(--ink); font: 13px var(--font-ui);
+  padding: 4.5px 9px; border-radius: var(--radius-sm); color: var(--ink); font: var(--text-md) var(--font-ui);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   /* flex:none is LOAD-BEARING (#30). .tp-list is a flex column with a definite height once the panel
      hits its cap, and these rows have no minimum flex size (they are buttons, AND overflow:hidden for
@@ -729,7 +737,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
      to its ~10px padding shell, clipping the text to a sliver, instead of letting the list scroll. */
   flex: none;
 }
-.tp-end { font: 600 11px var(--font-ui); letter-spacing: 0.05em; color: var(--muted); }
+.tp-end { font: 600 var(--text-xs) var(--font-ui); letter-spacing: 0.05em; color: var(--muted); }
 .tp-scene { font-weight: 600; color: var(--accent); }
 .tp-scene [data-icon] { display: inline-block; vertical-align: -2px; margin-right: 4px; color: var(--muted); } /* the drawn chevron before a scene row */
 .tp-block { padding-left: 24px; color: var(--ink-soft); }      /* blocks indented under their scene */
@@ -738,12 +746,13 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .tp-row.sel { box-shadow: inset 2px 0 0 var(--accent); }         /* the current target, marked */
 
 /* contextual hint bar: the host only. The chips are the shell's `hintBar` (keys.css), drawn from
-   each hint's portable combo, so the keycaps read the same as every other hint in the family. */
+   each hint's portable combo, so the keycaps read the same as every other hint in the family. A status
+   row on the window's ground: no rule over it and no fill of its own (the October 2026 UI review,
+   3-composition.md proposal 9). */
 #hintbar {
   display: flex; gap: 17.5px; align-items: center;
-  padding: 7px 19px; border-top: 1px solid var(--line);
-  background: var(--surface); min-height: 30.5px;
-  font: 12px var(--font-ui); color: var(--muted);
+  padding: 0 19px; min-height: 28px;
+  font: var(--text-xs) var(--font-ui); color: var(--muted);
 }
 
 /* the structural action menu (⋯ / right-click): a familiar vertical MENU - structural
@@ -753,15 +762,15 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   background: var(--surface); border: 0; border-radius: var(--radius-md);
   box-shadow: var(--shadow-pop); padding: 5px;
   display: flex; flex-direction: column; gap: 0.5px;
-  font: 13px var(--font-ui);
+  font: var(--text-md) var(--font-ui);
 }
 .action-submenu { min-width: 128px; z-index: 51; }
-.action-head { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); padding: 4px 8px 5px; }
+.action-head { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); padding: 4px 8px 5px; }
 .action-mi {
   display: flex; align-items: center; justify-content: space-between; gap: 9.5px;
   width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
   padding: 5.5px 8px; border-radius: var(--radius-sm); color: var(--ink);
-  font: 13px var(--font-ui);
+  font: var(--text-md) var(--font-ui);
 }
 .action-mi:hover, .action-mi.open { background: color-mix(in oklab, var(--accent) 10%, transparent); }
 .action-mi.has-icon { justify-content: flex-start; gap: 6.5px; } /* a leading drawn icon sits beside its label, not across from it */
@@ -787,7 +796,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .slash-item {
   display: block; width: 100%;
   text-align: left; background: none; border: 0; cursor: pointer; color: var(--ink);
-  padding: 5.5px 9.5px; border-radius: var(--radius-sm); font: 13px var(--font-ui);
+  padding: 5.5px 9.5px; border-radius: var(--radius-sm); font: var(--text-md) var(--font-ui);
   /* flex:none, for the same reason .tp-row carries it (#30): once max-height bites, this flex column
      has a definite height and rows with no minimum size get crushed to their padding instead of the
      list scrolling. */
@@ -795,7 +804,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 }
 .slash-item.active { background: color-mix(in oklab, var(--accent) 12%, transparent); } /* hover SETS .active (one shared highlight) */
 .slash-item u { text-decoration-color: var(--muted); text-underline-offset: 2px; } /* the access-key letter (type-ahead) */
-.slash-head { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); padding: 5px 9.5px 3px; flex: none; }
+.slash-head { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); padding: 5px 9.5px 3px; flex: none; }
 .slash-head:not(:first-child) { margin-top: 2.5px; border-top: 1px solid var(--line); padding-top: 6.5px; } /* a quiet rule between the two sections */
 
 /* per-beat delete affordance on the game-event atom (the .beat.kind-gameEvent row is styled above) */

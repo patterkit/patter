@@ -4,7 +4,7 @@
 body.swin {
   margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
   background: var(--bg); color: var(--ink);
-  font: 14.5px/1.4 var(--font-ui);
+  font: var(--text-lg)/1.4 var(--font-ui);
   -webkit-user-select: none; user-select: none;
   /* A transform-FREE fade entrance (not screen-in): translating a full-height body briefly pushes its
      bottom past the viewport and flashes a scrollbar until the animation settles. The results list owns
@@ -29,7 +29,7 @@ body.swin {
 .swin-modes { -webkit-app-region: no-drag; }
 /* Chrome base (design-language §4 "Chrome has its own scale"): the head's unstyled text is 14px whatever
    the root is; the literal stands in for the shell's `--chrome-size` until it exists. */
-.swin-head { font-size: 14px; }
+.swin-head { font-size: var(--chrome-size); }
 
 /* The pin and close buttons, their hover, the pinned state and their motion are
    all the shell's (tool-window.css), which carries the same "motion is
@@ -40,7 +40,7 @@ body.swin {
 .swin-input {
   margin: 6.5px 8px 5px; padding: 5.5px 8px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
-  color: var(--ink); font: 14.5px var(--font-ui);
+  color: var(--ink); font: var(--text-lg) var(--font-ui);
 }
 .swin-input::placeholder { color: var(--muted); }
 /* The ring is the family's (tokens.css); the edge colours with it. */
@@ -52,7 +52,7 @@ body.swin {
 .swin-chip {
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-pill); cursor: pointer;
-  color: var(--ink-soft); font: 600 11.5px var(--font-ui); padding: 2px 8px;
+  color: var(--ink-soft); font: 600 var(--text-xs) var(--font-ui); padding: 2px 8px;
 }
 .swin-chip:hover { border-color: var(--accent); }
 .swin-chip.active { border-color: var(--accent); color: var(--accent); background: color-mix(in oklab, var(--accent) 10%, transparent); }
@@ -70,25 +70,25 @@ body.swin {
 }
 .swin-row:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 .swin-row.sel { background: color-mix(in oklab, var(--accent) 16%, transparent); }
-.swin-kind { flex: none; color: var(--muted); font: 600 12.5px/1.2 var(--font-ui); min-width: 52px; }
+.swin-kind { flex: none; color: var(--muted); font: 600 var(--text-sm)/1.2 var(--font-ui); min-width: 52px; }
 .swin-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The location is the shell's breadcrumb (drawn chevrons); this span sizes and clips it. */
-.swin-loc { flex: none; display: inline-flex; min-width: 0; color: var(--muted); font: 12px var(--font-ui); max-width: 40%; overflow: hidden; white-space: nowrap; }
+.swin-loc { flex: none; display: inline-flex; min-width: 0; color: var(--muted); font: var(--text-sm) var(--font-ui); max-width: 40%; overflow: hidden; white-space: nowrap; }
 .swin-loc .shell-crumbs { font-size: inherit; }
-.swin-gid { flex: none; color: var(--ink-soft); font: 11.5px var(--font-mono); }
+.swin-gid { flex: none; color: var(--ink-soft); font: var(--text-xs) var(--font-mono); }
 /* A Field hit's value (`mood: tense`); "default" quietly marks a node that sets none, so the declared default holds. */
-.swin-field { flex: none; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); font: 12px var(--font-ui); }
+.swin-field { flex: none; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); font: var(--text-sm) var(--font-ui); }
 .swin-field-default { margin-left: 5.5px; color: var(--muted); font-style: italic; }
 /* A Field row carries one more piece, so its trail gives way first and the line's text keeps some room. */
 .swin-frow .swin-loc { flex: 0 1 auto; max-width: 28%; }
 /* The opaque id, shown on every row so an id → line lookup is unambiguous. Quieter than the Game ID. */
-.swin-id { flex: none; color: var(--muted); font: 11px var(--font-mono); opacity: 0.8; }
+.swin-id { flex: none; color: var(--muted); font: var(--text-xs) var(--font-mono); opacity: 0.8; }
 
 /* Replace mode: the replacement field + the bulk apply button, and the before → after preview rows. */
 .swin-replace-row { display: flex; gap: 6.5px; align-items: center; padding: 0 8px 5.5px; }
 .swin-replace-row[hidden] { display: none; } /* the `hidden` attr alone loses to the class's display:flex */
 .swin-replace { flex: 1; margin: 0; }
-.swin-replace-all { flex: none; padding: 5px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font: 13px var(--font-ui); cursor: pointer; }
+.swin-replace-all { flex: none; padding: 5px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font: var(--text-md) var(--font-ui); cursor: pointer; }
 .swin-replace-all:disabled { opacity: 0.45; cursor: default; background: var(--surface-2, var(--line)); color: var(--muted); }
 /* A Replace row is a two-column GRID, not the flex line the other rows use, because its diff has to
    wrap. On one nowrap line at the window's 460px default, a line of dialogue of ordinary length was cut
@@ -108,30 +108,30 @@ body.swin {
 }
 .swin-rrow .swin-loc { grid-column: 1; grid-row: 2; max-width: 100%; }
 .swin-rrow .swin-rone { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
-.swin-rfield { margin-right: 5.5px; color: var(--ink-soft); font: 12px var(--font-ui); }
+.swin-rfield { margin-right: 5.5px; color: var(--ink-soft); font: var(--text-sm) var(--font-ui); }
 .swin-before { color: var(--muted); } /* muted (not struck) - the → after + ink colour shows the change */
 .swin-arrow { display: inline-flex; vertical-align: middle; margin: 0 5.5px; color: var(--muted); }
 .swin-after { color: var(--ink); }
-.swin-rone { flex: none; padding: 2.5px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); font: 11.5px var(--font-ui); cursor: pointer; }
+.swin-rone { flex: none; padding: 2.5px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); font: var(--text-xs) var(--font-ui); cursor: pointer; }
 .swin-rone:hover { border-color: var(--accent); color: var(--accent); }
-.swin-empty { color: var(--muted); font: 13.5px var(--font-ui); padding: 9.5px 8px; }
+.swin-empty { color: var(--muted); font: var(--text-md) var(--font-ui); padding: 9.5px 8px; }
 
 /* The hint line: a lead phrase and the shell's hint bar (keys.css), side by side, nothing typed between. */
-.swin-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; border-top: 1px solid var(--line); padding: 4px 9px; color: var(--muted); font: 11.5px var(--font-ui); background: var(--surface); }
+.swin-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; border-top: 1px solid var(--line); padding: 4px 9px; color: var(--muted); font: var(--text-xs) var(--font-ui); background: var(--surface); }
 .swin-hint:empty { display: none; }
 
 /* Suggestions tab (bulk review): a row is what changes (text, speaker, direction, or a cut), where and by
    whom, then Accept / Reject. Two buttons, so the grid gains a column; the row itself goes to the line. */
 .swin-sugg-row { justify-content: flex-end; }
-.swin-sugg-summary { flex: 1 1 auto; color: var(--muted); font: 12.5px var(--font-ui); }
+.swin-sugg-summary { flex: 1 1 auto; color: var(--muted); font: var(--text-sm) var(--font-ui); }
 .swin-srow { grid-template-columns: minmax(0, 1fr) auto auto; cursor: pointer; }
 .swin-srow .swin-rone { grid-row: 1 / span 2; align-self: center; }
 .swin-srow .swin-rone:nth-of-type(1) { grid-column: 2; }
 .swin-srow .swin-rone:nth-of-type(2) { grid-column: 3; }
 .swin-srow .swin-rone:disabled { opacity: 0.45; cursor: default; border-color: var(--line); color: var(--muted); }
-.swin-slabel { margin-right: 5.5px; color: var(--muted); font: 600 11.5px var(--font-ui); }
+.swin-slabel { margin-right: 5.5px; color: var(--muted); font: 600 var(--text-xs) var(--font-ui); }
 .swin-slabel:not(:first-child) { margin-left: 9.5px; }
 .swin-cut { text-decoration: line-through; text-decoration-color: color-mix(in oklab, var(--danger) 70%, transparent); }
 .swin-sauthor { margin-left: 8px; color: var(--muted); }
-.swin-stale { margin-left: 8px; padding: 0 6px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--warn) 18%, transparent); color: var(--ink); font: 600 11px var(--font-ui); }
+.swin-stale { margin-left: 8px; padding: 0 6px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--warn) 18%, transparent); color: var(--ink); font: 600 var(--text-xs) var(--font-ui); }
 .swin-srow.stale .swin-after { color: var(--ink-soft); }

@@ -38,7 +38,7 @@ describe("EditorView renders the real shard in the zone model (jsdom)", () => {
     expect(dom.querySelector(".beat.kind-gameEvent .atom-glyph svg")).not.toBeNull(); // the drawn mark, never a typed glyph
     const fields = [...dom.querySelectorAll(".beat.kind-gameEvent .atom-fields .shell-meta-part")].map((p) => p.textContent);
     expect(fields).toEqual(["cue: camera_focus", "target: barkeep"]); // a drawn metadata line, no typed "·"
-    expect(dom.querySelector(".bubble.has-jump .bubble-jump")?.textContent).toBe("↪ menu");   // read-only snippet jump chip
+    expect(dom.querySelector(".bubble.has-jump .bubble-jump")?.textContent).toBe("Jump to menu");   // read-only snippet jump chip
     // the choice is a real recursive group, rendered as a rail (its options live inside it)
     const choice = dom.querySelector(".group-rail.is-choice");
     expect(choice?.querySelector(".group-rail-label")?.textContent).toBe("Choice");
@@ -134,10 +134,10 @@ describe("EditorView renders the real shard in the zone model (jsdom)", () => {
     document.body.appendChild(mount);
     const view = new EditorView(mount, { state: EditorState.create({ doc: openScene(flowSource, locSource).doc }), nodeViews });
     const chip = (view.dom as HTMLElement).querySelector(".bubble.has-jump .bubble-jump") as HTMLElement;
-    expect(chip.textContent?.trim()).toBe("↪ Menu");
+    expect(chip.textContent?.trim()).toBe("Jump to Menu");
     label = "Specials Board";           // the target block is renamed...
     refreshJumpLabels();                // ...so the host refreshes; the chip re-resolves past the unchanged-jump guard
-    expect(chip.textContent?.trim()).toBe("↪ Specials Board");
+    expect(chip.textContent?.trim()).toBe("Jump to Specials Board");
     setJumpLabelResolver((id) => id);   // reset the shared resolver
     view.destroy();
   });

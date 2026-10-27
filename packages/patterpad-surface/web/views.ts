@@ -416,7 +416,7 @@ const snippetView: NodeViewConstructor = (node, view, getPos) => {
     if (raw) {
       const d = JSON.parse(raw) as { to?: string; mode?: string };
       jumpTo = String(d.to ?? "");
-      jump.textContent = `${d.mode === "call" ? "⤳" : "↪"} ${resolveJumpLabel(jumpTo)}`;
+      jump.textContent = `${d.mode === "call" ? "Call" : "Jump to"} ${resolveJumpLabel(jumpTo)}`; // words, as the inspector says it
       jump.dataset.tip = jumpTo && jumpTo !== "END" ? "Double-click to go to the target" : "";
     } else { jumpTo = ""; jump.textContent = ""; jump.dataset.tip = ""; }
   };
@@ -483,11 +483,11 @@ const groupView: NodeViewConstructor = (node, view, getPos) => {
     dom.dataset.id = idOf(n);
     const raw = rawAttr(n);
     const option = isChoiceOption(view, getPos());
-    // An option's choice text lives in its prompt CELL (the optionprompt node, §13.10), so the rail
-    // label is just "Option" (+ "secret"); the diamond marker is drawn on the prompt cell by CSS
-    // (.option-prompt::before), so it sits with the choice text it marks. The same parts reach the
-    // inspector through inspect(), so the two read alike.
-    label.replaceChildren(metaLine(option ? optionLabelParts(raw) : groupLabelParts(raw)));
+    // An option's choice text lives in its prompt (the optionprompt node, §13.10), and the diamond drawn on
+    // the rail at the prompt (.option-prompt::before) says it's an option, so the rail draws no "Option"
+    // label: only "Secret" when it is one (the October 2026 UI review; the inspector still heads the level
+    // "Option").
+    label.replaceChildren(metaLine(option ? optionLabelParts(raw).slice(1).map((p) => p.charAt(0).toUpperCase() + p.slice(1)) : groupLabelParts(raw)));
     const c = typeof raw.condition === "string" ? raw.condition : "";
     cond.textContent = c ? `if ${humanizeCondition(c)}` : "";  // surface the condition (read-only, ids->titles); inspector edits it
     cond.style.display = c ? "" : "none";

@@ -8,15 +8,15 @@ body.fields-win {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--text-md);
   overflow: hidden;
 }
-.swin-head { font-size: 14px; }
+.swin-head { font-size: var(--chrome-size); }
 .fields-body { flex: 1 1 auto; overflow: auto; padding: 10px 14.5px 16px; }
-.fields-node { margin: 0 0 10px; font: 600 13px/1.3 var(--font-ui); color: var(--ink); }
+.fields-node { margin: 0 0 10px; font: 600 var(--text-md)/1.3 var(--font-ui); color: var(--ink); }
 .fields-node-kind { color: var(--muted); font-weight: 400; margin-right: 6px; }
 .fields-grid + .fields-grid { margin-top: 18px; }
-.fields-cap { margin: 0 0 4px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.fields-lock { margin: 0 0 6px; font: 12.5px/1.4 var(--font-ui); color: var(--danger); }
-.fields-empty { margin: 18px 0; font: 13px/1.4 var(--font-ui); color: var(--muted); }
-.fields-grid select, .fields-grid input { font: 13px var(--font-ui); padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); }
+.fields-cap { margin: 0 0 4px; font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); }
+.fields-lock { margin: 0 0 6px; font: var(--text-sm)/1.4 var(--font-ui); color: var(--danger); }
+.fields-empty { margin: 18px 0; font: var(--text-md)/1.4 var(--font-ui); color: var(--muted); }
+.fields-grid select, .fields-grid input { font: var(--text-md) var(--font-ui); padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); }

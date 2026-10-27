@@ -2,8 +2,15 @@
 // group(s) -> block, most-specific at the TOP - into the right pane. A READ projection of the
 // surface's `onSelect` context; a header click jumps to that node (revealNode). The snippet / group
 // CONDITION rows are editable - clicking opens the visual expression editor (M1, editCondition).
+//
+// Since the October 2026 UI review (patterkit design/ui-review-2026-10/3-composition.md, proposal 1) the
+// stack is flat sections divided by hairlines, not cards, and it shows what is SET. Each level draws a few
+// keys always (a line's Writing and Character, a snippet's Condition and Jump, an option's Condition and
+// behaviour, a block's or scene's Game ID); every other property draws only once it has a value, and until
+// then it waits in the level's one Add menu. The leaf and the snippet open; the outer levels fold to their
+// header and a one-line summary, and the author's open or closed choice is remembered per kind of level.
 
-import { fieldRows, iconNode, iconHtml, iconSvg, metaLine } from "@wildwinter/app-shell"; // the family's drawn icon set: one spelling of every icon across the suite; the drawn separator
+import { fieldRows, iconNode, iconHtml, iconSvg, metaLine, openContextMenu } from "@wildwinter/app-shell"; // the family's drawn icon set: one spelling of every icon across the suite; the drawn separator
 import type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, GroupPropsPatch, PadSource,
 } from "@patterkit/patterpad-surface/surface";
@@ -14,6 +21,15 @@ import { el } from "./dom.js";
 import { extensionSections, sweepExtensionRows, type ExtensionHandlers } from "./extension-rows.js";
 
 type Reveal = (id: string) => void;
+
+/** A property a level offers but doesn't draw while it's unset: it waits in the level's Add menu. Picking it
+ *  either builds the row (inserted at the foot, its control focused, or its editor opened) or acts at once
+ *  (`act`, anchored to the Add button), for a property whose row would only be a button to the same place.
+ *  `gameData` puts the row in the level's Game Data section. */
+interface Addable { label: string; build?: () => HTMLElement | null; act?: (anchor: HTMLElement) => void; gameData?: boolean }
+/** What a body builder returns: rows to draw, properties to offer, and nothing. */
+type Part = HTMLElement | Addable | null;
+const isAddable = (p: Part): p is Addable => p != null && !(p instanceof HTMLElement);
 /** Open the visual condition editor for the node `id`, seeded with `src`, anchored to `anchor`. */
 export type EditCondition = (id: string, src: string, anchor: HTMLElement) => void;
 /** Open the gameId (address) editor for the node `id`; `gameId` is the pinned value ("" = auto),
@@ -61,24 +77,34 @@ function gameDataRows(gd: Record<string, unknown> | undefined): HTMLElement[] {
   });
 }
 
-/** The author-defined gameData fields for a node type, as EDITABLE rows (value or, when unset, the
- *  field default), plus any orphaned keys read-only. */
-function gameDataFieldRows(kind: GameDataNodeKind, id: string | null, gd: GameData | undefined, h: InspectorHandlers): HTMLElement[] {
+/** The author-defined gameData fields for a node type: the ones this node SETS as editable rows, plus any
+ *  orphaned keys read-only, and the unset ones offered in the Add menu (the field default holds until then). */
+function gameDataFieldRows(kind: GameDataNodeKind, id: string | null, gd: GameData | undefined, h: InspectorHandlers): { rows: HTMLElement[]; unset: Addable[] } {
   const fields = h.gameDataFields(kind);
   const rows: HTMLElement[] = [];
+  const unset: Addable[] = [];
   const defined = new Set<string>();
-  for (const f of fields) { defined.add(f.name); rows.push(gameDataFieldRow(f, id, gd?.[f.name], h, kind)); }
+  for (const f of fields) {
+    defined.add(f.name);
+    if (gd?.[f.name] !== undefined) rows.push(gameDataFieldRow(f, id, gd[f.name], h, kind));
+    else if (id) unset.push({ label: f.name, gameData: true, build: () => gameDataFieldRow(f, id, undefined, h, kind) });
+  }
   for (const [k, v] of Object.entries(gd ?? {})) {
     if (!defined.has(k)) { const r = el("div", "insp-row"); r.append(el("span", "insp-key insp-gd", k), el("span", "insp-val insp-mono", typeof v === "string" ? v : JSON.stringify(v))); rows.push(r); }
   }
-  return rows;
+  return { rows, unset };
 }
 
 /** The gameData fields as one grouped section sitting BELOW a subtle divider (so a node's own data is
- *  visually separated from the host's custom fields). Returns null when there are no fields to show. */
-function gameDataSection(kind: GameDataNodeKind, id: string | null, gd: GameData | undefined, h: InspectorHandlers): HTMLElement | null {
-  const rows = gameDataFieldRows(kind, id, gd, h);
-  if (!rows.length) return null;
+ *  visually separated from the host's custom fields), drawn only when the node sets one, followed by the
+ *  unset fields for the Add menu. */
+function gameDataSection(kind: GameDataNodeKind, id: string | null, gd: GameData | undefined, h: InspectorHandlers): Part[] {
+  const { rows, unset } = gameDataFieldRows(kind, id, gd, h);
+  return [rows.length ? gameDataBox(rows) : null, ...unset];
+}
+
+/** The Game Data section's box: its caption, then the rows. */
+function gameDataBox(rows: HTMLElement[]): HTMLElement {
   const sec = el("div", "insp-gd-section");
   sec.append(el("div", "insp-gd-cap", "Game Data"), ...rows);
   return sec;
@@ -118,21 +144,32 @@ const leafNodeKind = (beat: LeafLevel["beat"]): GameDataNodeKind => (beat === "p
 
 const LEAF_HEAD: Record<LeafLevel["beat"], string> = { line: "Line", prose: "Text", gameEvent: "Game Event" };
 
-function leafBody(lv: LeafLevel, h: InspectorHandlers): HTMLElement[] {
-  const rows: Array<HTMLElement | null> = [];
+function leafBody(lv: LeafLevel, h: InspectorHandlers): Part[] {
+  const rows: Part[] = [];
   if (lv.beat !== "gameEvent") rows.push(statusRow(lv.id, h)); // writing status, line + text only (#196); game events aren't tracked
   if (lv.beat === "line") rows.push(recordingStatusRow(lv.id, h)); // recording status, dialogue lines only (#206)
-  if (lv.beat === "line") rows.push(rerecordRow(lv.id, h));         // "needs re-record" override, dialogue lines only (#227)
+  if (lv.beat === "line") rows.push(rerecordPart(lv.id, h));        // "needs re-record" override, dialogue lines only (#227)
   if (lv.beat === "line") {
     rows.push(lv.character ? row("Character", lv.character) : emptyRow("Character"));
-    rows.push(qualifierRow(lv.id, lv.qualifier, h));
+    rows.push(lv.qualifier ? qualifierRow(lv.id, lv.qualifier, h) : addable("Qualifier", () => qualifierRow(lv.id, lv.qualifier, h), lv.id && h.qualifiers().length));
     rows.push(row("Direction", lv.direction));
   }
-  if (lv.beat !== "gameEvent") rows.push(leafPadRow(lv, h));
-  rows.push(tagsRow(lv.id, lv.tags, h));
-  rows.push(gameDataSection(leafNodeKind(lv.beat), lv.id, lv.gameData, h));
+  if (lv.beat !== "gameEvent") rows.push(lv.padAfter !== undefined ? leafPadRow(lv, h) : addable("Pad after", () => leafPadRow(lv, h), lv.id));
+  rows.push(tagsPart(lv.id, lv.tags, h));
+  rows.push(...gameDataSection(leafNodeKind(lv.beat), lv.id, lv.gameData, h));
   rows.push(...extensionSections(leafNodeKind(lv.beat), lv.id, lv.ext, h));
-  return rows.filter((r): r is HTMLElement => r != null);
+  return rows;
+}
+
+/** An Add-menu entry for a row built on demand, or nothing when `offer` is falsy (no node to write to, or
+ *  nothing to pick from). */
+function addable(label: string, build: () => HTMLElement | null, offer: unknown = true): Addable | null {
+  return offer ? { label, build } : null;
+}
+
+/** Tags: the chips when the node has any, otherwise the Add menu's "Tags". */
+function tagsPart(id: string | null, tags: string[] | undefined, h: InspectorHandlers): Part {
+  return tags?.length ? tagsRow(id, tags, h) : addable("Tags", () => tagsRow(id, tags, h), id);
 }
 
 // --- line padding (design/proposals/line-padding.md) ---------------------------------------------------
@@ -350,6 +387,11 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
  *  recording script, the report, and status browse - a coloured pill echoes that here, and the underlying
  *  chip / take stays visible and playable above. Shares the recording row's gate (shown only when the
  *  project tracks recording status); null otherwise. */
+function rerecordPart(id: string | null, h: InspectorHandlers): Part {
+  if (!h.recordingStatuses().length || !id) return null;
+  return h.needsRerecord(id) ? rerecordRow(id, h) : { label: "Needs re-record", act: () => h.setNeedsRerecord(id, true) };
+}
+
 function rerecordRow(id: string | null, h: InspectorHandlers): HTMLElement | null {
   if (!h.recordingStatuses().length || !id) return null;
   const on = h.needsRerecord(id);
@@ -443,7 +485,7 @@ function phaseRow(id: string | null, label: string, phase: "onEnter" | "onExit",
   r.append(el("span", "insp-key", label));
   const btn = el("button", `insp-cond${mine.length ? "" : " muted"}`);
   btn.type = "button";
-  if (!mine.length) btn.textContent = "+ Add";
+  if (!mine.length) btn.textContent = "None";
   else btn.append(h.effectsPreview(mine)); // pills (inert → click opens editor)
   if (id) { btn.dataset.tip = `Edit ${label.toLowerCase()} effects`; btn.setAttribute("aria-label", `Edit ${label.toLowerCase()} effects`); btn.addEventListener("click", () => h.editEffects(id, onEnter, onExit, btn, phase)); }
   else btn.disabled = true;
@@ -454,12 +496,13 @@ function phaseRow(id: string | null, label: string, phase: "onEnter" | "onExit",
 /** An editable Condition row: clicking opens the visual expression editor (or "+ Add condition"). The
  *  current condition shows as PILLS. */
 function condRow(id: string | null, src: string | undefined, h: InspectorHandlers): HTMLElement {
-  // Stacked (value UNDER the label) so the pills get the row's full width to breathe.
-  const r = el("div", "insp-row insp-row-stack");
+  // Stacked (value UNDER the label) once it holds pills, so they get the row's full width to breathe; an
+  // unset one is a quiet field beside its label, as Jump is.
+  const r = el("div", src ? "insp-row insp-row-stack" : "insp-row");
   r.append(el("span", "insp-key", "Condition"));
   const btn = el("button", `insp-cond${src ? "" : " muted"}`);
   btn.type = "button";
-  if (!src) btn.textContent = "+ Add condition";
+  if (!src) btn.textContent = "None"; // a quiet field: unset reads as the word, and a click opens the editor
   else { btn.append(el("span", "insp-if", "if "), h.condPreview(src)); } // pills (inert → click opens editor)
   if (id) { btn.dataset.tip = "Edit condition"; btn.setAttribute("aria-label", "Edit condition"); btn.addEventListener("click", () => h.editCondition(id, src ?? "", btn)); }
   else btn.disabled = true;
@@ -470,7 +513,7 @@ function condRow(id: string | null, src: string | undefined, h: InspectorHandler
 /** A label : <select> row. Commits on change (the native dropdown closes before the re-render). */
 /** A full-width advisory note under the controls (e.g. the Best-match degeneracy nudge). Muted, never an error. */
 function noteRow(text: string): HTMLElement {
-  return el("div", "insp-note", text);
+  return el("div", "insp-advice", text); // not `.insp-note`, which is the header's note icon
 }
 
 function selectRow(label: string, value: string, opts: Array<[string, string]>, onChange: (v: string) => void): HTMLElement {
@@ -483,14 +526,20 @@ function selectRow(label: string, value: string, opts: Array<[string, string]>, 
   return r;
 }
 
-/** A label : checkbox row. */
-function toggleRow(label: string, on: boolean, onChange: (on: boolean) => void): HTMLElement {
+/** A row of on / off flags, each a small toggle button whose word is the control (an option's Sticky,
+ *  Fallback and Secret: three checkbox rows became one in the October 2026 review). */
+function flagsRow(label: string, flags: Array<{ name: string; on: boolean; tip: string; set: (on: boolean) => void }>): HTMLElement {
   const r = el("div", "insp-row");
   r.append(el("span", "insp-key", label));
-  const cb = el("input", "insp-check") as HTMLInputElement;
-  cb.type = "checkbox"; cb.checked = on;
-  cb.addEventListener("change", () => onChange(cb.checked));
-  r.append(cb);
+  const box = el("div", "insp-flags");
+  for (const f of flags) {
+    const b = el("button", "insp-flag", f.name) as HTMLButtonElement;
+    b.type = "button"; b.dataset.tip = f.tip;
+    b.setAttribute("aria-pressed", String(f.on));
+    b.addEventListener("click", () => f.set(!f.on));
+    box.append(b);
+  }
+  r.append(box);
   return r;
 }
 
@@ -501,7 +550,7 @@ function jumpRow(id: string | null, jump: SnippetLevel["jump"], h: InspectorHand
   r.append(el("span", "insp-key", "Jump"));
   const btn = el("button", `insp-cond${jump ? "" : " muted"}`);
   btn.type = "button";
-  btn.textContent = jump ? `${jump.mode === "call" ? "⤳" : "↪"} ${h.jumpLabel(jump.to)}` : "+ Set jump";
+  btn.textContent = jump ? `${jump.mode === "call" ? "Call" : "Jump to"} ${h.jumpLabel(jump.to)}` : "None";
   if (id) { btn.dataset.tip = "Set jump target"; btn.setAttribute("aria-label", "Set jump target"); btn.addEventListener("click", () => h.editJump(id, jump?.to ?? "", btn)); }
   else btn.disabled = true;
   const val = el("div", "insp-jumpval");
@@ -518,29 +567,37 @@ function jumpRow(id: string | null, jump: SnippetLevel["jump"], h: InspectorHand
       if (mode !== m) b.addEventListener("click", () => h.setJumpMode(id, m));
       return b;
     };
-    seg.append(opt("jump", "↪ jump", "One-way jump"), opt("call", "⤳ call", "Jump and return here"));
+    seg.append(opt("jump", "Jump", "One-way jump"), opt("call", "Call", "Jump and return here"));
     val.append(seg);
   }
   r.append(val);
   return r;
 }
 
-function snippetBody(lv: SnippetLevel, h: InspectorHandlers): HTMLElement[] {
-  const rows: Array<HTMLElement | null> = [];
+function snippetBody(lv: SnippetLevel, h: InspectorHandlers): Part[] {
+  const rows: Part[] = [];
   const onEnter = lv.onEnter ?? [];
   const onExit = lv.onExit ?? [];
   rows.push(condRow(lv.id, lv.condition, h));
   // Jump sits right under Condition - they are the two routing/eligibility rows an author scans first.
   rows.push(jumpRow(lv.id, lv.jump, h));
-  // On enter / On exit follow as first-class rows (not behind one "Effects" entry).
-  rows.push(phaseRow(lv.id, "On begin", "onEnter", onEnter, onExit, h));
-  rows.push(phaseRow(lv.id, "On end", "onExit", onEnter, onExit, h));
+  // On begin / On end draw once they hold an effect; until then the Add menu opens their editor directly.
+  const phase = (label: string, which: "onEnter" | "onExit", mine: EffectLike[]): Part =>
+    mine.length ? phaseRow(lv.id, label, which, onEnter, onExit, h)
+      : lv.id ? { label, act: (anchor) => h.editEffects(lv.id!, onEnter, onExit, anchor, which) } : null;
+  rows.push(phase("On begin", "onEnter", onEnter));
+  rows.push(phase("On end", "onExit", onExit));
   if (lv.beatCount === 0) rows.push(row("Beats", "none (a jump-only snippet)"));
-  rows.push(defaultPadRow(lv, h));
-  rows.push(tagsRow(lv.id, lv.tags, h));
-  rows.push(gameDataSection("snippet", lv.id, lv.gameData, h));
+  rows.push(defaultPadPart(lv, h));
+  rows.push(tagsPart(lv.id, lv.tags, h));
+  rows.push(...gameDataSection("snippet", lv.id, lv.gameData, h));
   rows.push(...extensionSections("snippet", lv.id, lv.ext, h));
-  return rows.filter((r): r is HTMLElement => r != null);
+  return rows;
+}
+
+/** Default pad: the field when the node sets one, otherwise the Add menu's "Default pad". */
+function defaultPadPart(lv: SnippetLevel | GroupLevel | BlockLevel | SceneLevel, h: InspectorHandlers): Part {
+  return lv.padAfterDefault !== undefined ? defaultPadRow(lv, h) : addable("Default pad", () => defaultPadRow(lv, h), lv.id);
 }
 
 const GROUP_HEAD: Record<GroupLevel["role"], string> = {
@@ -587,16 +644,18 @@ function noteButton(id: string, kind: string | undefined, has: boolean, h: Inspe
   return b;
 }
 
-function groupBody(lv: GroupLevel, h: InspectorHandlers): HTMLElement[] {
-  const rows: Array<HTMLElement | null> = [];
+function groupBody(lv: GroupLevel, h: InspectorHandlers): Part[] {
+  const rows: Part[] = [];
   const set = (patch: GroupPropsPatch): void => { if (lv.id) h.editGroupProps(lv.id, patch); };
   rows.push(condRow(lv.id, lv.condition, h));
   if (lv.role === "option") {
     // Option behaviour (spec §5): sticky = repeatable (off = once-only); fallback = auto-followed when
     // it is the last option left; secret = hidden while ineligible.
-    rows.push(toggleRow("Sticky", lv.sticky ?? false, (on) => set({ sticky: on })));
-    rows.push(toggleRow("Fallback", lv.fallback ?? false, (on) => set({ fallback: on })));
-    rows.push(toggleRow("Secret", lv.secretUntilEligible ?? false, (on) => set({ secretUntilEligible: on })));
+    rows.push(flagsRow("Behaviour", [
+      { name: "Sticky", on: lv.sticky ?? false, tip: "Offered again after it's picked", set: (on) => set({ sticky: on }) },
+      { name: "Fallback", on: lv.fallback ?? false, tip: "Followed by itself when it's the last option left", set: (on) => set({ fallback: on }) },
+      { name: "Secret", on: lv.secretUntilEligible ?? false, tip: "Hidden while its condition doesn't hold", set: (on) => set({ secretUntilEligible: on }) },
+    ]));
   } else if (lv.role === "choice") {
     // Nothing more: a choice IS its options, which are already surfaced in the script (and each
     // option's flags / condition are editable by selecting that option). A duplicate list here just
@@ -614,13 +673,13 @@ function groupBody(lv: GroupLevel, h: InspectorHandlers): HTMLElement[] {
       }
     }
   }
-  rows.push(defaultPadRow(lv, h));
-  rows.push(tagsRow(lv.id, lv.tags, h));
+  rows.push(defaultPadPart(lv, h));
+  rows.push(tagsPart(lv.id, lv.tags, h));
   // An option's fields are declared (the `option` node kind) and edit here; any other group's gameData has no
   // declared fields, so it shows as it stands.
-  if (lv.role === "option") rows.push(gameDataSection("option", lv.id, lv.gameData, h), ...extensionSections("option", lv.id, lv.ext, h));
+  if (lv.role === "option") rows.push(...gameDataSection("option", lv.id, lv.gameData, h), ...extensionSections("option", lv.id, lv.ext, h));
   else rows.push(...gameDataRows(lv.gameData));
-  return rows.filter((r): r is HTMLElement => r != null);
+  return rows;
 }
 
 /** The host-facing Game ID row: a clickable chip showing the effective address the runtime targets;
@@ -649,21 +708,21 @@ function scenePropsRow(h: InspectorHandlers): HTMLElement {
   const n = h.sceneProps().length;
   const btn = el("button", `insp-cond${n ? "" : " muted"}`);
   btn.type = "button"; btn.dataset.tip = "Scene-local @scene properties"; btn.setAttribute("aria-label", "Scene-local @scene properties");
-  btn.textContent = n ? `${n} scene ${n === 1 ? "property" : "properties"}, edit` : "+ Add scene properties";
+  btn.textContent = n ? `${n} scene ${n === 1 ? "property" : "properties"}` : "None";
   btn.addEventListener("click", () => h.editSceneProps());
   r.append(btn);
   return r;
 }
 
 
-function addressBody(lv: SceneLevel | BlockLevel, h: InspectorHandlers): HTMLElement[] {
-  const rows: Array<HTMLElement | null> = [addressRow(lv.id, lv.gameId, lv.address, h.editGameId)];
-  if (lv.kind === "scene") rows.push(scenePropsRow(h));
-  rows.push(defaultPadRow(lv, h));
-  rows.push(tagsRow(lv.id, lv.tags, h));
-  rows.push(gameDataSection(lv.kind, lv.id, lv.gameData, h));
+function addressBody(lv: SceneLevel | BlockLevel, h: InspectorHandlers): Part[] {
+  const rows: Part[] = [addressRow(lv.id, lv.gameId, lv.address, h.editGameId)];
+  if (lv.kind === "scene") rows.push(h.sceneProps().length ? scenePropsRow(h) : { label: "Scene properties", act: () => h.editSceneProps() });
+  rows.push(defaultPadPart(lv, h));
+  rows.push(tagsPart(lv.id, lv.tags, h));
+  rows.push(...gameDataSection(lv.kind, lv.id, lv.gameData, h));
   rows.push(...extensionSections(lv.kind, lv.id, lv.ext, h));
-  return rows.filter((r): r is HTMLElement => r != null);
+  return rows;
 }
 
 /** The summary shown when several whole chunks are selected (a shift-click run): just the count - it
@@ -678,35 +737,117 @@ function multiLevelView(lv: MultiLevel): HTMLElement {
   return section;
 }
 
+/** The kind of level, as the open / closed memory keys it: a group by its role ("option", "choice", ...). */
+const levelKey = (lv: Exclude<InspectLevel, MultiLevel>): string => (lv.kind === "group" ? lv.role : lv.kind);
+
+/** Which levels open by default: the ones that hold the caret's own text and its snippet. The rest fold to a
+ *  summary line until the author opens them, and the author's choice is remembered per kind. */
+const OPEN_BY_DEFAULT = new Set(["leaf", "snippet"]);
+
+/** A folded level's one-line summary: what it SETS, in words ("Sticky, has a condition"). Empty when it
+ *  sets nothing beyond its header. */
+function levelSummary(lv: Exclude<InspectLevel, MultiLevel>, h: InspectorHandlers): string {
+  const parts: string[] = [];
+  if (lv.kind === "group" && lv.role === "option") {
+    if (lv.sticky) parts.push("Sticky");
+    if (lv.fallback) parts.push("Fallback");
+    if (lv.secretUntilEligible) parts.push("Secret");
+  }
+  if ((lv.kind === "group" || lv.kind === "snippet") && lv.condition) parts.push("has a condition");
+  if (lv.kind === "snippet" && lv.jump) parts.push(`${lv.jump.mode === "call" ? "calls" : "jumps to"} ${h.jumpLabel(lv.jump.to)}`);
+  if (lv.kind === "scene" && h.sceneProps().length) parts.push(`${h.sceneProps().length} scene ${h.sceneProps().length === 1 ? "property" : "properties"}`);
+  if (lv.kind !== "leaf" && lv.padAfterDefault !== undefined) parts.push(`pad ${formatSeconds(lv.padAfterDefault)}s`);
+  const tags = lv.tags?.length ?? 0;
+  if (tags) parts.push(`${tags} ${tags === 1 ? "tag" : "tags"}`);
+  const fields = Object.keys(lv.gameData ?? {}).length;
+  if (fields) parts.push(`${fields} game data ${fields === 1 ? "field" : "fields"}`);
+  if (!parts.length) return "";
+  const text = parts.join(", ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The level's Add button: one menu of the properties it offers but doesn't draw yet. Picking one builds its
+ *  row at the foot of the level (inside Game Data for a field) and puts the author in it: the control
+ *  focused, or the editor a row's button opens. Absent when the level offers nothing. */
+function addButton(body: HTMLElement, offers: Addable[]): HTMLElement {
+  const btn = el("button", "insp-add") as HTMLButtonElement;
+  btn.type = "button";
+  btn.append(iconNode("add", 12), "Add");
+  btn.dataset.tip = "Add a property";
+  btn.setAttribute("aria-haspopup", "menu");
+  btn.addEventListener("click", () => {
+    const r = btn.getBoundingClientRect();
+    openContextMenu(r.left, r.bottom + 4, offers.map((o) => ({
+      label: o.label,
+      onClick: () => {
+        if (o.act) { o.act(btn); return; }
+        const row = o.build?.();
+        if (!row) return;
+        if (o.gameData) {
+          const box = body.querySelector<HTMLElement>(":scope > .insp-gd-section");
+          if (box) box.append(row); else body.insertBefore(gameDataBox([row]), btn);
+        } else body.insertBefore(row, btn);
+        offers.splice(offers.indexOf(o), 1);
+        if (!offers.length) btn.remove();
+        const target = row.querySelector<HTMLElement>("input, select, textarea, button.insp-cond");
+        if (target instanceof HTMLButtonElement) target.click(); else target?.focus();
+      },
+    })));
+  });
+  return btn;
+}
+
 function levelView(lv: InspectLevel, h: InspectorHandlers): HTMLElement {
   if (lv.kind === "multi") return multiLevelView(lv);
   let head: string;
   let sub: string | HTMLElement = "";
-  let body: HTMLElement[];
+  let parts: Part[];
   switch (lv.kind) {
-    case "leaf": head = LEAF_HEAD[lv.beat]; body = leafBody(lv, h); break;
-    case "snippet": head = "Snippet"; body = snippetBody(lv, h); break; // always "Snippet" - a jump is a snippet property, not its identity (the body notes a jump-only snippet)
-    case "group": head = GROUP_HEAD[lv.role]; sub = lv.role === "sequence" && lv.labelParts.length > 1 ? metaLine(lv.labelParts.slice(1)) : ""; body = groupBody(lv, h); break; // a sequence's sub: its order and exhaust, drawn separators
-    case "block": head = "Block"; sub = lv.name; body = addressBody(lv, h); break;
-    case "scene": head = "Scene"; sub = lv.name; body = addressBody(lv, h); break;
+    case "leaf": head = LEAF_HEAD[lv.beat]; parts = leafBody(lv, h); break;
+    case "snippet": head = "Snippet"; parts = snippetBody(lv, h); break; // always "Snippet" - a jump is a snippet property, not its identity (the body notes a jump-only snippet)
+    case "group": head = GROUP_HEAD[lv.role]; sub = lv.role === "sequence" && lv.labelParts.length > 1 ? metaLine(lv.labelParts.slice(1)) : ""; parts = groupBody(lv, h); break; // a sequence's sub: its order and exhaust, drawn separators
+    case "block": head = "Block"; sub = lv.name; parts = addressBody(lv, h); break;
+    case "scene": head = "Scene"; sub = lv.name; parts = addressBody(lv, h); break;
   }
+  const rows = parts.filter((p): p is HTMLElement => p instanceof HTMLElement);
+  const offers = parts.filter(isAddable);
 
-  const section = el("section", `insp-level insp-${lv.kind}`);
+  const key = levelKey(lv);
+  let open = h.levelOpen(key) ?? OPEN_BY_DEFAULT.has(key);
+  const section = el("section", `insp-level insp-${lv.kind}${open ? "" : " insp-folded"}`);
   const headerRow = el("div", "insp-head-row");
+  // The fold: a drawn chevron on the header's left. Structural, so it moves (the chevron turns); the
+  // header itself still reveals the node in the script.
+  const fold = el("button", "insp-fold") as HTMLButtonElement;
+  fold.type = "button";
+  const paintFold = (): void => {
+    fold.replaceChildren(iconNode(open ? "expanded" : "collapsed", 12));
+    fold.setAttribute("aria-expanded", String(open));
+    fold.setAttribute("aria-label", `${open ? "Fold" : "Open"} ${head}`);
+  };
+  paintFold();
+  fold.addEventListener("click", () => {
+    open = !open;
+    section.classList.toggle("insp-folded", !open);
+    paintFold();
+    h.setLevelOpen(key, open);
+  });
   const header = el("button", "insp-head");
   (header as HTMLButtonElement).type = "button";
   header.append(el("span", "insp-head-name", head));
   if (sub) { const subEl = el("span", "insp-head-sub"); subEl.append(sub); header.append(subEl); }
+  const summary = levelSummary(lv, h);
+  if (summary) header.append(el("span", "insp-head-sum", summary));
   if (lv.id) {
     header.dataset.tip = `Reveal this ${head.toLowerCase()} in the script`; // no opaque id surfaced (spec §6)
     header.addEventListener("click", () => h.reveal(lv.id!));
   } else {
     (header as HTMLButtonElement).disabled = true;
   }
-  headerRow.append(header);
-  // Top-right action cluster: an optional COPY icon (the node's address / loc ID - shown on rollover, click
-  // to copy) then - wherever notes are allowed (every node with an id) - a NOTE icon (outline = none, filled
-  // = notes set) that opens the notes modal for this node.
+  headerRow.append(fold, header);
+  // Top-right action cluster, shown as the pointer comes to the level: an optional COPY icon (the node's
+  // address / loc ID - shown on rollover, click to copy) then - wherever notes are allowed (every node with
+  // an id) - a NOTE icon (outline = none, filled = notes set) that opens the notes modal for this node.
   const actions = el("div", "insp-head-actions");
   if ((lv.kind === "scene" || lv.kind === "block") && lv.address) actions.append(addrCopyButton(lv.address, "address"));
   else if (lv.kind === "leaf" && lv.id && (lv.beat === "line" || lv.beat === "prose")) actions.append(addrCopyButton(lv.id, "line ID")); // loc / audio id (not game-event)
@@ -714,9 +855,10 @@ function levelView(lv: InspectLevel, h: InspectorHandlers): HTMLElement {
   if (actions.childElementCount) headerRow.append(actions);
   section.append(headerRow);
 
-  if (body.length) {
+  if (rows.length || offers.length) {
     const bodyEl = el("div", "insp-body");
-    bodyEl.append(...body);
+    bodyEl.append(...rows);
+    if (offers.length) bodyEl.append(addButton(bodyEl, offers));
     section.append(bodyEl);
   }
   return section;
@@ -792,6 +934,11 @@ export interface InspectorHandlers extends ExtensionHandlers {
   setPadAfter: (id: string, seconds: number | null) => void;
   /** Set (or clear, with null) a snippet, group, block, or scene's default pause, in seconds. */
   setPadAfterDefault: (id: string, seconds: number | null) => void;
+  /** Whether the author left this kind of level ("snippet", "option", "block", ...) open or folded, or
+   *  undefined when they never chose (the default then holds). */
+  levelOpen: (key: string) => boolean | undefined;
+  /** Remember the author's open or folded choice for a kind of level. */
+  setLevelOpen: (key: string, open: boolean) => void;
 }
 
 /** Render the whole stack into `host`. Empty selection -> a muted placeholder. */

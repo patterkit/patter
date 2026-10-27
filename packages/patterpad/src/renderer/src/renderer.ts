@@ -123,7 +123,7 @@ const frameHost = $("frame");
 // The remembered widths (navW / inspW) were always CSS px.
 const shell = mountPaneShell(frameHost, {
   nav: { defaultWidth: "224px", label: "scenes" },
-  inspector: { defaultWidth: "384px", label: "inspector" },
+  inspector: { defaultWidth: "320px", label: "inspector" },
   initial: {
     open: { nav: panes.nav, inspector: panes.inspector },
     width: { ...(panes.navW ? { nav: panes.navW } : {}), ...(panes.inspW ? { inspector: panes.inspW } : {}) },
@@ -174,7 +174,8 @@ const editorEl = $("editor");
 const propsDocEl = $("props-doc");            // the Properties document (@patter's own page)
 shell.centre.append(editorEl, propsDocEl);
 const inspectorStackEl = $("inspector-stack");
-shell.inspector.append($("inspector-label"), inspectorStackEl);
+shell.inspector.append(inspectorStackEl); // no "Inspector" header: the pane is named by its contents (and its label)
+shell.inspector.setAttribute("aria-label", "Inspector");
 frameHost.hidden = false;
 
 /** The project kits New Project offers. One today: what `patter init` writes (ops/src/init.ts),
@@ -565,11 +566,12 @@ function renderNav(): void {
   navBlocksSig = ""; // fresh rows: force the next block refresh to fill them
   const search = document.createElement("button");
   search.className = "nav-search"; search.type = "button"; search.dataset.tip = "Find by name, handle, or id"; search.setAttribute("aria-label", "Find by name, handle, or id");
-  // A magnifier icon + centred, bold label read as a BUTTON that opens the search window - not a text field.
+  // It reads as what it opens, a search field: the drawn magnifier, then "Find" in the field's quiet ink, and
+  // the shortcut at its right (the October 2026 UI review, 3-composition.md proposal 7).
   const searchIcon = document.createElement("span"); searchIcon.className = "nav-search-icon";
   searchIcon.append(iconNode("search", 13));
   search.append(searchIcon);
-  search.append(Object.assign(document.createElement("span"), { textContent: "Find…" }));
+  search.append(Object.assign(document.createElement("span"), { className: "nav-search-label", textContent: "Find…" }));
   const searchKey = document.createElement("span"); searchKey.className = "nav-search-kbd"; searchKey.append(keyHint("Mod+F"));
   search.append(searchKey);
   search.addEventListener("click", () => openSearch());
@@ -607,7 +609,7 @@ function renderNav(): void {
   // The quiet foot of the list: add a scene right where scenes live.
   const add = document.createElement("button");
   add.className = "nav-add-scene"; add.type = "button";
-  add.append(Object.assign(document.createElement("span"), { textContent: "+ New scene" }));
+  add.append(iconNode("add", 12), Object.assign(document.createElement("span"), { textContent: "New scene" })); // the drawn add, not a typed "+"
   add.addEventListener("click", () => newScenePrompt());
   navListEl.appendChild(add);
   paintNavBadges(); // re-apply VC badges after a list rebuild
@@ -2062,6 +2064,11 @@ function showInspector(ctx: InspectorContext): void {
   const nodeLabel = (nid: string): string => surface?.jumpTargets().find((t) => t.id === nid)?.label ?? nid;
   renderInspector(inspectorStackEl, ctx, {
     reveal: (id) => { surface?.revealNode(id); },
+    levelOpen: (key) => panes.inspectorOpen?.[key],
+    setLevelOpen: (key, open) => {
+      panes = { ...panes, inspectorOpen: { ...panes.inspectorOpen, [key]: open } };
+      void window.patter.setPanes(panes); // a display pref, remembered across launches like the others
+    },
     editNote: (id, anchor, kind) => openNoteEditor(id, anchor, kind), // title-bar note icon -> notes modal
     hasNotes: (id) => (docMap[id]?.length ?? 0) > 0,                   // filled vs outline note icon
     editCondition: (id, src, anchor) => openConditionEditor({

@@ -357,6 +357,9 @@ export interface PaneState {
   /** Review > Line Status: which writing-status rungs show their per-beat gutter pill. Absent / empty =
    *  none shown (the default; keeps the writing surface calm). Hidden in Writing View regardless. */
   lineStatusShown?: string[];
+  /** Which kinds of inspector level ("snippet", "option", "block", ...) the author opened or folded. Absent
+   *  for a kind = its default (the leaf and the snippet open, the outer levels folded). */
+  inspectorOpen?: Record<string, boolean>;
 }
 
 /** The colour theme (the `data-theme` axis): the family's, from app-shell (Follow System, Light, Dark,

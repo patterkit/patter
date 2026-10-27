@@ -5,14 +5,12 @@
 
 /* CHROME HAS ITS OWN SCALE (design-language §4). The root font size is the READING size (110% for the
    script's measure, and the maker's to change); the chrome does not move with it. Every rule in this
-   file is chrome and is sized in px off a 14px base, the size platform chrome sits at, so the navigator,
+   file is chrome and is sized off the shell's chrome base, `--chrome-size` (13px, 14px on Windows), in
+   its five text steps (`--text-xs` to `--text-xl`; the October 2026 UI review), so the navigator,
    inspector, bars, dialogs and controls read the same as the rest of the family whatever the reading
-   size is. The hosts below pin the base so any unstyled text inside them is 14px regardless of the
-   root (the toggles' `font: inherit`, the project name, a bare label). The literal stands in for the
-   shell's `--chrome-size` token until the shell publishes one; swap the value for `var(--chrome-size)`
-   then. The shell's own sheets (pane-shell, settings, welcome, stepper) are still rem-sized and will
-   move to the token with it. */
-.topbar, .pane-nav, .pane-inspector, .stepbar, .welcome { font-size: 14px; }
+   size is. The hosts below pin the base so any unstyled text inside them takes it regardless of the
+   root (the toggles' `font: inherit`, the project name, a bare label). */
+.topbar, .pane-nav, .pane-inspector, .stepbar, .welcome { font-size: var(--chrome-size); }
 
 /* The top bar is the shell's (pane-shell.css); the rules below are for what this app seats in it. */
 /* Buttons are the shell's `.btn` family (controls.css): bordered at rest, `.primary` filled, `.danger`
@@ -21,7 +19,7 @@
 /* "<project>: <scene>" - the scene name fades in beside the project name only when the scene's title has
    scrolled out of the edit pane (so you always know where you are). Recessive (secondary to the name). */
 .scene-suffix {
-  color: var(--muted); font: 600 13px var(--font-ui); white-space: nowrap; overflow: hidden;
+  color: var(--muted); font: 600 var(--text-md) var(--font-ui); white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; max-width: 352px; opacity: 0;
   margin-left: -8px; /* cancel the lead slot's flex gap so ": <scene>" sits flush against the project name */
   transition: opacity var(--dur-base) var(--ease-standard);
@@ -48,7 +46,7 @@
 .panes.no-nav > .pane-nav { border-right-color: transparent; }
 .panes.no-inspector > .pane-inspector { border-left-color: transparent; }
 /* The navigator's body: the list, inside the shell's scrolling inner. */
-.nav-list { display: flex; flex-direction: column; gap: 1.5px; padding: 8px; }
+.nav-list { display: flex; flex-direction: column; gap: 0; padding: 6px 8px; }
 /* Every nav row keeps its natural height. The list is a flex column, so once it outgrows the pane,
    flex SHRINKS the rows instead of scrolling: <button> flex items get no automatic content-based
    minimum size (unlike divs, which refuse to shrink below their content), and the open scene's block
@@ -61,14 +59,17 @@
 .pane-centre { display: flex; flex-direction: column; }
 #editor { flex: 1; min-height: 0; }
 
+/* One navigator row grammar (the October 2026 UI review, 3-composition.md proposal 7): 28px rows at weight
+   400, a hover one step off the pane, and the selected row on the neutral selection fill in ink at 500 with
+   a 2px accent mark at its left. The ancestors and the open scene take no colour of their own. */
 .nav-item {
-  display: flex; align-items: center; gap: 6.5px; width: 100%; text-align: left; cursor: pointer;
-  background: none; border: 0; border-radius: var(--radius-sm); padding: 6.5px 9.5px;
-  color: var(--ink); font: 600 13.5px var(--font-ui);
+  display: flex; align-items: center; gap: 6.5px; width: 100%; min-height: 28px; text-align: left; cursor: pointer;
+  background: none; border: 0; border-radius: var(--radius-sm); padding: 0 10px;
+  color: var(--ink); font: var(--weight-regular) var(--text-md) var(--font-ui);
 }
 .nav-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-item:hover { background: color-mix(in oklab, var(--accent) 10%, transparent); }
-.nav-item.active { background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent); }
+.nav-item:hover { background: var(--hover); }
+.nav-item.active { background: var(--selection); color: var(--ink); font-weight: var(--weight-medium); box-shadow: inset 2px 0 0 var(--accent); }
 
 /* A scene row + its block sub-list. The list reveals only for the OPEN (current) scene, easing
    between 0fr and 1fr - the previous scene's list closes while the new one opens (no pops). */
@@ -81,15 +82,16 @@
 .nav-blocks-inner { overflow: hidden; min-height: 0; display: flex; flex-direction: column; }
 @media (prefers-reduced-motion: reduce) { .nav-blocks { transition: none; } }
 
-/* A block sub-row: quieter than a scene, indented under a guide line; the caret's block is marked. */
+/* A block sub-row: quieter than a scene, indented under a hairline guide; the caret's block is marked by
+   its ink and a 2px accent bar on the guide, never a second fill beside the scene's. */
 .nav-block {
-  display: flex; align-items: center; width: calc(100% - 17px); text-align: left; cursor: pointer;
-  background: none; border: 0; border-radius: var(--radius-sm); padding: 4.5px 8px;
-  margin-left: 17px; color: var(--muted); font: 500 13px var(--font-ui);
-  border-left: 2px solid var(--line); border-top-left-radius: 0; border-bottom-left-radius: 0;
+  display: flex; align-items: center; width: calc(100% - 17px); min-height: 26px; text-align: left; cursor: pointer;
+  background: none; border: 0; border-radius: var(--radius-sm); padding: 0 8px;
+  margin-left: 17px; color: var(--muted); font: var(--weight-regular) var(--text-sm) var(--font-ui);
+  border-left: 1px solid var(--line-soft); border-top-left-radius: 0; border-bottom-left-radius: 0;
 }
-.nav-block:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); color: var(--ink); }
-.nav-block.active { color: var(--accent); border-left-color: var(--accent); background: color-mix(in oklab, var(--accent) 10%, transparent); }
+.nav-block:hover { background: var(--hover); color: var(--ink); }
+.nav-block.active { color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); border-left-color: transparent; }
 
 /* Scene drag-to-reorder: the grabbed row dims; an accent seam marks the drop slot. */
 .nav-scene.dragging { opacity: 0.45; }
@@ -98,22 +100,22 @@
 
 /* Destructive confirm (Delete Scene): the shell's frame + `.btn.danger`; ours is the referring-scene evidence list. */
 .del-refs { margin: 3px 0 6.5px; padding: 6.5px 9.5px; border-left: 2px solid var(--danger); }
-.del-refs-head { margin: 0 0 4px; font: 600 13px var(--font-ui); color: var(--ink); }
-.del-refs-row { margin: 1.5px 0; font: 13px var(--font-ui); color: var(--muted); }
+.del-refs-head { margin: 0 0 4px; font: 600 var(--text-md) var(--font-ui); color: var(--ink); }
+.del-refs-row { margin: 1.5px 0; font: var(--text-md) var(--font-ui); color: var(--muted); }
 .del-warn { color: var(--warn); }
 
 /* The nav's context menu is the shell's (openContextMenu + context-menu.css). */
 
-/* The quiet "+ New Scene" foot of the list: muted until hovered, then reads as the action it is. */
+/* The quiet "New scene" foot of the list, with the drawn add: muted until hovered, then reads as the action it is. */
 .nav-add-scene {
-  display: flex; align-items: center; width: 100%; text-align: left; cursor: pointer;
-  background: none; border: 0; border-radius: var(--radius-sm); padding: 6.5px 9.5px; margin-top: 2.5px;
-  color: var(--muted); font: 600 13px var(--font-ui);
+  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; text-align: left; cursor: pointer;
+  background: none; border: 0; border-radius: var(--radius-sm); padding: 0 10px; margin-top: 2px;
+  color: var(--muted); font: var(--weight-regular) var(--text-md) var(--font-ui);
 }
-.nav-add-scene:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); color: var(--accent); }
+.nav-add-scene:hover { background: var(--hover); color: var(--accent); }
 
 /* Per-scene version-control badge (#145): a small glyph chip on the right of a nav row. */
-.nav-badge { flex: 0 0 auto; font-size: 11.5px; line-height: 1; opacity: 0.9; }
+.nav-badge { flex: 0 0 auto; font-size: var(--text-xs); line-height: 1; opacity: 0.9; }
 /* The five `.vcs-*` badge colours are GONE: the shell's vc.css owns the badge now (`.vc-badge`, and
    `.vc-locked` / `.vc-stale` / `.vc-mine` / `.vc-dirty` / `.vc-new` / `.vc-frozen`). Its three "yours"
    colours are the ones this app already used, because the shell grew to this grammar rather than the
@@ -121,10 +123,11 @@
 .nav-item .vc-badge { margin-left: auto; }
 
 /* The topbar health chip (parity row 33): a tick when clean, the problem count when not; the tone is the
-   worst problem's. A count is a control (it steps to the first); the tick answers on click, quietly. */
-.healthchip { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 22.5px; height: 21px; padding: 0 7px; border: 0; border-radius: var(--radius-pill); background: none; color: var(--ok); font: 600 11.5px var(--font-ui); font-variant-numeric: tabular-nums; cursor: pointer; transition: background var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); }
+   worst problem's. A count is a control (it steps to the first); the tick answers on click, quietly. The
+   clean tick is muted: colour only when something's wrong (the October 2026 UI review). */
+.healthchip { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 22.5px; height: 21px; padding: 0 7px; border: 0; border-radius: var(--radius-pill); background: none; color: var(--muted); font: var(--weight-medium) var(--text-xs) var(--font-ui); font-variant-numeric: tabular-nums; cursor: pointer; transition: background var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); }
 .healthchip[hidden] { display: none; }
-.healthchip.ok { color: var(--ok); }
+.healthchip.ok { color: var(--muted); }
 .healthchip.err { color: var(--danger); background: color-mix(in oklab, var(--danger) 12%, transparent); }
 .healthchip.warn { color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
 .healthchip svg { display: block; }
@@ -134,7 +137,7 @@
 .job-host { flex: 0 0 auto; }
 
 /* Topbar chip: the CURRENT scene's VC state (sits beside the unsaved dot). */
-.vcs-scene { display: inline-flex; align-items: center; gap: 4px; font: 600 11.5px var(--font-ui); color: var(--warn); white-space: nowrap; }
+.vcs-scene { display: inline-flex; align-items: center; gap: 4px; font: 600 var(--text-xs) var(--font-ui); color: var(--warn); white-space: nowrap; }
 .vcs-scene[hidden] { display: none; } /* an explicit display would otherwise defeat the `hidden` attribute */
 .vcs-scene.locked { color: var(--danger); }
 
@@ -147,32 +150,32 @@
    `.shell-cmt-*` styles come with it in comments.css. What survives here is the
    action row, which the SUGGESTION popover borrowed and still uses. */
 .cmt-actions { display: flex; gap: 6.5px; margin-top: 8px; }
-.cmt-actions .btn { font: 600 12px var(--font-ui); padding: 4px 9.5px; }
+.cmt-actions .btn { font: 600 var(--text-sm) var(--font-ui); padding: 4px 9.5px; }
 
 /* "Suggest a rewrite" popovers (compose + review). Reuse the comment composer's input + actions. */
-.suggestion-popover .sg-hint { margin: 0 0 8px; font: 12px var(--font-ui); color: var(--muted); line-height: 1.4; }
-.suggestion-popover .sg-input { width: 100%; box-sizing: border-box; resize: vertical; font: 13.5px var(--font-ui); padding: 6.5px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); }
+.suggestion-popover .sg-hint { margin: 0 0 8px; font: var(--text-sm) var(--font-ui); color: var(--muted); line-height: 1.4; }
+.suggestion-popover .sg-input { width: 100%; box-sizing: border-box; resize: vertical; font: var(--text-md) var(--font-ui); padding: 6.5px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); }
 .suggestion-popover .sg-card { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px; }
 .suggestion-popover .sg-card:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
 .suggestion-popover .sg-card.resolved { opacity: 0.65; }
 .suggestion-popover .sg-head { display: flex; align-items: baseline; gap: 8px; }
-.suggestion-popover .sg-author { font: 600 12.5px var(--font-ui); color: var(--ink); }
-.suggestion-popover .sg-ts { font: 11px var(--font-ui); color: var(--muted); }
-.suggestion-popover .sg-outcome { margin-left: auto; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.suggestion-popover .sg-stale { margin: 5.5px 0; padding: 4px 7px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--accent) 10%, transparent); color: var(--ink-soft); font: italic 11.5px var(--font-ui); }
-.suggestion-popover .sg-diff-label { margin-top: 6.5px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.suggestion-popover .sg-before { margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--line); color: var(--muted); font: 13px var(--font-ui); white-space: pre-wrap; }
-.suggestion-popover .sg-source { font: 11px var(--font-ui); color: var(--muted); }
+.suggestion-popover .sg-author { font: 600 var(--text-sm) var(--font-ui); color: var(--ink); }
+.suggestion-popover .sg-ts { font: var(--text-xs) var(--font-ui); color: var(--muted); }
+.suggestion-popover .sg-outcome { margin-left: auto; font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); }
+.suggestion-popover .sg-stale { margin: 5.5px 0; padding: 4px 7px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--accent) 10%, transparent); color: var(--ink-soft); font: italic var(--text-xs) var(--font-ui); }
+.suggestion-popover .sg-diff-label { margin-top: 6.5px; font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); }
+.suggestion-popover .sg-before { margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--line); color: var(--muted); font: var(--text-md) var(--font-ui); white-space: pre-wrap; }
+.suggestion-popover .sg-source { font: var(--text-xs) var(--font-ui); color: var(--muted); }
 .suggestion-popover .sg-cut { text-decoration: line-through; text-decoration-color: color-mix(in oklab, var(--danger) 70%, transparent); }
-.suggestion-popover .sg-part { display: flex; align-items: center; gap: 6px; margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--accent); font: 600 12.5px var(--font-ui); color: var(--ink); }
+.suggestion-popover .sg-part { display: flex; align-items: center; gap: 6px; margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--accent); font: 600 var(--text-sm) var(--font-ui); color: var(--ink); }
 .suggestion-popover .sg-part svg { color: var(--muted); flex: 0 0 auto; }
-.suggestion-popover .sg-after { margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--accent); color: var(--ink); font: 13px var(--font-ui); white-space: pre-wrap; }
+.suggestion-popover .sg-after { margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--accent); color: var(--ink); font: var(--text-md) var(--font-ui); white-space: pre-wrap; }
 
 /* The toast is the shell's now (@wildwinter/app-shell/toast.css). */
-/* The search control is a BUTTON (opens the search window), styled to read as one - a magnifier + a
-   centred, bold label - so it isn't mistaken for a text field. The ⌘F hint is pinned right. */
-.nav-search { position: relative; display: flex; align-items: center; justify-content: center; gap: 6.5px; width: 100%; cursor: pointer; margin-bottom: 6.5px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6.5px 9px; color: var(--ink-soft); font: 600 12.5px var(--font-ui); }
-.nav-search:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in oklab, var(--accent) 8%, var(--surface)); }
+/* The search control opens the search window, and reads as the field it opens: a left-aligned drawn
+   magnifier, "Find…" in the quiet ink, on the content tier with a soft edge. The ⌘F hint is pinned right. */
+.nav-search { position: relative; display: flex; align-items: center; justify-content: flex-start; gap: 6.5px; width: 100%; height: 28px; cursor: pointer; margin-bottom: 6px; background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--radius-md); padding: 0 9px; color: var(--muted); font: var(--weight-regular) var(--text-md) var(--font-ui); }
+.nav-search:hover { border-color: var(--line); color: var(--ink-soft); }
 .nav-search-icon { display: inline-flex; align-items: center; }
 .nav-search-icon svg { display: block; }
 /* The Find shortcut sits at the button's right edge; the keycap itself is the shell's `.shell-kbd` (keys.css). */
@@ -182,14 +185,14 @@
    row, with its count where a scene's chevron would be, and a hairline under it so the scene list
    below still reads as the list. */
 .nav-doc {
-  display: flex; align-items: center; justify-content: space-between; gap: 6.5px; width: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 6.5px; width: 100%; min-height: 28px;
   text-align: left; cursor: pointer; background: none; border: 0; border-radius: var(--radius-sm);
-  padding: 6.5px 9.5px; margin-bottom: 5.5px; color: var(--ink); font: 600 13.5px var(--font-ui);
-  border-bottom: 1px solid var(--line);
+  padding: 0 10px; margin-bottom: 6px; color: var(--ink); font: var(--weight-regular) var(--text-md) var(--font-ui);
+  box-shadow: 0 1px 0 var(--line-soft);
 }
-.nav-doc:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
-.nav-doc.active { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
-.nav-doc-count { color: var(--muted); font: 11.5px var(--font-mono); }
+.nav-doc:hover { background: var(--hover); }
+.nav-doc.active { background: var(--selection); color: var(--ink); font-weight: var(--weight-medium); box-shadow: inset 2px 0 0 var(--accent), 0 1px 0 var(--line-soft); }
+.nav-doc-count { color: var(--muted); font: var(--text-xs) var(--font-ui); font-variant-numeric: tabular-nums; }
 .nav-doc.active .nav-doc-count { color: inherit; }
 
 /* project search palette (⌘F) */
@@ -198,34 +201,44 @@
 /* (#205 search / status browse now lives in its own detached window - see renderer/search/search.css.) */
 
 /* Inspector: the detail panel for the current selection (Patterpad.md §4) - a context stack,
-   innermost-first (leaf -> snippet -> group(s) -> block), most-specific at the top. The surface's
-   `aside` rule supplies border-left + bg. */
+   innermost-first (leaf -> snippet -> group(s) -> block), most-specific at the top. Since the October
+   2026 UI review it is flat sections divided by hairlines, not cards: no pane header, headers that are
+   type, the outer levels folded to a summary line, and a property drawn only once it's set
+   (inspector.ts; patterkit design/ui-review-2026-10/3-composition.md, proposal 1). */
 .pane-inspector .pane-inner { display: flex; flex-direction: column; }
-.inspector-label { display: flex; align-items: baseline; gap: 8px; padding: 9.5px 16px; color: var(--muted); font: 600 12.5px/1.2 var(--font-ui); border-bottom: 1px solid var(--line); }
-/* The <scene>.<block> Game ID breadcrumb - right-aligned, monospace, quiet (a reference, not a control). */
-.inspector-stack { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.inspector-stack { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 16px 24px; display: flex; flex-direction: column; gap: 0; }
 /* Levels keep their natural height so a tall inspector SCROLLS rather than squashing its content. */
 .inspector-stack > * { flex: 0 0 auto; }
 /* The empty line is the shell's `.empty` (controls.css); the inspector pads it a little. */
-.inspector-stack > .empty { padding: 13px 8px; }
+.inspector-stack > .empty { padding: 13px 0; }
 
-/* One level = a card; the top card (most specific) reads strongest, deeper containers recede. */
-.insp-level { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); overflow: hidden; }
-.insp-level + .insp-level { opacity: 0.92; }
+/* One level = a section; a hairline divides it from the next. */
+.insp-level { border: 0; }
+.insp-level + .insp-level { border-top: var(--hairline) solid var(--line-soft); }
+.insp-head-row { position: relative; display: flex; align-items: center; min-height: 32px; }
+/* The fold: a drawn chevron at the header's left; the header beside it reveals the node in the script. */
+.insp-fold { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 22px; margin-left: -4px; padding: 0; background: none; border: 0; border-radius: var(--radius-sm); color: var(--muted); cursor: pointer; }
+.insp-fold:hover { color: var(--ink); }
 .insp-head {
-  display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left;
-  background: color-mix(in oklab, var(--accent) 6%, transparent); border: 0; border-bottom: 1px solid var(--line);
-  padding: 5.5px 9.5px; cursor: pointer; color: var(--ink);
+  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; text-align: left;
+  background: none; border: 0; padding: 10px 52px 6px 2px; cursor: pointer; color: var(--ink);
 }
+.insp-folded .insp-head { padding-bottom: 10px; }
 .insp-head:disabled { cursor: default; }
-.insp-head:not(:disabled):hover { background: color-mix(in oklab, var(--accent) 13%, transparent); }
-.insp-head-name { font: 600 12px var(--font-ui); letter-spacing: 0.03em; color: var(--accent); }
-.insp-head-sub { font: 11.5px var(--font-mono); color: var(--muted); }
-/* The header's top-right action cluster, overlaid on the title bar: a copy icon (address / loc ID on
-   rollover) then a note icon. pointer-events route to the buttons so the rest of the header still reveals. */
-.insp-head-row { position: relative; }
-.insp-head-actions { position: absolute; right: 5.5px; top: 0; bottom: 0; display: inline-flex; align-items: center; gap: 1.5px; pointer-events: none; }
-.insp-head-actions > * { pointer-events: auto; }
+.insp-head-name { font: var(--weight-strong) var(--text-md) var(--font-ui); color: var(--ink); flex: none; }
+.insp-head:not(:disabled):hover .insp-head-name { color: var(--accent); }
+.insp-folded .insp-head-name { font-weight: var(--weight-medium); }
+.insp-head-sub { font: var(--text-sm) var(--font-ui); color: var(--muted); flex: none; }
+/* A folded level's summary: what it sets, in words, ellipsised. Drawn only while folded. */
+.insp-head-sum { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--text-sm) var(--font-ui); color: var(--muted); }
+.insp-level:not(.insp-folded) .insp-head-sum { display: none; }
+.insp-folded > .insp-body { display: none; }
+/* The header's top-right action cluster: a copy icon (address / loc ID on rollover) then a note icon,
+   shown as the pointer comes to the level. A filled note icon stays: "this has a note" is state.
+   pointer-events route to the buttons so the rest of the header still reveals. */
+.insp-head-actions { position: absolute; right: -4px; top: 0; bottom: 0; display: inline-flex; align-items: center; gap: 1.5px; pointer-events: none; }
+.insp-head-actions > * { pointer-events: auto; opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard); }
+.insp-level:is(:hover, :focus-within) .insp-head-actions > *, .insp-head-actions > .insp-note.has { opacity: 1; }
 /* the quiet click-to-copy button (address / loc ID) */
 .insp-copy { background: none; border: 0; cursor: pointer; color: var(--muted); line-height: 0; padding: 0 3px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; }
 .insp-copy:hover { color: var(--accent); }
@@ -236,24 +249,34 @@
 .insp-note:hover { color: var(--accent); }
 .insp-note.has { color: var(--accent); }
 .insp-note svg { display: block; }
-.insp-body { display: flex; flex-direction: column; gap: 2.5px; padding: 7px 9.5px; }
-.insp-row { display: grid; grid-template-columns: 104px 1fr; gap: 8px; align-items: baseline; font: 13px var(--font-ui); }
-/* Stacked rows (Condition / On enter / On exit): label on top, the full-width value field below -
-   gives the pills horizontal room rather than squeezing them into the right-hand column. */
-.insp-row.insp-row-stack { display: flex; flex-direction: column; align-items: stretch; gap: 3px; }
-/* Row labels read as a clear label (ink-soft), distinct from the lighter --muted of an UNSET value
-   they point at (e.g. "+ add condition"), so the label and the empty slot don't blur together. */
-.insp-key { color: var(--ink-soft); font-size: 11.5px; font-weight: 600; }
-.insp-key.insp-gd { font-family: var(--font-mono); color: var(--ink-soft); }
+.insp-body { display: flex; flex-direction: column; gap: 2px; padding: 0 0 14px; }
+/* Rows read by weight, not by boxes: the label lighter than the value, because the value is the content. */
+.insp-row { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: center; min-height: 28px; font: var(--text-md) var(--font-ui); }
+/* Stacked rows (On begin / On end): label on top, the full-width value field below - gives the pills
+   horizontal room rather than squeezing them into the right-hand column. */
+.insp-row.insp-row-stack { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 4px 0; }
+.insp-key { color: var(--muted); font-size: var(--text-sm); font-weight: var(--weight-regular); }
+.insp-key.insp-gd { font-family: var(--font-mono); }
 .insp-val { color: var(--ink); word-break: break-word; }
-.insp-val.insp-mono { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+.insp-val.insp-mono { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--ink-soft); }
 /* A row whose value is not set: the word, muted, never a typed dash. */
 .insp-val.insp-none { color: var(--muted); }
-/* the editable Condition / effect value: a clickable chip (showing pills) that opens the visual editor */
-.insp-cond { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2.5px; text-align: left; background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--ink); font: 12px var(--font-mono); padding: 1.5px 6.5px; }
+/* the editable Condition / effect value: a clickable field (showing pills) that opens the visual editor */
+.insp-cond { flex: 1; min-width: 0; min-height: 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 2.5px; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--ink); font: var(--text-sm) var(--font-mono); padding: 1.5px 6.5px; }
 .insp-cond:hover { border-color: var(--accent); color: var(--accent); }
-.insp-cond.muted { font-family: var(--font-ui); color: var(--muted); border-style: dashed; }
+/* An unset always-shown value reads as a quiet field, not a dashed box: dashes are for drop targets and
+   ghosts. "None" in the UI face, the edge one step quieter until the pointer comes to it. */
+.insp-cond.muted { font-family: var(--font-ui); color: var(--muted); border-color: var(--line-soft); }
+.insp-cond.muted:hover { border-color: var(--line); color: var(--muted); }
 .insp-if { color: var(--muted); font-family: var(--font-mono); }
+/* An option's behaviour flags: one row of small toggles whose words are the controls. */
+.insp-flags { display: flex; flex-wrap: wrap; gap: 4px; }
+.insp-flag { font: var(--text-sm) var(--font-ui); color: var(--ink); background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer; }
+.insp-flag:hover { border-color: var(--muted); }
+.insp-flag[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+/* The level's one Add button, under its rows: the properties it offers but doesn't draw yet. */
+.insp-add { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font: var(--text-sm) var(--font-ui); color: var(--muted); background: none; border: 0; border-radius: var(--radius-sm); padding: 3px 6px 3px 2px; cursor: pointer; }
+.insp-add:hover { color: var(--accent); }
 /* Jump row: the target chip and its go/call mode toggle stack in the value column. */
 .insp-jumpval { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-width: 0; }
 /* The go/call mode toggle is the shell's `.seg` (controls.css). */
@@ -269,15 +292,16 @@
 .shell-anchored:is(.cond-editor, .effects-editor, .value-picker, .suggestion-popover) .shell-anchored-body { display: block; padding: 9.5px; }
 /* effects editor: one section per phase (On enter / On exit) */
 .effects-section + .effects-section { margin-top: 11px; padding-top: 9.5px; border-top: 1px solid var(--line); }
-.effects-section-cap { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); margin-bottom: 5.5px; }
+.effects-section-cap { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); margin-bottom: 5.5px; }
 /* The gameId editor is the shell's (openGameIdEditor); its `.shell-id-*` styles
    come with it in anchored.css. Ours reused the expr-editor input look and the
    app's btn classes; the shell's are the family's, which is the point. */
 /* inspector inline editors: native select + checkbox + jump list */
-.insp-select { font: 12px var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 1.5px 5px; max-width: 176px; }
+.insp-select { font: var(--text-sm) var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 1.5px 5px; max-width: 176px; }
 .insp-select:focus-visible { border-color: var(--accent); outline-offset: 0; }
-/* A soft, advisory note under a control (e.g. the Best-match degeneracy nudge). Never an error colour. */
-.insp-note { color: var(--muted); font: italic 12px var(--font-ui); line-height: 1.3; padding: 1px 0 1.5px; }
+/* A soft, advisory note under a control (e.g. the Best-match degeneracy nudge). Never an error colour. Its
+   own class: it once shared `.insp-note` with the header's note icon, which took its italic and padding. */
+.insp-advice { color: var(--muted); font: italic var(--text-sm) var(--font-ui); line-height: 1.3; padding: 1px 0 1.5px; }
 /* Status rows (Writing #196 / Audio #206): the ladder dropdown reads as a tinted chip - its background is
    the selected rung's palette colour, so it matches the read-only recording chip (no separate swatch dot). */
 /* Wrap when the row is crowded (e.g. the recording chip + "out of date" + ▶ + ● Record all at once) so a
@@ -285,10 +309,10 @@
 .insp-status { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 6.5px; min-width: 0; }
 /* Text is full --ink and the fill is a soft tint (mixed toward --bg inline via statusTint), so the rung name
    stays readable on every palette; a saturated --char-N fill would swallow the text. */
-.insp-status-select { font: 11.5px var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--card)); border: none; border-radius: var(--radius-sm); padding: 1.5px 6.5px; max-width: 176px; cursor: pointer; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
+.insp-status-select { font: var(--text-xs) var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--card)); border: none; border-radius: var(--radius-sm); padding: 1.5px 6.5px; max-width: 176px; cursor: pointer; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
 .insp-status-select:focus-visible { box-shadow: 0 0 0 1px var(--accent); outline-offset: 0; }
 /* Audio Folders mode (#206): read-only recording status chip (the status is derived from files on disk). */
-.insp-rec-chip { font: 11.5px var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--card)); border-radius: var(--radius-sm); padding: 1.5px 6.5px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
+.insp-rec-chip { font: var(--text-xs) var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--card)); border-radius: var(--radius-sm); padding: 1.5px 6.5px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
 .insp-rec-play { flex: none; display: inline-flex; align-items: center; line-height: 1; color: var(--accent); background: none; border: none; cursor: pointer; padding: 2.5px 3px; border-radius: var(--radius-sm); }
 .insp-rec-play:hover { background: color-mix(in oklab, var(--accent) 16%, transparent); }
 /* Softly pulse the ▶ button while its clip is sounding, so it's clear which line you're hearing. */
@@ -296,12 +320,12 @@
 @keyframes insp-play-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .insp-rec-play.playing { animation: none; opacity: 1; } }
 /* Record-scratch button (#224): a quiet red affordance, offered when a line is at/below the scratch rung. */
-.insp-rec-record { flex: none; display: inline-flex; align-items: center; gap: 3px; font: 11px var(--font-ui); color: var(--danger); background: none; border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--line)); cursor: pointer; padding: 1.5px 6.5px; border-radius: var(--radius-sm); }
+.insp-rec-record { flex: none; display: inline-flex; align-items: center; gap: 3px; font: var(--text-xs) var(--font-ui); color: var(--danger); background: none; border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--line)); cursor: pointer; padding: 1.5px 6.5px; border-radius: var(--radius-sm); }
 .insp-rec-record:hover { background: color-mix(in oklab, var(--danger) 14%, transparent); border-color: var(--danger); }
 /* stale scratch take (#224): the recording predates an edit to the line */
-.insp-rec-stale { flex: none; display: inline-flex; align-items: center; gap: 3px; font: 10.5px var(--font-ui); color: var(--warn); white-space: nowrap; }
+.insp-rec-stale { flex: none; display: inline-flex; align-items: center; gap: 3px; font: var(--text-xs) var(--font-ui); color: var(--warn); white-space: nowrap; }
 /* "Needs re-record" toggle (#227): a compact checkbox + label, sitting in the inspector status row. */
-.insp-rerecord { display: inline-flex; align-items: center; gap: 5px; font: 11.5px var(--font-ui); color: var(--ink); cursor: pointer; }
+.insp-rerecord { display: inline-flex; align-items: center; gap: 5px; font: var(--text-xs) var(--font-ui); color: var(--ink); cursor: pointer; }
 .insp-rerecord input { margin: 0; cursor: pointer; }
 
 /* Live debug link (#181): the chip (the plug, its four states, the copiable address) is the shell's
@@ -310,7 +334,7 @@
    edge, opening a menu in the action-menu vocabulary (debug-panel.ts). */
 .linkstatus-flow {
   display: inline-flex; align-items: center; gap: 4.5px; max-width: 260px;
-  font: 11px var(--font-ui); color: var(--ink); background: var(--surface);
+  font: var(--text-xs) var(--font-ui); color: var(--ink); background: var(--surface);
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 5px 2px 7px; cursor: pointer;
   transition: border-color var(--dur-quick) var(--ease-standard);
 }
@@ -326,7 +350,7 @@
 .flowpick { display: flex; flex-direction: column; gap: 0.5px; min-width: 220px; max-width: 380px; max-height: 60vh; overflow: auto; }
 .flowpick-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flowpick-name.is-following { font-weight: 600; }
-.flowpick-scene { margin-left: auto; padding-left: 16px; flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.flowpick-scene { margin-left: auto; padding-left: 16px; flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); color: var(--muted); }
 
 /* Scratch-recording blocking overlay (#224): covers the whole window during a take; nothing behind it is
    reachable. Driven entirely by keys (Space finish, Esc cancel). */
@@ -335,19 +359,19 @@
 .scratch-card { display: flex; flex-direction: column; align-items: center; gap: 22.5px; padding: 38.5px 48px; min-width: 416px; max-width: 640px;
   background: var(--surface); border: 0; border-radius: var(--radius-dialog); box-shadow: var(--shadow-modal); text-align: center; }
 .scratch-line { font: 1.1rem/1.5 var(--font-read); color: var(--ink); }
-.scratch-stage { font: 700 51px var(--font-ui); line-height: 1; min-height: 54.5px; display: flex; align-items: center; gap: 6.5px; }
+.scratch-stage { font: 600 51px var(--font-ui); line-height: 1; min-height: 54.5px; display: flex; align-items: center; gap: 6.5px; }
 .scratch-stage.scratch-count { color: var(--accent); }
 .scratch-stage.scratch-rec { color: var(--danger); font-size: 32px; animation: scratch-pulse var(--dur-slow) var(--ease-standard) infinite; }
-.scratch-stage.scratch-processing, .scratch-stage.scratch-error { font-size: 22.5px; color: var(--muted); }
-.scratch-stage.scratch-ready { font-size: 22.5px; color: var(--muted); }
+.scratch-stage.scratch-processing, .scratch-stage.scratch-error { font-size: var(--text-xl); color: var(--muted); }
+.scratch-stage.scratch-ready { font-size: var(--text-xl); color: var(--muted); }
 /* The hint row: a lead phrase, then the shell's hint bar (keycap + word per key, nothing typed between). */
-.scratch-hint { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 14px; font: 13px var(--font-ui); color: var(--muted); letter-spacing: 0.02em; }
-.scratch-hint .shell-hintbar { font-size: 13px; }
+.scratch-hint { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 14px; font: var(--text-md) var(--font-ui); color: var(--muted); letter-spacing: 0.02em; }
+.scratch-hint .shell-hintbar { font-size: var(--text-md); }
 /* The speaker above the line being recorded. */
-.scratch-cue { font: 700 13.5px var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: -14.5px; }
+.scratch-cue { font: 600 var(--text-md) var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: -14.5px; }
 /* Take-state badge (#224): whether the shown line's existing take is missing, out of date, or up to date.
    Sits under the line on the main card and beside the next-line preview in the saved state. */
-.scratch-badge { font: 600 12.5px/1.2 var(--font-ui);
+.scratch-badge { font: 600 var(--text-sm)/1.2 var(--font-ui);
   padding: 2px 9px; border-radius: var(--radius-pill); margin-top: -14.5px; }
 .scratch-badge-missing { color: var(--muted); background: color-mix(in oklab, var(--ink) 8%, transparent); }
 .scratch-badge-stale { color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
@@ -360,8 +384,8 @@
 @keyframes scratch-slide { from { transform: translateX(-120%); } to { transform: translateX(320%); } }
 /* The next-line preview shown in the saved state (record it, or finish). */
 .scratch-next { display: flex; flex-direction: column; gap: 4px; align-items: center; }
-.scratch-next-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.scratch-next-cue { font: 700 13px var(--font-ui); letter-spacing: 0.05em; color: var(--accent); }
+.scratch-next-label { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); }
+.scratch-next-cue { font: 600 var(--text-md) var(--font-ui); letter-spacing: 0.05em; color: var(--accent); }
 .scratch-next-cue:empty { display: none; }
 .scratch-next-text { font: 1rem/1.4 var(--font-read); color: var(--ink); }
 /* Saved-state action buttons: replay / re-record / record next / finish (mouse-driven). */
@@ -371,13 +395,13 @@
 .scratch-cue[hidden], .scratch-bar[hidden], .scratch-next[hidden], .scratch-actions[hidden] { display: none; }
 @keyframes scratch-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 /* editable gameData field value (text / number input) */
-.insp-gd-input { font: 12.5px var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 5.5px; min-width: 0; width: 100%; max-width: 176px; }
+.insp-gd-input { font: var(--text-sm) var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 5.5px; min-width: 0; width: 100%; max-width: 176px; }
 .insp-gd-input:focus-visible { border-color: var(--accent); outline-offset: 0; }
 /* A seconds field (line padding): a short number box and its unit. The placeholder says what an empty
    field inherits, so it gets the width it needs to read. */
 .insp-pad { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
 .insp-pad .insp-pad-input { flex: 1 1 auto; max-width: 150px; }
-.insp-unit { flex: none; color: var(--muted); font: 11.5px var(--font-ui); }
+.insp-unit { flex: none; color: var(--muted); font: var(--text-xs) var(--font-ui); }
 /* The project's default pause in Project Settings: a few digits, not a full-width text field. */
 .settings-dialog input.settings-seconds { width: 96px; max-width: 96px; flex: none; }
 
@@ -385,7 +409,7 @@
 .insp-row-tags { align-items: start; }
 .insp-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
 .insp-tag { display: inline-flex; align-items: center; gap: 2.5px; max-width: 100%; padding: 1px 1.5px 1px 6.5px; border-radius: var(--radius-pill);
-  font: 600 11.5px var(--font-ui);
+  font: 600 var(--text-xs) var(--font-ui);
   color: color-mix(in oklab, var(--tag-c) 72%, var(--ink));
   background: color-mix(in oklab, var(--tag-c) 18%, var(--surface));
   border: 1px solid color-mix(in oklab, var(--tag-c) 50%, var(--line)); }
@@ -393,10 +417,10 @@
 .insp-tag-x { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%;
   background: transparent; color: inherit; opacity: 0.6; line-height: 1; cursor: pointer; }
 .insp-tag-x:hover { opacity: 1; background: color-mix(in oklab, var(--tag-c) 28%, transparent); }
-.insp-tag-input { flex: 1 1 64px; min-width: 64px; font: 12.5px var(--font-ui); color: var(--ink); background: transparent; border: 0; padding: 1.5px 2.5px; }
+.insp-tag-input { flex: 1 1 64px; min-width: 64px; font: var(--text-sm) var(--font-ui); color: var(--ink); background: transparent; border: 0; padding: 1.5px 2.5px; }
 /* the host's custom fields, grouped in the lower part of the level under a subtle divider */
-.insp-gd-section { display: flex; flex-direction: column; gap: 2.5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid color-mix(in oklab, var(--line) 65%, transparent); }
-.insp-gd-cap { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); margin-bottom: 1.5px; }
+.insp-gd-section { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: var(--hairline) solid var(--line-soft); }
+.insp-gd-cap { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); margin-bottom: 1.5px; }
 .insp-check { accent-color: var(--accent); cursor: pointer; }
 .value-list { display: flex; flex-direction: column; gap: 1.5px; max-height: 60vh; overflow: auto; }
 /* THE #30 fix (from when this list was the jump picker's). A long list overflows the 60vh cap - and flex then
@@ -404,7 +428,7 @@
    Every option crushed to an unreadable (still clickable) sliver. flex:none restores natural heights,
    letting the overflow reach this list's own scrollbar. (Same fix on .nav-list and .settings-tabs.) */
 .value-list > * { flex: none; }
-.value-list .exed-opt { font: 13px var(--font-ui); padding: 5px 7px; border-radius: var(--radius-sm); cursor: pointer; background: none; border: 0; text-align: left; color: var(--ink); }
+.value-list .exed-opt { font: var(--text-md) var(--font-ui); padding: 5px 7px; border-radius: var(--radius-sm); cursor: pointer; background: none; border: 0; text-align: left; color: var(--ink); }
 .value-list .exed-opt:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); }
 .value-list .exed-opt.sel { background: color-mix(in oklab, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; }
 
@@ -461,20 +485,20 @@
 .propsdoc { flex: 1; min-height: 0; display: grid; place-items: start center; padding: 48px 32px; overflow: auto; }
 .propsdoc[hidden] { display: none; }
 .propsdoc-card { width: min(672px, 100%); }
-.propsdoc-title { margin: 0 0 5px; font: 700 35px/1.1 var(--font-read); color: var(--ink); }
-.propsdoc-sub { color: var(--muted); font: 14.5px/1.5 var(--font-ui); margin: 0 0 19px; }
-.propsdoc-foot { color: var(--muted); font: 13px/1.5 var(--font-ui); margin: 19px 0 0; border-top: 1px solid var(--line); padding-top: 11px; }
+.propsdoc-title { margin: 0 0 5px; font: 600 35px/1.1 var(--font-read); color: var(--ink); }
+.propsdoc-sub { color: var(--muted); font: var(--text-lg)/1.5 var(--font-ui); margin: 0 0 19px; }
+.propsdoc-foot { color: var(--muted); font: var(--text-md)/1.5 var(--font-ui); margin: 19px 0 0; border-top: 1px solid var(--line); padding-top: 11px; }
 
 .overview { flex: 1; min-height: 0; display: grid; place-items: start center; padding: 48px 32px; overflow: auto; }
 .overview[hidden] { display: none; }
 .overview-card { width: min(672px, 100%); } /* entrance handled by the screen-level cross-fade */
-.overview-title { margin: 0 0 5px; font: 700 35px/1.1 var(--font-read); color: var(--ink); }
-.overview-stats { color: var(--muted); font: 14.5px var(--font-ui); margin-bottom: 16px; }
+.overview-title { margin: 0 0 5px; font: 600 35px/1.1 var(--font-read); color: var(--ink); }
+.overview-stats { color: var(--muted); font: var(--text-lg) var(--font-ui); margin-bottom: 16px; }
 /* The project's place on disk - what tells two same-named projects apart. A quiet mono line the
    width of its text; clicking reveals the folder in the platform file manager. */
 .overview-path {
   display: block; margin: -1.5px 0 8px; padding: 0; border: none; background: none; cursor: pointer;
-  color: var(--muted); font: 12.5px var(--font-mono); text-align: left;
+  color: var(--muted); font: var(--text-sm) var(--font-mono); text-align: left;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .overview-path:hover { color: var(--accent); }
@@ -482,11 +506,11 @@
 .overview-progress[hidden] { display: none; }
 .overview-bar { flex: 1; height: 6.5px; border-radius: var(--radius-pill); background: color-mix(in oklab, var(--ink) 10%, transparent); overflow: hidden; }
 .overview-bar-fill { display: block; height: 100%; background: var(--accent); border-radius: var(--radius-pill); transition: width var(--dur-settle) var(--ease-standard); }
-.overview-progress-label { color: var(--muted); font: 600 12.5px var(--font-ui); white-space: nowrap; }
-.overview-scenes-label { color: var(--muted); font: 600 12.5px/1.2 var(--font-ui); margin-bottom: 8px; }
+.overview-progress-label { color: var(--muted); font: 600 var(--text-sm) var(--font-ui); white-space: nowrap; }
+.overview-scenes-label { color: var(--muted); font: 600 var(--text-sm)/1.2 var(--font-ui); margin-bottom: 8px; }
 .overview-scenes { display: flex; flex-direction: column; gap: 2.5px; }
 .overview-scene {
-  text-align: left; width: 100%; cursor: pointer; color: var(--ink); font: 500 16px/1.3 var(--font-read);
+  text-align: left; width: 100%; cursor: pointer; color: var(--ink); font: 500 var(--text-lg)/1.3 var(--font-read);
   background: none; border: 1px solid transparent; border-radius: var(--radius-md); padding: 8px 11px;
   transition: background var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
 }
@@ -494,20 +518,20 @@
 
 /* A labelled field inside a dialog. Every dialog is on the shell's frame now (dialog.css), so only the
    field and its hint are this app's; the name is left over from the first-run identity dialog. */
-.identity-field { display: flex; flex-direction: column; gap: 4px; font: 600 12px var(--font-ui); color: var(--muted); }
-.identity-field input { font: 16px var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6.5px 9px; }
+.identity-field { display: flex; flex-direction: column; gap: 4px; font: 600 var(--text-sm) var(--font-ui); color: var(--muted); }
+.identity-field input { font: var(--text-lg) var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6.5px 9px; }
 .identity-field input:focus-visible { border-color: var(--accent); outline-offset: 0; }
 /* The sentence under a field. It had no rule of its own, so it inherited the field LABEL's 600 weight
    and shrank again as a `small`, reading as a squashed label rather than as prose. Sized and weighted
    here to match the shell's own `.shell-ident-hint`. */
-.identity-field .identity-hint { font: 11.5px/1.45 var(--font-ui); color: var(--muted); margin-top: 2px; }
+.identity-field .identity-hint { font: var(--text-xs)/1.45 var(--font-ui); color: var(--muted); margin-top: 2px; }
 
 /* New-project dialog (reuses the identity dialog chrome): a quiet preview of the .patter folder name. */
 /* New Project's own fields, in the kit gallery's details panel (the shell's kit-gallery.css). */
 .create-details { display: flex; flex-direction: column; gap: 6px; }
 .kit-gallery .create-details .insp-select, .kit-gallery .create-details .field { width: 100%; max-width: none; }
-.create-preview { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
-.create-preview code { font: 12.5px var(--font-mono); color: var(--ink-soft); }
+.create-preview { margin: 2px 0 0; color: var(--muted); font-size: var(--text-md); }
+.create-preview code { font: var(--text-sm) var(--font-mono); color: var(--ink-soft); }
 
 /* Project Settings is the shell's `mountSettingsDialog` + settings.css (ui-review-2026-09, finding 4); the
    rail, the panels, the Save gate and their classes are its. Two things are this app's: the dialog is WIDE,
@@ -534,7 +558,7 @@
 /* A text field in a settings row takes the row's width, as Storyletter's do (the shell scopes its own rule to
    Storyletter's panel class): the bundle path was clipped to a few characters. */
 .settings-panel .shell-labelled > input:not([type=checkbox]):not([type=radio]) { flex: 1; min-width: 0; }
-.settings-note { margin: 0; color: var(--muted); font-size: 12px; }
+.settings-note { margin: 0; color: var(--muted); font-size: var(--text-sm); }
 
 /* Placeholder text everywhere: --muted and italic, so a prompt can't read as content, and the prompt
    strings themselves are wrapped in <angle brackets> to say "this is a hint, not a value". No further fade:
@@ -562,26 +586,26 @@ input::placeholder, textarea::placeholder {
 .editable-range { display: flex; width: 100%; margin-bottom: 13px; }
 .editable-range .seg-opt { flex: 1 1 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9.5px 13px; text-align: left; min-width: 0; }
 .editable-range .seg-opt:disabled { opacity: .5; cursor: default; }
-.editable-range-label { font: 600 14px var(--font-ui); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.editable-range-count { font: 12px var(--font-ui); color: var(--muted); }
+.editable-range-label { font: 600 var(--text-md) var(--font-ui); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.editable-range-count { font: var(--text-sm) var(--font-ui); color: var(--muted); }
 .editable-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 11px; }
-.editable-field-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.editable-field-hint { font: 12px var(--font-ui); color: var(--muted); }
+.editable-field-label { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); }
+.editable-field-hint { font: var(--text-sm) var(--font-ui); color: var(--muted); }
 .editable-summary { margin-bottom: 13px; }
-.editable-summary-line { margin: 0 0 4.5px; font: 13.5px var(--font-ui); color: var(--ink); }
-.editable-counts { margin: 0 0 9.5px; font: 600 13.5px var(--font-ui); color: var(--ink); }
-.editable-refused { margin: 0; padding: 6.5px 9.5px; border-left: 2px solid var(--danger); font: 13.5px var(--font-ui); color: var(--ink); }
+.editable-summary-line { margin: 0 0 4.5px; font: var(--text-md) var(--font-ui); color: var(--ink); }
+.editable-counts { margin: 0 0 9.5px; font: 600 var(--text-md) var(--font-ui); color: var(--ink); }
+.editable-refused { margin: 0; padding: 6.5px 9.5px; border-left: 2px solid var(--danger); font: var(--text-md) var(--font-ui); color: var(--ink); }
 .editable-problems { list-style: none; margin: 0; padding: 0; max-height: 36vh; overflow: auto; border-top: 1px solid var(--line); }
-.editable-problem { display: flex; align-items: center; gap: 9px; padding: 6px 2px; border-bottom: 1px solid var(--line); font: 13px var(--font-ui); color: var(--ink); }
+.editable-problem { display: flex; align-items: center; gap: 9px; padding: 6px 2px; border-bottom: 1px solid var(--line); font: var(--text-md) var(--font-ui); color: var(--ink); }
 .editable-problem.info { color: var(--muted); }
 .editable-problem.warning .editable-problem-text::before { content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 8px 1px 0; border-radius: 50%; background: var(--warn); }
 .editable-problem-text { flex: 1 1 auto; min-width: 0; }
-.editable-goto { flex: 0 0 auto; font: 12px var(--font-ui); padding: 2px 8px; }
-.editable-error { margin: 9.5px 0 0; padding: 6.5px 9.5px; border-left: 2px solid var(--danger); font: 13px var(--font-ui); color: var(--ink); }
+.editable-goto { flex: 0 0 auto; font: var(--text-sm) var(--font-ui); padding: 2px 8px; }
+.editable-error { margin: 9.5px 0 0; padding: 6.5px 9.5px; border-left: 2px solid var(--danger); font: var(--text-md) var(--font-ui); color: var(--ink); }
 .loc-row { display: flex; gap: 16px; }
 .loc-row .identity-field { flex: 1; }
 /* What an export found dropping out of the loc files or coming into them (action text): the beats, listed. */
-.loc-changes-list { margin: 3px 0 10px; padding-left: 18px; font-size: 12.5px; color: var(--muted); }
+.loc-changes-list { margin: 3px 0 10px; padding-left: 18px; font-size: var(--text-sm); color: var(--muted); }
 
 /* Production Information (read-only report view): summary line, headline cards, status bars, tables. */
 .report-dialog { --dialog-width: 896px; max-height: 88vh; }
@@ -608,28 +632,28 @@ input::placeholder, textarea::placeholder {
 .report-scroll.has-below .report-more { opacity: 1; pointer-events: auto; }
 .report-more:hover { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 40%, var(--line)); }
 .rpt-summary { display: flex; align-items: baseline; gap: 9.5px; flex-wrap: wrap; }
-.rpt-summary-name { font: 700 16px var(--font-read); color: var(--ink); }
-.rpt-summary-scenes { color: var(--muted); font: 13px var(--font-ui); }
-.rpt-badge { margin-left: auto; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 1.5px 9px; }
+.rpt-summary-name { font: 600 var(--text-lg) var(--font-read); color: var(--ink); }
+.rpt-summary-scenes { color: var(--muted); font: var(--text-md) var(--font-ui); }
+.rpt-badge { margin-left: auto; font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 1.5px 9px; }
 .rpt-badge.voiced { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 40%, var(--line)); }
 .rpt-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); gap: 9.5px; }
 .rpt-card { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 9px 11px; background: var(--card); display: flex; flex-direction: column; gap: 2.5px; }
-.rpt-card-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.rpt-card-big { font: 700 20px var(--font-read); color: var(--ink); }
-.rpt-card-sub { font: 12px var(--font-ui); color: var(--muted); }
+.rpt-card-label { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); }
+.rpt-card-big { font: 600 var(--text-xl) var(--font-read); color: var(--ink); }
+.rpt-card-sub { font: var(--text-sm) var(--font-ui); color: var(--muted); }
 .rpt-section { display: flex; flex-direction: column; gap: 8px; }
-.rpt-section-cap { margin: 0; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
+.rpt-section-cap { margin: 0; font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); }
 .rpt-bars { display: flex; flex-direction: column; gap: 5px; }
 .rpt-bar-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 48px; align-items: center; gap: 9.5px; }
-.rpt-bar-label { font: 12.5px var(--font-ui); color: var(--ink-soft); }
+.rpt-bar-label { font: var(--text-sm) var(--font-ui); color: var(--ink-soft); }
 .rpt-bar-track { height: 11px; background: color-mix(in oklab, var(--line) 60%, transparent); border-radius: var(--radius-sm); overflow: hidden; }
 .rpt-bar-fill { height: 100%; background: var(--accent); border-radius: var(--radius-sm); min-width: 2px; }
 .rpt-bar-fill.zero { min-width: 0; }
-.rpt-bar-count { font: 12.5px var(--font-mono); color: var(--muted); text-align: right; }
+.rpt-bar-count { font: var(--text-sm) var(--font-mono); color: var(--muted); text-align: right; }
 .rpt-notes { display: flex; flex-direction: column; gap: 4px; }
-.rpt-note { margin: 0; font: 12.5px var(--font-ui); color: var(--muted); }
-.rpt-table { width: 100%; border-collapse: collapse; font: 13px var(--font-ui); }
-.rpt-table th { text-align: left; font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.rpt-note { margin: 0; font: var(--text-sm) var(--font-ui); color: var(--muted); }
+.rpt-table { width: 100%; border-collapse: collapse; font: var(--text-md) var(--font-ui); }
+.rpt-table th { text-align: left; font: 600 var(--text-xs) var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--line); }
 .rpt-table td { padding: 5px 8px; border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent); color: var(--ink); }
 .rpt-table .rpt-n { text-align: right; font-variant-numeric: tabular-nums; }
 .rpt-table tr:last-child td { border-bottom: 0; }
@@ -638,29 +662,29 @@ input::placeholder, textarea::placeholder {
 
 /* Game Data field-definition editor: node-kind tab rail + per-kind field list. */
 .gd-kindtabs { display: flex; flex-wrap: wrap; gap: 2.5px; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 3px; }
-.gd-kindtab { display: inline-flex; align-items: center; gap: 5px; background: none; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; padding: 4px 9px; color: var(--ink-soft); font: 600 12.5px var(--font-ui); }
+.gd-kindtab { display: inline-flex; align-items: center; gap: 5px; background: none; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; padding: 4px 9px; color: var(--ink-soft); font: 600 var(--text-sm) var(--font-ui); }
 .gd-kindtab:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 .gd-kindtab.active { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
-.gd-kindcount { font: 600 9.5px var(--font-mono); color: var(--on-accent); background: var(--accent); border-radius: var(--radius-sm); padding: 0 5px; }
+.gd-kindcount { font: var(--text-xs) var(--font-mono); color: var(--on-accent); background: var(--accent); border-radius: var(--radius-sm); padding: 0 5px; }
 .gd-fieldlist { display: flex; flex-direction: column; gap: 8px; max-height: 384px; overflow: auto; }
 .gd-field { display: flex; flex-direction: column; gap: 6.5px; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 8px 9.5px; background: var(--card); }
 .gd-field-top { display: flex; gap: 6.5px; align-items: center; }
 .gd-field-mid { display: flex; gap: 9.5px; flex-wrap: wrap; }
-.gd-input { font: 13.5px var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 7px; }
+.gd-input { font: var(--text-md) var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 7px; }
 .gd-input:focus-visible { border-color: var(--accent); outline-offset: 0; }
 .gd-name { flex: 1; min-width: 0; }
 .gd-type { flex: 0 0 auto; }
 .gd-acts { display: flex; gap: 1.5px; margin-left: auto; }
 /* A checkbox caption on the shell's `.shell-labelled` row (Shared / Temporary / Read-only): its own look only. */
-.gd-shared { gap: 6.5px; flex: 0 0 auto; cursor: pointer; font: 600 12.5px var(--font-ui); color: var(--ink-soft); }
-.gd-add { align-self: flex-start; margin-top: 3px; background: none; border: 1px dashed var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 600 12.5px var(--font-ui); padding: 4px 9.5px; }
+.gd-shared { gap: 6.5px; flex: 0 0 auto; cursor: pointer; font: 600 var(--text-sm) var(--font-ui); color: var(--ink-soft); }
+.gd-add { align-self: flex-start; margin-top: 3px; background: none; border: 1px dashed var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 600 var(--text-sm) var(--font-ui); padding: 4px 9.5px; }
 .gd-add:hover { color: var(--accent); border-color: var(--accent); }
 
 /* Estimating tab: the config below the enable toggle greys out (but stays editable) while it's off. */
 .est-config { display: flex; flex-direction: column; gap: 9px; margin-top: 11px; }
 .est-config.est-off { opacity: 0.5; }
 .est-num { width: 96px; }
-.est-tags-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); margin-top: 3px; }
+.est-tags-label { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); margin-top: 3px; }
 .est-tag-row { display: flex; align-items: center; gap: 6.5px; }
 .est-tag-row .est-tag { flex: 1; }
 
@@ -689,7 +713,7 @@ input::placeholder, textarea::placeholder {
 .set-rowline .qual-gameid { flex: 0 0 132px; width: 132px; font-family: var(--font-mono); }
 .set-rowline .qual-gameid.bad-id { border-color: var(--danger); }
 .qual-sets { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
-.qual-sets-label { color: var(--muted); font-size: 12px; }
+.qual-sets-label { color: var(--muted); font-size: var(--text-sm); }
 /* The speaker pattern, under the list and its add button: set apart from them, as a setting of its own. */
 .qual-pattern-field { margin-top: 16px; }
 /* Dictionary tab (#177): the language picker row (select + Import / Remove) and the import error line. */
@@ -699,10 +723,10 @@ input::placeholder, textarea::placeholder {
 .dict-error { color: var(--danger); }
 /* Status ladders (Project Settings > Status): a captioned section per ladder, each writing row
    carrying its two readiness-threshold radios. */
-.gd-statuscap { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); margin-top: 9.5px; }
+.gd-statuscap { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); margin-top: 9.5px; }
 .gd-statuscap:first-child { margin-top: 0; }
 .gd-markers { display: flex; gap: 14.5px; flex-wrap: wrap; padding-left: 1.5px; }
-.gd-marker { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font: 12px var(--font-ui); color: var(--muted); }
+.gd-marker { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font: var(--text-sm) var(--font-ui); color: var(--muted); }
 .gd-marker input { accent-color: var(--accent); }
 /* Writing-status row: a top line (name fills | readiness radios | move/delete buttons) plus a colour line
    below it (#196). The status row stacks (column); the top line is the inline row. */
@@ -714,17 +738,17 @@ input::placeholder, textarea::placeholder {
 /* The per-status colour picker: a "Colour" label, a "none" swatch, then the 12 theme-palette slots. The
    active slot is ringed; "none" shows a small diagonal slash. */
 .sp-colour { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding-left: 1.5px; }
-.sp-colour-cap { font: 11.5px var(--font-ui); color: var(--muted); margin-right: 2.5px; }
+.sp-colour-cap { font: var(--text-xs) var(--font-ui); color: var(--muted); margin-right: 2.5px; }
 /* Audio Folders (#206): the per-rung project-relative folder field, shown under a rung when folders mode is on. */
 .sp-folder { display: flex; align-items: center; gap: 5.5px; padding-left: 1.5px; margin-top: 4px; }
-.sp-folder-cap { font: 11.5px var(--font-ui); color: var(--muted); }
-.sp-folder-input { font-family: var(--font-mono); font-size: 12px; flex: 1 1 auto; min-width: 0; }
+.sp-folder-cap { font: var(--text-xs) var(--font-ui); color: var(--muted); }
+.sp-folder-input { font-family: var(--font-mono); font-size: var(--text-sm); flex: 1 1 auto; min-width: 0; }
 /* The fixed "missing" fallback rung (folder mode): its name reads as locked, and it shows a muted note in
    place of the folder field (it never points at a folder). */
 .gd-input.sp-locked { color: var(--muted); background: color-mix(in oklab, var(--ink) 5%, transparent); cursor: default; }
-.sp-folder-none { flex: 1 1 auto; min-width: 0; font: italic 12px var(--font-ui); color: var(--muted); align-self: center; }
+.sp-folder-none { flex: 1 1 auto; min-width: 0; font: italic var(--text-sm) var(--font-ui); color: var(--muted); align-self: center; }
 /* The auto-derived subfolder hint (folder mode): a read-only mono path shown in place of the old manual field. */
-.sp-folder-derived { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: 12px; color: var(--muted); align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-folder-derived { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--muted); align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sp-swatch { width: 17px; height: 17px; border-radius: 50%; padding: 0; cursor: pointer; box-sizing: border-box; border: 1px solid color-mix(in oklab, var(--ink) 18%, transparent); }
 .sp-swatch.active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent); }
 .sp-swatch-none { position: relative; background: var(--bg); }
@@ -742,7 +766,7 @@ input::placeholder, textarea::placeholder {
 .wordrow { display: flex; align-items: center; gap: 5px; }
 .wordrow .gd-input { flex: 1; min-width: 0; padding: 3.5px 6.5px; }
 /* Language tab: a locale row (code + Default radio + remove) and the add control. */
-.lang-code { font: 600 14.5px var(--font-mono); color: var(--ink); flex: 1; }
+.lang-code { font: var(--text-lg) var(--font-mono); color: var(--ink); flex: 1; }
 .lang-add { display: flex; gap: 8px; align-items: center; margin-top: 3px; }
 .lang-add .gd-input { flex: 1; }
 .gd-input.invalid { border-color: var(--danger); }
@@ -818,7 +842,7 @@ body.writing-view .writing-exit {
   display: inline-flex; align-items: center; gap: 6px;
   position: fixed; right: 9.5px; bottom: 5px; z-index: 50;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 8px;
-  color: var(--muted); font: 600 11px var(--font-ui); letter-spacing: 0.02em; cursor: pointer;
+  color: var(--muted); font: 600 var(--text-xs) var(--font-ui); letter-spacing: 0.02em; cursor: pointer;
   opacity: 0.7;
   transition: opacity var(--dur-base) var(--ease-standard), color var(--dur-base) var(--ease-standard), border-color var(--dur-base) var(--ease-standard);
   animation: var(--anim-panel-in);
@@ -830,10 +854,10 @@ body.writing-view #hintbar { padding-right: 192px; }
 /* (Coverage results styling lives in the detached coverage window: coverage/coverage.css.) */
 
 /* World settings tab (#159): host-scope + driver editors. */
-.world-cap { margin: 9.5px 0 3px; font: 600 13px var(--font-ui); color: var(--accent); }
+.world-cap { margin: 9.5px 0 3px; font: 600 var(--text-md) var(--font-ui); color: var(--accent); }
 .world-cap:first-child { margin-top: 0; }
 .world-ref { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; }
-.world-at, .world-dot, .world-scope { color: var(--muted); font: 13.5px var(--font-mono); padding: 0 1.5px; }
+.world-at, .world-dot, .world-scope { color: var(--muted); font: var(--text-md) var(--font-mono); padding: 0 1.5px; }
 .world-token { width: 80px; flex: 0 0 auto; }
 .world-driver-actions { display: flex; gap: 8px; margin-top: 3px; }
 
@@ -845,4 +869,4 @@ body.writing-view #hintbar { padding-right: 192px; }
 /* A game-data value is the shell's field row (inspector.ts gameDataFieldRow): a multiline value takes the
    row's width, and the purpose under it keeps the inspector's small voice. */
 .insp-gd-row textarea.insp-gd-input { max-width: none; resize: vertical; }
-.insp-gd-row .shell-fieldrow-purpose, .insp-gd-row .shell-fieldrow-problem { font-size: 11.5px; }
+.insp-gd-row .shell-fieldrow-purpose, .insp-gd-row .shell-fieldrow-problem { font-size: var(--text-xs); }

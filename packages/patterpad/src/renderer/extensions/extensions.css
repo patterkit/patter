@@ -8,8 +8,8 @@ body.ext-win {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--text-md);
   overflow: hidden;
 }
-.swin-head { font-size: 14px; }
+.swin-head { font-size: var(--chrome-size); }
 .ext-body { flex: 1 1 auto; overflow: auto; }

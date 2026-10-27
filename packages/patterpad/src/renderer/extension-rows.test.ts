@@ -47,6 +47,7 @@ function handlersWith(over: Partial<InspectorHandlers> = {}): InspectorHandlers 
     needsRerecord: () => false, setNeedsRerecord: noop,
     qualifiers: () => [], setQualifier: noop,
     projectPadAfter: () => 0.6, setPadAfter: noop, setPadAfterDefault: noop,
+    levelOpen: () => undefined, setLevelOpen: noop,
     extensions: () => probe(), setExtensionValue: noop, extensionLock: () => null, extensionAdapter: () => adapter,
     ...over,
   };
@@ -72,7 +73,7 @@ describe("extension sections in the inspector", () => {
       { kind: "scene", id: "scn_a", name: "Harbour", address: "harbour" },
     );
     // text, gameEvent, snippet, option, block, scene: not the plain sequence group.
-    expect(sections(host).map((s) => s.closest(".insp-level")!.className.replace("insp-level insp-", ""))).toEqual(["leaf", "leaf", "snippet", "group", "block", "scene"]);
+    expect(sections(host).map((s) => /\binsp-(leaf|snippet|group|block|scene)\b/.exec(s.closest(".insp-level")!.className)?.[1])).toEqual(["leaf", "leaf", "snippet", "group", "block", "scene"]);
     expect(sections(host).every((s) => s.querySelector(".insp-gd-cap")?.textContent === "Probe")).toBe(true);
     expect(rowOf(host, "style")).toBeTruthy();
     expect(rowOf(host, "icon")).toBeTruthy();

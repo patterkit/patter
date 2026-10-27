@@ -26,10 +26,31 @@ const handlers: InspectorHandlers = {
   needsRerecord: () => false, setNeedsRerecord: noop,
   qualifiers: () => [], setQualifier: noop,
   projectPadAfter: () => 0.6, setPadAfter: noop, setPadAfterDefault: noop,
+  levelOpen: () => undefined, setLevelOpen: noop,
   // Patter extensions (extension-rows.test.ts draws them): a project taking none.
   extensions: () => [], setExtensionValue: noop, extensionLock: () => null, extensionAdapter: () => ({ nodes: () => [] }),
 };
 const ctx = (level: unknown): InspectorContext => ({ levels: [level] }) as InspectorContext;
+
+/** What a level's Add menu offers (its labels), opening and closing the menu to read them. */
+function addOffers(host: HTMLElement, level = 0): string[] {
+  const btn = host.querySelectorAll<HTMLButtonElement>(".insp-level")[level]?.querySelector<HTMLButtonElement>(".insp-add");
+  if (!btn) return [];
+  btn.click();
+  const labels = [...document.querySelectorAll(".ctxmenu button, .ctxmenu [role=menuitem]")].map((b) => b.textContent ?? "");
+  document.querySelector(".ctxmenu")?.remove();
+  return labels;
+}
+
+/** Pick `label` from a level's Add menu (the October 2026 inspector draws an unset property only once it's
+ *  added, or once it has a value). */
+function pickAdd(host: HTMLElement, label: string, level = 0): void {
+  host.querySelectorAll<HTMLElement>(".insp-level")[level]!.querySelector<HTMLButtonElement>(".insp-add")!.click();
+  const item = [...document.querySelectorAll<HTMLElement>(".ctxmenu button, .ctxmenu [role=menuitem]")].find((b) => b.textContent === label);
+  if (!item) throw new Error(`the Add menu offers no "${label}"`);
+  item.click();
+  document.querySelector(".ctxmenu")?.remove();
+}
 
 describe("inspector: surfaced line ID + copy", () => {
   beforeEach(() => {
@@ -155,18 +176,19 @@ describe("inspector: surfaced line ID + copy", () => {
     expect(recRow(text)).toBeUndefined();
   });
 
-  it("the Re-record row: a checkbox that reflects the flag and shows a pill when set (#227)", () => {
+  it("the Re-record row: offered in the Add menu until flagged, then a ticked box and a pill (#227)", () => {
     const ladder = [{ name: "missing", colour: 0 }, { name: "recorded", colour: 4 }];
     const rrRow = (host: HTMLElement): HTMLElement | undefined =>
       [...host.querySelectorAll(".insp-row")].find((r) => r.querySelector(".insp-key")?.textContent === "Re-record") as HTMLElement | undefined;
 
-    // Unflagged: an unchecked checkbox, no pill.
-    const off = { ...handlers, recordingStatuses: () => ladder, needsRerecord: () => false };
+    // Unflagged: no row; the Add menu offers it, and picking it sets the flag.
+    const setNeedsRerecord = vi.fn();
+    const off = { ...handlers, recordingStatuses: () => ladder, needsRerecord: () => false, setNeedsRerecord };
     const a = document.createElement("div");
     renderInspector(a, ctx({ kind: "leaf", beat: "line", id: "L_greet" }), off);
-    const box = rrRow(a)?.querySelector("input[type=checkbox]") as HTMLInputElement | undefined;
-    expect(box?.checked).toBe(false);
-    expect(rrRow(a)?.querySelector(".insp-rec-chip")).toBeFalsy();
+    expect(rrRow(a)).toBeUndefined();
+    pickAdd(a, "Needs re-record");
+    expect(setNeedsRerecord).toHaveBeenCalledWith("L_greet", true);
 
     // Flagged: checked, plus a "re-record" pill echoing the masked status.
     const on = { ...handlers, recordingStatuses: () => ladder, needsRerecord: (id: string) => id === "L_greet" };
@@ -250,10 +272,12 @@ describe("inspector: the speaker qualifier row", () => {
     expect(sel.value).toBe("os");
   });
 
-  it("writes the picked gameId (and \"\" for None) through the handler", () => {
+  it("waits in the Add menu while unset, then writes the picked gameId (and \"\" for None)", () => {
     const host = document.createElement("div");
     const setQualifier = vi.fn();
     renderInspector(host, line(), { ...handlers, qualifiers: () => LIST, setQualifier });
+    expect(select(host)).toBeNull();
+    pickAdd(host, "Qualifier");
     const sel = select(host)!;
     expect(sel.value).toBe("");
     sel.value = "vo"; sel.dispatchEvent(new Event("change"));
@@ -275,15 +299,18 @@ describe("inspector: line padding fields", () => {
   const field = (host: HTMLElement): HTMLInputElement | null => host.querySelector<HTMLInputElement>("input.insp-pad-input");
   const commit = (input: HTMLInputElement, value: string): void => { input.value = value; input.dispatchEvent(new Event("change")); };
 
-  it("shows a line's inherited pause as a placeholder, naming where it comes from", () => {
+  it("offers an unset pause in the Add menu, its placeholder naming where the inherited one comes from", () => {
     const host = document.createElement("div");
     renderInspector(host, ctx({ kind: "leaf", beat: "line", id: "L1", character: "TAM", padInherited: { value: 0.25, from: "block" } }), handlers);
+    expect(field(host)).toBeNull();
+    pickAdd(host, "Pad after");
     const input = field(host)!;
     expect(input.value).toBe("");
     expect(input.placeholder).toBe("0.25 from the block");
     expect(input.min).toBe("-10");
     const bare = document.createElement("div");
     renderInspector(bare, ctx({ kind: "leaf", beat: "prose", id: "T1" }), { ...handlers, projectPadAfter: () => 0.6 });
+    pickAdd(bare, "Pad after");
     expect(field(bare)!.placeholder).toBe("0.6 from the project");
   });
 
@@ -305,6 +332,7 @@ describe("inspector: line padding fields", () => {
     const host = document.createElement("div");
     const setPadAfter = vi.fn();
     renderInspector(host, ctx({ kind: "leaf", beat: "line", id: "L9", character: "TAM", endsSnippet: true, padInherited: { value: -0.4, from: "snippet" } }), { ...handlers, setPadAfter });
+    pickAdd(host, "Pad after");
     const input = field(host)!;
     expect(input.min).toBe("0");
     expect(input.placeholder).toBe("0 at the end of a snippet");
@@ -313,10 +341,11 @@ describe("inspector: line padding fields", () => {
     // A prompt times the reply, which is certain: its field goes below zero.
     const prompt = document.createElement("div");
     renderInspector(prompt, ctx({ kind: "leaf", beat: "line", id: "P1", character: "TAM", prompt: true }), handlers);
+    pickAdd(prompt, "Pad after");
     expect(field(prompt)!.min).toBe("-10");
   });
 
-  it("puts a Default pad field on snippets, groups, blocks, and scenes, and none on a game event", () => {
+  it("puts a Default pad on snippets, groups, blocks, and scenes (drawn once set, offered until then), and none on a game event", () => {
     const setPadAfterDefault = vi.fn();
     const levels = [
       { kind: "snippet", id: "sn", beatCount: 1, padAfterDefault: 0.3 },
@@ -326,11 +355,14 @@ describe("inspector: line padding fields", () => {
     ];
     const host = document.createElement("div");
     renderInspector(host, { levels } as InspectorContext, { ...handlers, setPadAfterDefault });
-    const inputs = [...host.querySelectorAll<HTMLInputElement>("input.insp-pad-input")];
-    expect(inputs.map((i) => i.getAttribute("aria-label"))).toEqual(["Default pad", "Default pad", "Default pad", "Default pad"]);
-    expect(inputs[0]!.value).toBe("0.3");
-    expect(inputs[1]!.placeholder).toBe("1 from the scene");
-    commit(inputs[2]!, "0.9");
+    const set = [...host.querySelectorAll<HTMLInputElement>("input.insp-pad-input")];
+    expect(set.map((i) => i.getAttribute("aria-label"))).toEqual(["Default pad"]); // only the snippet sets one
+    expect(set[0]!.value).toBe("0.3");
+    for (const level of [1, 2, 3]) expect(addOffers(host, level)).toContain("Default pad");
+    pickAdd(host, "Default pad", 1);
+    expect(host.querySelectorAll<HTMLElement>(".insp-level")[1]!.querySelector<HTMLInputElement>("input.insp-pad-input")!.placeholder).toBe("1 from the scene");
+    pickAdd(host, "Default pad", 2);
+    commit(host.querySelectorAll<HTMLElement>(".insp-level")[2]!.querySelector<HTMLInputElement>("input.insp-pad-input")!, "0.9");
     expect(setPadAfterDefault).toHaveBeenCalledWith("b", 0.9);
     const event = document.createElement("div");
     renderInspector(event, ctx({ kind: "leaf", beat: "gameEvent", id: "A1" }), handlers);
@@ -345,6 +377,8 @@ describe("inspector: an option's game data", () => {
     const fields = [{ name: "tone", type: "text" as const }];
     const h: InspectorHandlers = { ...handlers, gameDataFields: (kind) => (kind === "option" ? fields : []), setGameData: (id, key, v) => { set.push([id, key, v]); } };
     renderInspector(host, ctx({ kind: "group", id: "o1", role: "option", labelParts: ["Option"], label: "Option", gameData: { outcome: "o-leave" } }), h);
+    expect(host.querySelector(".insp-gd-row")).toBeNull(); // unset: offered, not drawn
+    pickAdd(host, "tone");
     const input = host.querySelector<HTMLInputElement>(".insp-gd-row input")!;
     input.value = "kind";
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -367,6 +401,7 @@ describe("inspector: a game-data value typed through a redraw", () => {
     // The renderer redraws the whole stack on every change, as showInspector does when a value lands.
     const h: InspectorHandlers = { ...handlers, gameDataFields: () => fields, setGameData: (_id, key, v) => { gd = v === undefined ? {} : { [key]: v }; draw(); } };
     draw();
+    pickAdd(host, "mood");
     expect(host.querySelector(".shell-fieldrow-purpose")?.textContent).toBe("How the line is played");
     const input = host.querySelector<HTMLInputElement>(".insp-gd-row input")!;
     input.focus();
@@ -378,5 +413,47 @@ describe("inspector: a game-data value typed through a redraw", () => {
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(gd).toEqual({});   // Esc puts back what it held at focus: nothing set
     host.remove();
+  });
+});
+
+describe("inspector: sections that fold, and the option's behaviour flags (October 2026 UI review)", () => {
+  const option = { kind: "group", id: "o1", role: "option", labelParts: ["Option"], label: "Option", sticky: true, condition: "@x > 1" };
+  const stack = (): InspectorContext => ({ levels: [{ kind: "leaf", beat: "line", id: "L1", character: "TAM" }, { kind: "snippet", id: "sn", beatCount: 1 }, option, { kind: "block", id: "b", name: "Main", address: "main" }] }) as InspectorContext;
+  const folded = (host: HTMLElement): boolean[] => [...host.querySelectorAll(".insp-level")].map((l) => l.classList.contains("insp-folded"));
+
+  it("opens the line and the snippet, folds the outer levels, and sums up what a folded one sets", () => {
+    const host = document.createElement("div");
+    renderInspector(host, stack(), handlers);
+    expect(folded(host)).toEqual([false, false, true, true]);
+    expect(host.querySelectorAll(".insp-level")[2]!.querySelector(".insp-head-sum")?.textContent).toBe("Sticky, has a condition");
+  });
+
+  it("remembers the author's open or folded choice per kind of level", () => {
+    const remembered: Record<string, boolean> = {};
+    const h: InspectorHandlers = { ...handlers, levelOpen: (k) => remembered[k], setLevelOpen: (k, open) => { remembered[k] = open; } };
+    const host = document.createElement("div");
+    renderInspector(host, stack(), h);
+    host.querySelectorAll<HTMLButtonElement>(".insp-fold")[2]!.click(); // open the option
+    expect(folded(host)[2]).toBe(false);
+    expect(remembered).toEqual({ option: true });
+    renderInspector(host, stack(), h);
+    expect(folded(host)).toEqual([false, false, false, true]);
+  });
+
+  it("draws Sticky, Fallback and Secret as one row of toggles that write the group's props", () => {
+    const editGroupProps = vi.fn();
+    const host = document.createElement("div");
+    renderInspector(host, ctx(option), { ...handlers, editGroupProps });
+    const flags = [...host.querySelectorAll<HTMLButtonElement>(".insp-flag")];
+    expect(flags.map((f) => [f.textContent, f.getAttribute("aria-pressed")])).toEqual([["Sticky", "true"], ["Fallback", "false"], ["Secret", "false"]]);
+    flags[1]!.click();
+    expect(editGroupProps).toHaveBeenCalledWith("o1", { fallback: true });
+  });
+
+  it("shows an unset condition as a quiet None, and offers the unset properties in one Add menu", () => {
+    const host = document.createElement("div");
+    renderInspector(host, ctx({ kind: "snippet", id: "sn", beatCount: 1 }), handlers);
+    expect(host.querySelector(".insp-cond.muted")?.textContent).toBe("None");
+    expect(addOffers(host)).toEqual(["On begin", "On end", "Default pad", "Tags"]);
   });
 });
