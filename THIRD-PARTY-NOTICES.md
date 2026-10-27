@@ -12,7 +12,7 @@ ship in the packaged app's `node_modules`). All are under the SIL Open Font Lice
 - **Newsreader** (`@fontsource/newsreader`, `@fontsource-variable/newsreader` on the website):
   © The Newsreader Project Authors.
 - **Inter** (`@fontsource/inter`): © The Inter Project Authors.
-- **IBM Plex Mono** and **IBM Plex Sans** (`@ibm/plex-mono`, `@ibm/plex-sans`, IBM's own releases):
+- **IBM Plex Mono** (`@ibm/plex-mono`, IBM's own release):
   © IBM Corp., with Reserved Font Name "Plex". Patter uses IBM's unmodified files rather than a third
   party's subset, because the OFL keeps a reserved name off modified versions.
 - **Literata**, **Source Serif 4**, **Courier Prime** (`@fontsource/literata`, `@fontsource/source-serif-4`,

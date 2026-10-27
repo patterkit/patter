@@ -68,7 +68,7 @@ function statusPill(name: string): HTMLElement {
   if (slot != null) {
     // A tinted chip (not a saturated fill): readable in every colour theme, the rung's hue carried by
     // the background wash, border, and text together.
-    pill.style.background = `color-mix(in oklab, var(--char-${slot}) 20%, var(--surface))`;
+    pill.style.background = `color-mix(in oklab, var(--char-${slot}) 20%, var(--card))`;
     pill.style.borderColor = `color-mix(in oklab, var(--char-${slot}) 55%, var(--line))`;
     pill.style.color = `color-mix(in oklab, var(--char-${slot}) 72%, var(--ink))`;
   }

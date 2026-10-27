@@ -32,7 +32,7 @@ import { adoptSceneName, relabelNavScene } from "./scene-name.js";
 import { selectAllOutsideEditor, undoRoute } from "./edit-commands.js";
 import { UndoJournal, type EntryResult, type JournalEntry } from "./undo-journal.js";
 import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
-import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectHistoryOutcome, ProjectSettingsDto, ProjectStep, RecentProject, ReportData, ReviewItem, SaveResult, StageRenameDto, ThemePrefs, VcsKind } from "../../shared/api.js";
+import type { BootState, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectHistoryOutcome, ProjectSettingsDto, ProjectStep, RecentProject, ReportData, ReviewItem, SaveResult, StageRenameDto, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector, formatSeconds } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
 // open, because they are all the one panel.
@@ -61,7 +61,7 @@ import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
 import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way for both apps
-import { stageGateNote, toast } from "@wildwinter/app-shell";
+import { isThemeChoice, stageGateNote, toast } from "@wildwinter/app-shell";
 import { landed } from "./results.js";
 import { fileSafeName } from "../../shared/file-name.js";
 // The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
@@ -4022,7 +4022,10 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "export-script") void exportScript();
   else if (cmd === "export-editable") { if (project) void openEditableExport(editableContext()); }
   else if (cmd === "import-editable") { if (project) void openEditableReimport(editableContext()); }
-  else if (cmd.startsWith("theme:colour:")) setTheme({ colour: cmd.slice("theme:colour:".length) as ColourTheme });
+  else if (cmd.startsWith("theme:colour:")) {
+    const colour = cmd.slice("theme:colour:".length);
+    if (isThemeChoice(colour)) setTheme({ colour });
+  }
   else if (cmd.startsWith("theme:font:")) setTheme({ font: cmd.slice("theme:font:".length) as FontTheme });
   else if (cmd.startsWith("open-recent:")) void openPath(cmd.slice("open-recent:".length));
   // The family's About surface, never the stock OS panel. The shell draws it; the

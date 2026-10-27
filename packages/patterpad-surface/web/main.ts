@@ -41,11 +41,11 @@ const surface = mountSurface({
 // Dev affordance: expose the surface handle so the play marker / pointer can be driven from the console.
 (window as unknown as { __surface: unknown }).__surface = surface;
 
-// TEMP, in-session theme preview (not persisted): cycle follow-system -> light -> dark. A throwaway
+// TEMP, in-session theme preview (not persisted): cycle follow-system, light, dark, parchment. A throwaway
 // dev affordance so the dark palette can be eyeballed without changing the OS.
 const themeBtn = document.querySelector<HTMLButtonElement>("#theme-toggle");
 if (themeBtn) {
-  const modes = ["system", "paper", "mist", "slate", "night"] as const;
+  const modes = ["system", "light", "dark", "parchment"] as const;
   let mode = 0;
   const applyTheme = (): void => {
     const m = modes[mode]!;

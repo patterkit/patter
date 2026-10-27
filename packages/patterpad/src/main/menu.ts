@@ -23,13 +23,13 @@ const NAMED = namedMenuItems({
   suiteDocsUrl: "https://patterkit.dev/",
 });
 import { manualCheckForUpdates } from "@wildwinter/app-shell/updater";
+import { THEME_CHOICES } from "@wildwinter/app-shell/theme";
 import type { PaneState, RecentProject, ThemePrefs } from "../shared/api.js";
 import { viewMenuLabel } from "@wildwinter/app-shell/view-host";
 import type { ViewOffer } from "./views.js";
 
 const isMac = process.platform === "darwin";
 
-const COLOURS: Array<[ThemePrefs["colour"], string]> = [["system", "Follow System"], ["paper", "Paper"], ["mist", "Mist"], ["slate", "Slate"], ["night", "Night"]];
 const FONTS: Array<[ThemePrefs["font"], string]> = [["newsreader", "Newsreader"], ["literata", "Literata"], ["source", "Source Serif"], ["script", "Courier (script)"]];
 const DOC_CLASS_LABEL: Record<string, string> = { everyone: "Everyone", vo: "Voice (VO)", loc: "Localisers", editor: "Editors" };
 
@@ -385,7 +385,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { type: "separator" },
         {
           ...VIEW_MENU.colourTheme,
-          submenu: COLOURS.map(([v, label]) => ({
+          submenu: THEME_CHOICES.map(([v, label]) => ({
             label, type: "radio" as const, checked: theme.colour === v, click: () => send(`theme:colour:${v}`),
           })),
         },

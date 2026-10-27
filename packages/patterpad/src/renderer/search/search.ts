@@ -480,7 +480,7 @@ search.onProject(() => void (async () => {
 void (async () => {
   const info = await search.info();
   pin.set(info.pinned); // main decided this one, so no toggle callback
-  applyTheme(info.theme);  // the palette is the app's; importing theme.css alone leaves this on Paper
+  applyTheme(info.theme);  // the palette is the app's; importing theme.css alone leaves this on Light
   voiced = info.voiced; hasProject = info.hasProject; reflectVoiced();
   if (!info.hasProject) {
     hintEl.textContent = "Open a project to search.";

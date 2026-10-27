@@ -2,6 +2,7 @@
 // onto the Node main process (files, VCS, the @patterkit/ops core). Kept tiny on purpose - every
 // entry is an explicit, auditable operation, never raw fs / shell access.
 
+import type { ThemeChoice } from "@wildwinter/app-shell/theme";
 import type { GameDataFields, GameDataNodeKind, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier } from "@patterkit/model";
 
 export type { VcsKind } from "@patterkit/model";
@@ -358,11 +359,10 @@ export interface PaneState {
   lineStatusShown?: string[];
 }
 
-/** A curated colour theme (the `data-theme` axis): two light (Paper warm, Mist cool), two dark
- *  (Slate cool, Night warm), plus "system" (follow the OS - light = Paper, dark = Night). Replaces the
- *  old raw light/dark switch; older sessions migrate "light"/"dark" -> "paper"/"night" and the retired
- *  "sepia" -> "mist" on read. */
-export type ColourTheme = "system" | "paper" | "mist" | "slate" | "night";
+/** The colour theme (the `data-theme` axis): the family's, from app-shell (Follow System, Light, Dark,
+ *  Parchment), shared with Storyletter since the October 2026 UI review. app-shell's `migrateTheme`
+ *  carries an older session's Paper, Mist, Slate or Night (and the older light/dark/sepia) across on read. */
+export type ColourTheme = ThemeChoice;
 export type FontTheme = "newsreader" | "literata" | "source" | "script";
 
 /** The author's chosen look (View > Colour Theme / Font Theme), remembered across launches. Applied

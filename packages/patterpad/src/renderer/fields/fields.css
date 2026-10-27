@@ -19,4 +19,4 @@ body.fields-win {
 .fields-cap { margin: 0 0 4px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .fields-lock { margin: 0 0 6px; font: 12.5px/1.4 var(--font-ui); color: var(--danger); }
 .fields-empty { margin: 18px 0; font: 13px/1.4 var(--font-ui); color: var(--muted); }
-.fields-grid select, .fields-grid input { font: 13px var(--font-ui); padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); }
+.fields-grid select, .fields-grid input { font: 13px var(--font-ui); padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); }

@@ -20,14 +20,14 @@ body.play {
 }
 
 /* the play-language switcher (#195): a quiet select, sized to its content, on the right of the header */
-.play-locale { flex: none; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--ink); font: 500 11.5px var(--font-ui); text-transform: none; letter-spacing: normal; padding: 3px 5.5px; }
+.play-locale { flex: none; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--ink); font: 500 11.5px var(--font-ui); text-transform: none; letter-spacing: normal; padding: 3px 5.5px; }
 .play-locale:hover { border-color: var(--accent); }
 .play-locale[hidden] { display: none; }
 
-.play-speed { flex: none; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 500 11.5px var(--font-ui); text-transform: none; letter-spacing: normal; padding: 3px 5.5px; }
+.play-speed { flex: none; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 500 11.5px var(--font-ui); text-transform: none; letter-spacing: normal; padding: 3px 5.5px; }
 .play-speed:hover { border-color: var(--accent); }
 /* "Play with audio" toggle (#206): quiet by default, accented when on; only shown in Audio Folders mode */
-.play-audio { flex: none; display: inline-flex; align-items: center; gap: 5px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 500 11.5px var(--font-ui); text-transform: none; letter-spacing: normal; padding: 3px 6.5px; }
+.play-audio { flex: none; display: inline-flex; align-items: center; gap: 5px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 500 11.5px var(--font-ui); text-transform: none; letter-spacing: normal; padding: 3px 6.5px; }
 .play-audio svg { display: block; }
 .play-audio:hover { border-color: var(--accent); }
 .play-audio.on { color: var(--accent); border-color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
@@ -44,7 +44,7 @@ body.play {
 .play-rewind:hover { border-color: var(--accent); color: var(--accent); }
 /* Auto-continue toggle: a playback preference that lives in the header (not beside Step) so it stays
    reachable even in Continue mode, where the per-beat Step row never appears. Quiet by default, accented on. */
-.play-continue { flex: none; display: inline-flex; align-items: center; gap: 5px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 500 11.5px var(--font-ui); text-transform: none; letter-spacing: normal; padding: 3px 6.5px; }
+.play-continue { flex: none; display: inline-flex; align-items: center; gap: 5px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 500 11.5px var(--font-ui); text-transform: none; letter-spacing: normal; padding: 3px 6.5px; }
 .play-continue:hover { border-color: var(--accent); }
 .play-continue.on { color: var(--accent); border-color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
 
@@ -81,14 +81,14 @@ body.play {
    option stays invisible until its turn instead of flashing in at full opacity then re-fading. */
 .pchoice, .padv-row, .pnote { animation: var(--anim-panel-in, none); animation-fill-mode: backwards; }
 .pchoice {
-  text-align: left; cursor: pointer; background: var(--bg);
+  text-align: left; cursor: pointer; background: var(--card);
   border: 1px solid color-mix(in oklab, var(--accent) 26%, var(--line)); border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem; color: var(--ink); font: 1rem var(--font-read);
   transition: border-color var(--dur-quick, 120ms) var(--ease-standard, ease), background var(--dur-quick, 120ms) var(--ease-standard, ease);
 }
-.pchoice:hover { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 8%, var(--bg)); }
+.pchoice:hover { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 8%, var(--card)); }
 .pchoice.ineligible { opacity: 0.45; cursor: default; border-style: dashed; }
-.pchoice.ineligible:hover { border-color: color-mix(in oklab, var(--accent) 26%, var(--line)); background: var(--bg); }
+.pchoice.ineligible:hover { border-color: color-mix(in oklab, var(--accent) 26%, var(--line)); background: var(--card); }
 .pchoice.restart { display: inline-flex; align-items: center; justify-content: center; gap: 5.5px; border-color: var(--line); color: var(--muted); font: 600 13.5px var(--font-ui); text-align: center; }
 
 /* The advance control: a single full-width Step button (Continue mode is a header toggle now). */

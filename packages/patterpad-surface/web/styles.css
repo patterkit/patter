@@ -111,7 +111,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    menu rides the first text line (right padding reserves its space), the drag grip sits
    in the left gutter, and the read-only condition / jump tags appear only when set. */
 .bubble {
-  background: var(--surface);
+  background: var(--card);
   border-radius: var(--radius-lg);
   padding: 0.75rem 2rem 0.75rem 1.8rem;   /* right reserves the ⋯; left is the drag gutter */
   margin: 0 0 1.1rem;
@@ -160,7 +160,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .ProseMirror-selectednode { outline: none; }
 .bubble.ProseMirror-selectednode {
   box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 50%, transparent);
-  background: color-mix(in oklab, var(--accent) 6%, var(--surface));
+  background: color-mix(in oklab, var(--accent) 6%, var(--card));
 }
 .beat.kind-gameEvent.ProseMirror-selectednode { background: color-mix(in oklab, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 45%, transparent); border-radius: var(--radius-sm); }
 .bubble.ProseMirror-selectednode ::selection, .beat.kind-gameEvent.ProseMirror-selectednode ::selection { background: transparent; }
@@ -168,7 +168,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    suppressed so the run looks like one block, not a ragged drag (groups §6). */
 .chunk-multiselected {
   box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 50%, transparent);
-  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+  background: color-mix(in oklab, var(--accent) 8%, var(--card));
   border-radius: var(--radius-md);
 }
 .chunk-multiselected ::selection { background: transparent; }
@@ -177,7 +177,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .bubble-after {
   position: absolute; bottom: -1.45rem; left: 50%; transform: translateX(-50%);
   width: 1.4rem; height: 1.4rem; padding: 0;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 50%; cursor: pointer;
+  background: var(--card); border: 1px solid var(--line); border-radius: 50%; cursor: pointer;
   color: var(--muted);
   opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard); z-index: 2;
 }
@@ -450,7 +450,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   position: absolute; top: -3px; right: -5px; min-width: 13.5px; height: 13.5px;
   display: inline-flex; align-items: center; justify-content: center; padding: 0 2.5px;
   font: 600 9px var(--font-ui); line-height: 1; border-radius: 0.5rem;
-  background: var(--accent); color: var(--surface);
+  background: var(--accent); color: var(--on-accent);
 }
 .beat.has-suggestion .zone.say { background: color-mix(in oklab, var(--accent) 7%, transparent); border-radius: 3px; }
 
@@ -474,7 +474,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   position: absolute; pointer-events: auto; transform: translateX(-100%);
   white-space: nowrap; max-width: 112px; overflow: hidden; text-overflow: ellipsis;
   padding: 0.5px 6.5px; border-radius: var(--radius-pill); border: 1px solid var(--line);
-  background: var(--surface); color: var(--muted);
+  background: var(--card); color: var(--muted);
   font: 600 12.5px/1.2 var(--font-ui);
 }
 /* The colour swatch shown beside a rung's name in the "Status" submenu + the inspector dropdown. */
@@ -669,16 +669,15 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .group-rail-body > .bubble:last-child, .group-rail-body > .group-rail:last-child { margin-bottom: 0; }
 
 /* cue autocomplete (stub) */
-/* Exit motion: closeWithExit() (web/exit.ts) adds `.closing` just before teardown; this swaps the
-   enter keyframe for its reverse. Higher specificity than the base rule, so it wins. */
-.cue-ac.closing, .target-picker.closing, .action-menu.closing, .slash-menu.closing { animation: var(--anim-panel-out); }
-/* a dismissing popup must not catch a stray click during its fade */
+/* The popups appear and go at once, as the shell's menus do (the October 2026 review's motion pass):
+   with no exit animation, closeWithExit() (web/exit.ts) tears them down straight away. If one ever fades
+   again, a dismissing popup must not catch a stray click during it. */
 .cue-ac.closing, .target-picker.closing, .action-menu.closing, .slash-menu.closing { pointer-events: none; }
 
 .cue-ac {
-  position: fixed; z-index: 10; animation: var(--anim-panel-in);
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2); padding: 3px; min-width: 112px;
+  position: fixed; z-index: 10;
+  background: var(--surface); border: 0; border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop); padding: 3px; min-width: 112px;
   display: flex; flex-direction: column;
 }
 .cue-ac-item {
@@ -709,13 +708,13 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .target-picker {
   /* Above the floating condition / jump editor panels (z 900) when opened from a node-ref pill,
      and above the editor chrome when opened from `/jump`. Matches the expr popover convention. */
-  position: fixed; z-index: 1000; animation: var(--anim-panel-in);
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2); padding: 4px;
+  position: fixed; z-index: 1000;
+  background: var(--surface); border: 0; border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop); padding: 4px;
   display: flex; flex-direction: column; max-height: min(60vh, 352px);
 }
 .tp-field {
-  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none;
   padding: 5px 8px; margin-bottom: 3px; color: var(--ink); font: 13px var(--font-ui);
 }
 .tp-field:focus { border-color: color-mix(in oklab, var(--accent) 55%, var(--line)); }
@@ -750,9 +749,9 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* the structural action menu (⋯ / right-click): a familiar vertical MENU - structural
    actions only (data lives in the inspector). "Follow with" / "Wrap in" open submenu flyouts. */
 .action-menu {
-  position: fixed; z-index: 50; min-width: 176px; animation: var(--anim-panel-in);
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2); padding: 5px;
+  position: fixed; z-index: 50; min-width: 176px;
+  background: var(--surface); border: 0; border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop); padding: 5px;
   display: flex; flex-direction: column; gap: 0.5px;
   font: 13px var(--font-ui);
 }
@@ -776,9 +775,9 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 
 /* special-insert ("/") menu */
 .slash-menu {
-  position: fixed; z-index: 10; animation: var(--anim-panel-in);
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2); padding: 3px; min-width: 128px;
+  position: fixed; z-index: 10;
+  background: var(--surface); border: 0; border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop); padding: 3px; min-width: 128px;
   display: flex; flex-direction: column;
   /* Bounded + scrollable, like .target-picker: the menu is eleven rows tall, and on a short window
      the ones past the fold were simply unreachable (#63). anchor.ts flips it above the caret when

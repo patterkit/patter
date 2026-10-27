@@ -43,7 +43,7 @@ describe("session store", () => {
     const dir = tmpDir();
     const s = createStore(dir);
     s.setPanes({ nav: true, inspector: false, docHidden: ["vo"], lineStatusShown: ["draft"], reviewFeedback: true });
-    s.setTheme({ colour: "slate", font: "literata" });
+    s.setTheme({ colour: "parchment", font: "literata" });
     expect(createStore(dir).read().panes).toEqual({ nav: true, inspector: false, docHidden: ["vo"], lineStatusShown: ["draft"], reviewFeedback: true });
   });
 
@@ -55,7 +55,7 @@ describe("session store", () => {
     const s = createStore(dir);
     s.setPlayFollow(true);
     expect(s.read().playFollow).toBe(true);
-    s.setTheme({ colour: "slate", font: "literata" }); // an unrelated write keeps it
+    s.setTheme({ colour: "parchment", font: "literata" }); // an unrelated write keeps it
     expect(createStore(dir).read().playFollow).toBe(true); // and it survives a reload
   });
 
@@ -70,31 +70,38 @@ describe("session store", () => {
     }), "utf8");
     const st = createStore(dir).read();
     expect(st.playFollow).toBe(false);
-    expect(st.theme).toEqual({ colour: "night", font: "literata" }); // and the slice it DID have survives
+    expect(st.theme).toEqual({ colour: "dark", font: "literata" }); // and the slice it DID have survives, Night now Dark
   });
 
   it("remembers the colour theme / font theme", () => {
     const s = createStore(tmpDir());
     expect(s.read().theme).toEqual({ colour: "system", font: "newsreader" }); // first-run default
-    s.setTheme({ colour: "slate", font: "literata" });
-    expect(s.read().theme).toEqual({ colour: "slate", font: "literata" });
+    s.setTheme({ colour: "parchment", font: "literata" });
+    expect(s.read().theme).toEqual({ colour: "parchment", font: "literata" });
     s.setPanes({ nav: true, inspector: true }); // an unrelated write keeps the theme
-    expect(s.read().theme).toEqual({ colour: "slate", font: "literata" });
+    expect(s.read().theme).toEqual({ colour: "parchment", font: "literata" });
   });
 
-  it("migrates an older session's light/dark colour to the curated palettes (#173)", () => {
-    // The remap belongs to Patterpad, not the shell, so it must survive the fold-in of an old file.
-    let dir = tmpDir();
-    legacy(dir, { theme: { colour: "dark", font: "literata" } });
-    expect(createStore(dir).read().theme).toEqual({ colour: "night", font: "literata" }); // dark -> Night
+  it("carries every retired colour theme onto the family's palettes, in either file", () => {
+    // Paper and Mist are Light now, Slate and Night are Dark (the October 2026 UI review); the older
+    // light/dark switch (#173) lands where it says, and "sepia" with the light ones. The remap must
+    // survive both the current settings file and the fold-in of the pre-shell one.
+    const cases: Array<[string, string]> = [
+      ["paper", "light"], ["mist", "light"], ["sepia", "light"], ["light", "light"],
+      ["night", "dark"], ["slate", "dark"], ["dark", "dark"],
+      ["parchment", "parchment"], ["system", "system"], ["neon", "system"],
+    ];
+    for (const [stored, now] of cases) {
+      let dir = tmpDir();
+      writeFileSync(join(dir, "app-settings.json"), JSON.stringify({
+        recents: [], places: {}, panes: {}, windows: {}, app: { theme: { colour: stored, font: "source" } },
+      }), "utf8");
+      expect(createStore(dir).read().theme, stored).toEqual({ colour: now, font: "source" });
 
-    dir = tmpDir();
-    legacy(dir, { theme: { colour: "light", font: "source" } });
-    expect(createStore(dir).read().theme).toEqual({ colour: "paper", font: "source" }); // light -> Paper
-
-    dir = tmpDir();
-    legacy(dir, { theme: { colour: "sepia", font: "literata" } });
-    expect(createStore(dir).read().theme).toEqual({ colour: "mist", font: "literata" }); // retired sepia -> Mist
+      dir = tmpDir();
+      legacy(dir, { theme: { colour: stored, font: "source" } });
+      expect(createStore(dir).read().theme, `${stored} (pre-shell file)`).toEqual({ colour: now, font: "source" });
+    }
   });
 
   it("records opens most-recent-first, dedups, and tracks the last project", () => {
@@ -217,7 +224,7 @@ describe("session store", () => {
       expect(st.recents).toEqual([{ path: "/a", name: "A" }, { path: "/b", name: "B" }]); // openedAt was never read
       expect(st.identity).toEqual({ name: "Ian", email: "ian@example.com" });
       expect(st.panes).toEqual({ nav: true, inspector: false, docHidden: ["vo"] });
-      expect(st.theme).toEqual({ colour: "night", font: "literata" }); // remapped on the way through
+      expect(st.theme).toEqual({ colour: "dark", font: "literata" }); // carried across on the way through
       const store = createStore(dir);
       expect(store.window("play").bounds()).toEqual({ x: 1, y: 2, width: 300, height: 400 });
       expect(store.window("play").pinned()).toBe(false);
@@ -231,7 +238,7 @@ describe("session store", () => {
       const before = readFileSync(file, "utf8");
       const s = createStore(dir);
       s.recordOpen("/c", "C");
-      s.setTheme({ colour: "paper", font: "source" });
+      s.setTheme({ colour: "parchment", font: "source" });
       expect(readFileSync(file, "utf8")).toBe(before);
       expect(existsSync(join(dir, "app-settings.json"))).toBe(true);
     });
@@ -239,10 +246,10 @@ describe("session store", () => {
     it("runs once: the shell's file wins from then on", () => {
       const dir = tmpDir();
       const file = legacy(dir, OLD);
-      createStore(dir).setTheme({ colour: "paper", font: "source" });
+      createStore(dir).setTheme({ colour: "parchment", font: "source" });
       // The author rolls the old file back to something else; it must be ignored now.
       writeFileSync(file, JSON.stringify({ theme: { colour: "mist", font: "newsreader" } }), "utf8");
-      expect(createStore(dir).read().theme).toEqual({ colour: "paper", font: "source" });
+      expect(createStore(dir).read().theme).toEqual({ colour: "parchment", font: "source" });
     });
 
     it("treats an unreadable old file as a plain first run", () => {

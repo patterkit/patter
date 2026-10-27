@@ -89,7 +89,7 @@ async function boot(): Promise<void> {
   for (const s of info.scenes) sceneSel.append(new Option(s.name, s.id));
   sceneSel.value = ""; // default to the project start
   pin.set(info.pinned);
-  applyTheme(info.theme); // the palette is the app's; importing theme.css alone leaves this on Paper
+  applyTheme(info.theme); // the palette is the app's; importing theme.css alone leaves this on Light
   driversNote.textContent = !info.hasProject
     ? "No project open."
     : info.driverCount

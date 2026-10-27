@@ -1,168 +1,36 @@
 /* ============================================================================
    Patterpad design tokens - the APP-WIDE layer (design-language §4).
-   This is the single source of truth for palette, character colours, typography,
-   sizing, and motion for the WHOLE Patterpad app - NOT just this script surface.
-   The surface's component styles (styles.css) only ever *consume* these tokens;
-   the app shell (settings, dialogs, navigator, etc.) will consume the same file.
-   (Destined to move into a shared @patterkit/* tokens package when the app shell
-   lands; kept here for now as the surface is the only consumer.)
+   The colours are the FAMILY palette in app-shell (`palette.css`: Light, Dark and Parchment, blue pencil,
+   one character wheel), shared with Storyletter since the October 2026 UI review (patterkit
+   design/ui-review-2026-10, ruled 2026-10-27). Until then this file held Patterpad's own Paper, Mist,
+   Slate and Night. What stays here is truly Patterpad's: the reading size and the reading faces.
 
    Theming axes, all driven from the root element so they apply everywhere:
-     - colour theme: Paper / Mist / Slate / Night / Follow-System  (data-theme; absent = follow OS)
-     - reading size  : Small / Medium / Large         (the base font-size below; future S/M/L UI)
-     - font set      : reading / UI / mono            (the --font-* tokens; the data-font axis below)
+     - colour theme: app-shell's (data-theme; absent = follow the OS; ids and labels in app-shell/theme)
+     - reading size : the base font-size below (only the script surface scales off rem)
+     - reading face : the --font-read / --font-mono set (the data-font axis below). The UI face is the
+                      shell's system face and never changes with it.
    ============================================================================ */
 
-/* The app-agnostic grammar (elevation, motion, radius, scrollbar chrome, the focus ring, --scrim,
-   the --on-accent floor) comes from the shell. This file is the PALETTE: colours and faces only.
-   Until 0.39.0 the grammar was a second copy here, already drifted on scrollbar radius. */
+/* The grammar (elevation, motion, radius, the type scale, the focus ring) and the palette both come
+   from the shell. */
 @import "@wildwinter/app-shell/tokens.css";
+@import "@wildwinter/app-shell/palette.css";
 
 :root {
   /* --- reading size (Medium default; a future S/M/L control swaps this one value) --- */
-  font-size: 110%; /* ~17.6px root: the READING size. Only the script surface scales off rem; the chrome is px off a 14px base (design-language §4) */
-  /* No color-scheme here: the shell's tokens.css sets it from --color-scheme, falling back to
-     "light dark" so Follow System tracks the OS. Each palette block below declares its own. */
+  font-size: 110%; /* ~17.6px root: the READING size. Only the script surface scales off rem; the chrome is px off the shell's 13px base */
 
-  /* --- surface palette (LIGHT): warm, cosy, booklike - parchment + paper, a chocolate-caramel
-     accent (not a stark red), ink that reads like ink on paper rather than neutral black. --- */
-  --bg: #f1ebe0;       /* parchment */
-  --surface: #fbf7f0;  /* warm paper / vellum (not stark white) */
-  --ink: #312b22;      /* soft chocolate ink (warm near-black) */
-  --muted: #72695e;    /* warm taupe-grey: the lightest that passes AA as text on --bg and --surface (2026-10-21; was #9c9286, 2.6:1) */
-  --line: #e6dccd;     /* parchment line */
-  --accent: #8a5a34;   /* chocolate / caramel - warm and cosy, not red */
-  --on-accent: #fff;   /* the label on a caramel button */
-  /* --- semantic status colours: warm, theme-tuned (NOT stock web red/amber), so error + warning
-     surfaces sit with the parchment palette and track light/dark. Consumed by the validation
-     squiggles, the problem bar, VCS lock/stale badges, and invalid inputs (design-language §4
-     "coherent to the edges"). Two semantics only - "danger" covers error / lock / destructive. --- */
-  --danger: #b23b2f;   /* warm brick red - errors, locks, destructive actions */
-  --warn:   #89632c;   /* warm amber / ochre - warnings, stale; dark enough to pass AA as text in Paper and Mist (was #a9772b, 3.3:1) */
-  --ok:     #3a7544;   /* warm green - success, live / in-sync (--char-4 darkened to pass AA as text) */
-  /* derived reading inks (theme-agnostic: mix the live ink/muted) */
-  --ink-soft: color-mix(in oklab, var(--ink) 70%, var(--muted)); /* text */
-  --ink-read: color-mix(in oklab, var(--ink) 82%, var(--muted)); /* dialogue body, eased off stark */
-
-
-  /* --- character palette (LIGHT): a curated, theme-fitted set; a name's slot is a hash INDEX into
-     these (colour.ts), so it's stable + storage-free. Hand-tuned to sit together and read on cream,
-     never raw primaries. Theme-aware: the dark block below redefines the same slots, lighter. --- */
-  --char-0:  #b23b3b;  /* red    */
-  --char-1:  #b5642b;  /* rust   */
-  --char-2:  #927524;  /* ochre  */
-  --char-3:  #6b7a31;  /* olive  */
-  --char-4:  #3f7d49;  /* green  */
-  --char-5:  #2c7d6e;  /* teal   */
-  --char-6:  #2d7791;  /* cyan   */
-  --char-7:  #3a6aa8;  /* blue   */
-  --char-8:  #5a5ba6;  /* indigo */
-  --char-9:  #7e4e9c;  /* violet */
-  --char-10: #9c4486;  /* plum   */
-  --char-11: #a83e5c;  /* berry  */
-
-  /* --- typography (the chosen font set; the faces are declared in fonts.css) --- */
+  /* --- the reading faces (declared in fonts.css) --- */
   --font-read: "Newsreader", Georgia, "Iowan Old Style", serif;
-  --font-ui: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-
 }
 
-
-
-/* ============================================================================
-   CURATED COLOUR THEMES (the `data-theme` axis). A small, designed set rather than a raw
-   light/dark switch (design-language §4): two LIGHT (Paper, Mist) + two DARK (Slate, Night), plus
-   "Follow System" (no attr) which tracks the OS - light = Paper, dark = Night. The set spans a warm/cool
-   x light/dark matrix: Paper (warm light), Mist (cool light), Slate (cool dark), Night (warm dark).
-
-     Paper   - the warm vellum default (= the :root tokens above; no override block needed).
-     Mist    - a cool light blue-grey; the cool counterpart to Paper.
-     Slate   - a cool neutral dark (the high-contrast dark).
-     Night   - a warm brown-grey dark, dimmer and softer (also the follow-system dark).
-
-   Each block overrides only the surface palette + status colours; the character slots are shared by
-   tone (the LIGHT set above serves Paper + Mist; the lifted DARK set is defined once below for Slate
-   + Night + follow-system-dark). Keep the follow-system-dark block in sync with Night. --- */
-
-/* Paper is the bare :root palette, but an explicit pick still needs its own block so native
-   controls draw light under a dark OS (app-shell's rule: every palette block declares --color-scheme). */
-:root[data-theme="paper"] { --color-scheme: light; }
-
-/* The lifted DARK character set + status colours + accent, shared by every dark palette. */
-:root[data-theme="slate"],
-:root[data-theme="night"] {
-  --color-scheme: dark;
-  --accent: #cf9b6a;   /* warm caramel / tan */
-  --danger: #e6938a;   /* warm coral red, lifted for the dark surface */
-  --warn:   #d8aa63;   /* warm amber, lifted for the dark surface */
-  --ok:     #79bd80;   /* warm green, lifted for the dark surface (matches --char-4 dark) */
-  --char-0:  #e08282; --char-1:  #e0a064; --char-2:  #cdb061; --char-3:  #abb56b;
-  --char-4:  #79bd80; --char-5:  #5cb6a3; --char-6:  #61b1c9; --char-7:  #7ba6d9;
-  --char-8:  #9c9dd6; --char-9:  #b794d2; --char-10: #d389c2; --char-11: #de8298;
-}
-
-/* Night (warm dark) - the explicit pick AND the follow-system dark; the two MIRROR each other. */
-:root[data-theme="night"],
-:root[data-theme="slate"] { /* shared dark surface base; Slate re-cools its tones just below */
-  --bg: #1b1916;       /* warm near-black */
-  --on-accent: var(--bg); /* the accent is a light tan on the dark palettes: dark ink on it, not white */
-  --surface: #272320;  /* warm dark brown-grey */
-  --ink: #e9e4da;      /* warm off-white */
-  --muted: #918a7e;    /* warm grey: passes AA on --surface too (was #877f73, 3.9:1 there) */
-  --line: #38332c;     /* warm line */
-}
-:root[data-theme="slate"] {
-  --bg: #16181c;       /* cool near-black */
-  --surface: #202329;  /* cool neutral slate */
-  --ink: #e1e4e9;      /* cool off-white */
-  --muted: #828a95;    /* cool grey */
-  --line: #2d323a;     /* cool line */
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    --bg: #1b1916; --surface: #272320; --ink: #e9e4da; --muted: #918a7e; --line: #38332c;
-    --accent: #cf9b6a; --danger: #e6938a; --warn: #d8aa63; --ok: #79bd80; --on-accent: var(--bg);
-    --char-0:  #e08282; --char-1:  #e0a064; --char-2:  #cdb061; --char-3:  #abb56b;
-    --char-4:  #79bd80; --char-5:  #5cb6a3; --char-6:  #61b1c9; --char-7:  #7ba6d9;
-    --char-8:  #9c9dd6; --char-9:  #b794d2; --char-10: #d389c2; --char-11: #de8298;
-  }
-}
-
-/* Mist (cool light blue-grey) - the COOL light counterpart to the warm Paper (we already have a warm
-   light theme, so the second light palette leans cool). Overrides only the surface tones; it inherits
-   the LIGHT character set + the warm caramel accent (a warm focal point reads well on a cool ground). */
-:root[data-theme="mist"] {
-  --color-scheme: light;
-  --bg: #e6ecf3;       /* cool light blue-grey */
-  --surface: #f6f9fc;  /* cool near-white */
-  --ink: #25303b;      /* cool slate-blue ink (not warm) */
-  --muted: #606c79;    /* cool blue-grey: passes AA as text (was #84919e, 2.7:1) */
-  --line: #d9e1ea;     /* cool line */
-}
-
-/* --- FONT THEMES (data-font axis). Each is a cohesive reading / UI / mono set plus a per-face
-   base-size tweak (faces differ in x-height). Newsreader is the default (= the :root tokens). The
-   header "font:" toggle cycles these for testing; the real picker is future Patterpad (§7). All
-   faces are declared in fonts.css. --- */
-:root[data-font="newsreader"] { font-size: 110%; --font-read: "Newsreader", Georgia, serif;             --font-ui: "Inter", system-ui, sans-serif;        --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
-:root[data-font="literata"]   { font-size: 105%; --font-read: "Literata", Georgia, serif;               --font-ui: "Inter", system-ui, sans-serif;        --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
-:root[data-font="source"]     { font-size: 107%; --font-read: "Source Serif 4", Georgia, serif;         --font-ui: "IBM Plex Sans", system-ui, sans-serif; --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
-:root[data-font="script"]     { font-size: 100%; --font-read: "Courier Prime", ui-monospace, monospace; --font-ui: "Inter", system-ui, sans-serif;        --font-mono: "Courier Prime", ui-monospace, monospace; }
-
-/* --- @wildwinter/app-shell aliases -------------------------------------------------------------
-   The shell's CSS consumes a handful of token names Patterpad's palette does not define. They are
-   aliased HERE rather than by editing the shell (shared-shell.md: the app reconciles names, the
-   package does not learn about apps). Declared once, deriving from the live palette: custom
-   properties resolve lazily against the element's cascaded value, so these follow whichever
-   :root[data-theme] block is active without being repeated per theme. --- */
-:root {
-  --line-soft: color-mix(in oklab, var(--line) 55%, transparent);  /* a quieter rule than --line */
-  /* The ground an INSET control sits on: settings rows, inputs, composers, badges.
-     Step 0 aliased this to --surface, reading "card" as a raised thing. Every one
-     of the shell's uses is the opposite, and this app already draws all of them on
-     --bg (the nav, the inspector levels, every input), so the row would have been
-     invisible against its own panel. --bg is the answer. */
-  --card: var(--bg);
-  --accent-soft: color-mix(in oklab, var(--accent) 14%, transparent); /* accent wash behind a selection */
-}
+/* --- FONT THEMES (data-font axis). Each is a reading and mono pair plus a per-face base-size tweak
+   (faces differ in x-height). The UI face is the shell's in every set (the October 2026 review: the
+   reading-font setting no longer swaps the chrome). Newsreader is the default (= the :root tokens).
+   All faces are declared in fonts.css. --- */
+:root[data-font="newsreader"] { font-size: 110%; --font-read: "Newsreader", Georgia, serif;             --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
+:root[data-font="literata"]   { font-size: 105%; --font-read: "Literata", Georgia, serif;               --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
+:root[data-font="source"]     { font-size: 107%; --font-read: "Source Serif 4", Georgia, serif;         --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
+:root[data-font="script"]     { font-size: 100%; --font-read: "Courier Prime", ui-monospace, monospace; --font-mono: "Courier Prime", ui-monospace, monospace; }

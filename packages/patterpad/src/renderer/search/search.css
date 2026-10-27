@@ -51,7 +51,7 @@ body.swin {
 .swin-chips[hidden] { display: none; }
 .swin-chip {
   display: inline-flex; align-items: center; gap: 5px;
-  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-pill); cursor: pointer;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-pill); cursor: pointer;
   color: var(--ink-soft); font: 600 11.5px var(--font-ui); padding: 2px 8px;
 }
 .swin-chip:hover { border-color: var(--accent); }

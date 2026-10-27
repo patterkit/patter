@@ -11,8 +11,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **A scene somebody else holds is easier to read.** Its locked fields and buttons keep their text at full
   strength, so you can read every value; they show they're locked with a dashed edge and a no-entry cursor,
   and the notice above the document still says who holds it. The inspector is no longer dimmed as a whole.
-- **Green status text is a touch darker in the light palettes** (Paper and Mist), so words such as "Saved" and the
-  Live Link status meet the usual contrast guideline for text.
+- **A cleaner, crisper look, shared with Storyletter.** The two apps now have the same colour themes: Light and
+  Dark, which follow your system until you pick one, and Parchment, a warm option for long writing sessions. Blue
+  is the one accent colour, and every text colour meets the usual contrast guideline in every theme. If you'd
+  picked Paper or Mist you're now on Light, and Slate or Night are now Dark. The interface uses your system's own
+  typeface, with quieter corners and shadows, white fields, and menus that open
+  straight away.
+- **The font theme changes only the script.** View ▸ Font Theme no longer changes the typeface of the menus,
+  panes, and dialogs.
 
 ## [0.39.0] - 2026-10-22
 

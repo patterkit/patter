@@ -6,7 +6,7 @@
 // have to care that the bytes underneath are now the family's `app-settings.json`. Everything that is
 // genuinely shared (recents and their cap, panes, identity, per-window bounds + pin, the atomic write,
 // the tolerant read) is the shell's; everything below is the translation plus the three things that are
-// this app's alone - the light/dark theme remap, the pinned-by-default helper windows, and the
+// this app's alone - carrying its retired theme ids across, the pinned-by-default helper windows, and the
 // `lastScene` / `lastCaret` pair the renderer still speaks in.
 //
 // Takes the userData DIRECTORY, not a file: the shell owns the filename, and the one-time fold-in of
@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { createAppStore, resetWindows, windowSlice } from "@wildwinter/app-shell/app-store";
 import type { AppSettings, PaneState as ShellPaneState, WindowSlice, WindowState } from "@wildwinter/app-shell/app-store";
+import { migrateTheme } from "@wildwinter/app-shell/theme";
 import type { Identity, PaneState, RecentProject, ThemePrefs } from "../shared/api.js";
 
 export interface SessionState {
@@ -81,15 +82,11 @@ const SETTINGS_FILE = "app-settings.json";
 const DEFAULT_PANES: PaneState = { nav: false, inspector: false };
 // First-run look: follow the OS colour scheme, the Newsreader reading face (the surface default).
 const DEFAULT_THEME: ThemePrefs = { colour: "system", font: "newsreader" };
-/** Migrate an older session's colour choice to the current curated palettes: the raw light/dark switch
- *  (#173) light -> Paper, dark -> Night, and the retired warm "sepia" -> the cool "mist". Anything
- *  already a current palette (or "system") passes through unchanged.
- *
- *  Stays HERE rather than moving into the shell: the shell's `app` slice merges field by field and
- *  knows nothing about what any one app's values mean, let alone which of them were retired. */
-function migrateTheme(t: ThemePrefs): ThemePrefs {
-  const remap: Record<string, ThemePrefs["colour"]> = { light: "paper", dark: "night", sepia: "mist" };
-  const colour = remap[t.colour as string] ?? t.colour;
+/** Carry an older session's colour choice onto the family's palettes (app-shell's `migrateTheme`): Paper
+ *  and Mist to Light, Slate and Night to Dark, and the older light/dark switch and "sepia" with them.
+ *  A current choice passes through unchanged; anything unreadable falls back to Follow System. */
+function migrateStoredTheme(t: ThemePrefs): ThemePrefs {
+  const colour = migrateTheme(t.colour);
   return colour === t.colour ? t : { ...t, colour };
 }
 
@@ -158,7 +155,7 @@ function foldInLegacySession(dir: string): void {
       search: { ...old.search },
       coverage: { ...old.coverage },
     },
-    app: { theme: migrateTheme({ ...DEFAULT_THEME, ...old.theme }), playFollow: false, fieldsFollow: true, autoRebuild: false },
+    app: { theme: migrateStoredTheme({ ...DEFAULT_THEME, ...old.theme }), playFollow: false, fieldsFollow: true, autoRebuild: false },
   };
   try {
     mkdirSync(dir, { recursive: true });
@@ -202,7 +199,7 @@ export function createStore(dir: string): Store {
       // lineStatusShown). The shell merges and serialises whatever object it is handed and never reads
       // into it, so the extra fields round-trip untouched; only the static type is narrower.
       panes: { ...DEFAULT_PANES, ...(s.panes as PaneState) },
-      theme: migrateTheme({ ...DEFAULT_THEME, ...s.app.theme }),
+      theme: migrateStoredTheme({ ...DEFAULT_THEME, ...s.app.theme }),
       playFollow: s.app.playFollow ?? false,
       fieldsFollow: s.app.fieldsFollow ?? true,
       autoRebuild: s.app.autoRebuild ?? false,

@@ -1,32 +1,35 @@
-// Text contrast in every Patterpad palette (patterkit design/patterpad-text-contrast-2026-10.md): each text
-// token passes WCAG AA (4.5) on the board, the panels and a card, and under Increase Contrast (app-shell's
-// `prefers-contrast: more` block) the greys and edges rise further. Paper's --muted was 2.6:1 until 2026-10-21.
+// Text contrast in every palette Patterpad paints in (patterkit design/patterpad-text-contrast-2026-10.md). Since
+// the October 2026 UI review the palettes are the family's, in app-shell's palette.css, and app-shell's own test
+// holds them to AA; this one checks them as Patterpad loads them (the shell's palette, then theme.css), so
+// nothing Patterpad adds can take a text token under AA, and that theme.css keeps no palette of its own.
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import {
   EDGE_CONTRAST, TEXT_CONTRAST, contrastShortfalls, themePalettes, withHighContrast,
 } from "@wildwinter/app-shell/contrast";
 
-const palettes = themePalettes(readFileSync(new URL("../web/theme.css", import.meta.url), "utf8"));
+const require = createRequire(import.meta.url);
+// The built palette.css has its selectors' quotes dropped, which 0.64.0's reader can't parse; put them back.
+// app-shell's next release reads both, and this line can go when Patterpad moves to it.
+const shared = readFileSync(require.resolve("@wildwinter/app-shell/palette.css"), "utf8")
+  .replace(/\[data-theme=([\w-]+)\]/g, '[data-theme="$1"]');
+const own = readFileSync(new URL("../web/theme.css", import.meta.url), "utf8");
+const palettes = themePalettes(`${shared}\n${own}`);
 const GROUNDS = ["--bg", "--surface", "--card"];
-const TEXT = ["--ink", "--ink-read", "--ink-soft", "--muted", "--danger", "--warn", "--ok"];
+const TEXT = ["--ink", "--ink-read", "--ink-soft", "--muted", "--danger", "--warn", "--ok", "--accent"];
 const fmt = (s: { palette: string; token: string; ground: string; ratio: number }): string =>
   `${s.palette} ${s.token} on ${s.ground}: ${s.ratio}`;
 
-/** Known shortfalls not yet fixed. Each entry must still fail, so fixing one means taking it off this list. Empty since the
- *  light --ok went to #3a7544 (2026-10-24). */
-const PENDING: string[] = [];
-
 describe("text contrast", () => {
-  it("reads all five palettes and every token", () => {
-    expect(Object.keys(palettes).sort()).toEqual(["default", "mist", "night", "paper", "slate", "system-dark"]);
+  it("paints in the family's palettes, and theme.css sets no colour of its own", () => {
+    expect(Object.keys(palettes).sort()).toEqual(["dark", "default", "light", "parchment", "system-dark"]);
+    expect(own).not.toMatch(/--(bg|surface|card|ink|muted|line|accent|danger|warn|ok|char-\d+)\s*:/);
     expect(contrastShortfalls(palettes, TEXT, GROUNDS, TEXT_CONTRAST).unresolved).toEqual([]);
   });
 
-  it("passes AA for every text token on every ground, but the pending ones", () => {
-    const failing = contrastShortfalls(palettes, TEXT, GROUNDS, TEXT_CONTRAST).shortfalls.map(fmt);
-    expect(failing.filter((f) => !PENDING.some((p) => f.startsWith(p)))).toEqual([]);
-    expect(PENDING.filter((p) => !failing.some((f) => f.startsWith(p))), "pending entries that now pass").toEqual([]);
+  it("passes AA for every text token on every ground", () => {
+    expect(contrastShortfalls(palettes, TEXT, GROUNDS, TEXT_CONTRAST).shortfalls.map(fmt)).toEqual([]);
   });
 
   it("under Increase Contrast, grey text reaches 5:1 and edges 3:1", () => {

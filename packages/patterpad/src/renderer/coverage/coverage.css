@@ -19,7 +19,7 @@ body.coverage-win {
 /* Options row */
 .cov-opts { flex: 0 0 auto; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 11px; border-bottom: 1px solid var(--line); background: var(--surface); padding: 9.5px 14.5px; }
 .cov-opt { display: flex; flex-direction: column; gap: 3px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.cov-opt input, .cov-opt select { width: 104px; font: 13px var(--font-ui); padding: 5px 6.5px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); }
+.cov-opt input, .cov-opt select { width: 104px; font: 13px var(--font-ui); padding: 5px 6.5px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); }
 .cov-bar-spacer { flex: 1 1 auto; }
 /* The bar's buttons are the shell's `.btn` / `.btn.primary` (controls.css). */
 

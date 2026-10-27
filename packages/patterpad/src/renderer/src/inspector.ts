@@ -239,7 +239,7 @@ function qualifierRow(id: string | null, current: string | undefined, h: Inspect
  *  a neutral muted tint. Shared by the manual status selects + the folder-derived recording chip so they match. */
 export function statusTint(slot: number | undefined): string {
   const base = slot != null ? `var(--char-${slot})` : "var(--muted)";
-  return `color-mix(in oklab, ${base} 26%, var(--bg))`;
+  return `color-mix(in oklab, ${base} 26%, var(--card))`;
 }
 
 /** Tint a status <select> to its selected rung's (readable) colour, so the control itself reads as a coloured

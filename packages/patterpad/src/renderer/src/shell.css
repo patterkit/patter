@@ -44,7 +44,7 @@
 /* Screens that REPLACE the workspace (welcome / overview) sit beside the frame in the column. While the
    panes are hidden the frame is just the title bar, and must not keep the workspace's share of the height. */
 .pane-shell:has(> .panes[hidden]) { flex: none; }
-.pane-nav { border-right: 1px solid var(--line); background: var(--bg); }
+.pane-nav { border-right: 1px solid var(--line); background: var(--surface); }
 .panes.no-nav > .pane-nav { border-right-color: transparent; }
 .panes.no-inspector > .pane-inspector { border-left-color: transparent; }
 /* The navigator's body: the list, inside the shell's scrolling inner. */
@@ -151,7 +151,7 @@
 
 /* "Suggest a rewrite" popovers (compose + review). Reuse the comment composer's input + actions. */
 .suggestion-popover .sg-hint { margin: 0 0 8px; font: 12px var(--font-ui); color: var(--muted); line-height: 1.4; }
-.suggestion-popover .sg-input { width: 100%; box-sizing: border-box; resize: vertical; font: 13.5px var(--font-ui); padding: 6.5px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); }
+.suggestion-popover .sg-input { width: 100%; box-sizing: border-box; resize: vertical; font: 13.5px var(--font-ui); padding: 6.5px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--ink); }
 .suggestion-popover .sg-card { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px; }
 .suggestion-popover .sg-card:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
 .suggestion-popover .sg-card.resolved { opacity: 0.65; }
@@ -210,7 +210,7 @@
 .inspector-stack > .empty { padding: 13px 8px; }
 
 /* One level = a card; the top card (most specific) reads strongest, deeper containers recede. */
-.insp-level { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--bg); overflow: hidden; }
+.insp-level { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); overflow: hidden; }
 .insp-level + .insp-level { opacity: 0.92; }
 .insp-head {
   display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left;
@@ -274,7 +274,7 @@
    come with it in anchored.css. Ours reused the expr-editor input look and the
    app's btn classes; the shell's are the family's, which is the point. */
 /* inspector inline editors: native select + checkbox + jump list */
-.insp-select { font: 12px var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 1.5px 5px; max-width: 176px; }
+.insp-select { font: 12px var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 1.5px 5px; max-width: 176px; }
 .insp-select:focus-visible { border-color: var(--accent); outline-offset: 0; }
 /* A soft, advisory note under a control (e.g. the Best-match degeneracy nudge). Never an error colour. */
 .insp-note { color: var(--muted); font: italic 12px var(--font-ui); line-height: 1.3; padding: 1px 0 1.5px; }
@@ -285,10 +285,10 @@
 .insp-status { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 6.5px; min-width: 0; }
 /* Text is full --ink and the fill is a soft tint (mixed toward --bg inline via statusTint), so the rung name
    stays readable on every palette; a saturated --char-N fill would swallow the text. */
-.insp-status-select { font: 11.5px var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--bg)); border: none; border-radius: var(--radius-sm); padding: 1.5px 6.5px; max-width: 176px; cursor: pointer; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
+.insp-status-select { font: 11.5px var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--card)); border: none; border-radius: var(--radius-sm); padding: 1.5px 6.5px; max-width: 176px; cursor: pointer; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
 .insp-status-select:focus-visible { box-shadow: 0 0 0 1px var(--accent); outline-offset: 0; }
 /* Audio Folders mode (#206): read-only recording status chip (the status is derived from files on disk). */
-.insp-rec-chip { font: 11.5px var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--bg)); border-radius: var(--radius-sm); padding: 1.5px 6.5px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
+.insp-rec-chip { font: 11.5px var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--card)); border-radius: var(--radius-sm); padding: 1.5px 6.5px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
 .insp-rec-play { flex: none; display: inline-flex; align-items: center; line-height: 1; color: var(--accent); background: none; border: none; cursor: pointer; padding: 2.5px 3px; border-radius: var(--radius-sm); }
 .insp-rec-play:hover { background: color-mix(in oklab, var(--accent) 16%, transparent); }
 /* Softly pulse the ▶ button while its clip is sounding, so it's clear which line you're hearing. */
@@ -331,9 +331,9 @@
 /* Scratch-recording blocking overlay (#224): covers the whole window during a take; nothing behind it is
    reachable. Driven entirely by keys (Space finish, Esc cancel). */
 .scratch-overlay { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center;
-  background: color-mix(in oklab, var(--ink) 28%, transparent); backdrop-filter: blur(3px); }
+  background: color-mix(in oklab, var(--ink) 28%, transparent); }
 .scratch-card { display: flex; flex-direction: column; align-items: center; gap: 22.5px; padding: 38.5px 48px; min-width: 416px; max-width: 640px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-3); text-align: center; }
+  background: var(--surface); border: 0; border-radius: var(--radius-dialog); box-shadow: var(--shadow-modal); text-align: center; }
 .scratch-line { font: 1.1rem/1.5 var(--font-read); color: var(--ink); }
 .scratch-stage { font: 700 51px var(--font-ui); line-height: 1; min-height: 54.5px; display: flex; align-items: center; gap: 6.5px; }
 .scratch-stage.scratch-count { color: var(--accent); }
@@ -371,7 +371,7 @@
 .scratch-cue[hidden], .scratch-bar[hidden], .scratch-next[hidden], .scratch-actions[hidden] { display: none; }
 @keyframes scratch-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 /* editable gameData field value (text / number input) */
-.insp-gd-input { font: 12.5px var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 5.5px; min-width: 0; width: 100%; max-width: 176px; }
+.insp-gd-input { font: 12.5px var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 5.5px; min-width: 0; width: 100%; max-width: 176px; }
 .insp-gd-input:focus-visible { border-color: var(--accent); outline-offset: 0; }
 /* A seconds field (line padding): a short number box and its unit. The placeholder says what an empty
    field inherits, so it gets the width it needs to read. */
@@ -495,7 +495,7 @@
 /* A labelled field inside a dialog. Every dialog is on the shell's frame now (dialog.css), so only the
    field and its hint are this app's; the name is left over from the first-run identity dialog. */
 .identity-field { display: flex; flex-direction: column; gap: 4px; font: 600 12px var(--font-ui); color: var(--muted); }
-.identity-field input { font: 16px var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6.5px 9px; }
+.identity-field input { font: 16px var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6.5px 9px; }
 .identity-field input:focus-visible { border-color: var(--accent); outline-offset: 0; }
 /* The sentence under a field. It had no rule of its own, so it inherited the field LABEL's 600 weight
    and shrank again as a `small`, reading as a squashed label rather than as prose. Sized and weighted
@@ -613,7 +613,7 @@ input::placeholder, textarea::placeholder {
 .rpt-badge { margin-left: auto; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 1.5px 9px; }
 .rpt-badge.voiced { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 40%, var(--line)); }
 .rpt-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); gap: 9.5px; }
-.rpt-card { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 9px 11px; background: var(--bg); display: flex; flex-direction: column; gap: 2.5px; }
+.rpt-card { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 9px 11px; background: var(--card); display: flex; flex-direction: column; gap: 2.5px; }
 .rpt-card-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .rpt-card-big { font: 700 20px var(--font-read); color: var(--ink); }
 .rpt-card-sub { font: 12px var(--font-ui); color: var(--muted); }
@@ -641,12 +641,12 @@ input::placeholder, textarea::placeholder {
 .gd-kindtab { display: inline-flex; align-items: center; gap: 5px; background: none; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; padding: 4px 9px; color: var(--ink-soft); font: 600 12.5px var(--font-ui); }
 .gd-kindtab:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 .gd-kindtab.active { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
-.gd-kindcount { font: 600 9.5px var(--font-mono); color: var(--surface); background: var(--accent); border-radius: var(--radius-sm); padding: 0 5px; }
+.gd-kindcount { font: 600 9.5px var(--font-mono); color: var(--on-accent); background: var(--accent); border-radius: var(--radius-sm); padding: 0 5px; }
 .gd-fieldlist { display: flex; flex-direction: column; gap: 8px; max-height: 384px; overflow: auto; }
-.gd-field { display: flex; flex-direction: column; gap: 6.5px; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 8px 9.5px; background: var(--bg); }
+.gd-field { display: flex; flex-direction: column; gap: 6.5px; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 8px 9.5px; background: var(--card); }
 .gd-field-top { display: flex; gap: 6.5px; align-items: center; }
 .gd-field-mid { display: flex; gap: 9.5px; flex-wrap: wrap; }
-.gd-input { font: 13.5px var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 7px; }
+.gd-input { font: 13.5px var(--font-ui); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 7px; }
 .gd-input:focus-visible { border-color: var(--accent); outline-offset: 0; }
 .gd-name { flex: 1; min-width: 0; }
 .gd-type { flex: 0 0 auto; }
@@ -726,16 +726,16 @@ input::placeholder, textarea::placeholder {
 /* The auto-derived subfolder hint (folder mode): a read-only mono path shown in place of the old manual field. */
 .sp-folder-derived { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: 12px; color: var(--muted); align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sp-swatch { width: 17px; height: 17px; border-radius: 50%; padding: 0; cursor: pointer; box-sizing: border-box; border: 1px solid color-mix(in oklab, var(--ink) 18%, transparent); }
-.sp-swatch.active { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent); }
+.sp-swatch.active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent); }
 .sp-swatch-none { position: relative; background: var(--bg); }
 .sp-swatch-none::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(to bottom right, transparent 44%, var(--muted) 44%, var(--muted) 56%, transparent 56%); }
 /* The single colour swatch on a status row (opens the palette popover) is a touch larger to read as a
    button, with a hover ring. */
 .sp-colour-btn { width: 19px; height: 19px; }
-.sp-colour-btn:hover { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px color-mix(in oklab, var(--accent) 55%, transparent); }
+.sp-colour-btn:hover { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px color-mix(in oklab, var(--accent) 55%, transparent); }
 /* The palette popover: fixed (escapes the field list's overflow), painted in the modal dialog's top layer.
    A small grid of swatches. */
-.sp-colour-pop { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5.5px; padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-3); }
+.sp-colour-pop { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5.5px; padding: 8px; background: var(--surface); border: 0; border-radius: var(--radius-md); box-shadow: var(--shadow-pop); }
 .sp-colour-pop .sp-swatch { width: 18.5px; height: 18.5px; }
 /* Dictionary word list: thin scrollable rows (word + remove), not the full field card. */
 .wordlist { gap: 3px; }
