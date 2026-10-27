@@ -36,12 +36,10 @@ idea is identical.
     <marker id="pk-loop-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="var(--sl-color-gray-3)"/></marker>
   </defs>
   <!-- host + flow boxes -->
-  <rect x="24" y="42" width="200" height="96" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
-  <rect x="24" y="42" width="200" height="3" rx="1.5" fill="var(--pt-ember,#d2603e)"/>
+  <rect x="24" y="42" width="200" height="96" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
   <text x="124" y="82" text-anchor="middle" fill="var(--sl-color-white)" font-size="14">Your game</text>
   <text x="124" y="102" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="11">the host, owns the loop</text>
-  <rect x="536" y="42" width="200" height="96" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
-  <rect x="536" y="42" width="200" height="3" rx="1.5" fill="var(--pt-teal-ink,#214f4b)"/>
+  <rect x="536" y="42" width="200" height="96" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
   <text x="636" y="82" text-anchor="middle" fill="var(--sl-color-white)" font-size="14">Flow</text>
   <text x="636" y="102" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="11">one run of the story</text>
   <!-- top arrow host -> flow -->
@@ -52,14 +50,13 @@ idea is identical.
   <path d="M532 126 H228" fill="none" stroke="var(--sl-color-gray-3)" marker-end="url(#pk-loop-arrow)"/>
   <!-- five step chips -->
   <g font-size="12" text-anchor="middle" fill="var(--sl-color-white)" font-family="var(--sl-font-mono,monospace)">
-    <rect x="233" y="150" width="46" height="28" rx="6" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="256" y="169">line</text>
-    <rect x="289" y="150" width="46" height="28" rx="6" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="312" y="169">text</text>
-    <rect x="345" y="150" width="80" height="28" rx="6" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="385" y="169">gameEvent</text>
-    <rect x="435" y="150" width="58" height="28" rx="6" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="464" y="169">choice</text>
-    <rect x="503" y="150" width="42" height="28" rx="6" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="524" y="169">end</text>
+    <rect x="233" y="150" width="46" height="28" rx="4" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="256" y="169">line</text>
+    <rect x="289" y="150" width="46" height="28" rx="4" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="312" y="169">text</text>
+    <rect x="345" y="150" width="80" height="28" rx="4" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="385" y="169">gameEvent</text>
+    <rect x="435" y="150" width="58" height="28" rx="4" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="464" y="169">choice</text>
+    <rect x="503" y="150" width="42" height="28" rx="4" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="524" y="169">end</text>
   </g>
   <!-- state note -->
-  <rect x="24" y="214" width="712" height="40" rx="8" fill="none" stroke="var(--sl-color-gray-5)" stroke-dasharray="4 4"/>
   <text x="380" y="238" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="11.5">The host also reads and writes story state with getProperty / setProperty, and supplies its own live values to the story as @world.</text>
 </svg>
 

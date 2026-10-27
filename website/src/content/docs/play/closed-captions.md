@@ -15,19 +15,19 @@ This is a pure text feature: it doesn't depend on the audio system, voiced mode,
 <svg viewBox="0 0 760 196" role="img" aria-labelledby="pk-cc-title" style="width:100%;height:auto;font-family:var(--sl-font,sans-serif)">
   <title id="pk-cc-title">With captions off, the runtime removes each bracketed cue from a line. A line that is only a cue becomes a silent line: no text, but its event still fires so its audio still plays.</title>
   <defs><marker id="pk-cc-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="var(--sl-color-gray-3)"/></marker></defs>
-  <text x="184" y="26" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5" letter-spacing="1" style="text-transform:uppercase">Captions on</text>
-  <text x="576" y="26" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5" letter-spacing="1" style="text-transform:uppercase">Captions off</text>
+  <text x="184" y="26" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5">Captions on</text>
+  <text x="576" y="26" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5">Captions off</text>
   <!-- row 1: dialogue with a cue -->
-  <rect x="24" y="38" width="320" height="42" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
-  <text x="40" y="64" font-size="13"><tspan fill="var(--pt-teal-ink,#214f4b)" font-weight="600">ANNA  </tspan><tspan fill="var(--sl-color-white)">Oh dear. </tspan><tspan fill="var(--pt-gold,#cf9433)">[sigh]</tspan><tspan fill="var(--sl-color-white)"> What now?</tspan></text>
+  <rect x="24" y="38" width="320" height="42" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
+  <text x="40" y="64" font-size="13"><tspan fill="var(--app-char-2)" font-weight="600">ANNA  </tspan><tspan fill="var(--sl-color-white)">Oh dear. </tspan><tspan fill="var(--sl-color-gray-3)">[sigh]</tspan><tspan fill="var(--sl-color-white)"> What now?</tspan></text>
   <path d="M348 59 H412" stroke="var(--sl-color-gray-3)" fill="none" marker-end="url(#pk-cc-arrow)"/>
-  <rect x="416" y="38" width="320" height="42" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
-  <text x="432" y="64" font-size="13"><tspan fill="var(--pt-teal-ink,#214f4b)" font-weight="600">ANNA  </tspan><tspan fill="var(--sl-color-white)">Oh dear. What now?</tspan></text>
+  <rect x="416" y="38" width="320" height="42" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
+  <text x="432" y="64" font-size="13"><tspan fill="var(--app-char-2)" font-weight="600">ANNA  </tspan><tspan fill="var(--sl-color-white)">Oh dear. What now?</tspan></text>
   <!-- row 2: an all-cue SFX line -->
-  <rect x="24" y="92" width="320" height="42" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
-  <text x="40" y="118" font-size="13"><tspan fill="var(--pt-ember,#d2603e)" font-weight="600">SFX  </tspan><tspan fill="var(--sl-color-white)">Thunder rumbles.</tspan></text>
+  <rect x="24" y="92" width="320" height="42" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
+  <text x="40" y="118" font-size="13"><tspan fill="var(--app-char-3)" font-weight="600">SFX  </tspan><tspan fill="var(--sl-color-white)">Thunder rumbles.</tspan></text>
   <path d="M348 113 H412" stroke="var(--sl-color-gray-3)" fill="none" marker-end="url(#pk-cc-arrow)"/>
-  <rect x="416" y="92" width="320" height="42" rx="8" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)" stroke-dasharray="4 4"/>
+  <rect x="416" y="92" width="320" height="42" rx="6" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)" stroke-dasharray="4 4"/>
   <text x="432" y="118" font-size="12.5" font-style="italic" fill="var(--sl-color-gray-3)">silent line, audio still plays</text>
   <text x="380" y="162" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="11.5">Each cue is stripped and the spacing closed up.</text>
   <text x="380" y="180" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="11.5">A cue-only line goes silent, but its audio still plays.</text>

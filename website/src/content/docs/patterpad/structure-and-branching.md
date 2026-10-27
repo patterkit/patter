@@ -65,16 +65,16 @@ sit side by side, with reorder, delete, and add.
 <svg viewBox="0 0 760 272" role="img" aria-labelledby="pk-branch-title" style="width:100%;height:auto;font-family:var(--sl-font,sans-serif)">
   <title id="pk-branch-title">A choice branches into options, each with its own content, then rejoins at a gather and carries on. Separately: a jump leaves for another scene or block and does not return; a call runs a shared piece of story and then returns to where it left off.</title>
   <defs><marker id="pk-b-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="var(--sl-color-gray-3)"/></marker>
-    <marker id="pk-b-arrow-t" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="var(--pt-teal-mid,#2f6f66)"/></marker></defs>
-  <text x="300" y="20" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5" letter-spacing="1" style="text-transform:uppercase">A choice branches, then rejoins</text>
+    <marker id="pk-b-arrow-t" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="var(--sl-color-gray-3)"/></marker></defs>
+  <text x="300" y="20" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5">A choice branches, then rejoins</text>
   <!-- choice -->
-  <rect x="24" y="76" width="96" height="40" rx="8" fill="color-mix(in oklab, var(--pt-ember,#d2603e) 12%, var(--sl-color-bg-sidebar))" stroke="var(--pt-ember,#d2603e)"/>
+  <rect x="24" y="76" width="96" height="40" rx="6" fill="color-mix(in oklab, var(--sl-color-accent) 8%, var(--sl-color-bg-sidebar))" stroke="var(--sl-color-accent)"/>
   <text x="72" y="100" text-anchor="middle" fill="var(--sl-color-white)" font-size="13">Choice</text>
   <!-- options -->
   <g font-size="12" fill="var(--sl-color-white)">
-    <rect x="210" y="44" width="180" height="28" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="224" y="63">option A content</text>
-    <rect x="210" y="82" width="180" height="28" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="224" y="101">option B content</text>
-    <rect x="210" y="120" width="180" height="28" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="224" y="139">option C content</text>
+    <rect x="210" y="44" width="180" height="28" rx="4" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="224" y="63">option A content</text>
+    <rect x="210" y="82" width="180" height="28" rx="4" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="224" y="101">option B content</text>
+    <rect x="210" y="120" width="180" height="28" rx="4" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="224" y="139">option C content</text>
   </g>
   <!-- choice -> options (all fan from one point), options -> gather (all converge to one point) -->
   <g stroke="var(--sl-color-gray-3)" fill="none">
@@ -86,22 +86,22 @@ sit side by side, with reorder, delete, and add.
     <path d="M390 134 H426 V96 H470" marker-end="url(#pk-b-arrow)"/>
   </g>
   <!-- gather -->
-  <rect x="470" y="76" width="112" height="40" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--pt-teal-ink,#214f4b)"/>
+  <rect x="470" y="76" width="112" height="40" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
   <text x="526" y="93" text-anchor="middle" fill="var(--sl-color-white)" font-size="13">Gather</text>
   <text x="526" y="108" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10">rejoin here</text>
   <path d="M582 96 H616" stroke="var(--sl-color-gray-3)" fill="none" marker-end="url(#pk-b-arrow)"/>
   <text x="624" y="100" fill="var(--sl-color-gray-3)" font-size="11">carry on</text>
   <!-- divider -->
   <line x1="24" y1="164" x2="736" y2="164" stroke="var(--sl-color-gray-5)"/>
-  <text x="24" y="184" fill="var(--sl-color-gray-3)" font-size="10.5" letter-spacing="1" style="text-transform:uppercase">Two ways a snippet diverts</text>
+  <text x="24" y="184" fill="var(--sl-color-gray-3)" font-size="10.5">Two ways a snippet diverts</text>
   <!-- jump row -->
-  <rect x="24" y="196" width="94" height="30" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="71" y="215" text-anchor="middle" fill="var(--sl-color-white)" font-size="12.5">↪ jump</text>
+  <rect x="24" y="196" width="94" height="30" rx="4" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="71" y="215" text-anchor="middle" fill="var(--sl-color-white)" font-size="12.5">↪ jump</text>
   <path d="M118 211 H154" stroke="var(--sl-color-gray-3)" fill="none" marker-end="url(#pk-b-arrow)"/>
   <text x="162" y="215" fill="var(--sl-color-gray-3)" font-size="11.5">leaves for another scene or block, and never comes back</text>
   <!-- call row -->
-  <rect x="24" y="234" width="94" height="30" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="71" y="253" text-anchor="middle" fill="var(--sl-color-white)" font-size="12.5">⤳ call</text>
+  <rect x="24" y="234" width="94" height="30" rx="4" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="71" y="253" text-anchor="middle" fill="var(--sl-color-white)" font-size="12.5">⤳ call</text>
   <path d="M118 245 H154" stroke="var(--sl-color-gray-3)" fill="none" marker-end="url(#pk-b-arrow)"/>
-  <path d="M154 257 H118" stroke="var(--pt-teal-mid,#2f6f66)" fill="none" marker-end="url(#pk-b-arrow-t)"/>
+  <path d="M154 257 H118" stroke="var(--sl-color-gray-3)" fill="none" marker-end="url(#pk-b-arrow-t)"/>
   <text x="162" y="253" fill="var(--sl-color-gray-3)" font-size="11.5">runs a shared piece of story, then returns to carry on here</text>
 </svg>
 

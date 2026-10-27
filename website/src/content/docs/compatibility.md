@@ -15,7 +15,7 @@ pass, so parity is something you can check, not just hope for.
     <marker id="pk-c-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="var(--sl-color-gray-3)"/></marker>
   </defs>
   <!-- bundle -->
-  <rect x="306" y="16" width="148" height="44" rx="8" fill="color-mix(in oklab, var(--pt-gold,#cf9433) 14%, var(--sl-color-bg-sidebar))" stroke="var(--pt-gold,#cf9433)"/>
+  <rect x="290" y="16" width="180" height="44" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
   <text x="380" y="37" text-anchor="middle" fill="var(--sl-color-white)" font-family="var(--sl-font-mono,monospace)" font-size="13">.patterc</text>
   <text x="380" y="52" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10">one schema: patter/bundle@N</text>
   <!-- bundle -> runtimes: fan from one point -->
@@ -27,10 +27,10 @@ pass, so parity is something you can check, not just hope for.
   </g>
   <!-- runtimes -->
   <g font-size="12.5" text-anchor="middle" fill="var(--sl-color-white)">
-    <rect x="60" y="104" width="140" height="40" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><rect x="60" y="104" width="140" height="3" rx="1.5" fill="var(--pt-ember,#d2603e)"/><text x="130" y="129">JS / Web</text>
-    <rect x="220" y="104" width="140" height="40" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><rect x="220" y="104" width="140" height="3" rx="1.5" fill="var(--pt-ember,#d2603e)"/><text x="290" y="129">Unity</text>
-    <rect x="380" y="104" width="140" height="40" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><rect x="380" y="104" width="140" height="3" rx="1.5" fill="var(--pt-ember,#d2603e)"/><text x="450" y="129">Unreal</text>
-    <rect x="540" y="104" width="140" height="40" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><rect x="540" y="104" width="140" height="3" rx="1.5" fill="var(--pt-ember,#d2603e)"/><text x="610" y="129">Godot</text>
+    <rect x="60" y="104" width="140" height="40" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="130" y="129">JS / Web</text>
+    <rect x="220" y="104" width="140" height="40" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="290" y="129">Unity</text>
+    <rect x="380" y="104" width="140" height="40" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="450" y="129">Unreal</text>
+    <rect x="540" y="104" width="140" height="40" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="610" y="129">Godot</text>
   </g>
   <!-- runtimes -> corpus: converge to one point, one arrow in -->
   <g stroke="var(--sl-color-gray-3)" fill="none">
@@ -41,8 +41,7 @@ pass, so parity is something you can check, not just hope for.
     <path d="M380 172 V194" marker-end="url(#pk-c-arrow)"/>
   </g>
   <!-- corpus -->
-  <rect x="230" y="196" width="300" height="46" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--pt-teal-ink,#214f4b)"/>
-  <rect x="230" y="196" width="300" height="3" rx="1.5" fill="var(--pt-teal-ink,#214f4b)"/>
+  <rect x="230" y="196" width="300" height="46" rx="6" fill="color-mix(in oklab, var(--sl-color-accent) 8%, var(--sl-color-bg-sidebar))" stroke="var(--sl-color-accent)"/>
   <text x="380" y="217" text-anchor="middle" fill="var(--sl-color-white)" font-family="var(--sl-font-mono,monospace)" font-size="12.5">corpus.json</text>
   <text x="380" y="233" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5">the shared contract, checked on every release</text>
   <text x="380" y="270" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="11.5">The same language-neutral cases, pinned so a conforming runtime reproduces them exactly.</text>

@@ -1,54 +1,27 @@
 /* PatterKit landing page (the marketing home, a standalone Astro page, not the docs chrome).
- * Light-only by design. Brand colours come from the shared tokens in patter.css
- * (--pt-teal-ink / --pt-teal-mid / --pt-stage); the neutral paper/ink/hairline scale is the
- * Patterpad Paper theme's light palette, declared once here.
+ * Light-only by design. The colours are the family palette (src/chrome/palette.css, generated from
+ * patterkit/site-chrome out of app-shell's palette): the same white page, hairlines and blue pencil
+ * as Patterpad's Light, named here for what the landing does with them.
  *
  * Idiom, in one line: a plain page of prose with one hand-drawn artefact (the screenplay surface)
  * and one real screenshot. No cards, no eyebrows, no motion beyond a colour change on hover.
- * Monospace is for code, file names, and the condition expression only.
+ * Monospace is for code, file names, and the condition expression only. The header and footer are
+ * the shared chrome, and their colours are in palette.css too.
  */
 
 .pt-landing {
-  /* Neutral scale. Every text colour below clears AA (4.5:1) on --l-page and --l-paper-2. */
-  --l-page: #f1ebe0;          /* page ground */
-  --l-paper-2: #fbf7f0;       /* the script artefact's paper */
-  --l-ink: #22201b;           /* headings */
-  --l-ink-2: #2a241c;         /* strong body ink */
-  --l-body: #4a4339;          /* body text (8.2:1) */
-  --l-muted: #6b6256;         /* muted text (5.05:1) */
-  --l-hair: #e4dacb;          /* hairline on the page ground */
-  --l-hair-2: #e7ddcd;        /* header rule */
-  --l-hair-3: #ded3c1;        /* screenshot edge */
-  --l-cue: #2f6a98;           /* screenplay cue blue (4.6:1 on the paper) */
-  --l-wash: #e7f0ed;          /* pale teal wash: code chip, outline-button hover */
-  --l-accent-deep: #18403c;   /* primary button hover */
-
-  /* The header and the footer are the shared chrome (src/chrome/chrome.css, generated from
-     patterkit/site-chrome). These are the values it reads: the page's own hairline and ink for
-     the header, the stage ground and its four inks for the footer, and the seven the sign-up
-     field needs on that ground. */
-  --chrome-land-rule: var(--l-hair-2);
-  --chrome-land-wordmark-ink: #312b22;
-  --chrome-land-wordmark-accent: var(--pt-teal-ink);
-  --chrome-land-nav-ink: var(--pt-teal-ink);
-  --chrome-land-nav-hover: var(--pt-teal-ink);
-  --chrome-land-btn-ink: var(--pt-teal-ink);
-  --chrome-land-btn-hover: var(--l-wash);
-
-  --chrome-foot-bg: var(--pt-stage, #15201e);
-  --chrome-foot-ink: #a9bbb6;
-  --chrome-foot-rule: #22302d;
-  --chrome-foot-brand-ink: #e7ece9;
-  --chrome-foot-link: #c2cecb;
-  --chrome-foot-link-hover: #ffffff;
-
-  --chrome-nl-text: #8a9b97;
-  --chrome-nl-strong: #e7ece9;
-  --chrome-nl-field: #1b2624;
-  --chrome-nl-field-ink: #e7ece9;
-  --chrome-nl-hair: #2c3e3a;
-  --chrome-nl-hair-strong: #3c5551;
-  --chrome-nl-accent: #57a294;
+  --l-page: var(--app-card);        /* page ground: white */
+  --l-paper-2: var(--app-card);     /* the script artefact's page: white on white, edged */
+  --l-ink: var(--app-ink);          /* headings */
+  --l-ink-2: var(--app-ink);        /* strong body ink */
+  --l-body: var(--app-ink-read);    /* body text */
+  --l-muted: var(--app-muted);      /* muted text */
+  --l-hair: var(--app-line);        /* hairline */
+  --l-hair-soft: var(--app-line-soft); /* the artefact's head rule */
+  --l-cue: var(--app-char-7);       /* GUIDE's own colour in Patterpad's character wheel */
+  --l-wash: var(--app-bg);          /* the condition chip and the choice row: the desk */
+  --l-accent: var(--app-accent);
+  --l-accent-deep: color-mix(in oklab, var(--app-accent) 85%, var(--app-ink)); /* hover */
 
   color: var(--l-ink-2);
   background: var(--l-page);
@@ -56,7 +29,7 @@
   -webkit-font-smoothing: antialiased;
 }
 .pt-landing *, .pt-landing *::before, .pt-landing *::after { box-sizing: border-box; }
-.pt-landing ::selection { background: color-mix(in srgb, var(--pt-teal-ink) 18%, transparent); }
+.pt-landing ::selection { background: var(--app-accent-soft); }
 
 .pt-wrap { max-width: 1100px; margin: 0 auto; padding-left: 32px; padding-right: 32px; }
 .pt-serif { font-family: var(--pt-read, "Newsreader", Georgia, serif); }
@@ -65,23 +38,23 @@
  * A link is coloured and underlined; a button has an edge at rest. Hover changes colour only.
  * The bordered button itself is `.chrome-btn`, from the shared chrome; the primary is that
  * shape with the accent filled in, which is this site's to say. */
-.pt-link { color: var(--pt-teal-ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.pt-link { color: var(--l-accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .pt-link:hover { color: var(--l-accent-deep); }
-.pt-btn-primary { background: var(--pt-teal-ink); color: var(--chrome-cta-ink, #fff); border-color: var(--pt-teal-ink); }
+.pt-btn-primary { background: var(--l-accent); color: var(--app-on-accent); border-color: var(--l-accent); }
 .pt-btn-primary:hover { background: var(--l-accent-deep); border-color: var(--l-accent-deep); }
 
 /* ---- Hero: one sentence, one paragraph, one button, then the script ----------- */
-.pt-hero { padding-top: 64px; padding-bottom: 24px; }
+.pt-hero { padding-top: 72px; padding-bottom: 24px; }
 .pt-hero-copy { max-width: 38em; }
-.pt-h1 { font-family: var(--pt-read, "Newsreader", Georgia, serif); font-weight: 600; font-size: clamp(2.1rem, 4.4vw, 3.3rem); line-height: 1.1; letter-spacing: -0.01em; color: var(--l-ink); margin: 0; text-wrap: balance; }
+.pt-h1 { font-family: var(--pt-read, "Newsreader", Georgia, serif); font-weight: 400; font-size: clamp(2.5rem, 5vw, 3.75rem); line-height: 1.06; letter-spacing: -0.02em; color: var(--l-ink); margin: 0; text-wrap: balance; }
 .pt-lead { font-size: 18px; line-height: 1.6; color: var(--l-body); margin: 20px 0 0; }
 .pt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; margin-top: 26px; }
 .pt-actions .pt-link { font-size: 15px; font-weight: 500; }
 
 /* The screenplay surface, recreated by hand. Sits under the hero copy at the page's left edge,
    a page of script rather than a window: no title bar, no dots, no tilt. */
-.pt-screen { position: relative; max-width: 880px; margin-top: 52px; background: var(--l-paper-2); border: 1px solid var(--l-hair); border-radius: 8px; box-shadow: 0 1px 2px rgba(21, 32, 30, 0.05), 0 18px 40px -28px rgba(21, 32, 30, 0.25); }
-.pt-screen-head { padding: 14px 24px; border-bottom: 1px solid #ece3d4; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.pt-screen { position: relative; max-width: 880px; margin-top: 52px; background: var(--l-paper-2); border: 1px solid var(--l-hair); border-radius: 8px; }
+.pt-screen-head { padding: 14px 24px; border-bottom: 1px solid var(--l-hair-soft); display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .pt-screen-title { font-size: 14px; font-weight: 600; color: var(--l-ink); }
 .pt-screen-meta { font-size: 13px; color: var(--l-muted); }
 .pt-screen-body { padding: 26px 28px 30px; font-family: var(--pt-read, "Newsreader", Georgia, serif); }
@@ -92,29 +65,29 @@
 .pt-cue { font-family: var(--sl-font, "Inter", sans-serif); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--l-cue); }
 .pt-line { font-size: 17px; line-height: 1.5; color: var(--l-ink-2); }
 .pt-cond { margin-top: 24px; border-left: 2px solid var(--l-hair); padding-left: 18px; }
-.pt-cond-expr { display: inline-block; background: var(--l-wash); border-radius: 5px; padding: 4px 9px; font-family: var(--sl-font-mono, "IBM Plex Mono", monospace); font-size: 12.5px; color: var(--pt-teal-ink); }
+.pt-cond-expr { display: inline-block; background: var(--l-wash); border-radius: 5px; padding: 4px 9px; font-family: var(--sl-font-mono, "IBM Plex Mono", monospace); font-size: 12.5px; color: var(--l-ink); }
 .pt-cond-lines { margin-top: 12px; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: baseline; }
-.pt-choice { margin-top: 22px; display: flex; align-items: center; gap: 11px; background: #f4f7f5; border: 1px solid #dce8e3; border-radius: 6px; padding: 12px 15px; }
-.pt-choice svg { flex: 0 0 auto; display: block; }
+.pt-choice { margin-top: 22px; display: flex; align-items: center; gap: 11px; background: var(--l-wash); border: 1px solid var(--l-hair); border-radius: 6px; padding: 12px 15px; }
+.pt-choice svg { flex: 0 0 auto; display: block; color: var(--l-accent); }
 .pt-choice-label { font-size: 16px; color: var(--l-ink); }
 
 /* ---- Sections ----------------------------------------------------------------- */
-.pt-section { padding-top: 72px; }
-.pt-h2 { font-family: var(--pt-read, "Newsreader", Georgia, serif); font-weight: 600; font-size: clamp(1.6rem, 2.8vw, 2.1rem); line-height: 1.15; letter-spacing: -0.01em; color: var(--l-ink); margin: 0; }
+.pt-section { padding-top: 96px; }
+.pt-h2 { font-family: var(--pt-read, "Newsreader", Georgia, serif); font-weight: 450; font-size: 2rem; line-height: 1.15; letter-spacing: -0.015em; color: var(--l-ink); margin: 0; }
 .pt-prose { max-width: 40em; }
 .pt-prose p { font-size: 17px; line-height: 1.65; color: var(--l-body); margin: 16px 0 0; }
-.pt-prose a { color: var(--pt-teal-ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.pt-prose a { color: var(--l-accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .pt-prose a:hover { color: var(--l-accent-deep); }
-.pt-prose code { font-family: var(--sl-font-mono, "IBM Plex Mono", monospace); font-size: 0.9em; color: var(--pt-teal-ink); background: var(--l-wash); padding: 1px 5px; border-radius: 4px; }
+.pt-prose code { font-family: var(--sl-font-mono, "IBM Plex Mono", monospace); font-size: 0.9em; color: var(--l-ink); background: var(--l-wash); padding: 1px 5px; border-radius: 4px; }
 
 /* The real Patterpad screenshot: a square, edge-to-edge capture. A one-pixel edge stops its
-   Paper-theme ground dissolving into the page's; nothing else is drawn around it. */
+   white page dissolving into the landing's; nothing else is drawn around it. */
 .pt-shot { margin: 36px 0 0; }
-.pt-shot img { display: block; width: 100%; height: auto; border: 1px solid var(--l-hair-3); }
+.pt-shot img { display: block; width: 100%; height: auto; border: 1px solid var(--l-hair); }
 
 /* The four runtimes, as a sentence and a row of icons with their names. */
 .pt-engines { list-style: none; margin: 22px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 14px 36px; }
-.pt-engines li { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 500; color: var(--l-ink); }
+.pt-engines li { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 400; color: var(--l-ink); }
 .pt-engines img { display: block; width: 30px; height: 30px; border-radius: 6px; }
 
 /* Why teams reach for it: five plain sentences. */

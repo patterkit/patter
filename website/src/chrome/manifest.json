@@ -3,10 +3,11 @@
   "source": "patterkit/site-chrome",
   "files": {
     "site.mjs": "2b472edb5ba0afbee5e79a5f3cf377cdee2dc0f4b936e017601233ec50828b66",
-    "chrome.css": "81698895aec7a8704c1b486c33c382ad81709462b6ae11ec132b298448ca1adc",
+    "palette.css": "ee02704c71a612f6922994d05a9f0d0155cffe526c1c4b44f782d95fb2a6e5c5",
+    "chrome.css": "ea8effc06a8783be5313baa06e2e8bfc166df819294f118e0274cd174ad0024e",
     "fonts.css": "15881be7b3d33daac654e91b75f52667af03950164b8dfe7ede8b27eb227aa3f",
     "Footer.astro": "9baa2f68c856ca1bbcd86a63b28c57936ba10edff19029b7e34a91f89ee5396a",
-    "Newsletter.astro": "6919ee38971817b4852eeda30f2807192e7730c0ecf64264bab9fa000fbf1cae",
+    "Newsletter.astro": "39c27da67857b73c67d96f0f42ece2f0dcf4727265745ad611799a4f9fce813a",
     "Downloads.astro": "195f985eab80cd4e2bdfabcdb822df007e9a8e32077cb522f34ce6bcb26407cf",
     "LandingHeader.astro": "60675c087c5be259b5c5e0e4ba9b4e416bad8b85097d2cb5fd7a51d5f6d9737c",
     "LandingFooter.astro": "5ca206688f0c541a73a6b85a340339de6ca6abe99266726c19bf1282a6356c42"

@@ -19,24 +19,24 @@ sees a snippet or a block; it just pulls beats.
 <svg viewBox="0 0 760 244" role="img" aria-labelledby="pk-struct-title" style="width:100%;height:auto;font-family:var(--sl-font,sans-serif)">
   <title id="pk-struct-title">Two altitudes: the selection tree (Scene, Block, Group, Snippet, Beat, where groups and snippets can carry conditions) flattens into a delivery stream of individual beats that the host pulls one at a time.</title>
   <defs><marker id="pk-s-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="var(--sl-color-gray-3)"/></marker></defs>
-  <text x="150" y="24" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5" letter-spacing="1" style="text-transform:uppercase">Selection: the tree</text>
+  <text x="150" y="24" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5">Selection: the tree</text>
   <g font-size="12.5" fill="var(--sl-color-white)">
-    <rect x="24" y="36" width="176" height="26" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="36" y="54">Scene</text><text x="192" y="54" text-anchor="end" fill="var(--sl-color-gray-3)" font-size="10">address</text>
-    <rect x="44" y="66" width="176" height="26" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="56" y="84">Block</text><text x="212" y="84" text-anchor="end" fill="var(--sl-color-gray-3)" font-size="10">address</text>
-    <rect x="64" y="96" width="176" height="26" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--pt-teal-ink,#214f4b)"/><text x="76" y="114">Group</text><text x="232" y="114" text-anchor="end" fill="var(--pt-teal-mid,#2f6f66)" font-size="10">selectable</text>
-    <rect x="84" y="126" width="176" height="26" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--pt-teal-ink,#214f4b)"/><text x="96" y="144">Snippet</text><text x="252" y="144" text-anchor="end" fill="var(--pt-teal-mid,#2f6f66)" font-size="10">selectable</text>
-    <rect x="104" y="156" width="176" height="26" rx="6" fill="color-mix(in oklab, var(--pt-ember,#d2603e) 12%, var(--sl-color-bg-sidebar))" stroke="var(--pt-ember,#d2603e)"/><text x="116" y="174">Beat</text><text x="272" y="174" text-anchor="end" fill="var(--sl-color-gray-3)" font-size="10">delivered</text>
+    <rect x="24" y="36" width="176" height="26" rx="4" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="36" y="54">Scene</text><text x="192" y="54" text-anchor="end" fill="var(--sl-color-gray-3)" font-size="10">address</text>
+    <rect x="44" y="66" width="176" height="26" rx="4" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="56" y="84">Block</text><text x="212" y="84" text-anchor="end" fill="var(--sl-color-gray-3)" font-size="10">address</text>
+    <rect x="64" y="96" width="176" height="26" rx="4" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="76" y="114">Group</text><text x="232" y="114" text-anchor="end" fill="var(--sl-color-gray-3)" font-size="10">selectable</text>
+    <rect x="84" y="126" width="176" height="26" rx="4" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/><text x="96" y="144">Snippet</text><text x="252" y="144" text-anchor="end" fill="var(--sl-color-gray-3)" font-size="10">selectable</text>
+    <rect x="104" y="156" width="176" height="26" rx="4" fill="color-mix(in oklab, var(--sl-color-accent) 8%, var(--sl-color-bg-sidebar))" stroke="var(--sl-color-accent)"/><text x="116" y="174">Beat</text><text x="272" y="174" text-anchor="end" fill="var(--sl-color-gray-3)" font-size="10">delivered</text>
   </g>
-  <text x="410" y="102" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5" letter-spacing="1" style="text-transform:uppercase">flatten</text>
+  <text x="410" y="102" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5">flatten</text>
   <path d="M362 112 H468" fill="none" stroke="var(--sl-color-gray-3)" marker-end="url(#pk-s-arrow)"/>
-  <text x="600" y="22" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5" letter-spacing="1" style="text-transform:uppercase">Delivery: beats you pull</text>
+  <text x="600" y="22" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5">Delivery: beats you pull</text>
   <text x="600" y="38" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10">one at a time, in order</text>
   <g font-size="12" text-anchor="middle" fill="var(--sl-color-white)" font-family="var(--sl-font-mono,monospace)">
-    <rect x="500" y="48" width="200" height="26" rx="6" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="600" y="66">line</text>
-    <rect x="500" y="78" width="200" height="26" rx="6" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="600" y="96">line</text>
-    <rect x="500" y="108" width="200" height="26" rx="6" fill="color-mix(in oklab, var(--pt-ember,#d2603e) 10%, var(--sl-color-bg))" stroke="var(--pt-ember,#d2603e)"/><text x="600" y="126">choice</text>
-    <rect x="500" y="138" width="200" height="26" rx="6" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="600" y="156">line</text>
-    <rect x="500" y="168" width="200" height="26" rx="6" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="600" y="186">end</text>
+    <rect x="500" y="48" width="200" height="26" rx="4" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="600" y="66">line</text>
+    <rect x="500" y="78" width="200" height="26" rx="4" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="600" y="96">line</text>
+    <rect x="500" y="108" width="200" height="26" rx="4" fill="color-mix(in oklab, var(--sl-color-accent) 8%, var(--sl-color-bg))" stroke="var(--sl-color-accent)"/><text x="600" y="126">choice</text>
+    <rect x="500" y="138" width="200" height="26" rx="4" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="600" y="156">line</text>
+    <rect x="500" y="168" width="200" height="26" rx="4" fill="var(--sl-color-bg)" stroke="var(--sl-color-gray-5)"/><text x="600" y="186">end</text>
   </g>
   <text x="380" y="228" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="11.5">Groups and snippets can carry a condition; scenes and blocks are just addresses. The host never sees a container, only the beat stream.</text>
 </svg>

@@ -55,16 +55,16 @@ Scale them freely. Please don't recolour or redraw them.
 
 <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;margin:1rem 0;">
   <figure style="margin:0;">
-    <img src="/badges/patter-badge-paper.svg" width="360" height="112" alt="Dialogue made with Patter badge, warm paper colour way" style="display:block;border-radius:8px;" />
-    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-badge-paper.svg">SVG</a> · <a href="/badges/patter-badge-paper.png">PNG</a></figcaption>
+    <img src="/badges/patter-badge-light.svg" width="360" height="112" alt="Dialogue made with Patter badge, light colour way" style="display:block;border-radius:8px;" />
+    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-badge-light.svg">SVG</a>, <a href="/badges/patter-badge-light.png">PNG</a></figcaption>
   </figure>
   <figure style="margin:0;">
-    <img src="/badges/patter-badge-stage.svg" width="360" height="112" alt="Dialogue made with Patter badge, dark stage colour way" style="display:block;border-radius:8px;" />
-    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-badge-stage.svg">SVG</a> · <a href="/badges/patter-badge-stage.png">PNG</a></figcaption>
+    <img src="/badges/patter-badge-dark.svg" width="360" height="112" alt="Dialogue made with Patter badge, dark colour way" style="display:block;border-radius:8px;" />
+    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-badge-dark.svg">SVG</a>, <a href="/badges/patter-badge-dark.png">PNG</a></figcaption>
   </figure>
   <figure style="margin:0;">
     <img src="/badges/patter-badge-mono.svg" width="360" height="112" alt="Dialogue made with Patter badge, one-colour" style="display:block;border-radius:8px;" />
-    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-badge-mono.svg">SVG</a> · <a href="/badges/patter-badge-mono.png">PNG</a></figcaption>
+    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-badge-mono.svg">SVG</a>, <a href="/badges/patter-badge-mono.png">PNG</a></figcaption>
   </figure>
 </div>
 
@@ -72,16 +72,16 @@ Scale them freely. Please don't recolour or redraw them.
 
 <div style="display:flex;flex-direction:column;gap:0.8rem;align-items:flex-start;margin:1rem 0;">
   <figure style="margin:0;">
-    <img src="/badges/patter-line-paper.svg" width="330" height="38" alt="Dialogue made with Patter line badge, warm paper colour way" style="display:block;" />
-    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-line-paper.svg">SVG</a> · <a href="/badges/patter-line-paper.png">PNG</a></figcaption>
+    <img src="/badges/patter-line-light.svg" width="330" height="38" alt="Dialogue made with Patter line badge, light colour way" style="display:block;" />
+    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-line-light.svg">SVG</a>, <a href="/badges/patter-line-light.png">PNG</a></figcaption>
   </figure>
   <figure style="margin:0;">
-    <img src="/badges/patter-line-stage.svg" width="330" height="38" alt="Dialogue made with Patter line badge, dark stage colour way" style="display:block;" />
-    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-line-stage.svg">SVG</a> · <a href="/badges/patter-line-stage.png">PNG</a></figcaption>
+    <img src="/badges/patter-line-dark.svg" width="330" height="38" alt="Dialogue made with Patter line badge, dark colour way" style="display:block;" />
+    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-line-dark.svg">SVG</a>, <a href="/badges/patter-line-dark.png">PNG</a></figcaption>
   </figure>
   <figure style="margin:0;">
     <img src="/badges/patter-line-mono.svg" width="330" height="38" alt="Dialogue made with Patter line badge, one-colour" style="display:block;" />
-    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-line-mono.svg">SVG</a> · <a href="/badges/patter-line-mono.png">PNG</a></figcaption>
+    <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-line-mono.svg">SVG</a>, <a href="/badges/patter-line-mono.png">PNG</a></figcaption>
   </figure>
 </div>
 

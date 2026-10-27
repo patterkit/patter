@@ -14,25 +14,24 @@ writing surface, which is also what makes staleness computable (below).
 <svg viewBox="0 0 760 168" role="img" aria-labelledby="pk-loc-title" style="width:100%;height:auto;font-family:var(--sl-font,sans-serif)">
   <title id="pk-loc-title">The translation round-trip: export source strings as JSON, xlsx, or PO; a translator fills them in; import them back into the locale shards. You only ever edit the source language, and stable line ids mean a moved or edited line never orphans its translation.</title>
   <defs><marker id="pk-l-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="var(--sl-color-gray-3)"/></marker></defs>
-  <text x="94" y="30" text-anchor="middle" fill="var(--pt-teal-mid,#2f6f66)" font-size="10.5" letter-spacing="1" style="text-transform:uppercase">You edit here</text>
+  <text x="94" y="30" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10.5">You edit here</text>
   <!-- source -->
-  <rect x="24" y="42" width="140" height="48" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--pt-teal-ink,#214f4b)"/><rect x="24" y="42" width="140" height="3" rx="1.5" fill="var(--pt-teal-ink,#214f4b)"/>
+  <rect x="24" y="42" width="140" height="48" rx="6" fill="color-mix(in oklab, var(--sl-color-accent) 8%, var(--sl-color-bg-sidebar))" stroke="var(--sl-color-accent)"/>
   <text x="94" y="71" text-anchor="middle" fill="var(--sl-color-white)" font-size="13">Source shards</text>
-  <text x="185" y="58" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10" style="text-transform:uppercase" letter-spacing="1">export</text>
+  <text x="185" y="58" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10">export</text>
   <path d="M164 66 H206" stroke="var(--sl-color-gray-3)" fill="none" marker-end="url(#pk-l-arrow)"/>
   <!-- format pill -->
-  <rect x="206" y="50" width="150" height="32" rx="8" fill="color-mix(in oklab, var(--pt-gold,#cf9433) 12%, var(--sl-color-bg-sidebar))" stroke="var(--pt-gold,#cf9433)"/>
-  <text x="281" y="70" text-anchor="middle" fill="var(--sl-color-white)" font-family="var(--sl-font-mono,monospace)" font-size="12">JSON · xlsx · PO</text>
+  <rect x="206" y="50" width="150" height="32" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
+  <text x="281" y="70" text-anchor="middle" fill="var(--sl-color-white)" font-family="var(--sl-font-mono,monospace)" font-size="12">JSON, xlsx, PO</text>
   <path d="M356 66 H398" stroke="var(--sl-color-gray-3)" fill="none" marker-end="url(#pk-l-arrow)"/>
   <!-- translator -->
-  <rect x="398" y="42" width="122" height="48" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
+  <rect x="398" y="42" width="122" height="48" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
   <text x="459" y="71" text-anchor="middle" fill="var(--sl-color-white)" font-size="13">Translator</text>
-  <text x="540" y="58" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10" style="text-transform:uppercase" letter-spacing="1">import</text>
+  <text x="540" y="58" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="10">import</text>
   <path d="M520 66 H562" stroke="var(--sl-color-gray-3)" fill="none" marker-end="url(#pk-l-arrow)"/>
   <!-- locale shards -->
-  <rect x="562" y="42" width="150" height="48" rx="8" fill="var(--sl-color-bg-sidebar)" stroke="var(--pt-teal-ink,#214f4b)"/><rect x="562" y="42" width="150" height="3" rx="1.5" fill="var(--pt-teal-ink,#214f4b)"/>
+  <rect x="562" y="42" width="150" height="48" rx="6" fill="var(--sl-color-bg-sidebar)" stroke="var(--sl-color-gray-5)"/>
   <text x="637" y="71" text-anchor="middle" fill="var(--sl-color-white)" font-size="13">Locale shards</text>
-  <rect x="24" y="118" width="688" height="34" rx="8" fill="none" stroke="var(--sl-color-gray-5)" stroke-dasharray="4 4"/>
   <text x="368" y="139" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="11.5">You only ever edit the source language. Stable line ids mean a moved or edited line never orphans its translation.</text>
 </svg>
 

@@ -1,0 +1,137 @@
+/* Generated from patterkit/site-chrome; do not edit here, edit the source and run sync */
+:root,
+:root[data-theme="dark"] {
+  --app-bg: #161618;
+  --app-surface: #1b1b1d;
+  --app-card: #212124;
+  --app-ink: #ebebed;
+  --app-muted: #98989e;
+  --app-line: #303034;
+  --app-line-soft: #27272a;
+  --app-accent: #86a6f5;
+  --app-on-accent: #161618;
+  --app-danger: #ec948a;
+  --app-warn: #e0b771;
+  --app-ok: #7fc489;
+  --app-char-0: #e08282;
+  --app-char-1: #e0a064;
+  --app-char-2: #cdb061;
+  --app-char-3: #abb56b;
+  --app-char-4: #79bd80;
+  --app-char-5: #5cb6a3;
+  --app-char-6: #61b1c9;
+  --app-char-7: #7ba6d9;
+  --app-char-8: #9c9dd6;
+  --app-char-9: #b794d2;
+  --app-char-10: #d389c2;
+  --app-char-11: #de8298;
+  --app-accent-soft: color-mix(in oklab, var(--app-accent) 12%, transparent);
+  --app-selection: color-mix(in oklab, var(--app-ink) 7%, transparent);
+  --app-hover: color-mix(in oklab, var(--app-ink) 4%, transparent);
+  --app-ink-soft: color-mix(in oklab, var(--app-ink) 70%, var(--app-muted));
+  --app-ink-read: color-mix(in oklab, var(--app-ink) 82%, var(--app-muted));
+  --app-radius-sm: 4px;
+  --app-radius-md: 6px;
+  --app-radius-lg: 8px;
+  --app-radius-dialog: 12px;
+}
+
+:root[data-theme="light"] {
+  --app-bg: #f5f4f2;
+  --app-surface: #fbfbfa;
+  --app-card: #ffffff;
+  --app-ink: #201e1b;
+  --app-muted: #64605b;
+  --app-line: #e2dfdc;
+  --app-line-soft: #edebe8;
+  --app-accent: #2b5bd0;
+  --app-on-accent: #ffffff;
+  --app-danger: #b24133;
+  --app-warn: #8a5f1b;
+  --app-ok: #337344;
+  --app-char-0: #b23b3b;
+  --app-char-1: #a8581d;
+  --app-char-2: #866913;
+  --app-char-3: #65742b;
+  --app-char-4: #3a7544;
+  --app-char-5: #2c7d6e;
+  --app-char-6: #2d7791;
+  --app-char-7: #3a6aa8;
+  --app-char-8: #5a5ba6;
+  --app-char-9: #7e4e9c;
+  --app-char-10: #9c4486;
+  --app-char-11: #a83e5c;
+  --app-accent-soft: color-mix(in oklab, var(--app-accent) 12%, transparent);
+  --app-selection: color-mix(in oklab, var(--app-ink) 7%, transparent);
+  --app-hover: color-mix(in oklab, var(--app-ink) 4%, transparent);
+  --app-ink-soft: color-mix(in oklab, var(--app-ink) 70%, var(--app-muted));
+  --app-ink-read: color-mix(in oklab, var(--app-ink) 82%, var(--app-muted));
+}
+
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"] {
+  --sl-color-accent-low: color-mix(in oklab, var(--app-accent) 12%, var(--app-card));
+  --sl-color-accent: var(--app-accent);
+  --sl-color-accent-high: color-mix(in oklab, var(--app-accent) 70%, var(--app-ink));
+  --sl-color-text-accent: var(--app-accent);
+
+  --sl-color-white: var(--app-ink);
+  --sl-color-gray-1: var(--app-ink);
+  --sl-color-gray-2: var(--app-ink-read);
+  --sl-color-gray-3: var(--app-muted);
+  --sl-color-gray-4: color-mix(in oklab, var(--app-muted) 55%, var(--app-line));
+  --sl-color-gray-5: var(--app-line);
+  --sl-color-gray-6: var(--app-surface);
+  --sl-color-gray-7: var(--app-surface);
+  --sl-color-black: var(--app-card);
+
+  --sl-color-bg: var(--app-card);
+  --sl-color-bg-nav: var(--app-card);
+  --sl-color-bg-sidebar: var(--app-surface);
+  --sl-color-bg-inline-code: var(--app-bg);
+
+  --chrome-current-bg: color-mix(in oklab, var(--app-accent) 10%, transparent);
+  --chrome-current-ink: var(--app-accent);
+  --chrome-marker-ink: var(--app-accent);
+
+  --chrome-aside-ink: var(--app-accent);
+  --chrome-aside-edge: var(--app-accent);
+  --chrome-caution-ink: var(--app-warn);
+  --chrome-caution-edge: var(--app-warn);
+  --chrome-danger-ink: var(--app-danger);
+  --chrome-danger-edge: var(--app-danger);
+
+  --chrome-cta: var(--app-accent);
+  --chrome-cta-ink: var(--app-on-accent);
+  --chrome-cta-hover: color-mix(in oklab, var(--app-accent) 85%, var(--app-ink));
+  --chrome-secondary-ink: var(--app-accent);
+
+  --chrome-code-bg: var(--app-surface);
+  --chrome-code-ink: var(--app-ink);
+
+  --chrome-shot-edge: var(--app-line);
+  --chrome-shot-shadow: none;
+
+  --chrome-land-rule: var(--app-line);
+  --chrome-land-wordmark-ink: var(--app-ink);
+  --chrome-land-nav-ink: var(--app-ink-read);
+  --chrome-land-nav-hover: var(--app-accent);
+  --chrome-land-btn-ink: var(--app-accent);
+  --chrome-land-btn-hover: var(--app-accent-soft);
+
+  --chrome-foot-bg: var(--app-surface);
+  --chrome-foot-ink: var(--app-muted);
+  --chrome-foot-rule: var(--app-line);
+  --chrome-foot-brand-ink: var(--app-ink);
+  --chrome-foot-link: var(--app-ink-read);
+  --chrome-foot-link-hover: var(--app-accent);
+
+  --chrome-nl-text: var(--app-muted);
+  --chrome-nl-strong: var(--app-ink);
+  --chrome-nl-field: var(--app-card);
+  --chrome-nl-field-ink: var(--app-ink);
+  --chrome-nl-hair: var(--app-line);
+  --chrome-nl-hair-strong: var(--app-muted);
+  --chrome-nl-accent: var(--app-accent);
+}

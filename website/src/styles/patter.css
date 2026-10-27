@@ -1,16 +1,15 @@
-/* PatterKit documentation: the brand palette, and nothing else.
+/* PatterKit documentation: the site's brand, and nothing else.
  *
- * This file is the site's tokens. It anchors the docs on the real brand palette (teal ink for
- * the script, the accent and the primary button; ember kept for what it means, a danger aside
- * and the Patterpad screenshots; gold for caution; stage-black for the shared dark ground and
- * code), maps it onto Starlight's own tokens, and then declares the --chrome-* properties the
- * shared chrome reads.
+ * The colours are the family palette, the same as Patterpad's and Storyletter's since the October
+ * 2026 UI review: app-shell's Light and Dark with blue pencil as the one accent. They arrive in
+ * src/chrome/palette.css, generated from patterkit/site-chrome, which renders app-shell's palette
+ * and maps every Starlight and --chrome-* colour onto it. The RULES are in src/chrome/chrome.css,
+ * generated likewise. What stays here is the site's own: its faces, its measure, and the shape of
+ * the sidebar marker (the brand mark's drop). The brand's own colours live in its marks.
  *
- * The RULES that use these values are in src/chrome/chrome.css, which is generated from
- * patterkit/site-chrome and identical on every site in the family. Nothing here is a rule, and
- * nothing there is a colour. Fonts are loaded by the Google Fonts <link> in astro.config.mjs;
- * captions are words in the text face, never a tracked uppercase label; monospace is for code,
- * file names and CLI output only.
+ * Nothing here is a rule, and nothing there is a brand. The faces are bundled by
+ * src/chrome/fonts.css; captions are words in the text face, never a tracked uppercase label;
+ * monospace is for code, file names and CLI output only.
  */
 
 :root {
@@ -19,113 +18,20 @@
   --sl-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Widen the central reading column (Starlight default 45rem) so wide tables get room.
-   * Running prose is capped back to a comfortable measure by the chrome, so only tables,
-   * figures, code, and diagrams use the extra width. */
+   * Running prose is capped back to a comfortable measure by the chrome (about 75 characters a
+   * line), so only tables, figures, code, and diagrams use the extra width. */
   --sl-content-width: 54rem;
 
-  /* brand reference tokens (theme independent) */
-  --pt-teal-ink: #214f4b;
-  --pt-teal-mid: #2f6f66;
-  --pt-teal-soft: #4f8a82;
-  --pt-ember: #d2603e;
-  --pt-gold: #cf9433;
-  --pt-stage: #15201e;
-
-  /* The chrome, where this site's answer is the same in both themes. The sidebar marker is
-     the brand mark's drop, as a mask, so the pill carries the mark at 7px. */
+  /* The chrome's shape for this site: the serif for page titles, the measure, and the sidebar
+     marker, which is the brand mark's drop as a mask. Its colour is the accent, from palette.css. */
+  /* The wordmark is part of the logo, so the landing header draws its second word in the brand's
+     teal, as the docs header's wordmark image does; the site's accent is the family's blue. */
+  --chrome-land-wordmark-accent: #214f4b;
   --chrome-display: var(--pt-read);
-  --chrome-measure: 46rem;
-  --chrome-current-bg: var(--pt-teal-ink);
-  --chrome-current-ink: #f1ebe0;
+  --chrome-measure: 40rem;
   --chrome-marker-width: 7px;
   --chrome-marker-height: 9px;
   --chrome-marker-gap: 8px;
   --chrome-marker-shift: -1px;
-  --chrome-marker-ink: #8fc7bb;
   --chrome-marker-shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z'/%3E%3C/svg%3E");
-  /* Code blocks sit on stage-black in BOTH themes, a deliberate constant that reads as "the
-     runtime". The syntax theme is forced dark in astro.config to suit it. */
-  --chrome-code-bg: #15201e;
-}
-
-/* ------------------------------------------------------------------ */
-/* DARK (Starlight default): teal-soft accent on a stage-black ground  */
-/* ------------------------------------------------------------------ */
-:root,
-:root[data-theme="dark"] {
-  --sl-color-accent-low: #1c3b36;
-  --sl-color-accent: #57a294;
-  --sl-color-accent-high: #9fd0c4;
-  --sl-color-text-accent: #9fd0c4;
-
-  --sl-color-white: #f4efe6;
-  --sl-color-gray-1: #e7ece9;
-  --sl-color-gray-2: #c2cecb;
-  --sl-color-gray-3: #8a9b97;
-  --sl-color-gray-4: #5d6f6b;
-  --sl-color-gray-5: #2c3e3a;
-  --sl-color-gray-6: #1b2624;
-  --sl-color-black: #131c1a;
-
-  --sl-color-bg: #15201e;
-  --sl-color-bg-nav: #192724;
-  --sl-color-bg-sidebar: #192724;
-  --sl-color-bg-inline-code: #1f302d;
-
-  --chrome-aside-ink: var(--pt-teal-soft);
-  --chrome-aside-edge: var(--pt-teal-soft);
-  --chrome-caution-ink: #e0b257;
-  --chrome-caution-edge: var(--pt-gold);
-  --chrome-danger-ink: #e0734f;
-  --chrome-danger-edge: var(--pt-ember);
-  /* Primary button: the accent fill with stage ink on it (5.6:1). */
-  --chrome-cta: #57a294;
-  --chrome-cta-ink: #15201e;
-  --chrome-cta-hover: #6fb5a7;
-  --chrome-secondary-ink: var(--pt-teal-soft);
-  --chrome-code-ink: #9fd0c4;
-  --chrome-shot-edge: var(--sl-color-gray-4);
-  --chrome-shot-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
-/* ------------------------------------------------------------------ */
-/* LIGHT: teal-ink accent on warm paper                                */
-/* ------------------------------------------------------------------ */
-:root[data-theme="light"] {
-  --sl-color-accent-low: #dbe6e2;
-  --sl-color-accent: #214f4b;
-  --sl-color-accent-high: #18403c;
-  --sl-color-text-accent: #214f4b;
-
-  /* in Starlight light mode the "white" and "black" tokens invert:
-     white = highest-contrast text, black = page background */
-  --sl-color-white: #2a241c;
-  --sl-color-gray-1: #312b22;
-  --sl-color-gray-2: #4a4339;
-  --sl-color-gray-3: #6b6256;
-  --sl-color-gray-4: #9c9286;
-  --sl-color-gray-5: #e0d6c6;
-  --sl-color-gray-6: #f6f0e6;
-  --sl-color-gray-7: #faf5ec;
-  --sl-color-black: #f1ebe0;
-
-  --sl-color-bg: #f1ebe0;
-  --sl-color-bg-nav: #fbf7f0;
-  --sl-color-bg-sidebar: #f6f0e6;
-  --sl-color-bg-inline-code: #e7f0ed;
-
-  --chrome-aside-ink: var(--pt-teal-ink);
-  --chrome-aside-edge: var(--pt-teal-ink);
-  --chrome-caution-ink: #9a6e15;
-  --chrome-caution-edge: var(--pt-gold);
-  --chrome-danger-ink: #b04a28;
-  --chrome-danger-edge: var(--pt-ember);
-  /* Primary button: teal ink with white on it (9.2:1). */
-  --chrome-cta: #214f4b;
-  --chrome-cta-ink: #ffffff;
-  --chrome-cta-hover: #18403c;
-  --chrome-secondary-ink: var(--pt-teal-ink);
-  --chrome-code-ink: var(--pt-teal-ink);
-  --chrome-shot-edge: var(--sl-color-gray-5);
-  --chrome-shot-shadow: 0 1px 3px rgba(21, 32, 30, 0.08), 0 8px 24px rgba(21, 32, 30, 0.06);
 }

@@ -20,18 +20,23 @@ export default defineConfig({
     starlight({
       title: "Patter",
       tagline: "Write playable dialogue.",
-      customCss: ["./src/chrome/fonts.css", "./src/styles/patter.css", "./src/chrome/chrome.css"],
+      customCss: ["./src/chrome/fonts.css", "./src/styles/patter.css", "./src/chrome/palette.css", "./src/chrome/chrome.css"],
       // Every docs page ends with the mailing-list sign-up and the credit line naming the
       // licence and the author. Generated from patterkit/site-chrome, like the stylesheet
       // above; the landing page carries the same credit through its own footer, because it is
       // a standalone page outside Starlight's chrome.
       components: { Footer: "./src/chrome/Footer.astro" },
-      // Code blocks sit on the stage-black ground in BOTH site themes (a deliberate constant that reads
-      // as "the runtime"). Force one dark syntax theme so the tokens always suit the dark background, and
-      // pin the exact stage-black fill + hairline.
+      // Code follows the theme: a light block on a light page and a dark one on a dark page, on the
+      // chrome tier with a hairline and no shadow (the October 2026 UI review; until then a dark slab
+      // in both themes, which on a white page was the heaviest thing on it).
       expressiveCode: {
-        themes: ["github-dark"],
-        styleOverrides: { codeBackground: "#15201e", borderColor: "#2c3e3a" },
+        themes: ["github-dark-default", "github-light-default"],
+        styleOverrides: {
+          codeBackground: "var(--chrome-code-bg)",
+          borderColor: "var(--sl-color-gray-5)",
+          borderRadius: "8px",
+          frames: { frameBoxShadowCssValue: "none" },
+        },
       },
       // PatterKit brand: square mark as the favicon, the wordmark as the header logo
       // (light/dark variants - the wordmark uses fixed dark ink that needs lightening
