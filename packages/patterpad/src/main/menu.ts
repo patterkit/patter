@@ -144,7 +144,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { type: "separator" },
         // Scene-level actions: within the OPEN project (project-level New/Open live above).
         { label: "New Scene…", accelerator: "Shift+CmdOrCtrl+N", enabled: hasProject, click: () => send("new-scene") },
-        { label: "Delete Scene…", enabled: hasProject, click: () => send("delete-scene") },
+        { label: "Delete Scene", enabled: hasProject, click: () => send("delete-scene") },
         { type: "separator" },
         { ...FILE_MENU.projectSettings, enabled: hasProject, click: () => send("project-settings") },
         // What the project takes and this machine has installed: Add, Remove from Project, and Uninstall per
@@ -346,6 +346,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       // remembered state - then the standard view roles. Replaces role:viewMenu so both live in one place.
       label: "View",
       submenu: [
+        // Every command by name, and quick open for scenes and blocks (app-shell's command palette).
+        { ...VIEW_MENU.commandPalette, click: () => send("command-palette") },
+        { type: "separator" },
         { ...VIEW_MENU.projectOverview, enabled: hasProject, click: () => send("project-overview") }, // the #3a landing (scene index + stats)
         // Up a Level: the family's hierarchy step (Cmd+[), which here is a scene (or the Properties page)
         // up to the project overview. History (Back / Forward) is the other axis, below.

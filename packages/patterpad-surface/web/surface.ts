@@ -8,7 +8,7 @@
 // theme / font / size chrome, where the round-tripped source goes, and the cast / jump-target lists
 // (the project owns those). The surface only EDITS; it reports changes via `onChange`.
 
-import { EditorState, TextSelection, Selection, NodeSelection, type Transaction, type Command } from "prosemirror-state";
+import { EditorState, TextSelection, Selection, NodeSelection, type Transaction, type Command, type Plugin } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
@@ -160,6 +160,11 @@ export interface MountOptions {
   /** The host routes Undo and Redo itself (its Edit menu), so the editor binds no keys for them: a key
    *  the editor handled first would undo the scene behind the host's back. Default false. */
   hostUndo?: boolean;
+  /** An editor state this scene had when the host last left it (`handle.exportState()`), to come back to
+   *  instead of opening fresh: the document, the caret and the undo history as they were (the October 2026
+   *  review's scene switch). Its document must be the one `flowSource` and `locSource` save to; the host
+   *  checks that before passing it. The plugins are this mount's own. */
+  restoreState?: EditorState;
 }
 
 /** One field of an extension entry to set on a node, by the node's id (the scene's id for the scene), or to
@@ -370,6 +375,9 @@ export interface SurfaceHandle {
    *  there was something to undo (or redo) and the editor took it. */
   undo(): boolean;
   redo(): boolean;
+  /** The editor's whole state (document, selection, history), for the host to keep and hand back as
+   *  `restoreState` when it opens the scene again. */
+  exportState(): EditorState;
   /** How many events the scene's history can undo, and redo. */
   undoDepth(): number;
   redoDepth(): number;
@@ -590,6 +598,8 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   };
   let formattingEnabled = opts.formatting ?? true;
   const opened = openScene(opts.flowSource, opts.locSource, formattingEnabled, opts.extensions ?? []);
+  // Coming back to a scene: its kept document is the live one from the start (getSource saves it).
+  if (opts.restoreState) opened.doc = opts.restoreState.doc;
   let extensionLocks: ExtensionLocks = opts.lockedExtensions ?? {};
   /** The scene model `model()` last built, and the document it was built from. */
   let modelCache: { doc: PMNode; model: SceneModel } | null = null;
@@ -784,6 +794,14 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     else if (/(^|-)Delete$/.test(k) || k === "Ctrl-d" || k === "Alt-d") spineKeys[k] = forwardDelete;
   }
 
+  // A fresh scene opens with the caret at its first spot, but never on a speaker: a scene starting with a
+  // dialogue line would otherwise select the name and raise the cast picker as soon as it had focus. A kept
+  // one comes back as it was left, history and all: `reconfigure` keeps the state of every plugin whose key
+  // the new set shares (the history's is fixed) and starts the rest, which are this mount's own.
+  const startState = (plugins: Plugin[]): EditorState => opts.restoreState
+    ? opts.restoreState.reconfigure({ plugins })
+    : EditorState.create({ doc: opened.doc, selection: offCue(opened.doc, Selection.atStart(opened.doc)), plugins });
+
   const view = new EditorView(editorEl, {
     editable: () => isEditable,
     // Turn OFF the browser's native spellchecker on the editable: we run our own (#177, nspell + the project
@@ -794,12 +812,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     // Typewriter-ish scrolling for transactions that asked to scroll (typing, Enter); clicks / arrows
     // are handled in dispatchTransaction. Needs the tall padding-bottom on the editor element.
     handleScrollToSelection: (v) => recenterCaret(v),
-    state: EditorState.create({
-      doc: opened.doc,
-      // The scene opens with the caret at its first spot, but never on a speaker: a scene starting with a
-      // dialogue line would otherwise select the name and raise the cast picker as soon as it had focus.
-      selection: offCue(opened.doc, Selection.atStart(opened.doc)),
-      plugins: [
+    state: startState([
         // First, so nothing else sees a transaction it is going to refuse (ruling D).
         structureGuard(say),
         // An edit that would change a locked extension's data (an undo or redo included) is refused too.
@@ -834,8 +847,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         actionTextPlugin(opts.localiseDialogueText ?? false), // a dialogue scene's text drawn as action
         projectPad(() => opts.projectPadAfterDefault?.()), // the project's default pause, for pinning a moved line
         keepTimingOnJoin(), // lines a range edit joins into another bubble keep their timing (line padding)
-      ],
-    }),
+    ]),
     nodeViews,
     // Copy writes the spoken words, one beat to a line, never the speaker or direction (src/paste.ts).
     clipboardTextSerializer: (slice) => clipboardText(slice),
@@ -1544,6 +1556,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     nodesOfKind: (kind) => nodesOfKind(view.state.doc, kind),
     undo: () => { const done = undo(view.state, view.dispatch); view.focus(); return done; },
     redo: () => { const done = redo(view.state, view.dispatch); view.focus(); return done; },
+    exportState: () => view.state,
     undoDepth: () => undoDepth(view.state),
     redoDepth: () => redoDepth(view.state),
     // Applied directly, not dispatched: a metadata-only transaction with nothing for the popups to answer.

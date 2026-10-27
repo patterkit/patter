@@ -491,6 +491,17 @@ const stub = {
   onUpdaterSaveBeforeInstall: () => undefined,
   onUpdaterPrompt: () => undefined,
   onUpdaterDownloadProgress: () => undefined,
+  // The update chip and the command palette: `__updateReady({ appName, version })` shows the chip; the
+  // palette lists a few stand-in menu items and runs them through the menu relay.
+  onUpdaterReady: (h: (info: { appName: string; version: string }) => void) => { (window as unknown as { __updateReady: unknown }).__updateReady = h; },
+  updaterRestart: () => undefined,
+  paletteCommands: async () => [
+    { id: "File\u001fNew Scene\u2026", path: ["File"], label: "New Scene\u2026", accelerator: "CmdOrCtrl+Shift+N", enabled: true },
+    { id: "View\u001fProject Overview", path: ["View"], label: "Project Overview", enabled: true },
+    { id: "Publish\u001fPublish Bundle", path: ["Publish"], label: "Publish Bundle", accelerator: "Shift+CmdOrCtrl+B", enabled: false },
+  ],
+  paletteRun: () => undefined,
+  onUndoStep: () => undefined,
 };
 
 (window as unknown as { patter: unknown }).patter = stub;

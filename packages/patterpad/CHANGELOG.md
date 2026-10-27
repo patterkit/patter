@@ -6,7 +6,24 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **A command palette.** Press Cmd+K (Ctrl+K on Windows and Linux) to run any menu command by typing its
+  name, or to open a scene, a block, or the Properties page. It lists exactly what the menus hold, greyed where
+  a command can't run just now.
+
 ### Changed
+
+- **Undo instead of "Are you sure?"** Deleting a scene, Replace All, and accepting every clean suggestion
+  happen straight away and say what they did, with an Undo button on the message. Edit ▸ Undo works as
+  before. Merging a returned pack still asks first when the pack seems to come from another project, or when
+  it changes the game's shared World file.
+- **Switching scenes is instant, and undo comes with you.** The next scene shows as soon as it's read,
+  without waiting for the one you left to finish saving. The last eight scenes you visited keep their undo
+  history, so you can go back to a scene and undo there, and Undo after a switch works back into the scene you
+  came from, showing it first. A scene whose files changed while you were away opens fresh.
+- **Updates don't interrupt.** When an update has downloaded, a "Restart to update" button appears in the
+  top bar instead of a dialog over your work. It installs when you next quit if you'd rather not restart now.
 
 - **A scene somebody else holds is easier to read.** Its locked fields and buttons keep their text at full
   strength, so you can read every value; they show they're locked with a dashed edge and a no-entry cursor,

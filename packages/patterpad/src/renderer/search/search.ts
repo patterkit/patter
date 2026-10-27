@@ -21,7 +21,6 @@ import "@patterkit/patterpad-surface/fonts.css"; // every face the windows draw,
 import { applyTheme } from "../src/apply-theme.js";
 import { initTooltips } from "@wildwinter/app-shell";
 import type { SearchEntry, SearchMode, ReplaceHitDto, OpenSuggestionDto } from "../../shared/api.js";
-import { confirmDialog } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/dialog.css"; // the modal frame the confirm sits on (without it, Replace all's confirm drew unstyled)
 import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "@wildwinter/app-shell/tool-window.css"; // ...and the tool-window chrome (drag bar, pin, close)
@@ -257,20 +256,21 @@ const renderReplace = (): void => {
 const applyReplace = async (one?: ReplaceHitDto): Promise<void> => {
   const n = one ? 1 : replaceHits.length;
   if (n === 0) return;
-  if (!one) {
-    const scenes = new Set(replaceHits.map((h) => h.sceneId)).size;
-    const ok = await confirmDialog({
-      title: `Replace ${plural(n, "occurrence")} across ${plural(scenes, "scene")}?`,
-      // House style rule 30: a confirmation ends with what undo does. Replace is one step of the project
-      // history, so Edit ▸ Undo in the editor puts every shard back.
-      body: `Replace “${input.value}” with “${replaceInput.value}”. You can undo this.`,
-      confirmLabel: "Replace",
-    });
-    if (!ok) return;
-  }
+  // No question first: Replace is one step of the project history, so the report carries Undo (the
+  // October 2026 review: Undo replaces "Are you sure?"), and Edit > Undo in the editor works as ever.
   const res = await search.replaceApply({ ...replaceOpts(), ...(one ? { onlyId: one.id, onlyField: one.field } : {}) });
   if (!res.ok) { toast(`Replace failed: ${res.error ?? "unknown error"}`, "error"); return; }
+  if (!one) toastWithUndo(`Replaced ${plural(res.count, "occurrence")} in ${plural(res.scenes, "scene")}.`, res.step);
   await runReplacePreview(); // refresh: the applied hits are gone
+};
+
+/** A report with Undo, which the editor runs only while the step is still the newest thing done. */
+const toastWithUndo = (message: string, step: { id: number; merged: boolean } | undefined): void => {
+  if (!step || step.merged) { toast(message); return; }
+  const id = step.id;
+  toast(message, "info", { action: { label: "Undo", run: () => void search.undoStep(id).then((r) => {
+    if (r === "stale") toast("That's no longer the latest change. Undo in the editor's Edit menu steps back to it.");
+  }) } });
 };
 
 const applyChipFilter = (): void => {
@@ -338,11 +338,12 @@ const renderSuggestions = (): void => {
 };
 
 /** Accept or reject on the files, then refresh the chips and the list. */
-const decide = async (decisions: Array<{ id: string; accept: boolean }>): Promise<void> => {
+const decide = async (decisions: Array<{ id: string; accept: boolean }>, report?: string): Promise<void> => {
   const res = await search.decideSuggestions(decisions);
   if (!res.ok) { toast(res.error ? `Couldn't apply: ${res.error}` : "Couldn't apply", "error"); return; }
   const refused = (res.results ?? []).filter((r) => r.outcome === "stale" || r.outcome === "missing");
   if (refused.length) toast(`${plural(refused.length, "suggestion")} not applied: ${refused[0]!.reason ?? "out of date"}`, "error");
+  else if (report) toastWithUndo(report, res.step);
   chips = await suggestionChips();
   if (!chips.some((c) => c.name === activeChip)) activeChip = ALL;
   renderChips();
@@ -354,14 +355,9 @@ const acceptAllClean = async (): Promise<void> => {
   const clean = suggShown.filter((s) => !s.stale.length);
   if (!clean.length) return;
   const stale = suggShown.length - clean.length;
-  const ok = await confirmDialog({
-    title: `Accept ${plural(clean.length, "suggestion")}?`,
-    // A sentence, the action on the button, and what undo does (house style rules 29 and 30).
-    body: `This accepts every suggestion shown that still applies cleanly.${stale ? ` ${plural(stale, "out-of-date one")} ${stale === 1 ? "stays" : "stay"} open for review.` : ""} You can undo this.`,
-    confirmLabel: "Accept suggestions",
-  });
-  if (!ok) return;
-  await decide(clean.map((s) => ({ id: s.id, accept: true })));
+  // No question first: it's one step of the project history, so the report carries Undo.
+  await decide(clean.map((s) => ({ id: s.id, accept: true })),
+    `Accepted ${plural(clean.length, "suggestion")}.${stale ? ` ${plural(stale, "out-of-date one")} ${stale === 1 ? "stays" : "stay"} open for review.` : ""}`);
 };
 acceptCleanBtn.addEventListener("click", () => void acceptAllClean());
 

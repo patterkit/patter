@@ -27,6 +27,7 @@ import { plural } from "@wildwinter/app-shell/util";
 // Its IPC channel names are byte-identical to the ones this app already used, so
 // the preload and the renderer dialog are untouched.
 import { configureUpdater, startBackgroundUpdateCheck } from "@wildwinter/app-shell/updater";
+import { registerCommandPalette } from "@wildwinter/app-shell/palette-main";
 import { createJobHost } from "@wildwinter/app-shell/job";
 import { createProjectSession } from "@wildwinter/app-shell/session";
 import { SCRIPT_FONT_FILES, useScriptFontFiles } from "@patterkit/ops";
@@ -223,6 +224,11 @@ function flushBeforeClose(w: BrowserWindow): Promise<void> {
 // between its file pickers. With no window to answer, or none after five minutes, it is `cancelId`.
 let promptSeq = 0;
 const promptWaiters = new Map<number, (i: number) => void>();
+// The newest project step (for a window that asked for a write and wants its Undo), and the editor's
+// answers to "undo this step if it's still the newest".
+let lastProjectStep: import("../shared/api.js").ProjectStep | undefined;
+let undoAskSeq = 0;
+const undoAskWaiters = new Map<number, (r: string) => void>();
 function askInWindow(prompt: AppPrompt): Promise<number> {
   return new Promise((resolve) => {
     const w = win;
@@ -1301,7 +1307,7 @@ function registerIpc(): void {
   project.onAudioSnapshot((snap) => { if (win && !win.isDestroyed()) win.webContents.send("audio:index", snap); });
   // Every step of the project history, whichever window asked for the write (Replace and suggestion
   // decisions come from the search window), reaches the editor's journal.
-  project.onProjectStep((step) => { if (win && !win.isDestroyed()) win.webContents.send("project:step", step); });
+  project.onProjectStep((step) => { lastProjectStep = step; if (win && !win.isDestroyed()) win.webContents.send("project:step", step); });
   ipcMain.handle("scene:readSuggestions", (_e, id: string) => project.readSceneSuggestions(id));
   ipcMain.handle("scene:saveSuggestions", (_e, id: string, s: import("@patterkit/model").Suggestion[]) => project.saveSceneSuggestions(id, s));
   ipcMain.handle("review:feedback", (_e, scope?: { resolvedComments?: boolean; resolvedSuggestions?: boolean }) => project.reviewFeedback(scope));
@@ -1444,10 +1450,22 @@ function registerIpc(): void {
   ipcMain.handle("searchWin:handoffs", () => project.openHandoffs());
   ipcMain.handle("searchWin:decide", async (_e, decisions: Array<{ id: string; accept: boolean }>) => {
     await flushEditorScene();
+    const before = lastProjectStep;
     const r = await project.decideSuggestions(decisions, authorName());
     if (r.ok) win?.webContents.send("replace:applied");
-    return r;
+    // The step it made, for the search window's Undo.
+    const step = r.step ?? (lastProjectStep !== before ? lastProjectStep : undefined);
+    return step ? { ...r, step } : r;
   });
+  // A toast's Undo in the search window: the editor owns the journal, so it decides, and says how it went.
+  ipcMain.handle("searchWin:undoStep", (_e, id: number) => new Promise<"done" | "stale">((resolve) => {
+    if (!win || win.isDestroyed()) { resolve("stale"); return; }
+    const n = ++undoAskSeq;
+    const timer = setTimeout(() => { undoAskWaiters.delete(n); resolve("stale"); }, 30_000);
+    undoAskWaiters.set(n, (r) => { clearTimeout(timer); undoAskWaiters.delete(n); resolve(r === "done" ? "done" : "stale"); });
+    win.webContents.send("editor:undoStep", n, id);
+  }));
+  ipcMain.handle("editor:undoStepReply", (_e, n: number, r: string) => { undoAskWaiters.get(n)?.(r); });
   ipcMain.handle("app:promptReply", (_e, id: number, i: number) => { promptWaiters.get(id)?.(i); });
   ipcMain.handle("app:close-flushed", () => { const w = closeFlushWaiters; closeFlushWaiters = []; for (const r of w) r(); }); // the editor wrote what it held; the close may go on
   ipcMain.handle("editor:flushed", () => { const w = flushWaiters; flushWaiters = []; for (const r of w) r(); }); // the editor saved its open scene
@@ -1665,6 +1683,7 @@ if (!app.requestSingleInstanceLock({ argv: process.argv })) {
 
   app.whenReady().then(() => {
     registerIpc();
+    registerCommandPalette(); // Cmd+K reads the live menu and runs what it picks
     createWindow();
     app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
     // Auto-update: check shortly after launch (let the window settle first), then every 6 hours.

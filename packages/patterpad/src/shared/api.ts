@@ -3,6 +3,7 @@
 // entry is an explicit, auditable operation, never raw fs / shell access.
 
 import type { ThemeChoice } from "@wildwinter/app-shell/theme";
+import type { MenuCommand } from "@wildwinter/app-shell/menu";
 import type { GameDataFields, GameDataNodeKind, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier } from "@patterkit/model";
 
 export type { VcsKind } from "@patterkit/model";
@@ -931,7 +932,10 @@ export interface PatterSearchApi {
   /** Replace PREVIEW (no writes): the source-prose hits a project-wide replacement would make + scene count. */
   replacePreview(opts: ReplaceQuery): Promise<{ hits: ReplaceHitDto[]; scenes: number }>;
   /** Replace APPLY: flush the open scene, commit the rewrite through VC, reload the editor. Returns the count. */
-  replaceApply(opts: ReplaceQuery): Promise<{ ok: boolean; error?: string; count: number; scenes: number }>;
+  replaceApply(opts: ReplaceQuery): Promise<{ ok: boolean; error?: string; count: number; scenes: number; step?: ProjectStep }>;
+  /** A toast's Undo, from this window: the editor takes back project step `id`, but only while it is still
+   *  the newest thing done ("stale" otherwise, and nothing changes). */
+  undoStep(id: number): Promise<"done" | "stale">;
   /** The status ladder (name + palette colour) for the chips - recording-status when `recording`, else writing. */
   statuses(recording: boolean): Promise<Array<{ name: string; colour?: number }>>;
   /** Open suggestions across the project (optionally one handoff's), each marked clean or out of date. */
@@ -1288,6 +1292,9 @@ export interface PatterApi {
   setUndoLabels(labels: { undo?: string; redo?: string }): Promise<void>;
   /** Every step main records in the project history, whichever window asked for the write. */
   onProjectStep(handler: (step: ProjectStep) => void): void;
+  /** Another window's toast asks the editor to undo project step `id` only if it's still the newest; the
+   *  handler says what it came to. */
+  onUndoStep(handler: (id: number) => Promise<"done" | "stale">): void;
   /** Carry stage renames into every condition and set effect that names them (the open scene is saved
    *  first and reloads after). `expressions` is how many were rewritten. */
   renameStages(renames: StageRenameDto[]): Promise<SaveResult & { expressions: number }>;
@@ -1505,6 +1512,15 @@ export interface PatterApi {
   /** Live download progress from the auto-updater, fired while an update downloads. The open updater
    *  dialog (when shown with `progress: true`) renders it as a bar; otherwise it is ignored. */
   onUpdaterDownloadProgress(handler: (p: UpdaterDownloadProgress) => void): void;
+  /** An update downloaded on its own and is ready: the renderer shows a "Restart to update" chip in the
+   *  top bar (app-shell's showUpdateReady), never a dialog. */
+  onUpdaterReady(handler: (info: { appName: string; version: string }) => void): void;
+  /** The chip's click: restart and install, after the usual unsaved-edits question. */
+  updaterRestart(): void;
+  /** The command palette (Cmd+K): the live application menu, flattened (app-shell palette-main). */
+  paletteCommands(): Promise<MenuCommand[]>;
+  /** Run a menu item the palette picked, as clicking it would. */
+  paletteRun(id: string): void;
 }
 
 /** A themed auto-update prompt (the in-app replacement for dialog.showMessageBox). */

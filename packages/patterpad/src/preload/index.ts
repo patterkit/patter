@@ -110,6 +110,7 @@ const api: PatterApi = {
   projectClearRedo: () => ipcRenderer.invoke("project:clearRedo"),
   setUndoLabels: (labels) => ipcRenderer.invoke("project:undoLabels", labels),
   onProjectStep: (handler) => { ipcRenderer.on("project:step", (_e, step: ProjectStep) => handler(step)); },
+  onUndoStep: (handler) => { ipcRenderer.on("editor:undoStep", (_e, n: number, id: number) => { void handler(id).then((r) => ipcRenderer.invoke("editor:undoStepReply", n, r)); }); },
   renameStages: (renames) => ipcRenderer.invoke("project:renameStages", renames),
   stageGates: (target) => ipcRenderer.invoke("project:stageGates", target),
   setStart: (start) => ipcRenderer.invoke("project:setStart", start),
@@ -163,6 +164,11 @@ const api: PatterApi = {
   onUpdaterSaveBeforeInstall: (handler) => { ipcRenderer.on("updater:save-before-install", () => { void handler().then((r) => ipcRenderer.send("updater:save-done", r)); }); },
   onUpdaterPrompt: (handler) => { ipcRenderer.on("updater:prompt", (_e, opts: UpdaterPromptOptions) => { void handler(opts).then((idx) => ipcRenderer.send("updater:prompt-reply", idx)); }); },
   onUpdaterDownloadProgress: (handler) => { ipcRenderer.on("updater:download-progress", (_e, p: UpdaterDownloadProgress) => handler(p)); },
+  // app-shell's UPDATER_CHANNELS.ready / .restart and PALETTE_CHANNELS, spelled out as the others are.
+  onUpdaterReady: (handler) => { ipcRenderer.on("updater:ready", (_e, info: { appName: string; version: string }) => handler(info)); },
+  updaterRestart: () => { ipcRenderer.send("updater:restart"); },
+  paletteCommands: () => ipcRenderer.invoke("palette:commands"),
+  paletteRun: (id) => { ipcRenderer.send("palette:run", id); },
 };
 
 // The play window's bridge (drives the interactive walk + the editor step-marker).
@@ -207,6 +213,7 @@ const searchApi: PatterSearchApi = {
   decideSuggestions: (decisions) => ipcRenderer.invoke("searchWin:decide", decisions),
   replacePreview: (opts) => ipcRenderer.invoke("searchWin:replacePreview", opts),
   replaceApply: (opts) => ipcRenderer.invoke("searchWin:replaceApply", opts),
+  undoStep: (id) => ipcRenderer.invoke("searchWin:undoStep", id),
   jump: (entry) => { void ipcRenderer.invoke("searchWin:jump", entry); },
   setPin: (on) => { void ipcRenderer.invoke("searchWin:setPin", on); },
   close: () => { void ipcRenderer.invoke("searchWin:close"); },
