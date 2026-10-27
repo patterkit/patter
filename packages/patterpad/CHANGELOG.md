@@ -17,6 +17,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   picked Paper or Mist you're now on Light, and Slate or Night are now Dark. The interface uses your system's own
   typeface, with quieter corners and shadows, white fields, and menus that open
   straight away.
+- **A calmer inspector.** It shows what you've set, not every property a node could have: the rest wait in
+  one Add menu under each section. The line and its snippet stay open, while the option, group, block, and
+  scene above them fold to one line saying what they set, and Patterpad remembers which you keep open. An
+  option's Sticky, Fallback, and Secret are one row of buttons.
+- **More room for the script.** The editor's margins are narrower, a snippet's drag handle sits outside it,
+  and a jump reads "Jump to" or "Call" in words. A choice's options are marked by a small diamond on their
+  line instead of a tinted box and an "Option" label.
+- **A quieter navigator.** Scenes are listed at an even weight, the open one marked by a soft fill, and Find
+  looks like the search field it opens.
 - **The font theme changes only the script.** View ▸ Font Theme no longer changes the typeface of the menus,
   panes, and dialogs.
 
