@@ -23,6 +23,9 @@ import "@wildwinter/app-shell/kit-gallery.css"; // New Project (openKitGallery)
 import "@wildwinter/app-shell/link-status.css"; // the live-link chip (mountLinkStatus, via debug-panel.ts)
 import "@wildwinter/app-shell/updater.css"; // the updater prompt (showUpdaterDialog) and its "Restart to update" chip
 import "@wildwinter/app-shell/command-palette.css"; // Cmd+K (openCommandPalette)
+import "@wildwinter/app-shell/whats-new.css"; // What's New after an update, and Help > What's New
+// The changelog, built in as text, so What's New needs no network.
+import changelog from "../../../CHANGELOG.md?raw";
 import "@wildwinter/app-shell/job.css"; // the long-job strip the publish paths run under
 import "./shell.css"; // app shell layout, over the surface's page styles
 import "@patterkit/patterpad-surface/fonts.css"; // every face the windows draw, declared once
@@ -68,7 +71,7 @@ import { fileSafeName } from "../../shared/file-name.js";
 // The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
 // (plural / formatCount / debounce) are the shell's (ui-review-2026-09, shell step 6).
 import { EXAMPLES } from "../../shared/examples.js";
-import { mountWelcome, openKitGallery, type KitGalleryItem, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, showUpdateReady, openCommandPalette, type PaletteItem, plural, formatCount, debounce } from "@wildwinter/app-shell";
+import { mountWelcome, openKitGallery, type KitGalleryItem, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, showUpdateReady, openCommandPalette, type PaletteItem, whatsNewAfterUpdate, openWhatsNew, type WhatsNewOptions, plural, formatCount, debounce } from "@wildwinter/app-shell";
 import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in this file
 import "@wildwinter/app-shell/keys.css"; // the keycaps every hint in this window draws
 // Key hints come from ONE helper that writes "⌘" on a Mac and "Ctrl" elsewhere, and metadata is a drawn
@@ -4140,8 +4143,18 @@ function openPalette(): void {
   });
 }
 
+/** What's New's links and tickbox, the same for the launch dialog and the Help item. */
+const whatsNewOpts: Pick<WhatsNewOptions, "appName" | "changelog" | "onShow" | "releaseNotes" | "openExternal"> = {
+  appName: "Patterpad",
+  changelog,
+  onShow: (show) => window.patter.setWhatsNewShow(show),
+  releaseNotes: (version) => `https://github.com/patterkit/patter/releases/tag/v${version}`,
+  openExternal: (url) => window.patter.openExternal(url),
+};
+
 window.patter.onMenu((cmd) => {
   if (cmd === "command-palette") openPalette();
+  else if (cmd === "whats-new") void window.patter.whatsNewState().then((st) => openWhatsNew({ ...whatsNewOpts, version: st.version, show: st.show }));
   else if (cmd === "new") createDialog();
   else if (cmd === "new-scene") newScenePrompt();
   else if (cmd === "delete-scene") void deleteScenePrompt();
@@ -4295,6 +4308,8 @@ window.patter.onUpdaterDownloadProgress(feedUpdaterDownloadProgress);
 // An update that downloaded on its own: a "Restart to update" chip in the bar and one remark, never a
 // dialog over the work (the October 2026 review). It installs on quit if the chip is never clicked.
 window.patter.onUpdaterReady((info) => { showUpdateReady(info, { host: shell.topbarTrail, restart: () => window.patter.updaterRestart() }); });
+// The first launch after an update says what's new in it (main gives this answer once per launch).
+void window.patter.whatsNewState().then((st) => whatsNewAfterUpdate(st, { ...whatsNewOpts, onClose: () => window.patter.whatsNewSeen() }));
 // A publish path that reports through the ops layer turns the strip determinate (the shell flips the
 // band to the bar on the first positive total); none does yet.
 window.patter.onJobProgress((p) => { if (p.kind === "publish") jobView.update(p.done, p.total, p.elapsedMs); });

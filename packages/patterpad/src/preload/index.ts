@@ -169,6 +169,9 @@ const api: PatterApi = {
   updaterRestart: () => { ipcRenderer.send("updater:restart"); },
   paletteCommands: () => ipcRenderer.invoke("palette:commands"),
   paletteRun: (id) => { ipcRenderer.send("palette:run", id); },
+  whatsNewState: () => ipcRenderer.invoke("whatsNew:state"),
+  setWhatsNewShow: (show) => { ipcRenderer.send("whatsNew:setShow", show); },
+  whatsNewSeen: () => { ipcRenderer.send("whatsNew:seen"); },
 };
 
 // The play window's bridge (drives the interactive walk + the editor step-marker).

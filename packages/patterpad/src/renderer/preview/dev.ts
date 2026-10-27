@@ -502,6 +502,10 @@ const stub = {
   ],
   paletteRun: () => undefined,
   onUndoStep: () => undefined,
+  // What's New: a run after an update from 0.37.0, so the preview shows the dialog at boot.
+  whatsNewState: async () => ({ version: "0.39.0", previous: "0.37.0", show: true }),
+  setWhatsNewShow: () => undefined,
+  whatsNewSeen: () => undefined,
 };
 
 (window as unknown as { patter: unknown }).patter = stub;

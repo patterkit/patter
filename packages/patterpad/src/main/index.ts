@@ -28,6 +28,7 @@ import { plural } from "@wildwinter/app-shell/util";
 // the preload and the renderer dialog are untouched.
 import { configureUpdater, startBackgroundUpdateCheck } from "@wildwinter/app-shell/updater";
 import { registerCommandPalette } from "@wildwinter/app-shell/palette-main";
+import { registerWhatsNew } from "@wildwinter/app-shell/whats-new-main";
 import { createJobHost } from "@wildwinter/app-shell/job";
 import { createProjectSession } from "@wildwinter/app-shell/session";
 import { SCRIPT_FONT_FILES, useScriptFontFiles } from "@patterkit/ops";
@@ -1684,6 +1685,14 @@ if (!app.requestSingleInstanceLock({ argv: process.argv })) {
   app.whenReady().then(() => {
     registerIpc();
     registerCommandPalette(); // Cmd+K reads the live menu and runs what it picks
+    // What's New after an update: the version that last ran, and the tickbox. A machine with a recent
+    // project ran Patterpad before What's New began counting, so it hears about this version.
+    registerWhatsNew({
+      version: app.getVersion(),
+      read: () => store.whatsNew(),
+      write: (patch) => store.setWhatsNew(patch),
+      existing: store.read().recents.length > 0,
+    });
     createWindow();
     app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
     // Auto-update: check shortly after launch (let the window settle first), then every 6 hours.

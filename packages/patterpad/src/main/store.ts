@@ -17,6 +17,7 @@ import { basename, join } from "node:path";
 import { createAppStore, resetWindows, windowSlice } from "@wildwinter/app-shell/app-store";
 import type { AppSettings, PaneState as ShellPaneState, WindowSlice, WindowState } from "@wildwinter/app-shell/app-store";
 import { migrateTheme } from "@wildwinter/app-shell/theme";
+import type { WhatsNewMemory } from "@wildwinter/app-shell/whats-new-main";
 import type { Identity, PaneState, RecentProject, ThemePrefs } from "../shared/api.js";
 
 export interface SessionState {
@@ -68,6 +69,8 @@ interface AppSlice {
   storyletterPath?: string;
   /** Publish ▸ Auto Rebuild: a working habit, so per person rather than in the shared project file. */
   autoRebuild: boolean;
+  /** What's New: the version that last ran, and the "Show what's new after updates" tickbox. */
+  whatsNew?: WhatsNewMemory;
 }
 
 /** The old hand-rolled file, kept only for the one-time fold-in below. */
@@ -103,6 +106,9 @@ export interface Store {
   /** Storyletter's location, as the author pointed at it (undefined = look for it). */
   storyletterPath(): string | undefined;
   setStoryletterPath(path: string): void;
+  /** What's New's memory (app-shell whats-new-main), merged on write. */
+  whatsNew(): WhatsNewMemory;
+  setWhatsNew(patch: WhatsNewMemory): void;
   /** One helper window's remembered bounds + pin, read through the shell's `windowSlice`: the three
    *  helper windows float on top by default (the slice's own default), and nothing here flattens the
    *  shell's record back into named fields any more (ui-review-2026-09, finding 19). */
@@ -247,6 +253,12 @@ export function createStore(dir: string): Store {
     },
     setStoryletterPath(path) {
       app.patchApp({ storyletterPath: path });
+    },
+    whatsNew() {
+      return app.get().app.whatsNew ?? {};
+    },
+    setWhatsNew(patch) {
+      app.patchApp({ whatsNew: { ...app.get().app.whatsNew, ...patch } });
     },
     window(name) {
       return windowSlice(app, name);

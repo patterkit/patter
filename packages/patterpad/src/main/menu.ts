@@ -438,6 +438,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         linkItem(NAMED.docs),
         linkItem(NAMED.suiteDocs),
         { type: "separator" },
+        { ...HELP_MENU.whatsNew, click: () => send("whats-new") },
         { ...HELP_MENU.checkForUpdates, click: () => void manualCheckForUpdates(win) },
         // macOS keeps About in the app menu (above); Windows/Linux get it here, the conventional home.
         ...(isMac ? [] : [{ type: "separator" } as MenuItemConstructorOptions, { ...NAMED.about, click: () => send(`about:${app.getVersion()}`) } as MenuItemConstructorOptions]),

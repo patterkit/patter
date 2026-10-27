@@ -8,6 +8,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **What's new, after an update.** The first time Patterpad opens after an update, it shows what's new in that
+  version, or in every version since you last ran it. Help ▸ What's New shows the latest at any time, and a
+  tickbox turns the after-update window off.
 - **A command palette.** Press Cmd+K (Ctrl+K on Windows and Linux) to run any menu command by typing its
   name, or to open a scene, a block, or the Properties page. It lists exactly what the menus hold, greyed where
   a command can't run just now.

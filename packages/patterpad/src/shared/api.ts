@@ -4,6 +4,7 @@
 
 import type { ThemeChoice } from "@wildwinter/app-shell/theme";
 import type { MenuCommand } from "@wildwinter/app-shell/menu";
+import type { WhatsNewState } from "@wildwinter/app-shell/whats-new-main";
 import type { GameDataFields, GameDataNodeKind, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier } from "@patterkit/model";
 
 export type { VcsKind } from "@patterkit/model";
@@ -1521,6 +1522,12 @@ export interface PatterApi {
   paletteCommands(): Promise<MenuCommand[]>;
   /** Run a menu item the palette picked, as clicking it would. */
   paletteRun(id: string): void;
+  /** What's New at launch: this version, the one before it, and the tickbox (app-shell whats-new-main). */
+  whatsNewState(): Promise<WhatsNewState>;
+  /** The "Show what's new after updates" tickbox. */
+  setWhatsNewShow(show: boolean): void;
+  /** The launch dialog was closed: main stops giving the launch answer. */
+  whatsNewSeen(): void;
 }
 
 /** A themed auto-update prompt (the in-app replacement for dialog.showMessageBox). */
