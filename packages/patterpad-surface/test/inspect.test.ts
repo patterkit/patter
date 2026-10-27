@@ -188,5 +188,7 @@ describe("inspect: the detail-inspector context stack", () => {
     expect(levels).toHaveLength(1);                  // not a node stack - one summary
     const m = levels[0] as MultiLevel;
     expect(m).toMatchObject({ kind: "multi", count: 3, snippets: 3, groups: 0 });
+    // Each chunk as its own level would show it, so the inspector can show what they share.
+    expect(m.items.map((i) => [i.kind, i.id])).toEqual([["snippet", "s1"], ["snippet", "s2"], ["snippet", "s3"]]);
   });
 });

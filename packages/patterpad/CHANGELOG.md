@@ -24,6 +24,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **More room for the script.** The editor's margins are narrower, a snippet's drag handle sits outside it,
   and a jump reads "Jump to" or "Call" in words. A choice's options are marked by a small diamond on their
   line instead of a tinted box and an "Option" label.
+- **Change several snippets at once.** When you select more than one snippet, the inspector shows what
+  they share: their condition, jump, default pause, and tags, with "Mixed" where they differ. A change there
+  applies to all of them, and one Undo takes it back. A tag only some of them carry shows how many, and you
+  can add it to the rest or remove it from all of them.
+- **Dialogue fits a narrow window.** When the script column is narrow, a line's character name sits on its
+  own line above the speech, with any direction under it, as in a screenplay, instead of squeezing the speech
+  into a column one word wide.
 - **A quieter navigator.** Scenes are listed at an even weight, the open one marked by a soft fill, and Find
   looks like the search field it opens.
 - **The font theme changes only the script.** View ▸ Font Theme no longer changes the typeface of the menus,

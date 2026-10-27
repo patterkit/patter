@@ -48,6 +48,7 @@ function handlersWith(over: Partial<InspectorHandlers> = {}): InspectorHandlers 
     qualifiers: () => [], setQualifier: noop,
     projectPadAfter: () => 0.6, setPadAfter: noop, setPadAfterDefault: noop,
     levelOpen: () => undefined, setLevelOpen: noop,
+    batch: (edits) => edits(), editConditionMany: noop, editJumpMany: noop,
     extensions: () => probe(), setExtensionValue: noop, extensionLock: () => null, extensionAdapter: () => adapter,
     ...over,
   };

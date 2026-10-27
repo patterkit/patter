@@ -60,11 +60,11 @@ describe("chrome scale: no rem in chrome rules", () => {
 
 describe("chrome scale: the surface's mixed sheet", () => {
   it("chrome rules are px", () => {
-    for (const sel of ["#hintbar", ".action-menu", ".action-mi", ".slash-menu", ".slash-item", ".target-picker", ".tp-row", ".cue-ac", ".note-icon", ".comment-bubble", ".status-pill"]) {
+    for (const sel of ["#hintbar:not(.shell-statusrow)", ".action-menu", ".action-mi", ".slash-menu", ".slash-item", ".target-picker", ".tp-row", ".cue-ac", ".note-icon", ".comment-bubble", ".status-pill"]) {
       expect(rule(surface, sel), sel).not.toMatch(REM);
     }
-    expect(rule(surface, "#hintbar")).toContain("font: var(--text-xs) var(--font-ui)");
-    expect(rule(surface, "#hintbar")).toContain("min-height: 28px");
+    expect(rule(surface, "#hintbar:not(.shell-statusrow)")).toContain("font: var(--text-xs) var(--font-ui)");
+    expect(rule(surface, "#hintbar:not(.shell-statusrow)")).toContain("min-height: 28px");
   });
 
   it("reading rules keep rem", () => {
@@ -85,8 +85,8 @@ describe("chrome scale: the sizes the family measures", () => {
   });
 
   it("the navigator rows and the Find button sit on the shell's chrome scale", () => {
-    expect(rule(shell, ".nav-item")).toContain("font: var(--weight-regular) var(--text-md) var(--font-ui)");
-    expect(rule(shell, ".nav-item")).toContain("min-height: 28px");
+    // The scene rows are the shell's navigator row (app-shell 0.65), which sizes them on its scale.
+    expect(renderer).toContain('b.className = "nav-item shell-nav-row"');
     expect(rule(shell, ".nav-block")).toContain("font: var(--weight-regular) var(--text-sm) var(--font-ui)");
     expect(rule(shell, ".nav-search")).toContain("font: var(--weight-regular) var(--text-md) var(--font-ui)");
     expect(rule(shell, ".insp-row")).toContain("grid-template-columns: 96px 1fr");

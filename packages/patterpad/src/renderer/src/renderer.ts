@@ -510,10 +510,17 @@ paintHistory();
 
 // --- the project workspace ---------------------------------------------------
 
+/** The navigator's open document: `.active` for this app's own rules, and `aria-current`, which the shell's
+ *  row grammar (`.shell-nav-row`, app-shell 0.65) draws as the selection and a screen reader announces. */
+function markCurrent(el: HTMLElement, on: boolean): void {
+  el.classList.toggle("active", on);
+  if (on) el.setAttribute("aria-current", "page"); else el.removeAttribute("aria-current");
+}
+
 /** Mark the current scene: `.active` on its row, and `.open` on its container so its block list
  *  reveals while the previously open scene's list closes (both ease - no pops). */
 function highlightNav(id: string): void {
-  navListEl.querySelectorAll<HTMLElement>(".nav-item").forEach((el) => el.classList.toggle("active", el.dataset["id"] === id));
+  navListEl.querySelectorAll<HTMLElement>(".nav-item").forEach((el) => markCurrent(el, el.dataset["id"] === id));
   navListEl.querySelectorAll<HTMLElement>(".nav-scene").forEach((el) => el.classList.toggle("open", el.dataset["id"] === id));
   refreshNavBlocks();
 }
@@ -580,19 +587,19 @@ function renderNav(): void {
   // and no chevron - it is a page, not a container. (No VC badge yet: the renderer's shard map covers
   // scenes only, so the project shard has no status to paint here.)
   const propsRow = document.createElement("button");
-  propsRow.className = "nav-doc"; propsRow.type = "button";
+  propsRow.className = "nav-doc shell-nav-row"; propsRow.type = "button";
   propsRow.dataset.tip = "The project's @patter properties";
   propsRow.dataset["vc"] = PROJECT_SHARD_KEY; // the shard key `paintVcBadges` badges this row from
   propsRow.setAttribute("aria-label", "Properties");
   propsRow.append(Object.assign(document.createElement("span"), { className: "nav-doc-name", textContent: "Properties" }));
-  propsRow.append(Object.assign(document.createElement("span"), { className: "nav-doc-count", textContent: String(patterProps.length) }));
+  propsRow.append(Object.assign(document.createElement("span"), { className: "nav-doc-count shell-nav-count", textContent: String(patterProps.length) }));
   propsRow.addEventListener("click", () => void showPropertiesDoc());
   navListEl.appendChild(propsRow);
   for (const s of project?.scenes ?? []) {
     const row = document.createElement("div");
     row.className = "nav-scene"; row.dataset["id"] = s.id;
     const b = document.createElement("button");
-    b.className = "nav-item"; b.type = "button"; b.dataset["id"] = s.id;
+    b.className = "nav-item shell-nav-row"; b.type = "button"; b.dataset["id"] = s.id;
     b.dataset["vc"] = s.id; // the shard key `paintVcBadges` folds and badges this row from
     b.append(Object.assign(document.createElement("span"), { className: "nav-item-name", textContent: s.name }));
     b.addEventListener("click", () => void loadScene(s.id));
@@ -608,7 +615,7 @@ function renderNav(): void {
   }
   // The quiet foot of the list: add a scene right where scenes live.
   const add = document.createElement("button");
-  add.className = "nav-add-scene"; add.type = "button";
+  add.className = "nav-add-scene shell-nav-row shell-nav-add"; add.type = "button";
   add.append(iconNode("add", 12), Object.assign(document.createElement("span"), { textContent: "New scene" })); // the drawn add, not a typed "+"
   add.addEventListener("click", () => newScenePrompt());
   navListEl.appendChild(add);
@@ -2082,6 +2089,15 @@ function showInspector(ctx: InspectorContext): void {
     editGameId: (id, gameId, address, anchor) => { openGameIdEditor({ anchor, value: gameId, derived: address, onCommit: (g) => { surface?.setGameId(id, g); }, slugify: gameIdify, validate: isValidGameId, prefer: "left", keepClear: PANEL_KEEP_CLEAR }); },
     editGroupProps: (id, patch) => { surface?.setGroupProps(id, patch); },
     editJump: (id, _current, anchor) => surface?.editJump(id, anchor),
+    // A multi-selection's edits: each writes every chunk in the run, as one undo step (the surface's batch).
+    batch: (edits) => { if (surface) surface.batch(edits); else edits(); },
+    editConditionMany: (ids, src, anchor) => openConditionEditor({
+      anchor, src, properties: sceneProps,
+      pickNode: (a, current, onPick) => surface?.pickNode({ anchor: a, current, onPick }),
+      nodeLabel,
+      onChange: (next) => { surface?.batch(() => { for (const id of ids) surface?.setCondition(id, next); }); },
+    }),
+    editJumpMany: (ids, anchor) => surface?.editJumps(ids, anchor),
     setJumpMode: (id, mode) => { surface?.setJumpMode(id, mode); },
     editEffects: (id, onEnter, onExit, anchor, phase) => openEffectsEditor({ anchor, onEnter, onExit, ...(phase ? { phase } : {}), properties: sceneProps, // The editor's effect union still carries `emit`; Patter's does not (effects are set-only, and host
 // events ride gameData), so narrow rather than cast. Nothing in this dialect can produce an emit, so
@@ -2761,7 +2777,7 @@ async function showPropertiesDoc(): Promise<void> {
   if (surfaceSceneId) journal.dropScene(surfaceSceneId);
   highlightNav("");                       // no scene is current while the document is open
   paintHistory();
-  navListEl.querySelector(".nav-doc")?.classList.add("active");
+  const propsRowEl = navListEl.querySelector<HTMLElement>(".nav-doc"); if (propsRowEl) markCurrent(propsRowEl, true);
   // Open-where-you-left-off covers this page too: the document is where the author WAS, so a restart
   // should come back to it rather than to whichever scene happened to be open before it.
   currentSceneId = null;
@@ -2787,7 +2803,7 @@ async function leavePropertiesDoc(): Promise<void> {
   propsDocEl.hidden = true;
   editorEl.hidden = false;
   shell.holdClosed("inspector", false); // back to whatever was remembered
-  navListEl.querySelector(".nav-doc")?.classList.remove("active");
+  const propsRowEl = navListEl.querySelector<HTMLElement>(".nav-doc"); if (propsRowEl) markCurrent(propsRowEl, false);
   // The page hid the bars; with it gone they come back (each stays hidden if the workspace isn't up yet).
   paintProblems();
   renderReviewBar();

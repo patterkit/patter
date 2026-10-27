@@ -725,16 +725,110 @@ function addressBody(lv: SceneLevel | BlockLevel, h: InspectorHandlers): Part[] 
   return rows;
 }
 
-/** The summary shown when several whole chunks are selected (a shift-click run): just the count - it
- *  isn't one node, so there are no per-node fields. (What the run can do lives in the contextual hint
- *  bar at the bottom of the window, not here.) */
-function multiLevelView(lv: MultiLevel): HTMLElement {
+/** Several whole chunks selected (a shift-click run): the properties they SHARE, so a writer can set a
+ *  condition, a jump, a default pause or a tag on all of them at once (the October 2026 UI review,
+ *  3-composition.md proposal 10). A value every chunk has shows as it is; one that differs reads "Mixed",
+ *  and setting it writes every chunk, as one undo step. Jump is offered only when they are all snippets.
+ *  What the run can DO (wrap, move, delete) stays in the hint bar and the ⋯ menu. */
+function multiLevelView(lv: MultiLevel, h: InspectorHandlers): HTMLElement {
   const noun = lv.groups === 0 ? "snippets" : lv.snippets === 0 ? "groups" : "items";
   const section = el("section", "insp-level insp-multi");
+  const headerRow = el("div", "insp-head-row");
   const header = el("div", "insp-head");
   header.append(el("span", "insp-head-name", `${lv.count} ${noun} selected`));
-  section.append(header);
+  headerRow.append(header);
+  section.append(headerRow);
+  const items = lv.items.filter((i) => i.id !== null);
+  if (items.length < 2) return section;
+  const ids = items.map((i) => i.id!);
+  /** Every item's value, as text for comparing: one distinct value is shared, more is Mixed. */
+  const same = <T>(get: (i: (typeof items)[number]) => T): { shared: boolean; value: T } => {
+    const values = items.map(get);
+    const keys = new Set(values.map((v) => JSON.stringify(v ?? null)));
+    return { shared: keys.size === 1, value: values[0]! };
+  };
+  const body = el("div", "insp-body");
+
+  // Condition: the shared one as pills, or Mixed; the editor writes them all.
+  const cond = same((i) => i.condition ?? "");
+  const condBtn = el("button", `insp-cond${cond.shared && cond.value ? "" : " muted"}`) as HTMLButtonElement;
+  condBtn.type = "button";
+  if (!cond.shared) condBtn.append(el("span", "insp-mixed", "Mixed"));
+  else if (cond.value) condBtn.append(el("span", "insp-if", "if "), h.condPreview(cond.value));
+  else condBtn.textContent = "None";
+  condBtn.dataset.tip = `Edit the condition on all ${lv.count}`;
+  condBtn.setAttribute("aria-label", condBtn.dataset.tip);
+  condBtn.addEventListener("click", () => h.editConditionMany(ids, cond.shared ? cond.value : "", condBtn));
+  const condRowEl = el("div", cond.shared && cond.value ? "insp-row insp-row-stack" : "insp-row");
+  condRowEl.append(el("span", "insp-key", "Condition"), condBtn);
+  body.append(condRowEl);
+
+  // Jump: only when every item is a snippet, the one kind that carries one.
+  if (lv.groups === 0) {
+    const jump = same((i) => (i.kind === "snippet" && i.jump ? `${i.jump.mode ?? "jump"}:${i.jump.to}` : ""));
+    const first = items[0]!.kind === "snippet" ? items[0]!.jump : undefined;
+    const jumpBtn = el("button", `insp-cond${jump.shared && jump.value ? "" : " muted"}`) as HTMLButtonElement;
+    jumpBtn.type = "button";
+    if (!jump.shared) jumpBtn.append(el("span", "insp-mixed", "Mixed"));
+    else jumpBtn.textContent = first ? `${first.mode === "call" ? "Call" : "Jump to"} ${h.jumpLabel(first.to)}` : "None";
+    jumpBtn.dataset.tip = `Set the jump on all ${lv.count}`;
+    jumpBtn.setAttribute("aria-label", jumpBtn.dataset.tip);
+    jumpBtn.addEventListener("click", () => h.editJumpMany(ids, jumpBtn));
+    const r = el("div", "insp-row");
+    r.append(el("span", "insp-key", "Jump"), jumpBtn);
+    body.append(r);
+  }
+
+  // Default pad: the shared pause, or a Mixed placeholder; a value typed here sets it on all of them.
+  const pad = same((i) => i.padAfterDefault);
+  const padRowEl = padRow("Default pad", ids[0]!, pad.shared ? pad.value : undefined, pad.shared ? "Inherited" : "Mixed", PAD_AFTER_MIN,
+    `The pause after each line inside, on all ${lv.count}.`, (_id, seconds) => h.batch(() => { for (const id of ids) h.setPadAfterDefault(id, seconds); }));
+  body.append(padRowEl);
+
+  body.append(multiTagsRow(items, h));
+  section.append(body);
   return section;
+}
+
+/** Tags across a multi-selection: a tag every item has is a plain chip, one only some have is drawn with a
+ *  dashed edge and how many ("night, 2 of 3"). Adding a tag puts it on all of them; removing a chip takes it
+ *  off all of them, as one undo step either way. */
+function multiTagsRow(items: Array<{ id: string | null; tags?: string[] }>, h: InspectorHandlers): HTMLElement {
+  const r = el("div", "insp-row insp-row-tags");
+  r.append(el("span", "insp-key", "Tags"));
+  const box = el("div", "insp-tags");
+  const lists = items.map((i) => i.tags ?? []);
+  const all = [...new Set(lists.flat())];
+  const write = (change: (tags: string[]) => string[]): void => {
+    h.batch(() => { items.forEach((i, n) => { if (i.id) h.setTags(i.id, change(lists[n]!)); }); });
+  };
+  for (const t of all) {
+    const have = lists.filter((l) => l.includes(t)).length;
+    const partial = have < lists.length;
+    const chip = el("span", `insp-tag${partial ? " partial" : ""}`);
+    chip.style.setProperty("--tag-c", `var(--char-${colourIndex(t)})`);
+    chip.append(el("span", "insp-tag-text", partial ? `${t}, ${have} of ${lists.length}` : t));
+    const x = el("button", "insp-tag-x"); x.append(iconNode("close", 10));
+    x.type = "button"; x.dataset.tip = "Remove from all"; x.setAttribute("aria-label", `Remove tag ${t} from all`);
+    x.addEventListener("click", () => write((tags) => tags.filter((x2) => x2 !== t)));
+    chip.append(x);
+    box.append(chip);
+  }
+  const input = el("input", "insp-tag-input") as HTMLInputElement;
+  input.type = "text"; input.placeholder = all.length ? "" : "Add tag…";
+  input.setAttribute("aria-label", "add a tag to all");
+  input.spellcheck = false; input.autocapitalize = "off"; input.autocomplete = "off";
+  const add = (): void => {
+    const fresh = input.value.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean);
+    input.value = "";
+    if (fresh.length) write((tags) => [...tags, ...fresh.filter((t) => !tags.includes(t))]);
+  };
+  escRestores(input);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(); } });
+  input.addEventListener("blur", () => { if (input.value.trim()) add(); });
+  box.append(input);
+  r.append(box);
+  return r;
 }
 
 /** The kind of level, as the open / closed memory keys it: a group by its role ("option", "choice", ...). */
@@ -798,7 +892,7 @@ function addButton(body: HTMLElement, offers: Addable[]): HTMLElement {
 }
 
 function levelView(lv: InspectLevel, h: InspectorHandlers): HTMLElement {
-  if (lv.kind === "multi") return multiLevelView(lv);
+  if (lv.kind === "multi") return multiLevelView(lv, h);
   let head: string;
   let sub: string | HTMLElement = "";
   let parts: Part[];
@@ -934,6 +1028,13 @@ export interface InspectorHandlers extends ExtensionHandlers {
   setPadAfter: (id: string, seconds: number | null) => void;
   /** Set (or clear, with null) a snippet, group, block, or scene's default pause, in seconds. */
   setPadAfterDefault: (id: string, seconds: number | null) => void;
+  /** Run `edits` as ONE undo step (the surface's batch): the multi-selection's edits write each chunk. */
+  batch: (edits: () => void) => void;
+  /** Open the condition editor for several snippets / groups at once, seeded with `src` (their shared
+   *  condition, or "" when it's Mixed); what's written goes to all of them. */
+  editConditionMany: (ids: string[], src: string, anchor: HTMLElement) => void;
+  /** Open the jump picker for several snippets at once; a pick sets all of them. */
+  editJumpMany: (ids: string[], anchor: HTMLElement) => void;
   /** Whether the author left this kind of level ("snippet", "option", "block", ...) open or folded, or
    *  undefined when they never chose (the default then holds). */
   levelOpen: (key: string) => boolean | undefined;

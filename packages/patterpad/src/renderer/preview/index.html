@@ -10,8 +10,8 @@
          furniture the renderer seats into it. Mirrors renderer/index.html. -->
     <div id="frame" class="frame" hidden>
       <span id="histnav"></span><!-- app-shell historyNav mounts the back/forward pair here -->
-      <strong id="project-name">Patterpad</strong>
-      <span id="scene-suffix" class="scene-suffix"></span>
+      <strong id="project-name" class="shell-topbar-title">Patterpad</strong>
+      <span id="scene-suffix" class="scene-suffix shell-topbar-sub"></span>
       <button id="play-topbtn" class="btn topbtn" type="button" data-tip="Play scene" hidden>Play</button>
       <span id="vcs-scene" class="vcs-scene no-drag" hidden></span>
       <span id="save-indicator"></span><!-- the shell's saveIndicator mounts here (three states, always shown) -->
@@ -57,7 +57,7 @@
       </div>
     </section>
 
-    <footer id="hintbar" aria-label="keystroke hints"></footer>
+    <footer id="hintbar" class="shell-statusrow" aria-label="keystroke hints"></footer>
 
     <!-- The first-run / User Information ask is the shell's askIdentity (renderer.ts). -->
 

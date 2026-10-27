@@ -10,10 +10,7 @@ import {
 } from "@wildwinter/app-shell/contrast";
 
 const require = createRequire(import.meta.url);
-// The built palette.css has its selectors' quotes dropped, which 0.64.0's reader can't parse; put them back.
-// app-shell's next release reads both, and this line can go when Patterpad moves to it.
-const shared = readFileSync(require.resolve("@wildwinter/app-shell/palette.css"), "utf8")
-  .replace(/\[data-theme=([\w-]+)\]/g, '[data-theme="$1"]');
+const shared = readFileSync(require.resolve("@wildwinter/app-shell/palette.css"), "utf8");
 const own = readFileSync(new URL("../web/theme.css", import.meta.url), "utf8");
 const palettes = themePalettes(`${shared}\n${own}`);
 const GROUNDS = ["--bg", "--surface", "--card"];

@@ -19,7 +19,7 @@
 /* "<project>: <scene>" - the scene name fades in beside the project name only when the scene's title has
    scrolled out of the edit pane (so you always know where you are). Recessive (secondary to the name). */
 .scene-suffix {
-  color: var(--muted); font: 600 var(--text-md) var(--font-ui); white-space: nowrap; overflow: hidden;
+  white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; max-width: 352px; opacity: 0;
   margin-left: -8px; /* cancel the lead slot's flex gap so ": <scene>" sits flush against the project name */
   transition: opacity var(--dur-base) var(--ease-standard);
@@ -59,17 +59,10 @@
 .pane-centre { display: flex; flex-direction: column; }
 #editor { flex: 1; min-height: 0; }
 
-/* One navigator row grammar (the October 2026 UI review, 3-composition.md proposal 7): 28px rows at weight
-   400, a hover one step off the pane, and the selected row on the neutral selection fill in ink at 500 with
-   a 2px accent mark at its left. The ancestors and the open scene take no colour of their own. */
-.nav-item {
-  display: flex; align-items: center; gap: 6.5px; width: 100%; min-height: 28px; text-align: left; cursor: pointer;
-  background: none; border: 0; border-radius: var(--radius-sm); padding: 0 10px;
-  color: var(--ink); font: var(--weight-regular) var(--text-md) var(--font-ui);
-}
+/* The scene rows, the Properties row and "New scene" are the shell's navigator row (`.shell-nav-row`,
+   app-shell 0.65, the October 2026 UI review): 28px at weight 400, and the open document's row marked by
+   `aria-current` on the neutral selection fill with a 2px accent mark. What stays here is this app's. */
 .nav-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-item:hover { background: var(--hover); }
-.nav-item.active { background: var(--selection); color: var(--ink); font-weight: var(--weight-medium); box-shadow: inset 2px 0 0 var(--accent); }
 
 /* A scene row + its block sub-list. The list reveals only for the OPEN (current) scene, easing
    between 0fr and 1fr - the previous scene's list closes while the new one opens (no pops). */
@@ -106,13 +99,8 @@
 
 /* The nav's context menu is the shell's (openContextMenu + context-menu.css). */
 
-/* The quiet "New scene" foot of the list, with the drawn add: muted until hovered, then reads as the action it is. */
-.nav-add-scene {
-  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; text-align: left; cursor: pointer;
-  background: none; border: 0; border-radius: var(--radius-sm); padding: 0 10px; margin-top: 2px;
-  color: var(--muted); font: var(--weight-regular) var(--text-md) var(--font-ui);
-}
-.nav-add-scene:hover { background: var(--hover); color: var(--accent); }
+/* The quiet "New scene" foot of the list (the shell's `.shell-nav-add`), a breath under the last scene. */
+.nav-add-scene { margin-top: 2px; }
 
 /* Per-scene version-control badge (#145): a small glyph chip on the right of a nav row. */
 .nav-badge { flex: 0 0 auto; font-size: var(--text-xs); line-height: 1; opacity: 0.9; }
@@ -184,16 +172,9 @@
 /* The Properties document's row: a PAGE in the navigator, not a container - same weight as a scene
    row, with its count where a scene's chevron would be, and a hairline under it so the scene list
    below still reads as the list. */
-.nav-doc {
-  display: flex; align-items: center; justify-content: space-between; gap: 6.5px; width: 100%; min-height: 28px;
-  text-align: left; cursor: pointer; background: none; border: 0; border-radius: var(--radius-sm);
-  padding: 0 10px; margin-bottom: 6px; color: var(--ink); font: var(--weight-regular) var(--text-md) var(--font-ui);
-  box-shadow: 0 1px 0 var(--line-soft);
-}
-.nav-doc:hover { background: var(--hover); }
-.nav-doc.active { background: var(--selection); color: var(--ink); font-weight: var(--weight-medium); box-shadow: inset 2px 0 0 var(--accent), 0 1px 0 var(--line-soft); }
-.nav-doc-count { color: var(--muted); font: var(--text-xs) var(--font-ui); font-variant-numeric: tabular-nums; }
-.nav-doc.active .nav-doc-count { color: inherit; }
+.nav-doc { margin-bottom: 6px; box-shadow: 0 1px 0 var(--line-soft); }
+/* Its hairline stays under it while it's the open document, beside the shell's selection mark. */
+.nav-list > .nav-doc.shell-nav-row[aria-current] { box-shadow: inset 2px 0 0 var(--accent), 0 1px 0 var(--line-soft); }
 
 /* project search palette (⌘F) */
 /* The anchored panels' exit motion is the shell's now (anchored.css). */
@@ -414,6 +395,11 @@
   background: color-mix(in oklab, var(--tag-c) 18%, var(--surface));
   border: 1px solid color-mix(in oklab, var(--tag-c) 50%, var(--line)); }
 .insp-tag-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A multi-selection's tag that only some of the items carry: a dashed edge (a tag not wholly there) and
+   no fill, with the count in its words. */
+.insp-tag.partial { background: none; border: 1px dashed color-mix(in oklab, var(--tag-c) 55%, transparent); }
+/* A value a multi-selection's items don't share. */
+.insp-mixed { font-family: var(--font-ui); font-style: italic; color: var(--muted); }
 .insp-tag-x { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%;
   background: transparent; color: inherit; opacity: 0.6; line-height: 1; cursor: pointer; }
 .insp-tag-x:hover { opacity: 1; background: color-mix(in oklab, var(--tag-c) 28%, transparent); }

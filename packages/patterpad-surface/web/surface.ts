@@ -281,6 +281,13 @@ export interface SurfaceHandle {
   /** Set an existing snippet jump's mode: "jump" (one-way) or "call" (jump-and-return), keeping the
    *  target. Returns false if the snippet has no jump to re-mode. The `↪`/`⤳` chip updates on repaint. */
   setJumpMode(id: string, mode: "jump" | "call"): boolean;
+  /** Run `edits` as ONE undo step: every document change the commands inside it make joins the first
+   *  one's history event. For the inspector's edits to a multi-selection, which write each chunk. */
+  batch(edits: () => void): void;
+  /** The jump picker for several SNIPPETS at once (a multi-selection): seeded with their shared target
+   *  when they share one, and a pick sets every one of them, as one undo step. Ids that aren't snippets
+   *  here are skipped. */
+  editJumps(ids: string[], anchor: HTMLElement, afterPick?: () => void): void;
   /** Open the shared type-and-filter jump picker for a SNIPPET, anchored to `anchor` (the inspector
    *  row / problems-fix button), seeded with its current jump; a pick sets/clears it. `afterPick`
    *  runs after a commit (e.g. save + refresh). The same picker `/jump` uses, for one consistent UX. */
@@ -747,6 +754,14 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   // `view.editable` too, and as the backstop dispatchTransaction drops every doc change while it is off
   // (review 2026-10, MEDIUM 33), whichever route it came by.
   let isEditable = true;
+  /** While a `batch` runs: null until its first document change, then that change, which every later one
+   *  joins in history. Undefined outside a batch. */
+  let batchFirst: Transaction | null | undefined;
+  const batchEdits = (edits: () => void): void => {
+    const outer = batchFirst;
+    if (outer === undefined) batchFirst = null;
+    try { edits(); } finally { if (outer === undefined) batchFirst = undefined; }
+  };
   /** Transaction meta: a doc change allowed on a read-only scene (only setFormatting's mark strip, so
    *  the page keeps showing what the project setting says ships). */
   const READ_ONLY_OK = "patterReadOnlyOk";
@@ -918,6 +933,11 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     dispatchTransaction(tr) {
       // A locked scene takes no doc change from any route (see isEditable).
       if (!isEditable && tr.docChanged && !tr.getMeta(READ_ONLY_OK)) return;
+      // Inside `batch`: every change after the first joins the first's history event, so the batch
+      // undoes as one step (prosemirror-history groups a transaction marked `appendedTransaction`).
+      if (batchFirst !== undefined && tr.docChanged) {
+        if (batchFirst) tr.setMeta("appendedTransaction", batchFirst); else batchFirst = tr;
+      }
       // A secondary press only ever moves the caret, and the menu it opens lives outside the editor, so a
       // command picked there brings no keydown or mousedown here. The first doc change after the press is
       // that command: the press is over, and the command is programmatic entry, which may raise the popup
@@ -1263,6 +1283,32 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       if (!tr) return false;
       view.dispatch(tr);
       return true;
+    },
+    batch: batchEdits,
+    editJumps(ids, anchor, afterPick) {
+      const jumpOf = (id: string): string | null => {
+        const at = findNodePos(id);
+        const node = at == null ? null : view.state.doc.nodeAt(at);
+        if (node?.type.name !== "snippet") return null;
+        return node.attrs.jump ? ((JSON.parse(node.attrs.jump as string) as { to?: string }).to ?? "") : "";
+      };
+      const snippets = ids.filter((id) => jumpOf(id) !== null);
+      if (!snippets.length) return;
+      const targets = new Set(snippets.map(jumpOf));
+      const shared = targets.size === 1 ? [...targets][0]! : "";
+      openTargetPicker({
+        anchor, data: buildJumpData(), current: shared, allowClear: snippets.some((id) => jumpOf(id) !== ""),
+        onPick: (target) => {
+          batchEdits(() => {
+            for (const id of snippets) {
+              const p = findNodePos(id); if (p == null) continue;
+              const tr = setSnippetJump(view.state, p, target);
+              if (tr) view.dispatch(tr);
+            }
+          });
+          afterPick?.();
+        },
+      });
     },
     editJump(id, anchor, afterPick) {
       const at = findNodePos(id);

@@ -331,6 +331,21 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .beats .beat.kind-line { --line-inset: 1.25rem; }
 .beat.kind-line > .zone.cue, .beat.kind-line > .zone.paren { flex: 0 0 auto; }
 .beat.kind-line > .zone.say { flex: 1 1 auto; min-width: 0; }
+/* A NARROW column stacks the cue above the line, as a screenplay does (the October 2026 UI review,
+   3-composition.md proposal 3): an inline cue in a narrow card left the speech one word a line. The row
+   only WRAPS, the cue taking the full width, so the speech stays the flexing target it is in the wide form
+   and the caret on an empty line still sits where the text will (the hazard noted above). The bubble is
+   the container, so this follows the card's own width, not the window's. Units in em: they scale with the
+   reading size, as rem would, without joining the chrome's rem list. */
+.bubble { container-type: inline-size; }
+@container (max-width: 26em) {
+  /* Scoped under .bubble so they outrank the wide form's rules further down the sheet. */
+  .bubble .beats .beat.kind-line { flex-wrap: wrap; --line-inset: 0px; }
+  /* The cue on its own line, then the direction on its own, then the speech: a screenplay's order. */
+  .bubble .beat.kind-line > .zone.cue, .bubble .beat.kind-line > .zone.paren { flex-basis: 100%; margin-bottom: 0.1em; }
+  .bubble .zone.cue .cue-colon { display: none; }
+  .bubble .beat.kind-line > .zone.paren, .bubble .beat.kind-line > .zone.say { margin-left: 0; }
+}
 /* Text wraps flush-left. We previously hung wrapped continuations by 2ch via
    `padding-left: 2ch; text-indent: -2ch`, but that negative text-indent mis-places the caret on an
    EMPTY line - the browser positions the first-line caret at the indent offset, which on a beat-less
@@ -746,12 +761,12 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .tp-row.sel { box-shadow: inset 2px 0 0 var(--accent); }         /* the current target, marked */
 
 /* contextual hint bar: the host only. The chips are the shell's `hintBar` (keys.css), drawn from
-   each hint's portable combo, so the keycaps read the same as every other hint in the family. A status
-   row on the window's ground: no rule over it and no fill of its own (the October 2026 UI review,
-   3-composition.md proposal 9). */
-#hintbar {
-  display: flex; gap: 17.5px; align-items: center;
-  padding: 0 19px; min-height: 28px;
+   each hint's portable combo, so the keycaps read the same as every other hint in the family. In
+   Patterpad it is the shell's status row (`.shell-statusrow`, app-shell 0.65: 28px, no rule, no fill,
+   Live Link at its end); this rule draws the same row for the surface's own harness, which has no frame. */
+#hintbar:not(.shell-statusrow) {
+  display: flex; gap: 16px; align-items: center;
+  padding: 0 16px; min-height: 28px;
   font: var(--text-xs) var(--font-ui); color: var(--muted);
 }
 

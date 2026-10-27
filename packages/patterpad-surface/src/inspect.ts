@@ -183,6 +183,10 @@ export interface MultiLevel {
   /** How many are snippets vs groups (for a precise label). */
   snippets: number;
   groups: number;
+  /** Each chunk in the run, in document order, as its own level would show it: what the inspector
+   *  compares to show the properties they share, and "Mixed" where they differ (the October 2026 UI
+   *  review, 3-composition.md proposal 10). */
+  items: Array<SnippetLevel | GroupLevel>;
 }
 
 export type InspectLevel = LeafLevel | SnippetLevel | GroupLevel | BlockLevel | SceneLevel | MultiLevel;
@@ -354,9 +358,14 @@ export function inspect(state: EditorState): InspectorContext {
   // A multi-chunk selection (groups §6) is its own thing: show a count, not one node's fields.
   const multi = multiSelectPositions(state);
   if (multi.length >= 2) {
-    let snippets = 0;
-    for (const p of multi) { if (state.doc.nodeAt(p)?.type.name === "snippet") snippets++; }
-    return { levels: [{ kind: "multi", count: multi.length, snippets, groups: multi.length - snippets }] };
+    const items: Array<SnippetLevel | GroupLevel> = [];
+    for (const p of multi) {
+      const node = state.doc.nodeAt(p);
+      if (node?.type.name === "snippet") items.push(snippetLevel(node));
+      else if (node?.type.name === "group") items.push(groupLevel(node, state.doc.resolve(p).parent));
+    }
+    const snippets = items.filter((i) => i.kind === "snippet").length;
+    return { levels: [{ kind: "multi", count: multi.length, snippets, groups: multi.length - snippets, items }] };
   }
 
   const { $head } = state.selection;

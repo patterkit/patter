@@ -27,6 +27,7 @@ const handlers: InspectorHandlers = {
   qualifiers: () => [], setQualifier: noop,
   projectPadAfter: () => 0.6, setPadAfter: noop, setPadAfterDefault: noop,
   levelOpen: () => undefined, setLevelOpen: noop,
+  batch: (edits) => edits(), editConditionMany: noop, editJumpMany: noop,
   // Patter extensions (extension-rows.test.ts draws them): a project taking none.
   extensions: () => [], setExtensionValue: noop, extensionLock: () => null, extensionAdapter: () => ({ nodes: () => [] }),
 };
@@ -455,5 +456,62 @@ describe("inspector: sections that fold, and the option's behaviour flags (Octob
     renderInspector(host, ctx({ kind: "snippet", id: "sn", beatCount: 1 }), handlers);
     expect(host.querySelector(".insp-cond.muted")?.textContent).toBe("None");
     expect(addOffers(host)).toEqual(["On begin", "On end", "Default pad", "Tags"]);
+  });
+});
+
+describe("inspector: a multi-selection's shared properties (October 2026 UI review, proposal 10)", () => {
+  const multi = (items: unknown[]): InspectorContext =>
+    ({ levels: [{ kind: "multi", count: items.length, snippets: items.filter((i) => (i as { kind: string }).kind === "snippet").length,
+      groups: items.filter((i) => (i as { kind: string }).kind === "group").length, items }] }) as InspectorContext;
+  const snip = (id: string, over: Record<string, unknown> = {}): unknown => ({ kind: "snippet", id, beatCount: 1, ...over });
+  const rowOf = (host: HTMLElement, key: string): HTMLElement | undefined =>
+    [...host.querySelectorAll<HTMLElement>(".insp-row")].find((r) => r.querySelector(".insp-key")?.textContent === key);
+
+  it("shows a value they share as it is, and one they don't as Mixed", () => {
+    const host = document.createElement("div");
+    renderInspector(host, multi([snip("a", { condition: "@x > 1" }), snip("b", { condition: "@x > 1" })]), handlers);
+    expect(host.querySelector(".insp-head-name")?.textContent).toBe("2 snippets selected");
+    expect(rowOf(host, "Condition")?.querySelector(".insp-mixed")).toBeNull();
+    const mixed = document.createElement("div");
+    renderInspector(mixed, multi([snip("a", { condition: "@x > 1" }), snip("b")]), handlers);
+    expect(rowOf(mixed, "Condition")?.textContent).toContain("Mixed");
+  });
+
+  it("offers Jump only when every item is a snippet", () => {
+    const host = document.createElement("div");
+    renderInspector(host, multi([snip("a"), { kind: "group", id: "g", role: "sequence", labelParts: ["Sequence"], label: "Sequence" }]), handlers);
+    expect(rowOf(host, "Jump")).toBeUndefined();
+    expect(host.querySelector(".insp-head-name")?.textContent).toBe("2 items selected");
+  });
+
+  it("opens one condition editor for all of them, seeded with the shared condition", () => {
+    const editConditionMany = vi.fn();
+    const host = document.createElement("div");
+    renderInspector(host, multi([snip("a", { condition: "@x > 1" }), snip("b", { condition: "@x > 1" })]), { ...handlers, editConditionMany });
+    rowOf(host, "Condition")!.querySelector<HTMLButtonElement>("button")!.click();
+    expect(editConditionMany).toHaveBeenCalledWith(["a", "b"], "@x > 1", expect.any(HTMLElement));
+  });
+
+  it("writes a default pause to every item, inside one batch", () => {
+    const calls: string[] = [];
+    const setPadAfterDefault = vi.fn((id: string) => { calls.push(id); });
+    const batch = vi.fn((edits: () => void) => { calls.push("batch"); edits(); });
+    const host = document.createElement("div");
+    renderInspector(host, multi([snip("a"), snip("b", { padAfterDefault: 1 })]), { ...handlers, setPadAfterDefault, batch });
+    const input = rowOf(host, "Default pad")!.querySelector<HTMLInputElement>("input")!;
+    expect(input.placeholder).toBe("Mixed");
+    input.value = "0.5"; input.dispatchEvent(new Event("change"));
+    expect(calls).toEqual(["batch", "a", "b"]);
+    expect(setPadAfterDefault).toHaveBeenCalledWith("b", 0.5);
+  });
+
+  it("draws a tag only some items carry with its count, and a removal takes it off them all", () => {
+    const setTags = vi.fn();
+    const host = document.createElement("div");
+    renderInspector(host, multi([snip("a", { tags: ["night", "rain"] }), snip("b", { tags: ["night"] }), snip("c", { tags: ["night"] })]), { ...handlers, setTags });
+    const chips = [...host.querySelectorAll<HTMLElement>(".insp-tag")];
+    expect(chips.map((c) => [c.querySelector(".insp-tag-text")?.textContent, c.classList.contains("partial")])).toEqual([["night", false], ["rain, 1 of 3", true]]);
+    chips[0]!.querySelector<HTMLButtonElement>(".insp-tag-x")!.click();
+    expect(setTags.mock.calls).toEqual([["a", ["rain"]], ["b", []], ["c", []]]);
   });
 });
