@@ -34,7 +34,7 @@ header .hint { color: var(--muted); font-size: var(--text-sm); }
   background: none; cursor: pointer;
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 3px 9px;
   color: var(--muted); font: 600 var(--text-xs) var(--font-ui); letter-spacing: 0.03em;
-  transition: color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
+  transition: color var(--dur-tint) var(--ease-standard), border-color var(--dur-tint) var(--ease-standard);
 }
 .hdr-toggle:hover { color: var(--accent); border-color: var(--accent); }
 main { display: grid; grid-template-columns: 1fr 416px; gap: 0; flex: 1; min-height: 0; }
@@ -61,7 +61,13 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    field shows focus with its accent edge, in place of the system's focus ring, which comes in the Mac's
    own accent colour (orange, say) and boxes the heading. */
 .scene-title:focus { outline: none; border-bottom-color: var(--accent); }
-.block { position: relative; }
+/* THE PAGE (the October 2026 UI review, step 6): each block is one white page on the grey desk, its title
+   on it, and its snippets set down it as a script rather than stacked as cards. The page's left padding is
+   the gutter a snippet's rule and drag grip live in. */
+.block {
+  position: relative; background: var(--card); border-radius: var(--radius-lg);
+  padding: 0.75rem 1.5rem 0.5rem; margin: 0 0 1.5rem;
+}
 /* RENDER VIRTUALIZATION (Patterpad §9 "virtualized rendering of long scenes"). The browser SKIPS
    layout + paint for off-screen BLOCKS - the section unit, and the bulk of a long scene - so a
    2,000-line script stays snappy even though ProseMirror keeps the whole document in the model
@@ -70,9 +76,8 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    length is only the first guess for a block that has never been seen. The block holding the caret
    is always rendered (the browser force-renders the subtree that contains the selection). */
 .block { content-visibility: auto; contain-intrinsic-block-size: auto 320px; }
-/* `content-visibility` clips a block's paint to its own box, and a snippet's drag grip sits in the gutter
-   LEFT of its card, so the block's box reaches 1.5rem into that gutter (and its content stays put). */
-.block { margin-left: -1.5rem; padding-left: 1.5rem; }
+/* `content-visibility` clips a block's paint to its own box: the snippets' rules and grips sit in the page's
+   own left padding, inside that box, so nothing is cut off. */
 /* On-screen, scope a keystroke's reflow to its OWN bubble (layout containment), so typing stays
    instant no matter how long the scene is. NOT size containment - the bubble still sizes to its
    content, so its real geometry is available for drag-and-drop and the caret recentre. */
@@ -81,17 +86,17 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    room" gap (a margin on the node at the active seam) open to its full size instead of
    collapsing into the neighbour's margin (which made it barely visible). */
 .block-body, .group-rail-body { display: flex; flex-direction: column; }
-.block-head { display: flex; align-items: center; gap: 0.4rem; margin: 1.1rem 0 0.4rem; }
+.block-head { display: flex; align-items: center; gap: 0.4rem; margin: 0.2rem 0 0.5rem; }
 /* Documentation notes surfaced under a scene / block heading (spec §18 reading layer): quiet, small,
    clickable to open the notes editor (so headers need no gutter chip). */
-.doc-underhead { margin: 0 0 0.5rem; padding-left: 0.1rem; cursor: pointer; border-radius: var(--radius-sm); transition: background var(--dur-quick) var(--ease-standard); }
+.doc-underhead { margin: 0 0 0.5rem; padding-left: 0.1rem; cursor: pointer; border-radius: var(--radius-sm); transition: background var(--dur-tint) var(--ease-standard); }
 /* Block / group notes line up with the TITLE or type label, not the drag grip: the grip (~0.6rem glyph)
    + the head's 0.4rem flex gap offset the label by ~1rem. */
 .doc-underhead-indent { padding-left: 1rem; }
 .doc-underhead:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 .doc-underhead-line { font: italic 0.78rem var(--font-ui); color: var(--muted); line-height: 1.45; }
 .doc-underhead-cls { font-style: normal; font-weight: 600; font-size: 0.78rem; color: var(--muted); margin-right: 0.35rem; }
-.block-drag { opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); } /* to the left of the title */
+.block-drag { opacity: 0; transition: opacity var(--dur-conceal) var(--ease-standard), color var(--dur-tint) var(--ease-standard); } /* to the left of the title */
 .block:hover > .block-head > .block-drag, .block:focus-within > .block-head > .block-drag { opacity: 1; }
 .block-dots { margin-left: auto; } /* the quiet ⋯ sits at the right end of the heading */
 .block:hover > .block-head > .block-dots, .block:focus-within > .block-head > .block-dots { opacity: 1; }
@@ -110,7 +115,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .block-ctl {
   background: none; border: 0; cursor: pointer; color: var(--muted);
   font: 600 0.78rem var(--font-ui); padding: 0;
-  opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+  opacity: 0; transition: opacity var(--dur-conceal) var(--ease-standard), color var(--dur-tint) var(--ease-standard);
 }
 .block:hover > .block-after > .block-ctl, .block-after:hover > .block-ctl { opacity: 1; }
 .block-ctl:hover { color: var(--accent); }
@@ -121,33 +126,53 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    reserves no room for its chrome, so the script gets the width (the October 2026 UI review,
    3-composition.md proposal 3). */
 .bubble {
-  background: var(--card);
-  border-radius: var(--radius-lg);
-  padding: 0.75rem 1rem;
-  margin: 0 0 1.1rem;
-  /* A "soft raised surface" (Patterpad §2), NOT a framed card: no border, just a single faint lift
-     at rest, so the page reads as breathing script pages rather than a stack of bordered cards. The
-     depth deepens only on focus - quiet chrome, shown when it's relevant. */
-  box-shadow: var(--shadow-1);
-  transition: box-shadow var(--dur-base) var(--ease-standard), transform var(--dur-base) var(--ease-standard), margin var(--dur-base) var(--ease-standard); /* margin eases the drag make-room gap */
+  padding: 0.35rem 0;
+  margin: 0 0 1rem;
+  transition: margin var(--dur-base) var(--ease-standard); /* eases the drag make-room gap */
   position: relative;
+  /* Where the snippet's rule sits, left of its text. The rule and the drag grip both hang off this one
+     number, in whole pixels, so the grip's dots centre exactly on the rule's line. */
+  --rule-x: -14px;
 }
-.bubble:focus-within { box-shadow: var(--shadow-2); }
+/* The snippet's RULE: a 2px mark in the gutter beside it, the length of the snippet, like a code editor's
+   fold margin. It's how one snippet is told from the next on the page (Ian's condition for losing the
+   cards), at every depth: inside an option it sits between the option's rail and the text. The snippet the
+   caret is in takes the accent; the one under the pointer a step towards it. */
+.bubble::after {
+  content: ""; position: absolute; left: var(--rule-x); top: 0.4rem; bottom: 0.4rem; width: 2px;
+  border-radius: 1px; background: var(--line); pointer-events: none;
+  /* The notch the grip sits in (below) is a gap of --notch either side of the middle: 0 at rest, so the mask
+     shows the whole rule, and opening it is a transition rather than a cut. */
+  --notch: 0px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(50% - var(--notch)), transparent calc(50% - var(--notch)), transparent calc(50% + var(--notch)), #000 calc(50% + var(--notch)));
+          mask-image: linear-gradient(to bottom, #000 calc(50% - var(--notch)), transparent calc(50% - var(--notch)), transparent calc(50% + var(--notch)), #000 calc(50% + var(--notch)));
+  transition: background-color var(--dur-tint) var(--ease-standard), --notch var(--dur-conceal) var(--ease-standard);
+}
+/* Registered so it interpolates: an unregistered custom property would jump. */
+@property --notch { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.bubble:hover::after { background: color-mix(in oklab, var(--accent) 45%, var(--line)); }
+.ProseMirror-focused .bubble.has-caret::after { background: var(--accent); }
+/* Hovering a snippet shows its drag grip IN its rule: the rule breaks round the grip's dots, which sit
+   centred on its line, so the two never cross and the rule still shows the snippet's top and bottom. */
+.bubble:hover::after {
+  --notch: 15px;
+  transition: background-color var(--dur-tint) var(--ease-standard), --notch var(--dur-reveal) var(--ease-standard) var(--reveal-delay);
+}
 /* the drag handle sits in the LEFT gutter, revealed on the whole-bubble rollover. */
 .bubble-drag {
-  /* The grab AREA is the full-height left-gutter strip (a tall, easy target that scales with the
-     bubble); the glyph itself stays small and centred - just a hint, not a bigger handle. */
-  position: absolute; left: -1.5rem; top: 0; bottom: 0; width: 1.5rem;
+  /* The grab AREA is a full-height strip centred on the snippet's rule (18px, centred on the rule's
+     2px line); the glyph itself stays small and centred - just a hint, not a bigger handle. */
+  position: absolute; left: calc(var(--rule-x) + 1px - 9px); top: 0; bottom: 0; width: 18px;
   display: flex; align-items: center; justify-content: center;
-  opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+  opacity: 0; transition: opacity var(--dur-conceal) var(--ease-standard), color var(--dur-tint) var(--ease-standard);
 }
-/* The bubble grip is recessive even when the bubble is active - just a hint - and only firms up to
-   full when you actually hover the grip to grab it. */
-.bubble:hover > .bubble-drag, .bubble:focus-within > .bubble-drag { opacity: 0.35; }
+/* The grip shows while the pointer is on the snippet (it sits in the rule's notch, which only opens then),
+   recessive until you're on the grip itself. */
+.bubble:hover > .bubble-drag { opacity: 0.6; }
 .bubble > .bubble-drag:hover { opacity: 1; }
-/* the ⋯ action control rides the top-right over the text, on a plate of the chrome tier so it reads
-   over whatever line runs under it. */
-.bubble-menu { position: absolute; top: 0.4rem; right: 0.4rem; background: var(--surface); border-radius: var(--radius-sm); }
+/* the ⋯ action control sits at the right of the snippet's first line, on a plate of the page's colour so it
+   reads over whatever line runs under it. */
+.bubble-menu { position: absolute; top: 0.3rem; right: 0; background: var(--card); border-radius: var(--radius-sm); }
 /* read-only condition tag (top, only when a condition is set) */
 .bubble-cond {
   font: 600 0.66rem var(--font-ui); letter-spacing: 0.03em;
@@ -164,26 +189,33 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .bubble:not(.has-jump) > .bubble-jump { display: none; }
 .bubble-jump { cursor: pointer; border-radius: var(--radius-sm); padding: 0.05rem 0.25rem; gap: 0.3rem; align-self: flex-start; }
 .bubble-jump > svg { flex: none; }
-.bubble-jump:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+/* It's a link, so a hover underlines its target rather than washing a block of colour behind it. */
+.bubble-jump-to { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 2px; transition: text-decoration-color var(--dur-tint) var(--ease-standard); }
+.bubble-jump:hover .bubble-jump-to { text-decoration-color: currentColor; }
 /* Selected object (PM node-selection): a snippet / jump / action reads as "the current thing".
    PM's default outline is replaced with a themed accent ring + a faint wash. The ring is INSET (drawn
    just inside the edges) so it never clips against a container edge - an outset ring lost its right
    side. The browser's text-selection highlight (which a node-selection paints over all the content) is
    suppressed - a whole-node selection shouldn't read as "all this text is selected". */
 .ProseMirror-selectednode { outline: none; }
+/* A selected snippet: its rule in the accent and a faint wash that reaches a little past its text, short of
+   the rule, since on the page the snippet has no card edge of its own to ring. */
 .bubble.ProseMirror-selectednode {
-  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 50%, transparent);
-  background: color-mix(in oklab, var(--accent) 6%, var(--card));
+  background: color-mix(in oklab, var(--accent) 7%, var(--card));
+  box-shadow: 0 0 0 0.45rem color-mix(in oklab, var(--accent) 7%, var(--card));
+  border-radius: 1px;
 }
+.bubble.ProseMirror-selectednode::after { background: var(--accent); }
 .beat.kind-gameEvent.ProseMirror-selectednode { background: color-mix(in oklab, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 45%, transparent); border-radius: var(--radius-sm); }
 .bubble.ProseMirror-selectednode ::selection, .beat.kind-gameEvent.ProseMirror-selectednode ::selection { background: transparent; }
 /* a shift-click multi-select run: each chunk in the run reads as selected; the raw text highlight is
    suppressed so the run looks like one block, not a ragged drag (groups §6). */
 .chunk-multiselected {
-  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 50%, transparent);
   background: color-mix(in oklab, var(--accent) 8%, var(--card));
-  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 0.45rem color-mix(in oklab, var(--accent) 8%, var(--card));
+  border-radius: 1px;
 }
+.bubble.chunk-multiselected::after { background: var(--accent); }
 .chunk-multiselected ::selection { background: transparent; }
 /* the "+" add-after control, centred in the gap below the bubble (mirrors "+ block" /
    "+ option"); hover-revealed, sits in the inter-bubble margin so it never adds height. */
@@ -192,7 +224,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   width: 1.4rem; height: 1.4rem; padding: 0;
   background: var(--card); border: 1px solid var(--line); border-radius: 50%; cursor: pointer;
   color: var(--muted);
-  opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard); z-index: 2;
+  opacity: 0; transition: opacity var(--dur-conceal) var(--ease-standard), color var(--dur-tint) var(--ease-standard), border-color var(--dur-tint) var(--ease-standard); z-index: 2;
 }
 /* the "+" is two geometric bars centred on the button's middle (no font metrics involved) */
 .bubble-after::before, .bubble-after::after {
@@ -210,7 +242,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   display: flex; align-items: center; justify-content: center;
   min-height: 2.6rem; margin: 0 0 1.1rem; cursor: pointer; user-select: none;
   border: 1px dashed color-mix(in oklab, var(--muted) 50%, transparent); border-radius: var(--radius-lg);
-  color: var(--muted); transition: border-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), background var(--dur-quick) var(--ease-standard);
+  color: var(--muted); transition: border-color var(--dur-tint) var(--ease-standard), color var(--dur-tint) var(--ease-standard), background var(--dur-tint) var(--ease-standard);
 }
 .group-rail.is-empty > .ghost-snippet { margin-bottom: 0.2rem; }
 .ghost-snippet:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in oklab, var(--accent) 5%, transparent); }
@@ -229,7 +261,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   display: flex; align-items: center; justify-content: center;
   min-height: 1.15rem; margin: 0 0 0.25rem; cursor: pointer; user-select: none; opacity: 0;
   border: 1px dashed color-mix(in oklab, var(--muted) 50%, transparent); border-radius: var(--radius-sm);
-  color: var(--muted); transition: opacity var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+  color: var(--muted); transition: opacity var(--dur-conceal) var(--ease-standard), border-color var(--dur-tint) var(--ease-standard), color var(--dur-tint) var(--ease-standard);
 }
 .bubble.atom-first > .bubble-above .ghost-plus { font-size: 1rem; }
 .bubble.atom-first:hover > .bubble-above { opacity: 1; }
@@ -241,13 +273,12 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
      line (seedBeatInSnippet). */
 .bubble.is-empty { padding-top: 0.4rem; padding-bottom: 0.4rem; }
 .bubble.is-empty:not(.has-jump) {
-  background: none; box-shadow: none;
-  border: 1px dashed color-mix(in oklab, var(--muted) 40%, transparent);
+  border: 1px dashed color-mix(in oklab, var(--muted) 40%, transparent); border-radius: var(--radius-md);
 }
 .bubble.is-empty > .bubble-ghost {
   display: flex; align-items: center; justify-content: center;
   min-height: 1.2rem; cursor: pointer; user-select: none; color: var(--muted);
-  transition: color var(--dur-quick) var(--ease-standard), opacity var(--dur-quick) var(--ease-standard);
+  transition: color var(--dur-tint) var(--ease-standard), opacity var(--dur-conceal) var(--ease-standard);
 }
 .bubble.is-empty.has-jump > .bubble-ghost { opacity: 0; }                 /* quiet: the jump is the content */
 .bubble.is-empty.has-jump:hover > .bubble-ghost,
@@ -260,19 +291,17 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    jump - click it (or the chip) to add content. */
 .bubble.is-empty.has-jump {
   display: flex; align-items: center; gap: 0.6rem; flex-wrap: nowrap;
-  background: none; box-shadow: none;
-  padding: 0.1rem 2rem 0.1rem 1.8rem;   /* slim; keep the ⋯ / drag gutters */
-  margin-bottom: 0.5rem;
+  padding: 0.3rem 2rem 0.3rem 0;   /* slim; keep the ⋯ clear on the right */
+  margin-bottom: 0.6rem;
 }
 .bubble.is-empty.has-jump > .bubble-after { display: none; }              /* no add-after gap on a divert row */
-/* The divert chip keeps its size and sits at the right, clear of the "add a line" hint.
-   The "add a line" hint sits ON THE SAME LINE, off to the left where added content would begin - reserved
-   at rest so revealing it on hover / focus doesn't shift the row (no vertical "pop"); clicking it grows
-   the row into a real bubble. */
-.bubble.is-empty.has-jump > .bubble-jump { margin-left: auto; }
+/* The divert chip sits at the text column like every other jump, and the "add a line" hint follows it ON THE
+   SAME LINE - reserved at rest so revealing it on hover / focus doesn't shift the row (no vertical "pop");
+   clicking it grows the row into a real snippet. */
+.bubble.is-empty.has-jump > .bubble-jump { order: -1; margin-left: var(--cue-col); }
 .bubble.is-empty.has-jump > .bubble-ghost {
   min-height: 0; justify-content: flex-start; font-size: 0.85em;
-  opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard);
+  opacity: 0; transition: opacity var(--dur-conceal) var(--ease-standard);
 }
 .bubble.is-empty.has-jump:hover > .bubble-ghost,
 .bubble.is-empty.has-jump:focus-within > .bubble-ghost { opacity: 1; }
@@ -285,15 +314,23 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   display: inline-flex; align-items: center; justify-content: center;
   background: none; border: 0; cursor: pointer; color: var(--muted); padding: 0 0.2rem;
   line-height: 1; border-radius: var(--radius-sm); user-select: none;
-  opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), background var(--dur-quick) var(--ease-standard);
+  opacity: 0; transition: opacity var(--dur-conceal) var(--ease-standard), color var(--dur-tint) var(--ease-standard), background var(--dur-tint) var(--ease-standard);
 }
-.bubble:hover > .bubble-menu, .bubble:focus-within > .bubble-menu { opacity: 1; }
+.bubble:hover > .bubble-menu, .ProseMirror-focused .bubble.has-caret > .bubble-menu { opacity: 1; }
 .group-rail:hover > .group-rail-head > .group-menu, .group-rail:focus-within > .group-rail-head > .group-menu { opacity: 1; }
 .menu-dots:hover { color: var(--accent); background: color-mix(in oklab, var(--accent) 10%, transparent); }
+/* ONE "⋯" AT A TIME (the October 2026 UI review, step 6): only the innermost thing under the pointer shows
+   its grip and its menu. Hovering a snippet two choices deep used to light up the menus of every option,
+   choice and block around it too. A group (or a block) shows its own while its head is under the pointer,
+   not while something inside it is; with nothing hovered, the snippet holding the caret shows its menu. */
+.ProseMirror:has(.bubble:hover) .bubble.has-caret:not(:hover) > .bubble-menu { opacity: 0; }
+.group-rail:has(.bubble:hover, .group-rail .group-rail-head:hover) > .group-rail-head > :is(.group-menu, .rail-drag) { opacity: 0; }
+.group-rail > .group-rail-head:hover > :is(.group-menu, .rail-drag) { opacity: 1; }
+.block:has(.block-body :is(.bubble, .group-rail):hover) > .block-head > :is(.block-dots, .block-drag) { opacity: 0; }
 
 /* drag handle (groups §6) + the drop-seam targets */
 .drag-handle { display: inline-flex; align-items: center; cursor: grab; color: var(--muted); line-height: 1; user-select: none; }
-.drag-handle:hover { color: var(--accent); }
+.drag-handle:hover { color: var(--accent); } /* each grip (block, snippet, rail) eases its own colour and opacity */
 .is-dragging, .is-dragging * { cursor: grabbing !important; user-select: none; }
 .drag-source { opacity: 0.4; } /* the node being dragged, dimmed */
 /* during a drag every valid drop seam shows as a quiet target; the nearest is active.
@@ -316,15 +353,12 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 
 .beat { display: block; padding: 0; margin: 0; }
 .beat.kind-line, .beat.kind-prose { display: block; min-height: 1.45em; }
-/* Dialogue is INSET slightly (the character name sits in from the margin) so that when dialogue
-   and text mix in a bubble it reads more like a script - text stays flush left,
-   speech steps in (Patterpad §4 "dialogue may be inset"). Snippet content only; option prompts are
-   their own cell and stay flush (--line-inset defaults to 0).
-   HANGING INDENT: when a dialogue line wraps, the continuation hangs under the first content zone -
-   the direction if there is one, else the content - which both begin right after the cue. So the
-   hang point is just "past the cue": inset + cue width + the cue->content gap. The cue is variable
-   (name, font, reading size), so views.ts MEASURES it into --cue-w; a negative text-indent pulls
-   the first line (the cue) back to the inset while padding-left holds the wrap at the hang point. */
+/* THE HUNG CUE (the October 2026 UI review, step 6): in a snippet the character's name hangs in a margin
+   column, right-aligned against the text, and everything else - speech, narration, a game event, the
+   condition and the jump - starts at one edge to its right, as a prompt book sets it. A long name or a
+   qualifier runs left into the margin rather than pushing the line. Option prompts keep their inline cue:
+   they're labels, not script. A narrow snippet stacks the name above the line (the container query below). */
+.ProseMirror { --cue-col: 6rem; --cue-gap: 0.8rem; }
 /* A dialogue line is a FLEX row: the cue (character name) is a fixed prefix; the say (content) flexes
    to fill the rest of the line - so the content area is always a generous click / caret target, even
    when empty, and wrapped speech hangs within the content column. (This replaces a negative-text-indent
@@ -334,8 +368,15 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   display: flex; align-items: baseline;
   padding-left: var(--line-inset, 0px);
 }
-.beats .beat.kind-line { --line-inset: 1.25rem; }
 .beat.kind-line > .zone.cue, .beat.kind-line > .zone.paren { flex: 0 0 auto; }
+.beats .beat.kind-line > .zone.cue {
+  flex: 0 0 var(--cue-col); box-sizing: border-box; padding-right: var(--cue-gap);
+  display: flex; justify-content: flex-end; align-items: baseline; gap: 0.3em; white-space: nowrap;
+}
+.beats .zone.cue .cue-colon { display: none; }
+.beats .beat.kind-prose, .beats .beat.kind-gameEvent,
+.bubble > .bubble-cond, .bubble:not(.is-empty) > .bubble-jump { margin-left: var(--cue-col); }
+.beats .beat.kind-gameEvent { justify-content: flex-start; }
 .beat.kind-line > .zone.say { flex: 1 1 auto; min-width: 0; }
 /* A NARROW column stacks the cue above the line, as a screenplay does (the October 2026 UI review,
    3-composition.md proposal 3): an inline cue in a narrow card left the speech one word a line. The row
@@ -347,8 +388,12 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 @container (max-width: 26em) {
   /* Scoped under .bubble so they outrank the wide form's rules further down the sheet. */
   .bubble .beats .beat.kind-line { flex-wrap: wrap; --line-inset: 0px; }
-  /* The cue on its own line, then the direction on its own, then the speech: a screenplay's order. */
+  /* The cue on its own line, then the direction on its own, then the speech: a screenplay's order. The
+     margin column goes, so everything starts at the snippet's edge. */
   .bubble .beat.kind-line > .zone.cue, .bubble .beat.kind-line > .zone.paren { flex-basis: 100%; margin-bottom: 0.1em; }
+  .bubble .beats .beat.kind-line > .zone.cue { justify-content: flex-start; padding-right: 0; }
+  .bubble .beats .beat.kind-prose, .bubble .beats .beat.kind-gameEvent,
+  .bubble > .bubble-cond, .bubble > .bubble-jump, .bubble.is-empty.has-jump > .bubble-jump { margin-left: 0; }
   .bubble .zone.cue .cue-colon { display: none; }
   .bubble .beat.kind-line > .zone.paren, .bubble .beat.kind-line > .zone.say { margin-left: 0; }
 }
@@ -454,9 +499,9 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   display: inline-flex; align-items: center; justify-content: center;
   width: 22.5px; height: 22.5px; padding: 0; line-height: 0; cursor: pointer;
   background: none; border: 0; color: var(--accent); opacity: 0.8;
-  transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
+  transition: opacity var(--dur-conceal) var(--ease-standard);
 }
-.comment-bubble:hover { opacity: 1; transform: scale(1.15); }
+.comment-bubble:hover { opacity: 1; }
 .comment-bubble.resolved { color: var(--muted); opacity: 0.5; }
 .comment-bubble.orphaned { color: var(--muted); }
 .comment-bubble svg { display: block; }
@@ -469,9 +514,9 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   display: inline-flex; align-items: center; justify-content: center;
   width: 22.5px; height: 22.5px; padding: 0; line-height: 0; cursor: pointer;
   border: 0; background: none; color: var(--accent); opacity: 0.85;
-  transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
+  transition: opacity var(--dur-conceal) var(--ease-standard);
 }
-.suggestion-marker:hover { opacity: 1; transform: scale(1.15); }
+.suggestion-marker:hover { opacity: 1; }
 .suggestion-marker.stale { color: var(--muted); opacity: 0.6; }
 .suggestion-marker svg { display: block; }
 .suggestion-count {
@@ -517,9 +562,9 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   width: 22.5px; height: 22.5px; padding: 0; line-height: 0; cursor: pointer;
   border: 0; background: none;
   color: var(--accent); opacity: 0.9; /* the filled glyph reads clearly on its own - no chip frame needed */
-  transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
+  transition: opacity var(--dur-conceal) var(--ease-standard);
 }
-.note-icon:hover { opacity: 1; transform: scale(1.15); }
+.note-icon:hover { opacity: 1; }
 .note-icon svg { display: block; width: 16px; height: 16px; } /* the shell's 16-grid note page, at the gutter's size */
 
 /* A sub-text range a comment is pinned to: a soft highlight under the words (#148). */
@@ -592,8 +637,13 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .spell-menu .action-mi.spell-suggest { font-weight: 600; }
 .beat.kind-gameEvent.problem-error { box-shadow: inset 2px 0 0 var(--danger); border-radius: var(--radius-sm); }
 .beat.kind-gameEvent.problem-warning { box-shadow: inset 2px 0 0 var(--warn); border-radius: var(--radius-sm); }
-.bubble.problem-error, .group-rail.problem-error { box-shadow: inset 3px 0 0 var(--danger); }
-.bubble.problem-warning, .group-rail.problem-warning { box-shadow: inset 3px 0 0 var(--warn); }
+/* A problem colours the thing's own line, centred where the line already is: a snippet's rule, or a group's
+   rail (3px, one either side of the 1px rail, so an option's diamond stays on its centre). A separate bar
+   beside the rail pulled the diamond off-centre. */
+.bubble.problem-error::after { background: var(--danger); }
+.bubble.problem-warning::after { background: var(--warn); }
+.group-rail.problem-error, .group-rail.is-option.problem-error { border-left-color: var(--danger); box-shadow: -1px 0 0 0 var(--danger), inset 1px 0 0 0 var(--danger); }
+.group-rail.problem-warning, .group-rail.is-option.problem-warning { border-left-color: var(--warn); box-shadow: -1px 0 0 0 var(--warn), inset 1px 0 0 0 var(--warn); }
 
 /* game event: the toDOM renders the drawn mark; push it to the right margin. The row is a flex
    line (the mark + hover-revealed delete affordance, .atom-del below). */
@@ -617,8 +667,11 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    Nesting reads as nested rails. The label is persistent (structure the author must
    see); manipulation controls come later. */
 .group-rail {
+  /* The rail stands further out than a snippet's rule (--rail-pad against the rule's 14px), so a group's
+     line and its snippets' rules never touch: the page tells a snippet from the group holding it. */
+  --rail-pad: 1.6rem;
   border-left: 1px solid var(--line);
-  margin: 0 0 0.5rem; padding-left: 0.7rem;   /* bottom-only: in a flex body, a top margin would double the gap */
+  margin: 0 0 0.5rem; padding-left: var(--rail-pad);   /* bottom-only: in a flex body, a top margin would double the gap */
   transition: margin var(--dur-base) var(--ease-standard);              /* eases the drag make-room gap open / closed */
 }
 /* the rails are a quiet structural cue, not a loud frame. A choice draws none of its own: its options'
@@ -634,7 +687,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 }
 /* drag handle: INSIDE the rail, just left of the type label (so it never overlaps the
    rail) - the label sits to its right. Hover-revealed; holds its space so nothing shifts. */
-.rail-drag { opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); }
+.rail-drag { opacity: 0; transition: opacity var(--dur-conceal) var(--ease-standard), color var(--dur-tint) var(--ease-standard); }
 .group-rail:hover > .group-rail-head > .rail-drag, .group-rail:focus-within > .group-rail-head > .rail-drag { opacity: 1; }
 .group-rail.is-choice > .group-rail-head { color: var(--muted); }
 .group-rail.is-option > .group-rail-head { color: var(--ink); }
@@ -651,7 +704,8 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    so the rail reads as a timeline with one node per option. Its ground masks the rail behind it.
    Generated chrome, not editable, not selectable. */
 .option-prompt::before {
-  content: ""; position: absolute; left: calc(-4.5px - 0.7rem); top: 0.62em;
+  /* Centred on the rail's 1px line: the line's middle is half a pixel in from its left edge. */
+  content: ""; position: absolute; left: calc(-4px - var(--rail-pad)); top: 0.62em;
   width: 7px; height: 7px; box-sizing: border-box;
   border: 1.25px solid var(--accent); background: var(--bg);
   transform: rotate(45deg); user-select: none;
@@ -676,9 +730,11 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    that belong to the rails live at the left edge; the snippet's centred "+" owns the middle). */
 .option-after { display: none; }
 .group-rail.is-option > .option-after { display: flex; justify-content: flex-start; align-items: center; height: 1.3rem; }
-.option-after > .add-option { opacity: 0; color: var(--accent); transition: opacity var(--dur-quick) var(--ease-standard); }
+.option-after > .add-option { opacity: 0; color: var(--accent); transition: opacity var(--dur-conceal) var(--ease-standard); }
 .group-rail.is-option:hover > .option-after > .add-option,
 .option-after:hover > .add-option { opacity: 1; }
+/* "+ Option" belongs to the option under the pointer, not to every option around it. */
+.group-rail.is-option:has(.group-rail.is-option:hover) > .option-after > .add-option { opacity: 0; }
 /* read-only group condition tag (only when set) - sits after the type label */
 .group-rail-cond {
   text-transform: none; letter-spacing: normal;
@@ -692,6 +748,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   font: 600 0.78rem var(--font-ui);
 }
 .group-ctl:hover { color: var(--ink); }
+.group-ctl { transition: color var(--dur-tint) var(--ease-standard); }
 
 /* The confirm is the shell's (`confirmDialog` on the family's dialog frame); its panel, scrim, buttons and
    exit motion come from app-shell's dialog.css + controls.css + confirm.css, imported by the hosting window. */
@@ -831,7 +888,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* per-beat delete affordance on the game-event atom (the .beat.kind-gameEvent row is styled above) */
 .atom-del {
   display: inline-flex; align-items: center; background: none; border: 0; cursor: pointer; color: var(--muted);
-  line-height: 1; padding: 0 0.2rem; opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard);
+  line-height: 1; padding: 0 0.2rem; opacity: 0; transition: opacity var(--dur-conceal) var(--ease-standard);
 }
 .beat.kind-gameEvent:hover .atom-del { opacity: 1; }
 .atom-del:hover { color: var(--accent); }
@@ -863,3 +920,30 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .block-name[readonly] { cursor: default; }
 /* A game event's fields are a drawn metadata line that, like the text before it, never wraps the row. */
 .beat.kind-gameEvent .atom-fields .shell-meta { flex-wrap: nowrap; }
+
+/* HOVER THAT FADES (after step 6 of the October 2026 UI review): a control that appears when the pointer
+   arrives fades in over --dur-reveal after --reveal-delay, so sweeping the pointer down the page doesn't
+   flicker every snippet's controls in turn; it fades out over the longer --dur-conceal, which each control's
+   own rule above declares. (A transition takes its timing from the state being entered.) Here, the rules
+   that reveal them, with their colours still easing at --dur-tint. */
+.block:hover > .block-head > .block-drag, .block:focus-within > .block-head > .block-drag,
+.block:hover > .block-after > .block-ctl, .block-after:hover > .block-ctl,
+.bubble:hover > .bubble-drag, .group-rail:hover > .group-rail-head > .rail-drag, .group-rail:focus-within > .group-rail-head > .rail-drag {
+  transition: opacity var(--dur-reveal) var(--ease-standard) var(--reveal-delay), color var(--dur-tint) var(--ease-standard);
+}
+.bubble:hover > .bubble-menu, .ProseMirror-focused .bubble.has-caret > .bubble-menu,
+.block:hover > .block-head > .block-dots, .block:focus-within > .block-head > .block-dots,
+.group-rail:hover > .group-rail-head > .group-menu, .group-rail:focus-within > .group-rail-head > .group-menu,
+.group-rail > .group-rail-head:hover > :is(.group-menu, .rail-drag) {
+  transition: opacity var(--dur-reveal) var(--ease-standard) var(--reveal-delay), color var(--dur-tint) var(--ease-standard),
+    background var(--dur-tint) var(--ease-standard);
+}
+.bubble:hover > .bubble-after, .bubble.atom-first:hover > .bubble-above {
+  transition: opacity var(--dur-reveal) var(--ease-standard) var(--reveal-delay), color var(--dur-tint) var(--ease-standard),
+    border-color var(--dur-tint) var(--ease-standard);
+}
+.group-rail.is-option:hover > .option-after > .add-option, .option-after:hover > .add-option,
+.bubble.is-empty.has-jump:hover > .bubble-ghost, .bubble.is-empty.has-jump:focus-within > .bubble-ghost,
+.beat.kind-gameEvent:hover .atom-del {
+  transition: opacity var(--dur-reveal) var(--ease-standard) var(--reveal-delay);
+}

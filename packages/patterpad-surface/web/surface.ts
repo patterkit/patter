@@ -48,6 +48,7 @@ import { spellcheckPlugin, setSpellChecker, setSpellAddHandler, setSpellIgnoreHa
 import { writingStatusPlugin, setWritingStatusMap, setWritingStatusShown, setWritingStatusLadder, setWritingStatusHandler, type WritingStatusMap, type WritingStatusRung } from "./writingstatus.js";
 import { replaceSayText } from "../src/lines.js";
 import { multiSelectDecorations } from "./multiselect.js";
+import { caretSnippet } from "./caret-snippet.js";
 import { qualifiersPlugin, setQualifierList, qualifierList, type QualifierChoice } from "./qualifiers.js";
 import { actionTextPlugin, setLocaliseDialogueText } from "./action-text.js";
 import { cycleQualifier as cycleQualifierCmd } from "../src/qualifier.js";
@@ -837,6 +838,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         keymap(baseKeymap),
         multiSelectState(),       // the discontiguous chunk-selection set (groups §6)
         multiSelectDecorations(), // ...painted as one selection
+        caretSnippet(),           // the snippet the caret is in, for its rule's accent (step 6)
         problemsPlugin(), // inline validation squiggles (host pushes the set via handle.markProblems)
         docNotesPlugin(), // documentation notes surfaced as tooltips + under-heading text (handle.setDocNotes)
         commentsPlugin(), // threaded-comment bubbles on beats with a visible thread (handle.setComments)

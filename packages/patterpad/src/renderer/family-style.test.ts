@@ -213,14 +213,15 @@ describe("family style: chrome has its own scale", () => {
     "body.play", ".play-transcript", ".pline", ".pline.gameEvent", ".pcue", ".pdir", ".play-choices", ".pchoice",
     // styles.css: the script column and everything set in it.
     "body", "#editor", ".ProseMirror", ".block", ".scene-title", ".block-head", ".doc-underhead", ".doc-underhead-indent",
-    ".doc-underhead-line", ".doc-underhead-cls", ".block-name", ".block-after", ".block-ctl", ".bubble", ".bubble-drag",
+    ".doc-underhead-line", ".doc-underhead-cls", ".block-name", ".block-after", ".block-ctl", ".bubble", ".bubble::after",
+    ".bubble.ProseMirror-selectednode", ".chunk-multiselected",
     ".bubble-menu", ".bubble-cond", ".bubble-jump", ".bubble-after", ".bubble-after::before", ".bubble-after::after",
     ".block.is-empty > .ghost-snippet, .group-rail.is-empty > .ghost-snippet", ".group-rail.is-empty > .ghost-snippet",
     ".ghost-plus", ".bubble.atom-first > .bubble-above", ".bubble.atom-first > .bubble-above .ghost-plus", ".bubble.is-empty",
-    ".bubble.is-empty > .bubble-ghost", ".bubble.is-empty.has-jump", ".rawnode", ".menu-dots", ".beats .beat.kind-line",
+    ".bubble.is-empty > .bubble-ghost", ".bubble.is-empty.has-jump", ".rawnode", ".menu-dots",
     ".beat.kind-line + .beat.kind-prose, .beat.kind-prose + .beat.kind-line", ".zone.cue .cue-text", ".zone.cue .cue-qual",
     ".beat.kind-line .zone.paren, .beat.kind-line .zone.say", ".zone.paren", ".suggestion-count", ".beat.kind-gameEvent",
-    ".beat.kind-gameEvent .atom-fields", ".group-rail", ".group-rail-head", ".option-prompt", ".option-prompt::before",
+    ".beat.kind-gameEvent .atom-fields", ".group-rail", ".group-rail-head", ".option-prompt",
     ".group-rail.is-option > .option-after", ".group-rail-cond", ".group-menu", ".group-ctl", ".atom-del",
   ]);
   const REM = /(?<![\w.-])\d*\.?\d+rem\b/;

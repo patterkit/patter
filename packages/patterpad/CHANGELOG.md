@@ -41,10 +41,22 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   one Add menu under each section. The line and its snippet stay open, while the option, group, block, and
   scene above them fold to one line saying what they set, and Patterpad remembers which you keep open. An
   option's Sticky, Fallback, and Secret are one row of buttons.
-- **More room for the script.** The editor's margins are narrower, a snippet's drag handle sits outside it,
-  and a jump sits at the text's left edge, drawn as an arrow and its target (a call has its own loop
-  icon). A choice's options are marked by a small diamond on their
-  line instead of a tinted box and an "Option" label.
+- **The script is a page.** Each block is one white page with its title on it, and its snippets run down it
+  as a script instead of sitting in separate cards. A thin rule beside each snippet shows where it starts
+  and ends, at any depth inside a choice, and the snippet you're writing in has its rule in blue. Point at a
+  snippet and its drag handle appears in its rule, with its menu at the end of its first line; only the
+  thing you're pointing at shows a menu, never every group around it. A problem colours that snippet's
+  rule, or that option's line, rather than adding a bar beside it.
+- **Hover is calmer.** A snippet's drag handle and menu, the "+" controls, and the inspector's buttons fade in
+  after a moment and fade out gently, instead of blinking, and a highlight eases rather than snapping. A jump
+  no longer lights up a block of colour when you point at it; its target underlines instead. Reduce Motion
+  turns all of it off.
+- **Names hang in the margin.** A character's name sits right-aligned in a column to the left of their line,
+  so speech, narration, game events, and jumps all start at one edge, as in a prompt book. A long name runs
+  out into the margin rather than pushing the line along.
+- **More room for the script.** The editor's margins are narrower, and a jump sits at the text's left edge,
+  drawn as an arrow and its target (a call has its own loop icon). A choice's options are marked by a small
+  diamond on their line instead of a tinted box and an "Option" label.
 - **Renaming a scene looks like editing.** While you're in the scene's title, a blue line runs under it,
   instead of the system's focus box in your Mac's accent colour.
 - **Change several snippets at once.** When you select more than one snippet, the inspector shows what
