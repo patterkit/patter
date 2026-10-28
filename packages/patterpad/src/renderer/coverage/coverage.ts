@@ -1,8 +1,8 @@
 // The detached COVERAGE results window (#159). It STAYS OPEN while you edit: run a narrative-coverage
 // sweep (random playthroughs that tally which beats get reached), see the results grouped by scene, and
 // click a flagged row to jump the editor to it. The main process caches the last result for the session,
-// so reopening the window shows it again. "World Properties…" opens Project Settings ▸ External
-// Properties (declare @world properties + edit the coverage drivers the sweep feeds them).
+// so reopening the window shows it again. "Game scopes…" opens Project Settings ▸ Game
+// scopes (declare @world properties + edit the coverage drivers the sweep feeds them).
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
 import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
 import "@wildwinter/app-shell/controls.css"; // the options bar's buttons are the family's `.btn`, the order switch its `.seg`
@@ -93,8 +93,8 @@ async function boot(): Promise<void> {
   driversNote.textContent = !info.hasProject
     ? "No project open."
     : info.driverCount
-      ? `${plural(info.driverCount, "input driver")} configured (World properties…).`
-      : "No coverage drivers, so branches gated on @world will read as needing input (World properties…).";
+      ? `${plural(info.driverCount, "input driver")} configured (Game scopes…).`
+      : "No coverage drivers, so branches gated on @world will read as needing input (Game scopes…).";
   if (info.last) showResult(info.last);
   else { host.hidden = true; host.replaceChildren(); }
 }

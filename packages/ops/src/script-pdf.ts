@@ -169,7 +169,7 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
           // a page PDFKit has left. Drawn afterwards, the cue landed at that spot on the NEW page: a
           // stranded speaker name at the bottom of one page for a body at the top of the next.
           if (cue) {
-            pdf.font("Sans-Bold").fontSize(CUE).fillColor(hex(characterColour(el.character))).text(cue, cueX, yTop + ascentPt("Serif", BODY) - ascentPt("Sans-Bold", CUE), { lineBreak: false });
+            pdf.font("Sans-Bold").fontSize(CUE).fillColor(hex(characterColour(el.character, el.colour))).text(cue, cueX, yTop + ascentPt("Serif", BODY) - ascentPt("Sans-Bold", CUE), { lineBreak: false });
             pdf.y = yTop;
           }
           pdf.fontSize(BODY);
@@ -182,6 +182,14 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
         case "condition":
           pdf.fontSize(9.5); draw(split(`‹ ${el.text} ›`, "Mono", ACCENT), cx, { width: w });
           break;
+        case "effect": {
+          // Quiet: small muted sans, set where the condition sits, its phase label in italic (the serif's,
+          // as the sans has no italic here).
+          const at = el.text.indexOf(": ");
+          pdf.fontSize(8.5);
+          draw([...split(el.text.slice(0, at + 2), "Serif-Italic", MUTED), ...split(el.text.slice(at + 2), "Sans", MUTED)], cx, { width: w, lineGap: 2 });
+          break;
+        }
         case "group":
           pdf.fontSize(8); draw(split(el.label.toUpperCase(), "Sans-Bold", ACCENT), cx, { width: w, characterSpacing: 1.2 });
           break;

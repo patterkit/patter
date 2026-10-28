@@ -10,8 +10,15 @@
 //                text has none, so its words start flush left, apart from the dialogue
 //   text cell    the words, shaded with a hairline edge: the only thing meant to be edited
 //   margin cell  the option tag, the optional writing status, and the marker `[#K7Q2M]`
-// Everything else (headings, conditions, choice labels, jumps, game events, notes) is an ordinary
+// Everything else (headings, conditions, choice labels, jumps, game events, effects, notes) is an ordinary
 // paragraph built exactly as the readable script builds it (script-docx.ts).
+//
+// Effect lines ("On end: sets gold to gold + 5") are shown for context and aren't part of the record: they
+// carry their own paragraph style (EFFECT_STYLE) and phase label, and the re-import skips them, so an edit
+// to one changes nothing and asks nothing.
+//
+// The project's comment threads are never written into the document: open ones stay in the project, where
+// the re-import's own comments join them. The only Word comments in a returned file are the editor's.
 //
 // What the spike found shapes three details (§13): consecutive boxes get a 1 pt spacer paragraph between
 // them, since Google Docs merges tables that touch; only headings a jump in the export points at carry a
@@ -32,7 +39,7 @@ import type { LoadedProject } from "./load.js";
 import type { PlannedWrite } from "./write.js";
 import { runScriptDoc, characterColour, cueLabel, TOKENS } from "./script-doc.js";
 import type { ScriptElement } from "./script-doc.js";
-import { SERIF, SANS, MONO, S, bodyRuns, leftOf, paragraph } from "./script-docx.js";
+import { SERIF, SANS, MONO, S, EFFECT_STYLE_DEF, bodyRuns, leftOf, paragraph } from "./script-docx.js";
 import { mergeAuthoring, sourceStrings } from "./loaded-helpers.js";
 import { formatMarker, handoffWrite, issueMarkerCodes, newHandoffId, readHandoffs } from "./handoff.js";
 import type { Random } from "./handoff.js";
@@ -98,6 +105,7 @@ export async function exportEditableScript(loaded: LoadedProject, opts: Editable
   const lines: Record<string, HandoffLine> = {};
   const skeleton: HandoffRow[] = [];
   for (const el of doc.elements) {
+    if (el.kind === "effect") continue; // shown, never recorded: the re-import skips effect lines
     if (isEditable(el)) {
       const code = markerOf.get(el)!;
       // The line's text exactly as the project stores it (markup and placeholders included): what a
@@ -145,6 +153,7 @@ export async function exportEditableScript(loaded: LoadedProject, opts: Editable
   const date = new Date(now).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   const document = new Document({
     creator: "Patter", title: `${loaded.project.project.name} (editable script)`,
+    styles: { paragraphStyles: [EFFECT_STYLE_DEF] },
     sections: [{
       properties: { page: { size: { width: 11906, height: 16838 } } },
       headers: { default: new Header({ children: [new Paragraph({ children: [
@@ -159,7 +168,7 @@ export async function exportEditableScript(loaded: LoadedProject, opts: Editable
 }
 
 /** The words a context row shows, as the skeleton records them. */
-function contextText(el: Exclude<ScriptElement, Editable>): string {
+function contextText(el: Exclude<ScriptElement, Editable | { kind: "effect" }>): string {
   switch (el.kind) {
     case "group": return el.label;
     case "else": return "else (catch-all)";
@@ -175,7 +184,7 @@ function box(el: Editable, code: string, status: string | undefined): Table {
     new TableCell({ width: { size: width, type: WidthType.DXA }, borders: { top: NONE, bottom: NONE, left: NONE, right: NONE }, margins: { top: 60, bottom: 60, left: 100, right: 100 }, children, ...extra });
 
   const lead: TextRun[] = [];
-  if (el.kind === "line" && el.character) lead.push(new TextRun({ text: cueLabel(el.character, el.qualifierName), font: SANS, bold: true, allCaps: true, size: S.cue, color: characterColour(el.character) }));
+  if (el.kind === "line" && el.character) lead.push(new TextRun({ text: cueLabel(el.character, el.qualifierName), font: SANS, bold: true, allCaps: true, size: S.cue, color: characterColour(el.character, el.colour) }));
   if (el.kind === "line" && el.direction) lead.push(new TextRun({ text: `(${el.direction})`, font: SERIF, italics: true, size: S.cue, color: TOKENS.muted, break: el.character ? 1 : 0 }));
   if (el.kind === "option") lead.push(new TextRun({ text: "◇", color: TOKENS.accent, size: S.body }));
 
@@ -251,7 +260,7 @@ function frontPage(loaded: LoadedProject, handoff: HandoffFile, opts: EditableSc
     p("How to edit this script", { bold: true, size: 24, color: TOKENS.ink, after: 120 }),
     item("1.", "Change the words inside the shaded boxes. That's all that can be edited."),
     item("2.", "Don't delete, copy, or move the boxes, or change the grey markers like [#K7Q2M] beside them. If you want a line cut, delete its words but leave the box, or leave a comment."),
-    item("3.", "Everything outside the boxes (scene and block headings, speaker names, conditions, choices, jumps, and game events) is there to show you how the story flows. Comment on it rather than editing it."),
+    item("3.", "Everything outside the boxes (scene and block headings, speaker names, conditions, choices, jumps, game events, and effects) is there to show you how the story flows. Comment on it rather than editing it."),
     item("4.", "Use comments freely. You can also type a note inside a box like [[this]]."),
 
     p("How to read the structure", { bold: true, size: 24, color: TOKENS.ink, before: 280, after: 120 }),
@@ -261,6 +270,7 @@ function frontPage(loaded: LoadedProject, handoff: HandoffFile, opts: EditableSc
     item("‹ if … ›", "This only happens when the condition holds."),
     item("↪", "The story carries on somewhere else."),
     item("⚙", "Something happens in the game here."),
+    item("On begin / On end", "What the story changes as it passes through, before or after the lines it sits with."),
     item("once only", "An option that disappears once it has been picked; repeatable ones stay."),
     p("Words like {@name} in a different typeface are filled in by the game. Keep them exactly as they are, braces included, though they can move within a line.", { before: 160 }),
 
@@ -276,7 +286,7 @@ function castPage(loaded: LoadedProject, elements: ScriptElement[]): Paragraph[]
   return [
     new Paragraph({ spacing: { after: 200 }, children: [new TextRun({ text: "Cast", font: SERIF, bold: true, size: S.h1, color: TOKENS.ink })] }),
     ...cast.map((c) => new Paragraph({ spacing: { after: 100 }, children: [
-      new TextRun({ text: c.name.toUpperCase(), font: SANS, bold: true, size: S.cue, color: characterColour(c.name) }),
+      new TextRun({ text: c.name.toUpperCase(), font: SANS, bold: true, size: S.cue, color: characterColour(c.name, c.colour) }),
       ...(c.notes ? [new TextRun({ text: `   ${c.notes}`, font: SERIF, size: S.body, color: TOKENS.inkRead })] : []),
     ] })),
     new Paragraph({ children: [new PageBreak()] }),

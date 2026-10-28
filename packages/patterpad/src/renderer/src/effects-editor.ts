@@ -4,9 +4,9 @@
 // full pill/tree expressions. Lives at the body level so it survives inspector re-renders. onChange
 // writes the edited phase straight back through the surface.
 
-import { mountEffectsEditor, renderEffectsPreview, type EffectsEditorHandle, type EditorEffect } from "@wildwinter/expr-editor";
+import { mountEffectsEditor, renderEffectsPreview, type CatalogueEntry, type EffectsEditorHandle, type EditorEffect } from "@wildwinter/expr-editor";
 import type { ConditionProperty } from "../../shared/api.js";
-import { SCOPE_ORDER, OTHER_ENGINE_SCOPES, catalogueFrom, editorDialect, schemaFrom, patterFunctions, propertyActions } from "./expr-shared.js";
+import { HOME_SCOPE, SCOPE_ORDER, OTHER_ENGINE_SCOPES, catalogueFrom, editorDialect, schemaFrom, patterFunctions, propertyActions } from "./expr-shared.js";
 import { el } from "./dom.js";
 import { openPanel } from "./panel.js";
 import type { AnchoredPanel } from "@wildwinter/app-shell";
@@ -24,7 +24,7 @@ const toEditor = (e: ModelEffect): EditorEffect => ({ kind: "set", target: e.tar
  *  matching the editor's pills. `nodeLabel` resolves any node references in values. */
 export function renderEffectsPills(effects: ModelEffect[], properties: ConditionProperty[], nodeLabel?: (id: string) => string): HTMLElement {
   const cat = catalogueFrom(properties);
-  return renderEffectsPreview(effects.map(toEditor), { schema: schemaFrom(properties), dialect: editorDialect(), otherEngineScopes: OTHER_ENGINE_SCOPES, catalogue: cat, scopeOrder: SCOPE_ORDER, propertyActions, ...(nodeLabel ? { nodeLabel } : {}) });
+  return renderEffectsPreview(effects.map(toEditor), { schema: schemaFrom(properties), dialect: editorDialect(), otherEngineScopes: OTHER_ENGINE_SCOPES, catalogue: cat, scopeOrder: SCOPE_ORDER, homeScope: HOME_SCOPE, propertyActions, ...(nodeLabel ? { nodeLabel } : {}) });
 }
 
 let active: AnchoredPanel | null = null;
@@ -38,6 +38,10 @@ export function openEffectsEditor(opts: {
   phase?: Phase;
   /** Persist a phase's edited effect list (the renderer saves + re-validates). */
   onChange: (phase: Phase, effects: EditorEffect[]) => void;
+  /** Declare a new `@patter` property from the "+ set property" picker's "+ New property" row (the
+   *  hands-on fixes review): the renderer asks its type and saves it as the Properties page does, then
+   *  answers the catalogue entry, or null when the author backed out. */
+  onCreateProperty?: (name: string) => Promise<CatalogueEntry | null>;
 }): void {
   const cat = catalogueFrom(opts.properties);
   const schema = schemaFrom(opts.properties);
@@ -47,7 +51,8 @@ export function openEffectsEditor(opts: {
   const myHandles: EffectsEditorHandle[] = [];
   const panel = openPanel({
     anchor: opts.anchor, className: "effects-editor", title, width: 380,
-    ignoreDown: ".exed-pop", deferEscape: ".exed-pop",
+    // The new-property type choice is a dialog over the panel: a click in it isn't a click away from the panel.
+    ignoreDown: ".exed-pop, .new-prop-dialog", deferEscape: ".exed-pop, .new-prop-dialog",
     // Runs AFTER the exit fade; guard the singletons so a panel opened meanwhile isn't clobbered.
     onClose: () => { for (const h of myHandles) h.destroy(); if (active === panel) active = null; },
   });
@@ -65,6 +70,9 @@ export function openEffectsEditor(opts: {
       schema, dialect: editorDialect(), otherEngineScopes: OTHER_ENGINE_SCOPES, catalogue: cat, scopeOrder: SCOPE_ORDER, functions: fns,
       allowEmit: false, // patter effects are set-only; emission rides on gameData (spec §15)
       propertyActions, // right-click a property (a target pill included): go to definition / find usages
+      homeScope: HOME_SCOPE, // `@gold`, not `patter.gold`
+      // "+ New property" in the picker: a @patter property only (a scene's own are made in its Properties).
+      ...(opts.onCreateProperty ? { onCreateProperty: (name: string) => opts.onCreateProperty!(name), newPropertyScopes: [HOME_SCOPE] } : {}),
       onChange: (next) => opts.onChange(phase, next),
     }));
   };

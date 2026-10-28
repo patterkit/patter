@@ -91,6 +91,12 @@ export interface OpenedProject {
   trackAudioStatus: boolean;
   /** Master cast names (ProjectFile.cast). */
   cast: string[];
+  /** Each cast member's stored colour slot (`CastMember.colour`, 0 to 11, kept through a rename), by
+   *  name; absent when nobody has one. Every cue colour reads it before falling back to the name's hash. */
+  castColours?: Record<string, number>;
+  /** The project's source language (ProjectFile.locales.default): the script editor's `lang`, and what its
+   *  spell-check defaults to. */
+  sourceLocale?: string;
   /** Each cast member's player-facing name in the source language, by cast name, where it has one that
    *  differs from the cast name (a view extension's project node reads it). */
   castNames?: Record<string, string>;
@@ -249,7 +255,7 @@ export interface ProjectSettingsDto {
   gameDataFields: GameDataFields;
   /** Project-global `@patter` property declarations (the Properties settings tab). */
   properties: PropertyDecl[];
-  /** Host / world scope declarations (`@world`, ...) - the World Properties settings tab (#159). Absent = none.
+  /** Host / game scope declarations (`@world`, `@player`, ...) - the Game scopes settings tab (#159). Absent = none.
    *  With a game scopes folder, the game's own scopes come from its `game.scopes.json`, and saving writes
    *  them there first and then to the project's synced copy. */
   scopeRegistry?: HostScopeRegistry;
@@ -275,6 +281,11 @@ export interface ProjectSettingsDto {
    *  renamed. Saving carries each into every condition and set effect that names it (through the VC layer).
    *  Write-only: never read back. */
   stageRenames?: StageRenameDto[];
+  /** Game scopes the author renamed in Project Settings ▸ Game scopes, the token each was saved under ->
+   *  the new one. Saving carries every reference (`@player.hp` in conditions and effects, `{@player.hp}` in
+   *  strings) to the new token in the same batch, one undo step, after the stage renames (which name the
+   *  old token). Write-only: never read back. */
+  scopeRenames?: Record<string, string>;
   /** How a character's label reads with a qualifier (the Qualifiers tab), `{name}` and `{qualifier}` filled
    *  in. "" means the default (`DEFAULT_SPEAKER_PATTERN`), which the project doesn't store. A caller that
    *  sends none leaves the project's as it is. */
@@ -811,6 +822,8 @@ export interface PlayStep {
    *  qualifier the speaker pattern filled in (`TAM (O.S.)`) or the pair's own label. Absent in an IDs-only
    *  build. */
   speakerLabel?: string;
+  /** line only: the speaker's stored colour slot (`CastMember.colour`), when the cast keeps one. */
+  colour?: number;
   /** line / text only: the pause after it before the next line, in seconds, resolved by the runtime
    *  (line padding). Negative = the next line cuts in. */
   padAfter?: number;
@@ -1303,6 +1316,9 @@ export interface PatterApi {
   projectClearRedo(): Promise<void>;
   /** The Edit menu's Undo and Redo labels, from the journal's newest entries ("Replace"; none for a scene edit). */
   setUndoLabels(labels: { undo?: string; redo?: string }): Promise<void>;
+  /** Whether Edit ▸ Move Up / Move Down can do anything now (the focused scene row, or the script's
+   *  selection); the menu greys them otherwise. Sent as it changes. */
+  setMoveEnabled(state: { up: boolean; down: boolean }): Promise<void>;
   /** Every step main records in the project history, whichever window asked for the write. */
   onProjectStep(handler: (step: ProjectStep) => void): void;
   /** Another window's toast asks the editor to undo project step `id` only if it's still the newest; the
@@ -1321,8 +1337,13 @@ export interface PatterApi {
   reorderScenes(ids: string[]): Promise<SaveResult & { project?: OpenedProject }>;
   /** Create a new scene (the minimal playable scaffold) as fresh flow + loc shards, lock-aware.
    *  Returns the refreshed summary and the new scene's id so the renderer can open it. */
-  /** New Scene from a kit (main/scene-kits.ts); `speaker` for a kit with lines, added to the cast when new. */
-  createScene(name: string, kit?: SceneKitId, speaker?: string): Promise<SaveResult & { project?: OpenedProject; sceneId?: string }>;
+  /** New Scene from a kit (main/scene-kits.ts); `speaker` for a kit with lines, added to the cast when new.
+   *  With `after` (a scene id) the new scene goes straight after it, written into `sceneOrder` in the same
+   *  step; without it, at the end. */
+  createScene(name: string, kit?: SceneKitId, speaker?: string, after?: string): Promise<SaveResult & { project?: OpenedProject; sceneId?: string }>;
+  /** Move a scene one place up (-1) or down (1) in the authored order (`sceneOrder`), one step of the
+   *  project history. `moved` is false at the first or last place, where nothing is written. */
+  moveScene(sceneId: string, dir: -1 | 1): Promise<SaveResult & { project?: OpenedProject; moved?: boolean }>;
   /** What deleting a scene would cost - drives the delete confirm's severity: untouched scaffolds
    *  delete silently, content asks, and inbound references list the referring scenes by name. */
   sceneDeleteInfo(sceneId: string): Promise<SceneDeleteInfo | null>;

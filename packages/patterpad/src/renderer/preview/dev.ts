@@ -333,10 +333,19 @@ const stub = {
     project.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
     return { ok: true, project };
   },
-  createScene: async (name: string) => {
+  createScene: async (name: string, _kit?: string, _speaker?: string, after?: string) => {
     const sceneId = `scn_${project.scenes.length + 1}`;
-    project.scenes.push({ id: sceneId, name: name.trim() || "Scene", blocks: [{ id: `${sceneId}_main`, name: "Main" }] });
+    const at = after ? project.scenes.findIndex((s) => s.id === after) : -1;
+    const scene = { id: sceneId, name: name.trim() || "Scene", blocks: [{ id: `${sceneId}_main`, name: "Main" }] };
+    if (at >= 0) project.scenes.splice(at + 1, 0, scene); else project.scenes.push(scene);
+    project.sceneIds = project.scenes.map((s) => s.id);
     return { ok: true, sceneId, project };
+  },
+  moveScene: async (sceneId: string, dir: -1 | 1) => {
+    const i = project.scenes.findIndex((s) => s.id === sceneId), j = i + dir;
+    if (i < 0 || j < 0 || j >= project.scenes.length) return { ok: true, moved: false };
+    [project.scenes[i], project.scenes[j]] = [project.scenes[j]!, project.scenes[i]!];
+    return { ok: true, moved: true, project };
   },
   // Canned severities: the tavern is referenced (severity 3), the street is content-only (2),
   // and anything created in-session reads as an untouched scaffold (1 - silent unless unsaved).
@@ -484,6 +493,8 @@ const stub = {
   projectRedo: async () => ({ ok: false, label: "", stale: true, scenes: [], authoring: [] }),
   projectClearRedo: async () => undefined,
   setUndoLabels: async () => undefined,
+  // Edit ▸ Move Up / Move Down's enabled state: kept on the window so the preview can be asked what it is.
+  setMoveEnabled: async (state: { up: boolean; down: boolean }) => { (window as unknown as { __moveEnabled?: unknown }).__moveEnabled = state; },
   onProjectStep: () => undefined,
   // Auto-update hooks (#189) - inert in the browser preview, but they MUST exist: the renderer subscribes
   // at module top level, and a missing method throws and aborts boot.
@@ -498,6 +509,8 @@ const stub = {
   paletteCommands: async () => [
     { id: "File\u001fNew Scene\u2026", path: ["File"], label: "New Scene\u2026", accelerator: "CmdOrCtrl+Shift+N", enabled: true },
     { id: "View\u001fProject Overview", path: ["View"], label: "Project Overview", enabled: true },
+    { id: "Edit\u001fMove Up", path: ["Edit"], label: "Move Up", accelerator: "Ctrl+Cmd+Up", enabled: true },
+    { id: "Edit\u001fMove Down", path: ["Edit"], label: "Move Down", accelerator: "Ctrl+Cmd+Down", enabled: true },
     { id: "Publish\u001fPublish Bundle", path: ["Publish"], label: "Publish Bundle", accelerator: "Shift+CmdOrCtrl+B", enabled: false },
   ],
   paletteRun: () => undefined,

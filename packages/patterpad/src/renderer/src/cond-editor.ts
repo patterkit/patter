@@ -5,7 +5,7 @@
 
 import { mountExpressionEditor, renderConditionPreview, type ExpressionEditorHandle } from "@wildwinter/expr-editor";
 import type { ConditionProperty } from "../../shared/api.js";
-import { SCOPE_ORDER, OTHER_ENGINE_SCOPES, catalogueFrom, editorDialect, schemaFrom, patterFunctions, propertyActions } from "./expr-shared.js";
+import { HOME_SCOPE, SCOPE_ORDER, OTHER_ENGINE_SCOPES, catalogueFrom, editorDialect, schemaFrom, patterFunctions, propertyActions } from "./expr-shared.js";
 import { openPanel } from "./panel.js";
 import type { AnchoredPanel } from "@wildwinter/app-shell";
 
@@ -14,7 +14,7 @@ import type { AnchoredPanel } from "@wildwinter/app-shell";
  *  seen()/visits() node ids to readable names. */
 export function renderConditionPills(src: string, properties: ConditionProperty[], nodeLabel?: (id: string) => string): HTMLElement {
   const cat = catalogueFrom(properties);
-  return renderConditionPreview(src, { schema: schemaFrom(properties), dialect: editorDialect(), otherEngineScopes: OTHER_ENGINE_SCOPES, catalogue: cat, scopeOrder: SCOPE_ORDER, propertyActions, ...(nodeLabel ? { nodeLabel } : {}) });
+  return renderConditionPreview(src, { schema: schemaFrom(properties), dialect: editorDialect(), otherEngineScopes: OTHER_ENGINE_SCOPES, catalogue: cat, scopeOrder: SCOPE_ORDER, homeScope: HOME_SCOPE, propertyActions, ...(nodeLabel ? { nodeLabel } : {}) });
 }
 
 let active: AnchoredPanel | null = null;
@@ -44,6 +44,7 @@ export function openConditionEditor(opts: {
     dialect: editorDialect(), otherEngineScopes: OTHER_ENGINE_SCOPES,
     catalogue: cat,
     scopeOrder: SCOPE_ORDER,
+    homeScope: HOME_SCOPE, // `@gold`, not `patter.gold`
     functions: patterFunctions(cat),
     mode: "tree",
     nullLabel: "always", // an empty condition is "always" eligible

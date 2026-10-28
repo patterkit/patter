@@ -477,3 +477,118 @@ describe("planEditableImport: speaker qualifiers", () => {
     expect(authoringOf(s.dir).suggestions![0]).toMatchObject({ proposedQualifier: "os", outcome: "accepted" });
   });
 });
+
+// ---- Effects (hands-on review Q13): shown in the editable script, ignored on the way back ----
+
+/** The flow file's effects, every phase of every node, by node id. */
+function effectsOf(dir: string): string {
+  const out: Record<string, unknown> = {};
+  for (const file of ["tavern", "street"]) {
+    const flow = parseSource(readFileSync(join(dir, `scenes/${file}.patterflow`), "utf8")) as FlowFile;
+    if (flow.scene.onEntry) out[flow.scene.id] = flow.scene.onEntry;
+    const visit = (nodes: Array<{ id: string; onEnter?: unknown; onExit?: unknown; children?: unknown[] }>): void => {
+      for (const n of nodes) { if (n.onEnter || n.onExit) out[n.id] = { onEnter: n.onEnter, onExit: n.onExit }; visit((n.children ?? []) as typeof nodes); }
+    };
+    for (const block of flow.scene.blocks) visit(block.children as Parameters<typeof visit>[0]);
+  }
+  return JSON.stringify(out);
+}
+
+/** The whole `<w:p>` holding `text`. */
+function paraSpan(xml: string, text: string): [number, number] {
+  const at = xml.indexOf(text);
+  return [xml.lastIndexOf("<w:p>", at), xml.indexOf("</w:p>", at) + "</w:p>".length];
+}
+
+describe("planEditableImport: effect lines are shown, never read back", () => {
+  const GOLD = "sets gold to gold + 5";
+
+  it("the export shows each effect line in its own style and leaves it out of the record", async () => {
+    const s = await sent();
+    const xml = await (await JSZip.loadAsync(s.out.docx)).file("word/document.xml")!.async("string");
+    const [a, b] = paraSpan(xml, GOLD);
+    expect(xml.slice(a, b)).toContain(`<w:pStyle w:val="PatterEffect"/>`);
+    expect(xml.slice(a, b)).toContain("On end: ");
+    expect(xml).toContain("sets knows_secret to true");
+    expect(s.out.handoff.skeleton.some((row) => "text" in row && row.text.includes("gold"))).toBe(false);
+  });
+
+  it("an edited script with its effect lines changed, tracked or not, styled or not: the box edit and nothing else", async () => {
+    const s = await sent();
+    const before = effectsOf(s.dir);
+    const plan = await bringBack(s, (x) => {
+      x = setWords(x, s.code("L_greet"), p(r("What'll it be, friend?")));
+      // One effect line rewritten without tracking, its style dropped (as Google Docs drops it) ...
+      let [a, b] = paraSpan(x, GOLD);
+      x = x.slice(0, a) + p(r("On end: sets gold to gold + 50")) + x.slice(b);
+      // ... and the other with a tracked change, its style kept.
+      [a, b] = paraSpan(x, "sets knows_secret to true");
+      const para = x.slice(a, b).replace(/<w:r>(?:(?!<w:r>).)*?sets knows_secret to true.*?<\/w:r>/, del("Jo", "sets knows_secret to true") + ins("Jo", "sets knows_secret to false"));
+      expect(para).toContain("PatterEffect");
+      expect(para).toContain("<w:ins ");
+      return x.slice(0, a) + para + x.slice(b);
+    }, { direct: true });
+    expect(plan.report.problems).toEqual([]);
+    expect(plan.comments).toEqual([]);
+    expect(plan.suggestions.map((x) => [x.anchor, x.proposed])).toEqual([["L_greet", "What'll it be, friend?"]]);
+    applyWrites(plan.writes);
+    expect(effectsOf(s.dir)).toBe(before);
+  });
+
+  it("a comment on an end effect line lands on the line before it", async () => {
+    const s = await sent();
+    const plan = await bringBack(s, (x) => {
+      const at = x.indexOf(GOLD);
+      const run = x.lastIndexOf("<w:r>", at);
+      return x.slice(0, run) + `<w:commentRangeStart w:id="0"/>` + x.slice(run);
+    }, {}, {
+      "word/comments.xml": `<?xml version="1.0"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:comment w:id="0" w:author="Jo"><w:p>${r("Five's too generous.")}</w:p></w:comment></w:comments>`,
+    });
+    expect(plan.report.problems).toEqual([]);
+    expect(plan.comments.map((c) => [c.anchor, c.messages[0]!.body])).toEqual([["L_intim", "Five's too generous."]]);
+  });
+
+  it("a comment on a begin effect line lands on the line after it", async () => {
+    const s = await sent({}, (dir) => {
+      const path = join(dir, "scenes/tavern.patterflow");
+      const flow = parseSource(readFileSync(path, "utf8")) as FlowFile;
+      const secret = flow.scene.blocks.find((b) => b.id === "secret")!.children[0] as { onEnter?: unknown };
+      secret.onEnter = [{ kind: "set", target: "@drunk", value: "true" }];
+      writeFileSync(path, canonicalStringify(flow));
+    });
+    const plan = await bringBack(s, (x) => {
+      const at = x.indexOf("On begin: ");
+      const run = x.lastIndexOf("<w:r>", at);
+      return x.slice(0, run) + `<w:commentRangeStart w:id="0"/>` + x.slice(run);
+    }, {}, {
+      "word/comments.xml": `<?xml version="1.0"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:comment w:id="0" w:author="Jo"><w:p>${r("Drunk already?")}</w:p></w:comment></w:comments>`,
+    });
+    expect(plan.report.problems).toEqual([]);
+    expect(plan.comments.map((c) => [c.anchor, c.messages[0]!.body])).toEqual([["T_lean", "Drunk already?"]]);
+  });
+});
+
+// ---- Open comments (hands-on review): never written into the editable script ----
+
+describe("exportEditableScript: the project's comment threads stay in the project", () => {
+  it("open and resolved threads alike: no Word comments in the export, and none come back", async () => {
+    const s = await sent({}, (dir) => {
+      const path = join(dir, "authoring/tavern.patterx");
+      const authoring = parseSource(readFileSync(path, "utf8")) as AuthoringFile;
+      writeFileSync(path, canonicalStringify({ ...authoring, comments: [
+        { id: "cmt_open", anchor: "L_greet", messages: [{ author: "Ian", ts: "2026-10-01T09:00:00Z", body: "Warmer?" }, { author: "Sam", ts: "2026-10-01T10:00:00Z", body: "Agreed." }] },
+        { id: "cmt_done", anchor: "L_work", resolved: true, messages: [{ author: "Ian", ts: "2026-10-01T09:00:00Z", body: "Fixed." }] },
+      ] }));
+    });
+    const zip = await JSZip.loadAsync(s.out.docx);
+    // The docx library always writes a comments part; it holds none.
+    expect(await zip.file("word/comments.xml")?.async("string") ?? "").not.toContain("<w:comment ");
+    const xml = await zip.file("word/document.xml")!.async("string");
+    expect(xml).not.toMatch(/commentRangeStart|commentReference|Warmer\?/);
+    const returned = await readEditableDocx(s.out.docx);
+    expect(returned.comments).toEqual([]);
+    const plan = planEditableImport(loadProject(s.dir), returned, { by: "Ian", fileHash: "hash", now: NOW, random: seeded(9) });
+    expect(plan.comments).toEqual([]);
+    expect(plan.report.problems).toEqual([]);
+  });
+});

@@ -40,7 +40,7 @@ function handlersWith(over: Partial<InspectorHandlers> = {}): InspectorHandlers 
     editEffects: noop, condPreview: () => document.createElement("span"), effectsPreview: () => document.createElement("span"),
     jumpLabel: () => "", setJumpMode: noop, setTags: noop,
     gameDataFields: () => [], setGameData: noop, sceneProps: () => [], editSceneProps: noop,
-    writingStatuses: () => [], lineStatus: () => null, setLineStatus: noop,
+    writingStatuses: () => [], lineStatus: () => null, setLineStatus: noop, statusBeats: () => [], setStatusOf: noop,
     recordingStatuses: () => [], recordingStatus: () => null, setRecordingStatus: noop,
     audioFoldersOn: () => false, recordingFolderStatus: () => null, playRecording: noop,
     scratchStatus: () => null, recordScratch: noop, scratchStale: () => false,

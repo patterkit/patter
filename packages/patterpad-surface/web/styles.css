@@ -947,3 +947,36 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .beat.kind-gameEvent:hover .atom-del {
   transition: opacity var(--dur-reveal) var(--ease-standard) var(--reveal-delay);
 }
+
+/* --- the hands-on fixes review (Q13 to Q16) ------------------------------------------------------ */
+/* A snippet's effects, read-only and quiet: worded like the condition tag ("On begin: set @gold to …"),
+   On begin under the condition, On end above the jump, each only when set. The inspector edits them. */
+.bubble-fx {
+  font: 500 0.66em var(--font-ui); letter-spacing: 0.02em;
+  color: var(--muted); user-select: none;
+}
+.bubble-fx.fx-begin { margin-bottom: 0.45em; }
+.bubble-fx.fx-end { margin-top: 0.5em; }
+.bubble:not(.has-fx-begin) > .bubble-fx.fx-begin, .bubble:not(.has-fx-end) > .bubble-fx.fx-end { display: none; }
+.bubble > .bubble-fx { margin-left: var(--cue-col); }
+@container (max-width: 26em) { .bubble > .bubble-fx { margin-left: 0; } }
+/* The scene's entry effects, in the same voice, under its title. */
+.scene-effects {
+  max-width: 60em; margin: -0.3em auto 0.9em; /* 60em at this size is the title's 42rem column */
+  font: 500 0.7em var(--font-ui); letter-spacing: 0.02em; color: var(--muted); user-select: none;
+}
+.scene-effects[hidden] { display: none; }
+/* A deleted scene or block, wherever a ref names it: the label in the problem colour, its old id in the
+   tooltip. A jump to one has nowhere to go, so it isn't a link. */
+.missing-target { color: var(--danger); }
+.bubble-jump.is-missing { cursor: default; }
+.bubble-jump.is-missing:hover .bubble-jump-to { text-decoration-color: transparent; }
+/* The ⋯ menu from the keyboard: a focused item shows as a hovered one does; the ⋯ itself shows while focused. */
+.action-mi:focus-visible { outline: none; background: color-mix(in oklab, var(--accent) 10%, transparent); }
+.menu-dots:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: 1px; }
+.action-mi:disabled { color: var(--muted); cursor: default; opacity: 0.6; }
+.action-mi:disabled:hover { background: none; }
+/* Move up / Move down carry their shortcut at the right, in the muted ink. */
+.action-key { margin-left: auto; padding-left: 18px; color: var(--muted); font: var(--text-sm) var(--font-ui); }
+/* The jump picker's create rows. */
+.tp-create { color: var(--accent); }

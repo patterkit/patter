@@ -91,6 +91,13 @@ describe("exportBundle", () => {
     // Nothing anywhere in the serialised bundle names the actor (not in cast, not in gameData).
     expect(JSON.stringify(b)).not.toContain("Jane Doe");
   });
+
+  it("leaves a cast member's editor colour (an authoring-only palette slot) out of the bundle", () => {
+    const authored = project({ cast: [{ name: "INNKEEPER", colour: 7 }] });
+    const b = exportBundle({ project: authored, scenes: [sceneWith("@hp > 0")], locales: [en] });
+    expect(b.cast![0]).toEqual({ name: "INNKEEPER" });
+    expect(JSON.stringify(b)).not.toContain('"colour"');
+  });
 });
 
 describe("author tags bake into the bundle (#215)", () => {

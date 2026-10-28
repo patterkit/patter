@@ -50,7 +50,7 @@ export { catalogToXlsx, xlsxToCatalog } from "./loc-xlsx.js";
 export { runVoiceScript } from "./voice-script.js";
 export type { VoiceScript, VoiceLine } from "./voice-script.js";
 export { voiceScriptToXlsx } from "./voice-script-xlsx.js";
-export { runScriptDoc, cueLabel, qualifierNamer } from "./script-doc.js";
+export { runScriptDoc, cueLabel, qualifierNamer, effectDescriber, characterColour, castColours } from "./script-doc.js";
 export type { ScriptDoc, ScriptElement } from "./script-doc.js";
 export { scriptToDocx } from "./script-docx.js";
 export { scriptToPdf } from "./script-pdf.js";
@@ -80,7 +80,7 @@ export type { MergeResult, MergeFileType, Conflict, ConflictKind, ShardText } fr
 export { manifestPath, readProjectManifest, soundManifest, projectManifests, planExtensionUpgrades, renameCastKeys } from "./extensions.js";
 export type { ExtensionUpgrade, CastKeyRewrite } from "./extensions.js";
 // A cast member renamed: the lines and project-level strings that name them (extension data: renameCastKeys)
-export { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys } from "./cast-rename.js";
+export { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, keepCastColours } from "./cast-rename.js";
 // Editable-script handoff records and markers (patterkit/design/proposals/editable-script-handoff.md)
 export {
   HANDOFF_DIR, handoffPath, handoffWrite, serialiseHandoff, parseHandoff, readHandoffs, readHandoff,
@@ -95,7 +95,7 @@ export { exportEditableScript } from "./editable-docx.js";
 export type { EditableScriptOptions, EditableScript } from "./editable-docx.js";
 // Reading a returned editable script
 export { readEditableDocx } from "./docx-read.js";
-export type { ReturnedDoc, ReadItem, ReadBox, ReadParagraph, ReadText, ReadComment, TrackedChange } from "./docx-read.js";
+export type { ReturnedDoc, ReadItem, ReadBox, ReadEffect, ReadParagraph, ReadText, ReadComment, TrackedChange } from "./docx-read.js";
 // Bringing an editable script back: suggestions, comments, and a report, planned
 export { planEditableImport, REFUSE_MISSING_SHARE } from "./editable-import.js";
 export type { ImportOptions, ImportPlan, ImportReport, ImportProblem } from "./editable-import.js";

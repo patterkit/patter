@@ -27,7 +27,7 @@ import { toggleLineType, flipToFreeText, promoteToDialogue } from "../src/linety
 import { context } from "../src/context.js";
 import { inspect, inspectScene, type InspectorContext } from "../src/inspect.js";
 import { duplicateChunk, notifyDuplicated, setDuplicateHandler, DUPLICABLE_KINDS } from "../src/duplicate.js";
-import { STRUCTURAL_MOVE, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, deleteBlock, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining, seedBeatInSnippet } from "../src/groups.js";
+import { STRUCTURAL_MOVE, insertBlock, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, deleteBlock, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining, seedBeatInSnippet } from "../src/groups.js";
 import { structureGuard, refusal } from "../src/guard.js";
 import { projectPad, keepTimingOnJoin } from "../src/pad.js";
 import { clipboardText, pasteParagraphs } from "../src/paste.js";
@@ -39,13 +39,14 @@ import { setPlayBlockHandler } from "./actionmenu.js";
 import { confirmDeleteBlock, confirmDeleteChunk, confirmDeleteSet } from "./confirm.js";
 import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, optionPromptId, sayText as sayTextOf, sayStartOf, offCue, isBlankBeat, rawAttr, isZoneBeat } from "../src/zoneutil.js";
 import { patterSchema } from "../src/schema.js";
-import { nodeViews, setJumpLabelResolver, setJumpNavHandler, refreshJumpLabels, openSceneMenu, destroyActionMenu } from "./views.js";
+import { nodeViews, setJumpLabelResolver, setJumpNavHandler, refreshJumpLabels, openSceneMenu, destroyActionMenu, isActionMenuOpen, openActionMenuAt, onJumpLabelsRefresh, sceneEffectNodes } from "./views.js";
+import { movePositions, planMove, runMove, moveKeyDir, type MoveDir } from "./move.js";
 import { problemsPlugin, setProblemMarks, type ProblemMark } from "./problems.js";
 import { docNotesPlugin, setDocNotes, setNoteHandler, type DocNote, type DocNoteMap } from "./docnotes.js";
 import { commentsPlugin, setComments, setCommentHandler, commentRanges, type CommentMark, type CommentOpenRequest } from "./comments.js";
 import { suggestionsPlugin, setSuggestions, setSuggestionHandler, type SuggestionMark, type SuggestionOpenRequest } from "./suggestions.js";
 import { spellcheckPlugin, setSpellChecker, setSpellAddHandler, setSpellIgnoreHandler, spellingIssues, type SpellChecker } from "./spellcheck.js";
-import { writingStatusPlugin, setWritingStatusMap, setWritingStatusShown, setWritingStatusLadder, setWritingStatusHandler, type WritingStatusMap, type WritingStatusRung } from "./writingstatus.js";
+import { writingStatusPlugin, collectBeatIds, setWritingStatusMap, setWritingStatusShown, setWritingStatusLadder, setWritingStatusHandler, type WritingStatusMap, type WritingStatusRung } from "./writingstatus.js";
 import { replaceSayText } from "../src/lines.js";
 import { multiSelectDecorations } from "./multiselect.js";
 import { caretSnippet } from "./caret-snippet.js";
@@ -70,7 +71,11 @@ export type { QualifierChoice } from "./qualifiers.js";
 // unchanged. `tipAt` / `hideTip` come with it: a tip anchored to a rectangle
 // rather than an element, for anything drawn rather than laid out.
 export { initTooltips, tipBold, tipAt, hideTip } from "@wildwinter/app-shell";
+/** The move shortcut as a portable combo ("Ctrl+Mod+Up" on a Mac, "Ctrl+Alt+Up" elsewhere) and as the
+ *  platform spells it ("⌃⌘↑"), for the host's Edit menu items that call `handle.moveSelection`. */
+export { moveCombo, moveShortcutLabel, moveKeyDir } from "./move.js";
 import { createCuePopup } from "./cuepopup.js";
+import { castColour, setCastColours } from "../src/colour.js";
 import { createSlashMenu } from "./slashmenu.js";
 import { createHintBar } from "./hintbar.js";
 
@@ -92,6 +97,9 @@ export interface MountOptions {
   lockedExtensions?: ExtensionLocks;
   /** Recency-ordered cast seed; the opened scene's speakers are auto-adopted on top. */
   castSeed?: string[];
+  /** The cast's stored colour slots by name (`CastMember.colour`): a character with one keeps that colour
+   *  on the page whatever their name hashes to. Push changes with `setCastColours`. */
+  castColours?: Record<string, number>;
   /** The project's speaker qualifiers in display order (gameId + the name the cue shows): drawn after a
    *  qualified line's speaker, `TAM (O.S.)`, and cycled by the keyboard route. Push changes with
    *  `setQualifiers`. */
@@ -107,8 +115,17 @@ export interface MountOptions {
    *  (so you can jump to any scene OR any block); ids are the stable join keys stored on the jump,
    *  labels are shown. The app passes every other scene here. */
   jumpTargets?: Array<{ id: string; label: string; blocks?: Array<{ id: string; label: string }> }>;
-  /** Prepend the scene-name title above the script (the harness / a single-scene view wants this). */
+  /** Prepend the scene-name title above the script (the harness / a single-scene view wants this). The
+   *  scene's entry effects, when it has any, show in a quiet line under it. */
   showTitle?: boolean;
+  /** Make a jump target from the picker (Q13). When given, typing a name no scene or block has in any
+   *  jump picker (`/jump`, `editJump`, `editJumps`, `pickNode`) offers "+ New scene 'name'" and
+   *  "+ New block 'name' in this scene". Choosing one calls this with the trimmed name (and, for a block,
+   *  the open scene's id); the host makes it and answers what was made, or null to give up. The surface
+   *  then points the jump (or the node reference) at `block ?? scene`. A block in the OPEN scene belongs
+   *  in this editor's document: make it with `handle.addBlock(name)`. Omit it and the pickers offer no
+   *  create rows. */
+  onCreateTarget?: (req: { kind: "scene" | "block"; name: string; scene?: string }) => Promise<{ scene: string; block?: string } | null>;
   /** Called (rAF-coalesced) whenever the document changes, and once on mount - the host reads
    *  `handle.getSource()` to persist / mirror. */
   onChange?: (handle: SurfaceHandle) => void;
@@ -324,6 +341,28 @@ export interface SurfaceHandle {
   duplicate(): boolean;
   /** Reorder the chunk with this id up / down within its container. */
   moveChunk(id: string, dir: "up" | "down"): boolean;
+  /** Move what's selected one place up (-1) or down (1) within its parent, as one undo step (Q14; the
+   *  keys are Ctrl+Cmd+Up / Down on a Mac, Ctrl+Alt+Up / Down elsewhere): the multi-selected chunks when
+   *  they're neighbours, else the selected snippet, group or block, else the snippet holding the caret.
+   *  At the first or last place, or for a set with gaps, nothing moves and the reason goes to `onRefuse`.
+   *  True when it moved. For the host's Edit menu. */
+  moveSelection(dir: -1 | 1): boolean;
+  /** Whether `moveSelection(dir)` would move anything now (for enabling the Edit menu's items). */
+  canMoveSelection(dir: -1 | 1): boolean;
+  /** Add a block called `name` at the end of this scene, leaving the caret where it is, and answer its id
+   *  (null on a read-only scene). For the host's `onCreateTarget` when the new block is in this scene. */
+  addBlock(name: string): string | null;
+  /** Replace the cast the speaker picker offers (Q15). The surface's list otherwise only grows, so after
+   *  any step that changes the project cast (an undone "Add to cast" included) the host passes the whole
+   *  cast here. Names keep their order; repeats (ignoring case) are dropped. */
+  setCast(names: string[]): void;
+  /** The line and text beats a writing status set on this node reaches, in document order: every one under
+   *  it, or the whole scene for the scene's own id. Empty for an id nothing has. For the host's scene and
+   *  block status (the hands-on fixes review, Q17). */
+  statusBeats(id: string): string[];
+  /** Hand over the cast's stored colour slots (`CastMember.colour`, by name): a character with one keeps
+   *  it on the page, whatever their name now hashes to. Repaints the cues at once. */
+  setCastColours(colours: Record<string, number> | undefined): void;
   /** Move the play PLAYHEAD to the node with this id (a running highlight, scrolled into view). The
    *  beat the playhead leaves keeps a quiet VISITED mark, so the path play took is visible. Pass null
    *  to clear just the playhead. */
@@ -590,6 +629,20 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   let destroyed = false;
   const nextFrame = (fn: () => void): void => { requestAnimationFrame(() => { if (!destroyed) fn(); }); };
   let titleEl: HTMLElement | null = null;
+  // The scene's entry effects, in a quiet line under the title ("On begin: set @gold to 10"), like a
+  // snippet's effect chips. Repainted on a doc change and with the jump chips (a `visits()` in a value).
+  let sceneFxEl: HTMLElement | null = null;
+  let lastSceneFx = " ";
+  const syncSceneEffects = (force = false): void => {
+    if (!sceneFxEl) return;
+    const raw = rawAttr(view.state.doc);
+    const key = JSON.stringify(raw.onEntry ?? null);
+    if (!force && key === lastSceneFx) return;
+    lastSceneFx = key;
+    sceneFxEl.replaceChildren(...sceneEffectNodes(raw));
+    sceneFxEl.hidden = !sceneFxEl.firstChild;
+  };
+  let unhookSceneFx: (() => void) | null = null;
   /** Show the doc's own scene name in the title, unless the author is typing in it: an undo / redo of a
    *  rename changes the doc and nothing else would tell the title (review 2026-10, MEDIUM 38). */
   const syncTitle = (): void => {
@@ -608,6 +661,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   // The project cast. Seed (recency-ordered) + auto-adopt every speaker the opened scene already
   // names, so an imported file's speakers are first-class. The popup's "add new" prepends here.
   const cast: string[] = [];
+  setCastColours(opts.castColours); // before the first paint, so every cue draws in its kept colour
   const addToCast = (name: string): void => { const n = name.trim(); if (n && !cast.some((c) => c.toLowerCase() === n.toLowerCase())) cast.unshift(n); };
   (opts.castSeed ?? []).forEach(addToCast);
   charactersInDoc(opened.doc).forEach(addToCast);
@@ -649,13 +703,35 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   // block + the host scenes) each time is wasteful. Memoize on `liveDoc` IDENTITY - PM reuses the same doc
   // node for selection-only transactions, so this rebuilds only on an actual edit - and look up via a map.
   let jumpLabels: { doc: PMNode; labels: Map<string, string> } | null = null;
-  const jumpLabel = (id: string): string => {
+  // An id nothing has now answers null: the chip shows "Missing scene" / "Missing block" (reftext.ts).
+  const jumpLabel = (id: string): string | null => {
     if (!jumpLabels || jumpLabels.doc !== liveDoc) {
       const labels = new Map<string, string>();
       for (const t of flatTargets()) labels.set(t.id, t.label);
       jumpLabels = { doc: liveDoc, labels };
     }
-    return jumpLabels.labels.get(id) ?? id;
+    return jumpLabels.labels.get(id) ?? null;
+  };
+  /** The pickers' create hook (Q13), or undefined when the host didn't give `onCreateTarget`. After the host
+   *  makes the target, a new scene joins the cross-scene targets (so the chip can name it at once, before
+   *  the host's own `setJumpTargets`), then `use` points the jump or reference at it. */
+  const createHook = (use: (target: string) => void): ((what: "scene" | "block", name: string) => void) | undefined => {
+    const make = opts.onCreateTarget;
+    if (!make) return undefined;
+    return (what, name) => {
+      const sceneId = rawAttr(liveDoc).id;
+      const req = what === "block" && typeof sceneId === "string" ? { kind: what, name, scene: sceneId } : { kind: what, name };
+      void make(req).then((made) => {
+        if (!made || destroyed) return;
+        const known = (opts.jumpTargets ?? []).some((t) => t.id === made.scene) || made.scene === sceneId;
+        if (!known) {
+          opts.jumpTargets = [...(opts.jumpTargets ?? []), { id: made.scene, label: name, blocks: made.block ? [{ id: made.block, label: name }] : [] }];
+          jumpLabels = null;
+        }
+        use(made.block ?? made.scene);
+        refreshJumpLabels();
+      }, () => { /* the host said why itself */ });
+    };
   };
   setJumpLabelResolver(jumpLabel); // BEFORE the view paints, so existing jump chips show labels
   setPlayBlockHandler(opts.onPlayBlock ?? null); // the context-menu "Play block" item routes here
@@ -673,17 +749,18 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     // line can be gone by the time the author picks (#63), and the bubble is what they meant to route.
     const from = context(view.state).snippet;
     const snippetId = from ? (modelIdOf(from.node) ?? "") : "";
+    const commit = (target: string | null): void => {
+      if (!target) return;
+      // The bubble's position BEFORE the change, so the same rule the inspector's picker uses can map
+      // it: a bubble left beat-less by the jump keeps the inspector, instead of handing it to whichever
+      // neighbour the caret fell into.
+      const before = findByModelId(view.state.doc, snippetId, (n) => n.type.name === "snippet")?.pos;
+      const tr = commitSlashJump(view.state, target, snippetId);
+      if (tr) view.dispatch(before == null ? tr : keepBeatlessBubbleSelected(tr, before));
+    };
     openTargetPicker({
       anchor: { caretOf: view }, data: buildJumpData(), current: "", allowClear: false,
-      onPick: (target) => {
-        if (!target) return;
-        // The bubble's position BEFORE the change, so the same rule the inspector's picker uses can map
-        // it: a bubble left beat-less by the jump keeps the inspector, instead of handing it to whichever
-        // neighbour the caret fell into.
-        const before = findByModelId(view.state.doc, snippetId, (n) => n.type.name === "snippet")?.pos;
-        const tr = commitSlashJump(view.state, target, snippetId);
-        if (tr) view.dispatch(before == null ? tr : keepBeatlessBubbleSelected(tr, before));
-      },
+      onPick: commit, onCreate: createHook(commit),
       afterClose: () => view.focus(),
     });
   });
@@ -777,6 +854,13 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
    *  the page keeps showing what the project setting says ships). */
   const READ_ONLY_OK = "patterReadOnlyOk";
   const say = (message: string): void => opts.onRefuse?.(message);
+  /** Move the selection (see `moveSelection`); a refusal goes to the hint channel. */
+  const moveSelectionNow = (dir: MoveDir): boolean => {
+    const why = runMove(view, movePositions(view.state), dir);
+    if (why) { say(why); return false; }
+    view.focus();
+    return true;
+  };
 
   // Backspace and Delete in all their platform variants (Mod-, Alt-, Shift-, Ctrl-h / Ctrl-d on a Mac)
   // go through the zone spine; baseKeymap's join commands would otherwise run for the variants and
@@ -896,7 +980,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         // the focus themselves, so this fired the moment one opened and swept away the very line the menu
         // was raised on. `insertJump` then had nothing to consume and the author's pick did nothing at all
         // (#63, still true in 0.16.6 - their capture shows the line vanishing before the pick).
-        if (!isEditable || popup.isOpen() || slash.isOpen() || isTargetPickerOpen()) return false;
+        if (!isEditable || popup.isOpen() || slash.isOpen() || isTargetPickerOpen() || isActionMenuOpen()) return false;
         const tr = sweepEmptyBeats(v.state);
         if (tr) v.dispatch(tr);
         return false;
@@ -917,6 +1001,17 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     },
     handleKeyDown: (v, event) => {
       lastInputWasPointer = false;
+      // Move the snippet or group up / down (Q14): Ctrl+Cmd+Up / Down on a Mac, Ctrl+Alt elsewhere. Read
+      // per platform here, since a keymap's "Mod" can't say Ctrl+Cmd. Taken even at the edge, where the
+      // hint says why nothing moved.
+      const moveDir = moveKeyDir(event);
+      if (moveDir) { popup.close(); slash.close(); moveSelectionNow(moveDir); return true; }
+      // The ⋯ menu from the keyboard: the context-menu key, or Shift+F10, opens the menu of what's selected
+      // (or the snippet holding the caret) with its first item focused.
+      if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey)) {
+        const at = movePositions(v.state);
+        if (at.length === 1 && openActionMenuAt(v, at[0]!)) { popup.close(); return true; }
+      }
       lastKeyWasVertical = event.key === "ArrowUp" || event.key === "ArrowDown";
       if (slash.handleKeyDown(v, event)) return true;
       // A printable key with a NODE selected. ProseMirror's default replaces the selection with the
@@ -975,7 +1070,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       // events) down. An undo or redo moves it too, and is not a new event.
       if (opts.onHistoryStep && !isHistoryTransaction(tr) && undoDepth(next) !== depthBefore) opts.onHistoryStep();
       const ctx = context(next);
-      if (tr.docChanged) { scheduleChange(); syncTitle(); }
+      if (tr.docChanged) { scheduleChange(); syncTitle(); syncSceneEffects(); }
       if (tr.selectionSet) scenePinned = false; // a real selection move (beat / block / group) un-pins the scene
       if (tr.selectionSet || tr.docChanged) { slash.close(); scheduleSelect(); }
       // A vertical (Up/Down) move only passes THROUGH a cue, so it must not raise the cast popup; a
@@ -1042,8 +1137,12 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       e.preventDefault();
       try { const id = (JSON.parse(view.state.doc.attrs.raw as string) as { id?: string }).id; if (id) openSceneMenu(view, { x: e.clientX, y: e.clientY }, id); } catch { /* no scene id */ }
     }, { signal: sig });
-    editorEl.prepend(title);
+    const fx = document.createElement("div"); fx.className = "scene-effects"; fx.contentEditable = "false";
+    editorEl.prepend(title, fx);
     titleEl = title;
+    sceneFxEl = fx;
+    syncSceneEffects(true);
+    unhookSceneFx = onJumpLabelsRefresh(() => syncSceneEffects(true));
   }
 
   // Clicking the empty BACKGROUND (the editor container, or the ProseMirror root's own padding - not a
@@ -1138,6 +1237,24 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     view,
     getSource,
     getCast: () => cast,
+    statusBeats(id) {
+      if (rawAttr(view.state.doc).id === id) return collectBeatIds(view.state.doc);
+      const at = findNodePos(id);
+      const node = at == null ? null : view.state.doc.nodeAt(at);
+      return node ? collectBeatIds(node) : [];
+    },
+    setCastColours(colours) {
+      setCastColours(colours);
+      for (const cue of view.dom.querySelectorAll<HTMLElement>(".cue-text")) {
+        const name = cue.textContent ?? "";
+        if (name) cue.style.color = castColour(name);
+      }
+    },
+    setCast(names) {
+      cast.length = 0;
+      for (const n of names) { const t = n.trim(); if (t && !cast.some((c) => c.toLowerCase() === t.toLowerCase())) cast.push(t); }
+      if (popup.isOpen()) popup.update(view, context(view.state)); // an open picker shows the new list
+    },
     setFormatting(on) {
       if (on === formattingEnabled) return;
       if (!on) { // disabling strips existing marks so the doc matches the plain strings that ship
@@ -1312,17 +1429,18 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       const shared = targets.size === 1 ? [...targets][0]! : "";
       openTargetPicker({
         anchor, data: buildJumpData(), current: shared, allowClear: snippets.some((id) => jumpOf(id) !== ""),
-        onPick: (target) => {
-          batchEdits(() => {
-            for (const id of snippets) {
-              const p = findNodePos(id); if (p == null) continue;
-              const tr = setSnippetJump(view.state, p, target);
-              if (tr) view.dispatch(tr);
-            }
-          });
-          afterPick?.();
-        },
+        onPick: setAll, onCreate: createHook(setAll),
       });
+      function setAll(target: string | null): void {
+        batchEdits(() => {
+          for (const id of snippets) {
+            const p = findNodePos(id); if (p == null) continue;
+            const tr = setSnippetJump(view.state, p, target);
+            if (tr) view.dispatch(tr);
+          }
+        });
+        afterPick?.();
+      }
     },
     editJump(id, anchor, afterPick) {
       const at = findNodePos(id);
@@ -1330,15 +1448,16 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       const node = view.state.doc.nodeAt(at);
       if (node?.type.name !== "snippet") return;
       const cur = node.attrs.jump ? ((JSON.parse(node.attrs.jump as string) as { to?: string }).to ?? "") : "";
-      openTargetPicker({
-        anchor, data: buildJumpData(), current: cur, allowClear: cur !== "",
-        onPick: (target) => {
+      const set = (target: string | null): void => {
         const p = findNodePos(id); if (p == null) return;
         const tr = setSnippetJump(view.state, p, target);
         if (!tr) return;
         view.dispatch(keepBeatlessBubbleSelected(tr, p));
         afterPick?.();
-      },
+      };
+      openTargetPicker({
+        anchor, data: buildJumpData(), current: cur, allowClear: cur !== "",
+        onPick: set, onCreate: createHook(set),
       });
     },
     jumpTargets: () => flatTargets(),
@@ -1353,6 +1472,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       openTargetPicker({
         anchor, data: buildJumpData(), current, allowClear: false, allowEnd: false,
         onPick: (target) => { if (target) onPick(target); }, // scenes/blocks only; END/clear suppressed
+        onCreate: createHook(onPick),
       });
     },
     addOption(choiceId) {
@@ -1404,6 +1524,27 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       if (!tr) return false;
       view.dispatch(tr);
       return true;
+    },
+    moveSelection: (dir) => moveSelectionNow(dir),
+    canMoveSelection: (dir) => isEditable && "tr" in planMove(view.state, movePositions(view.state), dir),
+    addBlock(name) {
+      if (!isEditable) return null;
+      let last = -1;
+      view.state.doc.forEach((n, off) => { if (n.type.name === "block") last = off; });
+      if (last < 0) return null;
+      const tr = insertBlock(view.state, last);
+      if (!tr) return null;
+      // One step: the block inserted and named, the caret left where the author had it.
+      const at = last + view.state.doc.nodeAt(last)!.nodeSize; // the new block follows the last one
+      const block = tr.doc.nodeAt(at);
+      if (!block) return null;
+      tr.setNodeMarkup(at, undefined, { ...block.attrs, raw: JSON.stringify({ ...rawAttr(block), name }) });
+      tr.setSelection(view.state.selection.map(tr.doc, tr.mapping));
+      const before = view.state.doc;
+      view.dispatch(tr);
+      if (view.state.doc === before) return null;
+      refreshJumpLabels();
+      return modelIdOf(block);
     },
     markLine(id) {
       cancelPendingMark?.(); cancelPendingMark = null; // drop any mark still waiting on the previous glide
@@ -1579,7 +1720,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       destroyed = true;
       cancelPendingMark?.(); listeners.abort(); closeTargetPicker(); setPlayBlockHandler(null); setJumpNavHandler(null);
       popup.destroy(); slash.destroy(); destroyActionMenu();
-      pointerResize.disconnect(); playPointer.remove(); titleEl?.remove(); opts.hintbar?.replaceChildren(); view.destroy();
+      pointerResize.disconnect(); playPointer.remove(); titleEl?.remove(); sceneFxEl?.remove(); unhookSceneFx?.(); opts.hintbar?.replaceChildren(); view.destroy();
     },
   };
   opts.onChange?.(handle); // initial mirror

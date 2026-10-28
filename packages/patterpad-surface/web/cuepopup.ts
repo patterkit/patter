@@ -38,6 +38,14 @@ const isFilterKey = (event: KeyboardEvent): boolean => {
   return k.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && k !== "(" && k !== ")" && k !== "/";
 };
 
+/** Text that could be a character's name, so the popup offers to add it (Q15): up to three words, with no
+ *  full stop or question mark. A sentence typed into the cue by mistake is not offered to the cast. */
+export function isNameLike(text: string): boolean {
+  const t = text.trim();
+  if (!t || /[.?]/.test(t)) return false;
+  return t.split(/\s+/).length <= 3;
+}
+
 /**
  * @param getCast    recency-ordered project cast (the shell owns ordering).
  * @param addToCast  register a brand-new character in the project cast (rare).
@@ -75,7 +83,7 @@ export function createCuePopup(getCast: () => readonly string[], addToCast: (nam
     const exact = cast.some((c) => c.toLowerCase() === q.toLowerCase());
     // A new character is stored in CAPITALS (the house style for cue tokens), so the Add row shows the
     // upper-cased name the author will actually get - whatever case they typed.
-    rows = q.length > 0 && !exact ? [...picks, { kind: "add", name: q.toUpperCase() }] : picks;
+    rows = q.length > 0 && !exact && isNameLike(q) ? [...picks, { kind: "add", name: q.toUpperCase() }] : picks;
     highlight = Math.max(0, Math.min(highlight, rows.length - 1));
   };
 

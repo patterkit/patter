@@ -10,7 +10,7 @@ in conditions, effects, and interpolated text. They're how you make dialogue rea
 state: a threat level, the player's class, whether the alarm is ringing.
 
 You **declare** them in Patterpad (Project Settings ▸ World Properties, see
-[Properties & game data](/setup/properties-and-data/#world-values-your-game-owns)), giving
+[Properties & game data](/setup/properties-and-data/#game-scopes-values-your-game-owns)), giving
 each a name, type, default, and whether the story may write it. At runtime you **bind** a resolver
 so the story reads, and if you allow it, writes your live state.
 

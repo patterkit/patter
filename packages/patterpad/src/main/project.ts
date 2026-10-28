@@ -26,9 +26,10 @@ import type { ReviewItem, ProjectStep, ProjectHistoryOutcome } from "../shared/a
 import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync, prepareToWriteFilesAsync,
   setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
 import { fileSafeName } from "../shared/file-name.js";
+import { hostScopesProblem, renameScopesInLocale, renameScopesInScene } from "./scope-rename.js";
 import type { EditableExportRequest, EditableImportRequest, EditableImportSummary, OpenSuggestionDto } from "../shared/api.js";
 import type { ImportPlan } from "@patterkit/ops";
-import { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, renameCastKeys, readProjectManifest, manifestPath, planExtensionUpgrades } from "@patterkit/ops";
+import { castColours, keepCastColours, cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, renameCastKeys, readProjectManifest, manifestPath, planExtensionUpgrades } from "@patterkit/ops";
 import { createHash, randomUUID } from "node:crypto";
 import type { StageRenameDto } from "../shared/api.js";
 import type { SceneExtensionShards, LiveSceneSource, SceneExtensionSourceDto } from "../shared/api.js";
@@ -337,11 +338,24 @@ function rerecordOnEdit(s: SceneShards, sceneId: string, prevLocSource: string |
 // The built-in spell-check dictionary ids (mirrors dictionaries.ts BUILTINS). Kept a plain const here -
 // NOT imported from dictionaries.ts - so this module (and its Node tests) never pull in `electron`.
 const BUILTIN_DICT_IDS = ["en-US", "en-GB"] as const;
-/** The dictionary to default to for a source locale: an exact id match, else the first built-in sharing the
- *  primary subtag (e.g. "en" -> "en-US"), else en-US. */
+/** The system's preferred languages, most preferred first (Electron's `getPreferredSystemLanguages`), set
+ *  once at start-up: a project in plain "en" spell-checks in the system's English. */
+let systemLocales: string[] = [];
+export function setSystemLocales(locales: readonly string[]): void { systemLocales = [...locales]; }
+/** A built-in dictionary id for a locale tag ("en_gb" -> "en-GB"), or undefined when there's none. */
+const builtinDict = (tag: string): string | undefined =>
+  BUILTIN_DICT_IDS.find((id) => id.toLowerCase() === tag.replace(/_/g, "-").toLowerCase());
+/** The dictionary to default to for a source locale: the project's source language (the hands-on fixes
+ *  review, Q16). An exact id match first. A plain language ("en") takes the system's own variety of it when
+ *  there's a dictionary for that (an en-GB system gets en-GB), else the first built-in sharing it (en-US). */
 function deriveDictLanguage(locale: string): string {
-  if ((BUILTIN_DICT_IDS as readonly string[]).includes(locale)) return locale;
+  const exact = builtinDict(locale);
+  if (exact) return exact;
   const primary = (locale.split(/[-_]/)[0] ?? "").toLowerCase();
+  if (!/[-_]/.test(locale)) {
+    const system = systemLocales.map(builtinDict).find((id) => id?.split("-")[0]!.toLowerCase() === primary);
+    if (system) return system;
+  }
   return BUILTIN_DICT_IDS.find((id) => id.split("-")[0]!.toLowerCase() === primary) ?? "en-US";
 }
 /** The resolved spell-check setup for a project (language defaulted from the source locale when unset). */
@@ -370,6 +384,8 @@ function summarise(p: LoadedProject): OpenedProject {
     voiced: p.project.voiced ?? false,
     trackAudioStatus: (p.project.voiced ?? false) && (p.project.trackAudioStatus ?? false),
     cast: (p.project.cast ?? []).map((c) => c.name),
+    sourceLocale: p.project.locales.default,
+    ...castColoursOf(p),
     ...castNamesOf(p),
     qualifiers: projectQualifiers(p.project),
     padAfterDefault: p.project.padAfterDefault ?? DEFAULT_PAD_AFTER,
@@ -385,6 +401,12 @@ function summarise(p: LoadedProject): OpenedProject {
     scratchStatus: p.project.scratchStatus ?? null,
     ...extensionSummary(p),
   };
+}
+
+/** Each cast member's stored colour slot, by name, for the renderer's cues (absent when nobody has one). */
+function castColoursOf(p: LoadedProject): Pick<OpenedProject, "castColours"> {
+  const colours = castColours(p.project.cast);
+  return colours.size ? { castColours: Object.fromEntries(colours) } : {};
 }
 
 /** Each cast member's player-facing name in the source language, where it differs from the cast name: the
@@ -1958,7 +1980,11 @@ function resetPlaySession(): void { flow = null; engine = null; playBundle = nul
 // where the playhead is. The editor uses it to follow a cross-scene jump.
 const toStep = (r: StepResult, scene: string | null): PlayStep | null => {
   const s = scene ?? undefined;
-  if (r.type === "line") return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction, qualifier: r.qualifier, qualifierName: r.qualifierName, speakerLabel: r.speakerLabel, padAfter: r.padAfter };
+  if (r.type === "line") {
+    // The cue's colour slot, when the cast stores one (kept through a rename): the play window paints with it.
+    const colour = r.character ? (loaded?.project.cast ?? []).find((c) => c.name === r.character)?.colour : undefined;
+    return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction, qualifier: r.qualifier, qualifierName: r.qualifierName, speakerLabel: r.speakerLabel, padAfter: r.padAfter, ...(colour !== undefined ? { colour } : {}) };
+  }
   if (r.type === "text") return { kind: "text", id: r.id, scene: s, text: r.text, padAfter: r.padAfter, ...(r.action ? { action: true } : {}) };
   if (r.type === "gameEvent") return { kind: "gameEvent", id: r.id, scene: s };
   return null; // choice / end carry no played beat
@@ -1976,7 +2002,7 @@ const OTHER_ENGINES: Record<string, { engine: string; file: string; project: str
  *  stands that scope in. With a game scopes folder, the play window stands in every scope the folder
  *  declares, so a refusal there means the other engine's file is missing, and the way out is to write
  *  it. With no folder, the way out is to share scopes with that engine, or to declare the scope under
- *  World properties, which Patter backs with the declared defaults. The engine's own words are kept. */
+ *  Game scopes, which Patter backs with the declared defaults. The engine's own words are kept. */
 export function playRefusal(message: string, gameScopesDir?: string): string {
   const other = /^this content names @(\S+?),/.exec(message)?.[1];
   if (other === undefined) return message;
@@ -1991,7 +2017,7 @@ export function playRefusal(message: string, gameScopesDir?: string): string {
   }
   const share = known ? `share scopes with ${known.engine} (File > Share Scopes with Other Tools), or ` : "";
   return `This project names @${other}, which ${engineName} provides. To play it here, ${share}declare @${other} in `
-    + `Project Settings > World properties, with the properties you read; ${both}\n\n${message}`;
+    + `Project Settings > Game scopes, with the properties you read; ${both}\n\n${message}`;
 }
 
 const errBatch = (e: unknown): PlayBatch => ({ steps: [], stop: "error", error: e instanceof Error ? e.message : String(e) });
@@ -2910,6 +2936,55 @@ function castRenameWrites(renames: Map<string, string>, base: { path: string; co
   return writes;
 }
 
+/**
+ * The game scope renames a settings save carries, old token -> new: only a scope the tab was shown (the
+ * project's, or the shared file's), to a token the saved scopes hold, and never @world, whose token is
+ * fixed. A string when the rename would fold two scopes into one: onto a token the project already has
+ * (unless that one is renamed away in the same save), or from one the saved scopes still hold.
+ */
+function cleanScopeRenames(renames: Record<string, string> | undefined, next: ProjectSettingsDto["scopeRegistry"]): Map<string, string> | string {
+  const out = new Map<string, string>();
+  if (!loaded || !renames) return out;
+  const shown = new Set((worldSettingsScopes(loaded.project, loaded.gameScopes)?.scopes ?? []).map((x) => x.token));
+  const saved = new Set((next?.scopes ?? []).map((x) => x.token));
+  const pairs = Object.entries(renames).filter(([from, to]) => from !== to && from !== "world" && shown.has(from) && saved.has(to));
+  const sources = new Set(pairs.map(([from]) => from));
+  const targets = new Set(pairs.map(([, to]) => to));
+  for (const [from, to] of pairs) {
+    if ((shown.has(to) && !sources.has(to)) || (saved.has(from) && !targets.has(from))) {
+      return `@${from} can't be renamed to @${to}: the project already has an @${to} scope.`;
+    }
+    out.set(from, to);
+  }
+  return out;
+}
+
+/** The writes a game scope rename makes: each scene with a condition or set effect naming the scope, and
+ *  each loc shard with a `{@scope.x}` slot, every locale's. `base` holds writes already planned in the same
+ *  batch: a shard among them is renamed from that content, so neither edit loses the other. */
+function scopeRenameWrites(renames: ReadonlyMap<string, string>, base: { path: string; content: string }[]): { path: string; content: string }[] {
+  if (!loaded) return [];
+  ensureHydrated(); // references anywhere in the project
+  const planned = new Map(base.map((w) => [w.path, w.content]));
+  const dialect = stageDialect(loaded.project, loaded.gameScopes); // the project's as it stands, which knows the old tokens
+  const writes: { path: string; content: string }[] = [];
+  for (const scene of loaded.scenes) {
+    const path = loaded.sceneFiles[scene.id];
+    if (!path) continue;
+    const queued = planned.get(path);
+    const copy = queued !== undefined ? (parseSource(queued) as FlowFile).scene : structuredClone(scene);
+    if (renameScopesInScene(copy, renames, dialect) > 0) writes.push({ path, content: withDiskMark(path, canonicalStringify({ schema: FLOW_SCHEMA, scene: copy } satisfies FlowFile)) });
+  }
+  loaded.locales.forEach((loc, i) => {
+    const path = loaded!.localeFiles[i];
+    if (!path) return;
+    const queued = planned.get(path);
+    const copy = queued !== undefined ? (parseSource(queued) as LocaleFile) : structuredClone(loc);
+    if (renameScopesInLocale(copy, renames)) writes.push({ path, content: withDiskMark(path, canonicalStringify(copy)) });
+  });
+  return writes;
+}
+
 /** Carry stage renames on their own (the Scene properties dialog, whose declarations the open scene saves). */
 export function renameStages(renames: StageRenameDto[], openScene?: { sceneId: string; flowBefore: string | null }): Promise<SaveResult & { expressions: number; step?: ProjectStep }> {
   return enqueueWrite(async () => {
@@ -3071,6 +3146,12 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
     // `game.scopes.json` FIRST (re-read, so another tool's scopes are kept), and the project keeps the
     // same as its synced copy, so it still compiles packed or checked out alone.
     let scopeRegistry = s.scopeRegistry && s.scopeRegistry.scopes.length ? s.scopeRegistry : undefined;
+    const scopesProblem = hostScopesProblem(scopeRegistry?.scopes ?? []);
+    if (scopesProblem) return { ok: false, error: scopesProblem };
+    // A game scope renamed in the tab (Ian's ruling of 2026-10-28): carried through every reference below,
+    // in the same batch. Worked out against the scopes the tab was shown, before the shared file is planned.
+    const scopeRenames = cleanScopeRenames(s.scopeRenames, s.scopeRegistry);
+    if (typeof scopeRenames === "string") return { ok: false, error: scopeRenames };
     const sharedWrites: { path: string; content: string }[] = [];
     if (loaded.gameScopes) {
       const plan = planWorldSave(loaded.project, loaded.gameScopes, scopeRegistry);
@@ -3086,6 +3167,8 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
       .filter(([from, to]) => (loaded!.project.cast ?? []).some((c) => c.name === from) && s.cast.some((c) => c.name === to))));
     const cast = structuredClone(s.cast);
     if (renames) renameQualifierLabels(cast, renames);
+    // A renamed character keeps the colour their old name had, stamped in this same save.
+    if (castRenames) keepCastColours(cast, castRenames);
     const next: ProjectFile = {
       ...loaded.project,
       project: { ...loaded.project.project, name: s.name },
@@ -3155,6 +3238,13 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
       const at = writes.findIndex((x) => x.path === w.path);
       if (at >= 0) writes[at] = w; else writes.push(w);
     }
+    // A game scope renamed: every condition, set effect, and `{@scope.x}` slot naming it follows, in the same
+    // batch, after the stage renames (which name the old token), built on their writes of a scene.
+    const scopes = scopeRenames.size ? scopeRenameWrites(scopeRenames, writes) : [];
+    for (const w of scopes) {
+      const at = writes.findIndex((x) => x.path === w.path);
+      if (at >= 0) writes[at] = w; else writes.push(w);
+    }
     // The project's own values for its Patter extensions, edited in their Settings sections: each
     // `_project.patterextension`, in the same batch, so one undo puts the settings and the values back. A
     // shard left with no data goes in the batch as a delete, after anything below that rewrites it.
@@ -3205,7 +3295,7 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
       }
     }
     loaded.project = next; // reflect in the cached project
-    const reload = !!renames || stages.writes.length > 0 || casts.length > 0;
+    const reload = !!renames || stages.writes.length > 0 || casts.length > 0 || scopes.length > 0;
     if (stamp && !reload) syncAuthoringAt(stamp.path, stamp.af); // a rename reloads everything below
     if (!reload) for (const w of extensionWrites) applyExtensionShardAt(loaded, w.path, w.content); // validation sees the new values
     if (reload) reloadFromDisk(); // the rewritten scenes, strings, and extension data, read back whole
@@ -3234,7 +3324,7 @@ export function setStart(start: { scene: string; block?: string }): Promise<Save
  *  in the same commit when new: the author named them in New Scene's panel, so this is their choice,
  *  not the kit's. The filename stem is the slugged name, de-collided (`-2`, `-3`, …) against existing
  *  shards. Returns the refreshed summary + the new id. */
-export function createScene(name: string, kit: SceneKit = "blank", speaker?: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; sceneId?: string }> {
+export function createScene(name: string, kit: SceneKit = "blank", speaker?: string, after?: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; sceneId?: string }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     ensureHydrated(); // the stem de-collides against ALL shards, not the landing-only view
@@ -3259,15 +3349,23 @@ export function createScene(name: string, kit: SceneKit = "blank", speaker?: str
     const cast = [...(loaded.project.cast ?? [])];
     const addToCast = kitNeedsSpeaker(kit) && who !== undefined && !cast.some((c) => c.name === who);
     if (addToCast) cast.push({ name: who });
-    // One step: its undo deletes the files it made (and takes the speaker back out of the cast).
+    // A new scene goes straight after `after` (the scene the author is in), written into `sceneOrder` in
+    // the same commit so it stays there on reload (hands-on fixes review, ruling 3). Without `after`, or
+    // when it isn't a scene, it goes at the end as before.
+    const at = after ? loaded.scenes.findIndex((s) => s.id === after) : -1;
+    const sceneOrder = at >= 0 ? [...loaded.scenes.slice(0, at + 1).map((s) => s.id), sceneId, ...loaded.scenes.slice(at + 1).map((s) => s.id)] : undefined;
+    const nextProject: ProjectFile = { ...loaded.project, ...(addToCast ? { cast } : {}), ...(sceneOrder ? { sceneOrder } : {}) };
+    // One step: its undo deletes the files it made (and takes the speaker back out of the cast, and the
+    // scene back out of the order).
     const res = await projectCommit("New Scene", freshKey("scene"), [
       { path: flowPath, content: canonicalStringify(flow) },
       { path: locPath, content: canonicalStringify(locale) },
-      ...(addToCast ? [{ path: loaded.projectFile, content: canonicalStringify({ ...loaded.project, cast }) }] : []),
+      ...(addToCast || sceneOrder ? [{ path: loaded.projectFile, content: canonicalStringify(nextProject) }] : []),
     ]);
     if (!res.ok) return res;
-    if (addToCast) loaded.project = { ...loaded.project, cast };
-    loaded.scenes.push(scene);
+    if (addToCast || sceneOrder) loaded.project = nextProject;
+    if (at >= 0) loaded.scenes.splice(at + 1, 0, scene);
+    else loaded.scenes.push(scene);
     loaded.sceneFiles[sceneId] = flowPath;
     loaded.locales.push(locale);
     loaded.localeFiles.push(locPath);
@@ -3439,6 +3537,29 @@ export function reorderScenes(ids: string[]): Promise<SaveResult & { step?: Proj
     const rank = new Map(ids.map((id, i) => [id, i]));
     loaded.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
     return { ok: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
+  });
+}
+
+/** Move one scene a place up (-1) or down (1) in the nav's authored order, written as the whole
+ *  `sceneOrder` like a drag (hands-on fixes review, ruling 3): the scene's right-click menu, the Edit
+ *  menu, and Ctrl+Cmd+Up / Down on a focused scene row all come here. At the first or last place it
+ *  answers ok with nothing written and `moved: false`. One step of the project history. */
+export function moveScene(sceneId: string, dir: -1 | 1): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; moved?: boolean }> {
+  return enqueueForProject(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    ensureHydrated();
+    const ids = loaded.scenes.map((s) => s.id);
+    const i = ids.indexOf(sceneId);
+    if (i < 0) return { ok: false, error: "That scene isn't in the project any more." };
+    const j = i + dir;
+    if (j < 0 || j >= ids.length) return { ok: true, moved: false };
+    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+    const next: ProjectFile = { ...loaded.project, sceneOrder: ids };
+    const res = await commitProjectFile(next, dir < 0 ? "Move Scene Up" : "Move Scene Down");
+    if (!res.ok) return res;
+    const rank = new Map(ids.map((id, k) => [id, k]));
+    loaded.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+    return { ok: true, moved: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
   });
 }
 

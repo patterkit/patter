@@ -30,28 +30,43 @@ that doesn't exist.
 |---|---|---|
 | **`@patter`** | Whole story, saved | Global state: `@gold`, `@reputation`, story flags. |
 | **`@scene`** | One scene, saved | Bookkeeping local to a scene: `@scene.asked_about_work`. |
-| **`@world`** | Your game owns it | Values the game sets while it runs: `@world.threat`, `@world.location`. |
+| **`@world`**, and any other game scope | Your game owns it | Values the game sets while it runs: `@world.threat`, `@player.hp`. |
 
 A short, well-named property list is a kindness to writers: the condition editor stays easy to
 use, and there are fewer ways to write a logic bug.
 
-## `@world`: values your game owns
+## Game scopes: values your game owns
 
 Some branches depend on things the *game* knows, not the story, such as the player's location,
-a difficulty setting, or a live threat level. Declare those in **Project Settings ▸ World Properties**
-as `@world` values (name, type, default, and whether the story is allowed to change them). Two
-payoffs:
+a difficulty setting, or a live threat level. Declare those in **Project Settings ▸ Game scopes**.
+`@world` comes first and is always there; **+ Add scope** adds another, such as `@player` or
+`@inventory`, when the game keeps its values in more than one place. For each scope:
 
-- The editor **checks** `@world.*` references, so a condition against a value your game feeds is
-  validated like any other.
+- **Its properties**: name, type, default, and whether the story may change each one.
+- **Read-only to the story**: the story can read every property in the scope but set none of them.
+  A write is reported as a problem.
+- **Any name, unchecked**: the game decides what the scope holds, so the story may name any property
+  on it and nothing checks it. Turn it off to declare the properties instead. `@world` is always
+  declared.
+
+A scope's name is letters, digits, and `_`, and doesn't start with a digit. It can't be Patter's own
+`@patter` or `@scene`, another engine's scope such as `@story`, or a name already used; the field
+says which when it can't be used. **Renaming** a scope renames every reference to it across the
+project, in conditions, effects, and `{@player.hp}` in text, and one undo puts it all back.
+**Removing** one takes its declarations away; references to it then show as problems.
+
+Two payoffs:
+
+- The editor **checks** references such as `@world.threat` and `@player.hp`, so a condition against
+  a value your game feeds is validated like any other.
 - While the game runs it **supplies** these values; if nothing sets them, the runtime falls back
   to the defaults you declared and saves them with the rest of the run (see
   [Save/load & Game Data](/play/integration/)).
 
-One thing to know now is that because the game sets `@world` values while it runs, the editor's
+One thing to know now is that because the game sets these values while it runs, the editor's
 [coverage test](/production/coverage-testing/) can't know them, so a branch gated on
 `@world.threat` shows up as *needs input* until you give the test stand-in values. Those
-stand-ins, **coverage drivers**, live in the same World Properties tab and are covered with
+stand-ins, **coverage drivers**, live in the same Game scopes tab and are covered with
 the test itself under [Coverage drivers](/production/coverage-testing/#coverage-drivers).
 
 ## Sharing scopes with the game's other tools
@@ -79,11 +94,13 @@ my-game/
   warning, never an error, because the other project may be a save behind on someone's branch. A
   token nobody declares is accepted unchecked, as it is without a folder. The condition and effect
   editors offer the other tools' properties by name, with who declares each in the tip.
-- **The game's own scopes live in `game.scopes.json`.** With the folder, **Project Settings ▸ World
-  Properties** edits that file (and leaves the scopes it doesn't show alone), and the project keeps
-  a copy, so it still compiles packed or checked out on its own. The shared file wins: if the two
-  ever differ, `validate` says so. Its `@world` is compiled into the bundle, so a game running
-  Patter alone still starts from those defaults.
+- **The game's own scopes live in `game.scopes.json`.** With the folder, **Project Settings ▸ Game
+  scopes** edits that file when you save the settings (and leaves the scopes it doesn't show alone),
+  and the project keeps a copy, so it still compiles packed or checked out on its own. Removing a
+  scope there removes it from the file too. Renaming one renames it in the file, but not in the
+  other tools' projects, so update those where they use it. The shared file wins: if the two ever
+  differ, `validate` says so. Its scopes are compiled into the bundle, so a game running Patter
+  alone still starts from those defaults.
 - **Previews stand the other tools in.** The Play window, `patter play`, and coverage runs play a
   line that names `@story`, reading the defaults the Storylet Engine's file declares. A real game
   still needs the other engine on the same registry (see
@@ -100,14 +117,14 @@ gameScopes: "../../shared/game-scopes",
 A **`.patterpack`** carries a read-only snapshot of the folder, and unpacking puts it in
 `game-scopes/` inside the new project folder, so the person you sent it to has the same checks,
 pickers, and previews. Merging their pack back never writes that snapshot anywhere: your folder
-stays the truth. If they changed World properties, the merge writes their change to your
+stays the truth. If they changed the game scopes, the merge writes their change to your
 `game.scopes.json` and tells you so (see
 [Handing the project to someone](/setup/building-and-shipping/#the-games-shared-scopes-travel-too)).
 
 A project with no folder works alone, exactly as before. **File ▸ Share Scopes with Other Tools**
 creates the folder where you choose (the picker opens at your version-control root, the usual place) with Patter's
-file and a `game.scopes.json` holding your World properties. An `@story` you imported under World
-properties before the folder existed is superseded once Storyletter writes its file there, and
+file and a `game.scopes.json` holding your game scopes. An `@story` you imported under the game
+scopes before the folder existed is superseded once Storyletter writes its file there, and
 `validate` asks you to remove it.
 
 ### Scenes that storylets play

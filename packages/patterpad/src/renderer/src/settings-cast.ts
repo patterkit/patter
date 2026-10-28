@@ -183,6 +183,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[], labels?: Cas
         if (m.notes) c.notes = m.notes;
         if (m.qualifierLabels && Object.keys(m.qualifierLabels).length) c.qualifierLabels = { ...m.qualifierLabels };
         if (m.gameData) c.gameData = m.gameData; // preserve any host gameData on the member
+        if (m.colour !== undefined) c.colour = m.colour; // the colour a rename kept (stamped by the save)
         return c;
       });
     },

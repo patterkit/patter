@@ -10,10 +10,14 @@
 // script) and not an editable handoff (that's the .patterpack). Cut nodes are omitted.
 // ---------------------------------------------------------------------------
 
-import type { Block, DocLine, GameEventBeat, Group, Scene, Snippet } from "@patterkit/model";
+import type { Block, DocLine, Effect, GameEventBeat, Group, Scene, Snippet } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers } from "@patterkit/model";
 import type { ProjectFile } from "@patterkit/model";
 import { humanizeNodeRefs } from "@patterkit/core";
+import { splitRef } from "@patterkit/dialect";
+import { parse } from "@wildwinter/expr";
+import type { Dialect, ExprNode } from "@wildwinter/expr";
+import { stageDialect } from "./stages.js";
 import { sourceStrings, mergeAuthoring } from "./loaded-helpers.js";
 import { classesForChannel } from "./documentation.js";
 import type { LoadedProject } from "./load.js";
@@ -32,7 +36,8 @@ export const TOKENS = {
   line: "e4dfd5",       // hairlines / rules / the group rail
 } as const;
 
-/** The 12 curated character-cue colours (patterpad-surface). A speaker's slot is a hash of its name. */
+/** The 12 curated character-cue colours (patterpad-surface). A speaker's slot is the one the cast stores
+ *  for them (`CastMember.colour`, kept through a rename), else a hash of the name. */
 export const CHAR_PALETTE = [
   "b23b3b", "b5642b", "927524", "6b7a31", "3f7d49", "2c7d6e",
   "2d7791", "3a6aa8", "5a5ba6", "7e4e9c", "9c4486", "a83e5c",
@@ -47,9 +52,20 @@ export function colourIndex(name: string): number {
   h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
   return (h >>> 0) % 12;
 }
-/** The cue colour for a speaker name, as a bare hex (no '#'). */
-export function characterColour(name: string): string {
-  return CHAR_PALETTE[colourIndex(name)]!;
+/** Whether a stored colour is a palette slot (a whole number, 0 to 11), as app-shell's `isColourSlot`. */
+export function isColourSlot(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v >= 0 && v < CHAR_PALETTE.length;
+}
+
+/** The cue colour for a speaker, as a bare hex (no '#'): the slot the cast stores for them when it's a
+ *  valid one, else the name's hash, as the editor's cue does. */
+export function characterColour(name: string, stored?: unknown): string {
+  return CHAR_PALETTE[isColourSlot(stored) ? stored : colourIndex(name)]!;
+}
+
+/** The stored colour slot of each cast member who has one, by script name (for `characterColour`). */
+export function castColours(cast: readonly { name: string; colour?: number }[] | undefined): Map<string, number> {
+  return new Map((cast ?? []).filter((c) => isColourSlot(c.colour)).map((c) => [c.name, c.colour!]));
 }
 
 
@@ -115,7 +131,9 @@ export type ScriptElement =
   /** A spoken line: SPEAKER cue (coloured, uppercase), an optional (direction), and the body runs. A speaker
    *  qualifier rides as its `gameId` (`qualifier`) and its shown name (`qualifierName`), for the cue to print
    *  after the character (`cueLabel`). */
-  | { kind: "line"; id: string; indent: number; snippet?: number; character: string; qualifier?: string; qualifierName?: string; direction?: string; runs: TextRun[] }
+  | { kind: "line"; id: string; indent: number; snippet?: number; character: string; qualifier?: string; qualifierName?: string; direction?: string; runs: TextRun[];
+      /** The speaker's stored colour slot (`CastMember.colour`), when the cast keeps one: pass it to `characterColour`. */
+      colour?: number }
   /** Text (speaker-less prose: on-screen text or action; the kind keeps its old name), upright in a soft ink, flush left. `id` is the beat. */
   | { kind: "narration"; id: string; indent: number; snippet?: number; runs: TextRun[] }
   /** A gating condition, set in accent mono above the beat it controls: `‹ if @brave ›`. `id` is the node
@@ -133,6 +151,11 @@ export type ScriptElement =
   | { kind: "jump"; id: string; to: string; indent: number; snippet?: number; text: string }
   /** A game event, set apart right-aligned in accent mono: `⚙ game event: door.open`. `id` is the beat. */
   | { kind: "gameEvent"; id: string; indent: number; snippet?: number; text: string }
+  /** A snippet's or scene's effects in one phase, as a quiet line of plain words: `On end: sets gold to
+   *  gold + 5`. `begin` is a snippet's `onEnter` (shown before its beats) or a scene's `onEntry` (under its
+   *  heading); `end` is a snippet's `onExit` (after its beats, before any jump). The labels are the app's.
+   *  `id` is the snippet or scene. Shown, never edited: the editable script leaves it out of the record. */
+  | { kind: "effect"; id: string; phase: "begin" | "end"; indent: number; snippet?: number; text: string }
   /** A documentation note on the element above, when the caller asked for notes (`ScriptDocOptions.notes`).
    *  `id` is the node or beat the note is on. The readable script asks for none. */
   | { kind: "note"; id: string; indent: number; snippet?: number; text: string; class?: string };
@@ -196,6 +219,77 @@ function sequenceLabel(node: Group): string {
   return bits.length ? `In sequence (${bits.join(", ")})` : "In sequence";
 }
 
+// ---------------------------------------------------------------------------
+// Effects in plain words. Literal, never paraphrased ("Sets gold to gold + 1", not "Adds 1 to gold"): a
+// Patter property is named bare (`@gold` and `@patter.gold` read "gold"), any other scope's in full
+// (`@world.threat`, `@scene.mood`). Three shapes read as what they do: a quality advancing itself
+// (`advance(@debt)`, "Advances debt", as the app's effect row reads), a flags change on its own property
+// (`set_flags(@mood, +calm, -armed)`, "Adds calm to mood and removes armed"), and a single string, an enum
+// value or a named stage, shown without its quotes ("Sets mood to angry").
+// ---------------------------------------------------------------------------
+
+/** The phase labels, as the app's inspector shows them. */
+export const EFFECT_PHASE_LABEL = { begin: "On begin", end: "On end" } as const;
+
+const REF_RE = /@[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?/g;
+
+/** "a", "a and b", "a, b, and c". */
+const andList = (xs: string[]): string => xs.length <= 2 ? xs.join(" and ") : `${xs.slice(0, -1).join(", ")}, and ${xs[xs.length - 1]}`;
+
+/** Effects as prose: one describer per project (its dialect knows the project's scopes). */
+export function effectDescriber(dialect: Dialect, nodeLabel: (id: string) => string = (id) => id): (effect: Effect) => string {
+  const scopes = new Set(dialect.scopes.map((s) => s.token));
+  const isScope = (t: string): boolean => scopes.has(t);
+  /** A ref as prose: bare for a Patter property (keeping how it was written), in full for any other scope,
+   *  including one this project doesn't declare (`@world.threat` with no game scopes). */
+  const refText = (ref: string): string => {
+    const body = ref.slice(1);
+    const dot = body.indexOf(".");
+    if (dot < 0) return body;
+    return body.slice(0, dot) === "patter" ? body.slice(dot + 1) : ref;
+  };
+  /** An expression as prose: its refs shortened (never inside a string), visits()/seen() by name. */
+  const prose = (src: string): string => {
+    let out = "", i = 0;
+    while (i < src.length) {
+      const q = src[i]!;
+      if (q === "\"" || q === "'") {
+        let j = i + 1;
+        while (j < src.length && src[j] !== q) j += src[j] === "\\" ? 2 : 1;
+        out += src.slice(i, j + 1); i = j + 1; continue;
+      }
+      let j = i;
+      while (j < src.length && src[j] !== "\"" && src[j] !== "'") j++;
+      out += src.slice(i, j).replace(REF_RE, refText); i = j;
+    }
+    return humanizeNodeRefs(out.trim(), nodeLabel);
+  };
+  const sameRef = (n: ExprNode | undefined, target: { scope: string; name: string }): boolean =>
+    n?.kind === "scopedvar" && n.scope === target.scope && n.name.toLowerCase() === target.name;
+
+  return (effect: Effect): string => {
+    const shown = refText(effect.target);
+    let ast: ExprNode | undefined;
+    try { ast = parse(effect.value, dialect); } catch { ast = undefined; }
+    const target = splitRef(effect.target, isScope);
+    if (ast?.kind === "call" && ast.name === "advance" && ast.args.length === 1 && sameRef(ast.args[0], target)) return `Advances ${shown}`;
+    if (ast?.kind === "call" && ast.name === "set_flags" && sameRef(ast.args[0], target) && ast.args.length > 1 && ast.args.slice(1).every((a) => a.kind === "flagdelta")) {
+      const deltas = ast.args.slice(1) as Array<Extract<ExprNode, { kind: "flagdelta" }>>;
+      const adds = deltas.filter((d) => d.sign === "+").map((d) => d.name), removes = deltas.filter((d) => d.sign === "-").map((d) => d.name);
+      if (adds.length && removes.length) return `Adds ${andList(adds)} to ${shown} and removes ${andList(removes)}`;
+      return adds.length ? `Adds ${andList(adds)} to ${shown}` : `Removes ${andList(removes)} from ${shown}`;
+    }
+    if (ast?.kind === "string") return `Sets ${shown} to ${ast.value}`;
+    return `Sets ${shown} to ${prose(effect.value)}`;
+  };
+}
+
+/** One phase's effects as one line: `On end: sets knows_secret to true; sets gold to gold + 5`. */
+function effectLine(phase: "begin" | "end", effects: Effect[], describe: (e: Effect) => string): string {
+  const clauses = effects.map((e) => { const t = describe(e); return t.charAt(0).toLowerCase() + t.slice(1); });
+  return `${EFFECT_PHASE_LABEL[phase]}: ${clauses.join("; ")}`;
+}
+
 /** Compute the readable script document. Pure: data out, no I/O. */
 export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {}): ScriptDoc {
   const { project } = loaded;
@@ -219,12 +313,15 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
   }
   // visits()/seen() in a condition reads better with the bare scene / block NAME than the full trail.
   const humanize = (cond: string): string => humanizeNodeRefs(cond, (id) => blockName.get(id) ?? sceneOf.get(id) ?? id);
+  const describeEffect = effectDescriber(stageDialect(project, loaded.gameScopes), (id) => blockName.get(id) ?? sceneOf.get(id) ?? id);
 
   const els: ScriptElement[] = [];
   const nameOf = qualifierNamer(project);
   // A line beat's speaker fields, for a `line` element: the qualifier only when the line has one.
+  const colours = castColours(project.cast);
   const speaker = (beat: { character?: string; qualifier?: string; direction?: string }) => ({
     character: beat.character ?? "",
+    ...(colours.has(beat.character ?? "") ? { colour: colours.get(beat.character ?? "")! } : {}),
     ...(beat.qualifier ? { qualifier: beat.qualifier, qualifierName: nameOf(beat.qualifier) } : {}),
     direction: beat.direction,
   });
@@ -242,8 +339,15 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
   let snippetSeq = 0;
   const nextSid = (): number => ++snippetSeq;
 
-  // Emit a snippet's beats (dialogue / text / game events) and any trailing jump, at `indent`/`sid`.
+  // A phase's effects as one quiet line, when there are any.
+  const effects = (id: string, phase: "begin" | "end", list: Effect[] | undefined, indent: number, sid: number | undefined): void => {
+    if (list?.length) els.push({ kind: "effect", id, phase, indent, snippet: sid, text: effectLine(phase, list, describeEffect) });
+  };
+
+  // Emit a snippet's begin effects, its beats (dialogue / text / game events), its end effects, and any
+  // trailing jump, at `indent`/`sid`.
   const emitBeats = (node: Snippet, indent: number, sid: number | undefined): void => {
+    effects(node.id, "begin", node.onEnter, indent, sid);
     for (const beat of node.beats ?? []) {
       if (cut.has(beat.id)) continue;
       if (beat.kind === "line") els.push({ kind: "line", id: beat.id, indent, snippet: sid, ...speaker(beat), runs: textRuns(textOf(beat.id)) });
@@ -252,6 +356,7 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
       else continue;
       notes(beat.id, indent, sid);
     }
+    effects(node.id, "end", node.onExit, indent, sid);
     if (node.jump) els.push({ kind: "jump", id: node.id, to: node.jump.to, indent, snippet: sid, text: jumpText(node.jump) });
   };
 
@@ -294,7 +399,9 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
           els.push({ kind: "option", id: first?.id ?? child.id, node: child.id, indent, snippet: cid, runs: textRuns(first ? textOf(first.id) || "(option)" : "(option)"), tag: optionTag(child) });
           notes(child.id, indent, cid);
           if (first) notes(first.id, indent, cid);
-          // content = the snippet minus its prompt beat, plus any jump (indented a level under the option)
+          // content = the snippet minus its prompt beat, plus its effects and any jump (indented a level
+          // under the option)
+          effects(child.id, "begin", child.onEnter, indent + 1, cid);
           let seenPrompt = false;
           for (const beat of beats) {
             if (!seenPrompt && beat === first) { seenPrompt = true; continue; }
@@ -305,6 +412,7 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
             else continue;
             notes(beat.id, indent + 1, cid);
           }
+          effects(child.id, "end", child.onExit, indent + 1, cid);
           if (child.jump) els.push({ kind: "jump", id: child.id, to: child.jump.to, indent: indent + 1, snippet: cid, text: jumpText(child.jump) });
         } else {
           // a non-option group nested directly under a choice (unusual) - render its content
@@ -342,6 +450,7 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
     if (cut.has(scene.id) || (only && !only.has(scene.id))) continue;
     els.push({ kind: "scene", id: scene.id, text: scene.name });
     notes(scene.id, 0, undefined);
+    effects(scene.id, "begin", scene.onEntry, 0, undefined);
     for (const block of scene.blocks as Block[]) {
       if (cut.has(block.id)) continue;
       els.push({ kind: "block", id: block.id, text: block.name });

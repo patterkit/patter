@@ -8,7 +8,8 @@
 //   original  every tracked change rejected: deletions in, insertions out (what was there before)
 // so the import can tell a tracked edit from an untracked one. Bold and italic come back as Patter's
 // <b> / <i> / <bi>; other formatting is dropped. Also the comments, with their authors and replies, and the
-// handoff id from the page header.
+// handoff id from the page header. An effect line (shown, never edited) comes back as its own kind, for the
+// import to skip.
 //
 // Pure: bytes in, a description out. Deciding what any of it means is the import's job (editable-import.ts).
 // ---------------------------------------------------------------------------
@@ -18,6 +19,7 @@ import { DOMParser } from "@xmldom/xmldom";
 import { readMarker } from "./handoff.js";
 import { TOKENS, CHAR_PALETTE } from "./script-doc.js";
 import { BOX_FILL, MARKER_INK } from "./editable-docx.js";
+import { EFFECT_STYLE } from "./script-docx.js";
 import type { ReadMarker } from "./handoff.js";
 
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -73,7 +75,15 @@ export interface ReadParagraph {
   style?: string;
 }
 
-export type ReadItem = ReadBox | ReadParagraph;
+/** An effect line ("On end: sets gold to gold + 5"): shown for context, not part of the handoff, so the
+ *  import skips it. Known by its paragraph style, or (where a tool dropped the style) by its phase label. */
+export interface ReadEffect {
+  kind: "effect";
+  phase: "begin" | "end";
+  text: ReadText;
+}
+
+export type ReadItem = ReadBox | ReadParagraph | ReadEffect;
 
 export interface ReadComment {
   id: string;
@@ -257,6 +267,9 @@ function readRow(tr: XElement, indent: number | undefined): ReadItem {
   };
 }
 
+/** An effect line's phase label, as the exporter writes it (script-doc.ts EFFECT_PHASE_LABEL). */
+const EFFECT_LABEL = /^\s*On (begin|end):\s/i;
+
 /** Read the body: paragraphs and table rows, in order. */
 function readBody(body: XElement): ReadItem[] {
   const items: ReadItem[] = [];
@@ -265,7 +278,10 @@ function readBody(body: XElement): ReadItem[] {
     if (name === "p") {
       const c = new Collector(); c.walk(e, "both");
       const style = attr(child(child(e, "pPr") ?? e, "pStyle"), "val");
-      items.push({ kind: "paragraph", text: c.read(), ...(style ? { style } : {}) });
+      const text = c.read();
+      const phase = EFFECT_LABEL.exec(text.original.replace(/<\/?(?:b|i|bi)>/g, ""))?.[1]?.toLowerCase();
+      if (style === EFFECT_STYLE || phase) items.push({ kind: "effect", phase: phase === "end" ? "end" : "begin", text });
+      else items.push({ kind: "paragraph", text, ...(style ? { style } : {}) });
     } else if (name === "tbl") {
       const tblPr = child(e, "tblPr");
       const ind = tblPr ? attr(child(tblPr, "tblInd"), "w") : undefined;

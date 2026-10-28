@@ -122,7 +122,8 @@ describe("EditorView renders the real shard in the zone model (jsdom)", () => {
     // Lazy open: the cross-scene block ("blk_far") isn't in the target list yet (only the landing scene loaded).
     const surface = mountSurface({ editor, flowSource: flow, locSource: loc, jumpTargets: [] });
     const at = (): string[] => [...editor.querySelectorAll(".bubble.has-cond .bubble-cond")].map((c) => c.textContent?.trim() ?? "");
-    expect(at()).toEqual(["if visits(The Crossroads)==1", "if visits(blk_far)>1"]); // same-scene resolves; cross-scene shows id
+    // Same-scene resolves; the cross-scene one isn't known yet, so it reads as missing (Q15), never the raw id.
+    expect(at()).toEqual(["if visits(The Crossroads)==1", "if visits(Missing block)>1"]);
 
     // hydrate: the full cross-scene target list arrives -> the stuck id must re-humanize.
     surface.setJumpTargets([{ id: "scn_far", label: "Far", blocks: [{ id: "blk_far", label: "The Far Room" }] }]);

@@ -98,7 +98,7 @@ export function renderCoverage(
     host.append(el("p", "cov-note", `Inputs driven: ${report.drivers.map((d) => d.ref).join(", ")}`));
   }
   if (report.unwrittenInputs.length) {
-    host.append(el("p", "cov-note cov-note-input", `Some dead branches are gated on inputs nothing writes or drives: ${report.unwrittenInputs.join(", ")}. Add a coverage driver in Project Settings ▸ World properties.`));
+    host.append(el("p", "cov-note cov-note-input", `Some dead branches are gated on inputs nothing writes or drives: ${report.unwrittenInputs.join(", ")}. Add a coverage driver in Project Settings ▸ Game scopes.`));
   }
   // Choices that ran DRY (fell through with nothing takeable). The runtime hides this - here it is explicit.
   if (report.dryChoices.length) {

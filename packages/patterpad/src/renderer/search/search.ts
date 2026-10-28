@@ -26,6 +26,7 @@ import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own C
 import "@wildwinter/app-shell/tool-window.css"; // ...and the tool-window chrome (drag bar, pin, close)
 import "@wildwinter/app-shell/keys.css"; // ...and the keycaps of the hint line
 import { modeHint, locationCrumbs, fieldEmptyText, fieldValuePiece } from "./pieces.js";
+import { shortRefs } from "@patterkit/patterpad-surface/reftext";
 import { pinButton, toolWindowHead, iconNode, toast, plural, debounce } from "@wildwinter/app-shell";
 
 // The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
@@ -182,7 +183,8 @@ const runProperty = async (): Promise<void> => {
   const mine = ++token;
   const hits = q.trim() ? await search.propertyUsage(q) : [];
   if (mine !== token) return;
-  results = hits; sel = 0; renderResults();
+  // Each hit reads its expression as the page does: `@gold` for Patter's own scope, any other in full.
+  results = hits.map((h) => (h.text ? { ...h, text: shortRefs(h.text) } : h)); sel = 0; renderResults();
 };
 
 const runField = async (): Promise<void> => {

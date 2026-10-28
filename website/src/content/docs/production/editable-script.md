@@ -28,6 +28,9 @@ Choose **Review ▸ Export Editable Script…**.
    - **Add a cast page**: the speaking characters, with their notes, before the script.
 4. Save the `.docx` and send it.
 
+The project's own comment threads stay in the project and aren't written into the document, so the
+only comments in a returned file are the editor's.
+
 Patter also writes a small **handoff record** into the project, in `handoffs/`, holding exactly what was
 sent. Commit it with the rest of the project: it's what the returned file is checked against, so any
 teammate can bring it back.
@@ -35,8 +38,10 @@ teammate can bring it back.
 ## What the editor sees
 
 The document reads like the [readable script](/patterpad/publishing/): scene and block headings, speaker
-names (with any speaker qualifier, `TAM (O.S.)`), conditions, choices, jumps, and game events, so the editor
-can follow the story. The **words of
+names (with any speaker qualifier, `TAM (O.S.)`), conditions, choices, jumps, game events, and effects, so
+the editor can follow the story. Effects show as a quiet line in plain words, labelled as Patterpad labels
+them: `On begin: sets gold to gold + 1` before a snippet's lines, `On end: sets @world.threat to 3` after
+them. The **words of
 every line sit in a shaded box**, with a small grey marker like `[#K7Q2M]` beside it. A front page
 explains the rules in plain terms:
 
@@ -86,6 +91,9 @@ needs first. If someone else holds one, **nothing is written**, and the dialog s
   their replies. Inline `[[notes]]` become comments as well.
 - **A line that changed in the project since you sent it** still gets its suggestion, shown as out of
   date, so you can weigh it against the newer text.
+
+Effect lines are there to read, not to edit: whatever comes back in one is left alone, so an effect only
+ever changes in Patterpad. A comment on one lands on the line it sits with.
 
 Nothing the editor wrote is thrown away. Anything that can't be a suggestion becomes a comment quoting
 their words: changed `{@…}` placeholders, a copied box, text typed outside the boxes, an edit to a

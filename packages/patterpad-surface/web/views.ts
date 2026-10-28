@@ -13,15 +13,15 @@ import type { CueQualifierSpec } from "./qualifiers.js";
 import { NodeSelection } from "prosemirror-state";
 import { selectChunkAt } from "./chunkselect.js";
 import type { Node as PMNode } from "prosemirror-model";
-import { humanizeNodeRefs } from "@patterkit/core";
-import { colourFor } from "../src/colour.js";
+import { refText, refNodes, effectNodes, effectsOf, missingTargetEl, missingLabel, type TargetLabel } from "./reftext.js";
+import { castColour } from "../src/colour.js";
 import { deleteAtomAt } from "../src/special.js";
 import { setBlockName, insertBlock, insertOptionAfter, seedSnippet, seedBeatInSnippet } from "../src/groups.js";
 import { insertLineBefore } from "../src/lines.js";
 import { groupLabelParts, optionLabelParts } from "../src/grouplabel.js";
 import { createActionMenu } from "./actionmenu.js";
 import { makeDragHandle } from "./dnd.js";
-import { modelIdOf, isChoiceGroup, rawAttr } from "../src/zoneutil.js";
+import { modelIdOf, isChoiceGroup, rawAttr, findByModelId } from "../src/zoneutil.js";
 import { iconNode, metaLine } from "@wildwinter/app-shell"; // the family's drawn icons and drawn separators: no typed glyphs in the script surface
 
 type View = import("prosemirror-view").EditorView;
@@ -29,8 +29,10 @@ type GetPos = () => number | undefined;
 
 // The jump chip shows a READABLE address, not the opaque internal id it stores. The host injects a
 // resolver (id -> readable label: a block / scene name, or its gameId); default is identity (the id).
-let resolveJumpLabel: (id: string) => string = (id) => id;
-export function setJumpLabelResolver(fn: (id: string) => string): void { resolveJumpLabel = fn; }
+// A resolver that answers null for an id says nothing has it now: the chip shows "Missing scene" /
+// "Missing block" in the problem colour (reftext.ts), as every other ref on the page does.
+let resolveJumpLabel: TargetLabel = (id) => id;
+export function setJumpLabelResolver(fn: TargetLabel): void { resolveJumpLabel = fn; }
 
 // Double-clicking a jump chip follows the divert to its target (the host switches scene if needed and
 // reveals the node). The host injects the navigator; default is a no-op (an embedder with no routing).
@@ -43,8 +45,17 @@ export function setJumpNavHandler(fn: ((targetId: string) => void) | null): void
 // after a rename (block heading / scene title) to repaint every chip with the new name.
 const jumpRefreshers = new Set<() => void>();
 export function refreshJumpLabels(): void { for (const fn of jumpRefreshers) fn(); }
+/** Register a repaint to run with the jump chips' (the scene's entry effects under the title use it).
+ *  Returns the unregister. */
+export function onJumpLabelsRefresh(fn: () => void): () => void { jumpRefreshers.add(fn); return () => { jumpRefreshers.delete(fn); }; }
 
-export const humanizeCondition = (c: string): string => humanizeNodeRefs(c, resolveJumpLabel);
+/** A condition as the page reads it: ids swapped for titles (a missing one for its label), and Patter's own
+ *  scope shortened to `@gold`. */
+export const humanizeCondition = (c: string): string => refText(c, resolveJumpLabel);
+/** The same, as DOM, a missing target drawn in the problem colour. */
+const conditionNodes = (c: string): Node[] => refNodes(c, resolveJumpLabel);
+/** The scene's entry effects as the line under its title shows them ("On begin: set @gold to 10"), or none. */
+export const sceneEffectNodes = (raw: Record<string, unknown>): Node[] => effectNodes("On begin", effectsOf(raw, "onEntry"), resolveJumpLabel);
 
 // The read-only condition tag reads `if visits(The Tavern) > 0`, not `if visits("blk_x7q2")`: the id is
 // swapped for the scene / block TITLE through the same resolver the jump chips use. The rule itself is
@@ -57,6 +68,25 @@ const menu = (): ReturnType<typeof createActionMenu> => (actionMenu ??= createAc
 /** Take the shared action menu out of the page (the surface's destroy); the next use makes a new one. */
 export function destroyActionMenu(): void { actionMenu?.destroy(); actionMenu = null; }
 
+/** Is the action menu up? The editor's blur-time housekeeping asks, as it does of the other panels: a menu
+ *  opened from the keyboard takes the focus, and the author has not left their line. */
+export function isActionMenuOpen(): boolean { return actionMenu?.isOpen() ?? false; }
+
+/** Open the ⋯ menu of the snippet, group or block at `pos` from the keyboard (the context-menu key, or
+ *  Shift+F10): anchored to its ⋯, the first item focused, Escape back to that ⋯. False when there's no
+ *  such node. */
+export function openActionMenuAt(view: View, pos: number): boolean {
+  const node = view.state.doc.nodeAt(pos);
+  const id = node ? modelIdOf(node) : null;
+  if (!node || !id || !["snippet", "group", "block"].includes(node.type.name)) return false;
+  const dom = view.nodeDOM(pos);
+  const sel = node.type.name === "block" ? ":scope > .block-head > .block-dots" : node.type.name === "group" ? ":scope > .group-rail-head > .group-menu" : ":scope > .bubble-menu";
+  const dots = dom instanceof HTMLElement ? dom.querySelector<HTMLElement>(sel) : null;
+  const getPos: GetPos = () => findByModelId(view.state.doc, id)?.pos;
+  menu().open(view, getPos, dots ?? (dom instanceof HTMLElement ? dom : view.dom), node.type.name === "block" ? "note" : "full", null, true);
+  return true;
+}
+
 /** Open the shared action menu for a SCENE (the title right-click, surface.ts): a note-only menu carrying
  *  the scene id, so it offers "Note…" and the writing-status submenu (which ripples to the whole scene). */
 export function openSceneMenu(view: View, at: { x: number; y: number }, sceneId: string): void {
@@ -67,7 +97,20 @@ export function openSceneMenu(view: View, at: { x: number; y: number }, sceneId:
 function menuButton(view: View, getPos: GetPos): HTMLButtonElement {
   const b = document.createElement("button"); b.className = "menu-dots"; b.append(iconNode("more")); b.dataset.tip = "Actions"; b.setAttribute("aria-label", "Actions"); b.contentEditable = "false";
   b.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); menu().open(view, getPos, b); });
+  menuKeys(b, () => menu().open(view, getPos, b, "full", null, true));
   return b;
+}
+
+/** The ⋯ is a real button from the keyboard too: Enter or Space opens its menu with the first item focused
+ *  (the menu then takes the arrows, Enter, and Escape, which brings the focus back here). The key is kept
+ *  from the editor, which would otherwise read it as typing. */
+function menuKeys(b: HTMLButtonElement, open: () => void): void {
+  b.type = "button";
+  b.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault(); e.stopPropagation();
+    open();
+  });
 }
 
 /**
@@ -140,6 +183,7 @@ function addAfterButton(view: View, getPos: GetPos): HTMLButtonElement {
   // so it is GEOMETRICALLY centred, not subject to a font's math-axis offset.
   const b = document.createElement("button"); b.className = "snippet-ctl add-after"; b.dataset.tip = "Follow with"; b.setAttribute("aria-label", "Follow with"); b.contentEditable = "false";
   b.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); if (view.editable) menu().open(view, getPos, b, "add"); });
+  menuKeys(b, () => { if (view.editable) menu().open(view, getPos, b, "add", null, true); });
   return b;
 }
 
@@ -193,7 +237,7 @@ const cueView: NodeViewConstructor = (node, _view, _getPos, decorations) => {
   dom.append(content, qual, colon);
   const paint = (n: typeof node): void => {
     const name = n.textContent;
-    content.style.color = name ? colourFor(name) : "var(--muted)";
+    content.style.color = name ? castColour(name) : "var(--muted)"; // a stored slot (kept by a rename), else the hash
     colon.style.display = name ? "" : "none";
     dom.classList.toggle("empty", name.length === 0);
   };
@@ -371,6 +415,10 @@ const snippetView: NodeViewConstructor = (node, view, getPos) => {
   const cond = document.createElement("div"); cond.className = "bubble-cond"; cond.contentEditable = "false"; // read-only condition tag
   const contentDOM = document.createElement("div"); contentDOM.className = "beats";
   const jump = document.createElement("div"); jump.className = "bubble-jump"; jump.contentEditable = "false"; // read-only jump chip
+  // Read-only effect chips, worded like the condition tag: On begin at the top (under the condition), On end
+  // at the bottom (above the jump), each only when set. The inspector edits them.
+  const fxBegin = document.createElement("div"); fxBegin.className = "bubble-fx fx-begin"; fxBegin.contentEditable = "false";
+  const fxEnd = document.createElement("div"); fxEnd.className = "bubble-fx fx-end"; fxEnd.contentEditable = "false";
   // An un-entered (beat-less) bubble - a branch's else leaf, or a jump-only bubble - shows a
   // generic click-to-add ghost; the click injects a type-following line above any jump (§9).
   const ghost = ghostSnippet(view, getPos, seedBeatInSnippet, "Add a line"); ghost.classList.add("bubble-ghost");
@@ -389,7 +437,7 @@ const snippetView: NodeViewConstructor = (node, view, getPos) => {
     if (tr) { view.dispatch(tr); view.focus(); }
   });
   const addAfter = addAfterButton(view, getPos); addAfter.classList.add("bubble-after"); // "+" in the gap below
-  dom.append(drag, dots, cond, above, contentDOM, ghost, jump, addAfter);
+  dom.append(drag, dots, cond, fxBegin, above, contentDOM, ghost, fxEnd, jump, addAfter);
   // Clicking anywhere on the bubble that ISN'T an editable beat, the ghost, the drag grip, or a button
   // selects the whole snippet - its border / padding, the gaps around the beats, the read-only
   // condition / jump chrome. A generous hit target (the thin gutter alone was too hard to land).
@@ -399,15 +447,27 @@ const snippetView: NodeViewConstructor = (node, view, getPos) => {
   });
   wireContextMenu(dom, view, getPos);
 
-  let lastCond = " ", lastJump = " "; // force a first paint of each
+  let lastCond = " ", lastJump = " ", lastFx = " "; // force a first paint of each
   const paintCondition = (n: typeof node): void => {
     const c = (rawAttr(n) as { condition?: string }).condition ?? "";
     if (c === lastCond) return;
     lastCond = c;
-    cond.textContent = c ? `if ${humanizeCondition(c)}` : "";
+    if (c) cond.replaceChildren("if ", ...conditionNodes(c)); else cond.replaceChildren();
     dom.classList.toggle("has-cond", c.length > 0);
   };
+  const paintEffects = (n: typeof node): void => {
+    const raw = rawAttr(n);
+    const key = JSON.stringify([raw.onEnter ?? null, raw.onExit ?? null]);
+    if (key === lastFx) return;
+    lastFx = key;
+    const begin = effectNodes("On begin", effectsOf(raw, "onEnter"), resolveJumpLabel);
+    const end = effectNodes("On end", effectsOf(raw, "onExit"), resolveJumpLabel);
+    fxBegin.replaceChildren(...begin); fxEnd.replaceChildren(...end);
+    dom.classList.toggle("has-fx-begin", begin.length > 0);
+    dom.classList.toggle("has-fx-end", end.length > 0);
+  };
   let jumpTo = ""; // the current divert target id (for double-click-to-follow); "" / "END" don't navigate
+  let missingJump = false; // the target is gone: nothing to follow
   const paintJump = (n: typeof node): void => {
     const raw = n.attrs.jump as string;
     if (raw === lastJump) return;
@@ -418,30 +478,38 @@ const snippetView: NodeViewConstructor = (node, view, getPos) => {
       jumpTo = String(d.to ?? "");
       // The drawn arrow (or the out-and-back loop for a call) and the target, at the text's left edge
       // (the October 2026 review's END marker); the words are for a screen reader.
-      const call = d.mode === "call", label = resolveJumpLabel(jumpTo);
-      const name = document.createElement("span"); name.className = "bubble-jump-to"; name.textContent = label;
+      const call = d.mode === "call", resolved = resolveJumpLabel(jumpTo);
+      // A target nothing has now (deleted) draws as "Missing scene" / "Missing block" in the problem
+      // colour, its old id in the tooltip; double-clicking it goes nowhere.
+      missingJump = jumpTo !== "" && jumpTo !== "END" && resolved == null;
+      const label = missingJump ? missingLabel(jumpTo) : (resolved ?? jumpTo);
+      const name = missingJump ? missingTargetEl(jumpTo) : document.createElement("span");
+      name.classList.add("bubble-jump-to"); name.textContent = label;
       jump.replaceChildren(iconNode(call ? "call" : "jump", 13), name);
+      jump.classList.toggle("is-missing", missingJump);
       jump.setAttribute("aria-label", `${call ? "Call" : "Jump to"} ${label}`);
-      jump.dataset.tip = jumpTo && jumpTo !== "END" ? `${call ? "Call" : "Jump to"} ${label}. Double-click to go there` : `Jump to ${label}`;
-    } else { jumpTo = ""; jump.replaceChildren(); jump.removeAttribute("aria-label"); jump.dataset.tip = ""; }
+      jump.dataset.tip = missingJump ? (name.dataset.tip ?? "")
+        : jumpTo && jumpTo !== "END" ? `${call ? "Call" : "Jump to"} ${label}. Double-click to go there` : `Jump to ${label}`;
+      if (missingJump) delete name.dataset.tip; // one tooltip, on the chip
+    } else { jumpTo = ""; missingJump = false; jump.classList.remove("is-missing"); jump.replaceChildren(); jump.removeAttribute("aria-label"); jump.dataset.tip = ""; }
   };
   // Double-click the jump chip -> follow the divert to its target (the host switches scene if needed).
-  jump.addEventListener("dblclick", (e) => { if (!jumpTo || jumpTo === "END") return; e.preventDefault(); e.stopPropagation(); jumpNav?.(jumpTo); });
+  jump.addEventListener("dblclick", (e) => { if (!jumpTo || jumpTo === "END" || missingJump) return; e.preventDefault(); e.stopPropagation(); jumpNav?.(jumpTo); });
   const paintEmpty = (n: typeof node): void => {
     dom.classList.toggle("is-empty", n.childCount === 0);                            // beat-less -> ghost
     dom.classList.toggle("atom-first", n.firstChild?.type.name === "gameEvent");     // opens with an atom -> "+" strip above
   };
-  paintCondition(node); paintJump(node); paintEmpty(node);
+  paintCondition(node); paintEffects(node); paintJump(node); paintEmpty(node);
   // Re-resolve the humanized labels on a rename / target-list change (refreshJumpLabels): force BOTH the
   // jump chip AND the condition tag past their unchanged guards. The condition tag humanizes `visits(id)`
   // too, so if it was painted before the (cross-scene) targets were ready - e.g. a lazy project load - it
   // must re-resolve here or it sticks on the raw block id.
   let curNode = node;
-  const refresh = (): void => { lastJump = " "; lastCond = " "; paintJump(curNode); paintCondition(curNode); };
+  const refresh = (): void => { lastJump = " "; lastCond = " "; lastFx = " "; paintJump(curNode); paintCondition(curNode); paintEffects(curNode); };
   jumpRefreshers.add(refresh);
   return {
     dom, contentDOM, ignoreMutation: ignoreChrome(contentDOM),
-    update: (n) => { if (n.type.name !== "snippet") return false; curNode = n; dom.dataset.id = idOf(n); paintCondition(n); paintJump(n); paintEmpty(n); return true; },
+    update: (n) => { if (n.type.name !== "snippet") return false; curNode = n; dom.dataset.id = idOf(n); paintCondition(n); paintEffects(n); paintJump(n); paintEmpty(n); return true; },
     destroy: () => { jumpRefreshers.delete(refresh); },
   };
 };
@@ -494,7 +562,7 @@ const groupView: NodeViewConstructor = (node, view, getPos) => {
     // "Option").
     label.replaceChildren(metaLine(option ? optionLabelParts(raw).slice(1).map((p) => p.charAt(0).toUpperCase() + p.slice(1)) : groupLabelParts(raw)));
     const c = typeof raw.condition === "string" ? raw.condition : "";
-    cond.textContent = c ? `if ${humanizeCondition(c)}` : "";  // surface the condition (read-only, ids->titles); inspector edits it
+    if (c) cond.replaceChildren("if ", ...conditionNodes(c)); else cond.replaceChildren(); // read-only, ids->titles; inspector edits it
     cond.style.display = c ? "" : "none";
     dom.classList.toggle("is-choice", raw.selector === "choice");
     dom.classList.toggle("is-option", option);
@@ -553,6 +621,7 @@ const blockView: NodeViewConstructor = (node, view, getPos) => {
   // Delete block - so the action is discoverable, not buried behind a right-click only.
   const dots = document.createElement("button"); dots.className = "menu-dots block-dots"; dots.append(iconNode("more")); dots.dataset.tip = "Actions"; dots.setAttribute("aria-label", "Actions"); dots.contentEditable = "false";
   dots.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); menu().open(view, getPos, dots, "note"); });
+  menuKeys(dots, () => menu().open(view, getPos, dots, "note", null, true));
   head.append(drag, name, dots);
   wireNoteMenu(head, view, getPos); // right-click the block heading -> "Note…" (#148)
   // Click the heading -> node-select the block so the inspector tracks the block (not the last beat). Skip

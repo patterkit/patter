@@ -20,6 +20,28 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **Change by, for a number.** Setting a number property in an effect now offers "Change by" first: add or
   take away an amount, and Patterpad writes it as the property plus or minus that amount. Adding 1 to a
   counter is one step instead of building the sum by hand.
+- **Effects show on the page.** A snippet's On begin and On end effects sit beside it as a quiet line
+  ("On begin: set @gold to @gold + 1"), and a scene's own effects sit under its title, so you can see what
+  the story changes without opening the inspector. The Word, PDF, and editable scripts show them the same way.
+- **Effects in the exported script.** The Word, PDF, and editable scripts show each snippet's effects as a
+  quiet line, such as "On end: sets knows_secret to true". Re-importing an edited script leaves them alone.
+- **Jump to somewhere new.** Type a name no scene or block has into the jump picker and it offers "+ New
+  scene" and "+ New block in this scene": the jump then points at what it made. A new scene goes straight
+  after the one you're in, and you stay where you are.
+- **Make a property from an effect.** Type a name no property has into an effect's "+ set property" picker
+  and choose "+ New property": Patterpad asks whether it holds a number (the default), true or false, or
+  text, adds it to the Properties page, and carries on to its value. One undo takes it back.
+- **Move things from the keyboard.** Ctrl+Cmd+Up and Ctrl+Cmd+Down (Ctrl+Alt on Windows and Linux) move
+  the selected snippet, group, or block, or the snippet you're writing in, one place up or down, stopping
+  with a quiet hint at the first or last place. Edit ▸ Move Up and Move Down do the same, and so does the
+  command palette.
+- **Move a scene up or down.** Right-click a scene for Move up and Move down, or use the same keys, or
+  Edit ▸ Move Up and Move Down, with its row focused. One undo puts it back. A new scene now goes after the
+  one you're in, and stays there when you reopen the project, rather than at the bottom of the list.
+- **Writing status for a scene or a block.** The scene and block inspectors have a Writing dropdown showing
+  the lowest status among their lines, with "Mixed" when they differ. Choosing a status raises every line
+  below it and leaves the lines already further along; choosing the first rung clears them all. The ⋯ menu's
+  Status follows the same rule, and either is one undo.
 
 - **Direction in the voice script.** The exported voice script has a Direction column, so an actor reads each
   line's performance direction beside it.
@@ -28,6 +50,30 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
+- **Game scopes, as in Storyletter.** Project Settings ▸ World properties is now Game scopes. `@world` comes
+  first, and + Add scope adds another, such as `@player`, with its own name and a Remove button. Each scope
+  can be read-only to the story, or take any name unchecked. A name that can't be used says why where you
+  typed it. Renaming a scope renames every reference to it, in conditions, effects, and `{@player.hp}` in
+  text, and one undo puts it all back. Removing a scope the game shares with its other tools removes it
+  from `game.scopes.json` too. Coverage drivers can feed any scope.
+- **Cmd+1 and Cmd+2 go into the pane.** With the scenes list or the inspector open, the shortcut moves the
+  keyboard into it (the open scene's row, in the scenes list), and closes it only when you're already there,
+  taking you back to where you were. A pane you can't see is no longer in the Tab order.
+- **Focus comes back after a dialog.** Closing a dialog opened from the inspector, such as Scene properties
+  or a note, puts the keyboard back on the button that opened it, or in the script, rather than nowhere.
+- **`@gold` everywhere.** A property of the story's own reads `@gold` in conditions, effects, the inspector,
+  and Find Property Usage, as you'd write it; a property of any other scope keeps its name in full
+  (`@world.day`).
+- **A renamed character keeps their colour.** Rename someone in Project Settings ▸ Cast and their name
+  keeps the colour it had, on the page, in the play window, and in the Word and PDF scripts.
+- **The speaker picker keeps up with the cast.** It offers "+ Add" only for a name (up to three words, with
+  no full stop or question mark), and undoing an add, or renaming someone, takes the old name out of it.
+- **Spell-check in your project's language.** A project whose source language is plain English ("en")
+  checks spelling in your system's English, British or American, unless you pick a dictionary yourself.
+- **No question with only one scene.** Play from Start and Coverage no longer ask where the story starts
+  when the project has only one scene: it starts there.
+- **Game scopes, everywhere.** The play window's advice, the merge messages, the coverage window's
+  button, and the Properties page's link now say Game scopes, matching the settings tab.
 - **Undo instead of "Are you sure?"** Deleting a scene, Replace All, and accepting every clean suggestion
   happen straight away and say what they did, with an Undo button on the message. Edit ▸ Undo works as
   before. Merging a returned pack still asks first when the pack seems to come from another project, or when
@@ -90,6 +136,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **A deleted jump target says so.** A jump or condition whose scene or block has been deleted reads
+  "Missing scene" or "Missing block" in red, on the page and in the inspector, with the old id in its
+  tooltip, instead of showing the raw id.
 - **A scene changed outside Patterpad is no longer overwritten.** If a scene's files changed on disk after
   Patterpad read them (a pull in a terminal, a synced folder, another app), the next save used to write the
   editor's copy over them. Now the save is refused, the scene is read again so you see the change, and a

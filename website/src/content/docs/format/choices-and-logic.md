@@ -157,7 +157,7 @@ Conditions decide whether a snippet or group (or a conditional jump) is eligible
 off and it's always eligible.
 
 Effects are ordered lists that run at a snippet's seam, `onEnter` / `onExit` on a snippet
-and `onEntry` on a scene. An effect does **one thing and one thing only**, which is to set
+(Patterpad calls them *On begin* and *On end*) and `onEntry` on a scene. An effect does **one thing and one thing only**, which is to set
 a property to the result of an expression. There's no way to fire an event from an effect,
 so host events ride on [Game Data](/format/gamedata-and-addressing/) instead.
 

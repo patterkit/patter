@@ -19,7 +19,7 @@ const handlers: InspectorHandlers = {
   // inside the typecheck, not when the tests ran.
   setJumpMode: noop, setTags: noop,
   gameDataFields: () => [], setGameData: noop, sceneProps: () => [], editSceneProps: noop,
-  writingStatuses: () => [], lineStatus: () => null, setLineStatus: noop,
+  writingStatuses: () => [], lineStatus: () => null, setLineStatus: noop, statusBeats: () => [], setStatusOf: () => {},
   recordingStatuses: () => [], recordingStatus: () => null, setRecordingStatus: noop,
   audioFoldersOn: () => false, recordingFolderStatus: () => null, playRecording: noop,
   scratchStatus: () => null, recordScratch: noop, scratchStale: () => false,

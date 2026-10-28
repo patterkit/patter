@@ -4,7 +4,7 @@
 // its own fonts), so any source language and emoji render.
 //
 // Word can't carry custom faces, so the design's three type roles map to faces present on every machine:
-// reading serif -> Georgia, UI sans (cues / labels / tags) -> Arial, mono (conditions / {@property} /
+// reading serif -> Georgia, UI sans (cues / labels / tags / effects) -> Arial, mono (conditions / {@property} /
 // game events) -> Courier New. All three ship with macOS and Windows and are offered by Google Docs and Word
 // for the web, so Pages and the browser editors open the file without a missing-font warning (Calibri and
 // Consolas only arrive with Office). Structure is carried by colour, case, indent and space (this is paper,
@@ -29,6 +29,12 @@ const HANG = 340;            // twips the cue / option marker out-dents (hanging
 const RIGHT_TAB = 9020;      // twips - the usable text width (A4, default margins); option-tag right edge
 const SNIP_GAP = 170;        // twips before a snippet's FIRST row (delimits snippets); tight within
 const WITHIN = 30;           // twips before a within-snippet row
+
+/** The paragraph style an effect line carries, so the editable script's re-import knows it for one and
+ *  skips it (docx-read.ts): effects are shown, never edited. */
+export const EFFECT_STYLE = "PatterEffect";
+/** The style's definition, for every document that sets effect lines. */
+export const EFFECT_STYLE_DEF = { id: EFFECT_STYLE, name: "Patter effect", basedOn: "Normal", quickFormat: false } as const;
 
 export const S = { h1: 32, h2: 26, body: 22, cue: 18, label: 16, tag: 15, mech: 18 }; // half-points
 
@@ -65,7 +71,7 @@ export function paragraph(el: ScriptElement, prev: ScriptElement | undefined): P
       // The spoken line insets by DIALOGUE_INDENT; the cue then out-dents by HANG (hanging indent) so the
       // coloured speaker name sticks out left of the wrapped dialogue. Colour + case carry it (no colon).
       const kids: TextRun[] = [];
-      if (el.character) kids.push(new TextRun({ text: cueLabel(el.character, el.qualifierName), font: SANS, bold: true, allCaps: true, color: characterColour(el.character), size: S.cue }), new TextRun({ text: "  ", font: SANS, size: S.cue }));
+      if (el.character) kids.push(new TextRun({ text: cueLabel(el.character, el.qualifierName), font: SANS, bold: true, allCaps: true, color: characterColour(el.character, el.colour), size: S.cue }), new TextRun({ text: "  ", font: SANS, size: S.cue }));
       if (el.direction) kids.push(new TextRun({ text: `(${el.direction})  `, font: SERIF, italics: true, color: TOKENS.muted, size: S.body }));
       kids.push(...bodyRuns(el.runs, TOKENS.inkRead));
       return new Paragraph({ keepLines: true, spacing: { before, after: 20 }, indent: { left: leftOf(el) + DIALOGUE_INDENT + HANG, hanging: HANG }, children: kids });
@@ -74,6 +80,14 @@ export function paragraph(el: ScriptElement, prev: ScriptElement | undefined): P
       return new Paragraph({ keepLines: true, spacing: { before, after: 20 }, indent: { left: leftOf(el) }, children: bodyRuns(el.runs, TOKENS.inkSoft) });
     case "condition":
       return new Paragraph({ keepNext: true, spacing: { before, after: 20 }, indent: { left: leftOf(el) }, children: [new TextRun({ text: `‹ ${el.text} ›`, font: MONO, color: TOKENS.accent, size: S.mech - 1 })] });
+    case "effect": {
+      // Quiet: small muted sans, set where the condition sits, its phase label in italic.
+      const [label, ...rest] = el.text.split(": ");
+      return new Paragraph({ style: EFFECT_STYLE, keepLines: true, spacing: { before, after: 20 }, indent: { left: leftOf(el) }, children: [
+        new TextRun({ text: `${label}: `, font: SANS, italics: true, color: TOKENS.muted, size: S.mech - 1 }),
+        new TextRun({ text: rest.join(": "), font: SANS, color: TOKENS.muted, size: S.mech - 1 }),
+      ] });
+    }
     case "group":
       return new Paragraph({ keepNext: true, spacing: { before: 260, after: 60 }, indent: { left: el.indent * STEP }, children: [new TextRun({ text: el.label.toUpperCase(), font: SANS, bold: true, allCaps: true, color: TOKENS.accent, size: S.label, characterSpacing: 14 })] });
     case "else":
@@ -100,6 +114,6 @@ export async function scriptToDocx(doc: ScriptDoc): Promise<Buffer> {
     new Paragraph({ spacing: { after: 560 }, children: [new TextRun({ text: doc.project, font: SERIF, bold: true, color: TOKENS.ink, size: 52 })] }),
     ...doc.elements.map((el, i) => paragraph(el, doc.elements[i - 1])),
   ];
-  const document = new Document({ creator: "Patter", title: doc.project, sections: [{ children: body }] });
+  const document = new Document({ creator: "Patter", title: doc.project, styles: { paragraphStyles: [EFFECT_STYLE_DEF] }, sections: [{ children: body }] });
   return Packer.toBuffer(document);
 }

@@ -20,7 +20,12 @@ type Row =
   | { kind: "end" }
   | { kind: "scene"; id: string; label: string }
   | { kind: "block"; id: string; label: string; scene: string }
-  | { kind: "clear" };
+  | { kind: "clear" }
+  | { kind: "create"; what: "scene" | "block"; name: string };
+
+/** The create rows' wording: "+ New scene 'Cellar'", "+ New block 'Cellar' in this scene". */
+export const createRowLabel = (what: "scene" | "block", name: string): string =>
+  what === "scene" ? `+ New scene '${name}'` : `+ New block '${name}' in this scene`;
 
 let active: { panel: HTMLElement; onDown: (e: PointerEvent) => void; anchor: HTMLElement | null; unfollow: () => void } | null = null;
 
@@ -52,6 +57,10 @@ export function openTargetPicker(opts: {
    *  is not a real node - only scenes + blocks are valid. */
   allowEnd?: boolean;
   onPick: (target: string | null) => void;
+  /** Offer to create what the author typed (Q13): when given, a name no scene or block is called offers
+   *  "+ New scene" and "+ New block ... in this scene" rows; choosing one closes the picker and calls this
+   *  with the trimmed name. Omitted, no create rows. */
+  onCreate?: (what: "scene" | "block", name: string) => void;
   /** Called after the picker closes for any reason (pick / Esc / click-away) - e.g. refocus the editor. */
   afterClose?: () => void;
 }): void {
@@ -84,6 +93,13 @@ export function openTargetPicker(opts: {
         for (const b of blocks) out.push({ kind: "block", id: b.id, label: b.label, scene: g.scene.label });
       }
     }
+    // A name nothing is called yet can be made here: a new scene, or a new block in this scene.
+    const name = query.trim();
+    if (opts.onCreate && name) {
+      const lower = name.toLowerCase();
+      const taken = opts.data.scenes.some((g) => g.scene.label.toLowerCase() === lower || g.blocks.some((b) => b.label.toLowerCase() === lower));
+      if (!taken) out.push({ kind: "create", what: "scene", name }, { kind: "create", what: "block", name });
+    }
     if (opts.allowClear) out.push({ kind: "clear" });
     rows = out;
     highlight = Math.max(0, Math.min(highlight, rows.length - 1));
@@ -99,6 +115,7 @@ export function openTargetPicker(opts: {
     if (picked) return;
     const r = rows[i]; if (!r) return;
     picked = true;
+    if (r.kind === "create") { close(); opts.onCreate?.(r.what, r.name); return; }
     opts.onPick(idOf(r)); // a "clear" row yields null
     close();
   };
@@ -122,10 +139,10 @@ export function openTargetPicker(opts: {
     buttons = [];
     rows.forEach((r, i) => {
       const sel = idOf(r) !== null && idOf(r) === opts.current;
-      const cls = r.kind === "scene" ? "tp-row tp-scene" : r.kind === "block" ? "tp-row tp-block" : r.kind === "clear" ? "tp-row tp-clear" : "tp-row tp-end";
+      const cls = r.kind === "scene" ? "tp-row tp-scene" : r.kind === "block" ? "tp-row tp-block" : r.kind === "clear" ? "tp-row tp-clear" : r.kind === "create" ? "tp-row tp-create" : "tp-row tp-end";
       const b = mk("button", `${cls}${i === highlight ? " active" : ""}${sel ? " sel" : ""}`);
       b.type = "button";
-      b.textContent = r.kind === "end" ? "END" : r.kind === "clear" ? "Clear jump" : r.label;
+      b.textContent = r.kind === "end" ? "END" : r.kind === "clear" ? "Clear jump" : r.kind === "create" ? createRowLabel(r.what, r.name) : r.label;
       if (r.kind === "scene") b.prepend(iconNode("forward", 12)); // a scene is a target (its start) + a heading
       // Act on the CLICK, not the mousedown. Picking on mousedown closed the panel while the button
       // was still down, so the browser delivered the click that followed to whatever the panel had

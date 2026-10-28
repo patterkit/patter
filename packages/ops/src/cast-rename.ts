@@ -15,7 +15,18 @@
 // ---------------------------------------------------------------------------
 
 import { castStringKey, speakerLabelKey, walkNodes } from "@patterkit/model";
-import type { Beat, Group, LocaleFile, Scene, Snippet } from "@patterkit/model";
+import type { Beat, CastMember, Group, LocaleFile, Scene, Snippet } from "@patterkit/model";
+import { colourIndex, isColourSlot } from "./script-doc.js";
+
+/** A renamed member keeps their colour (the hands-on fixes review): one with no stored slot is given the one
+ *  their OLD name hashed to, in place, so the cue, the play window, and the readable script don't recolour
+ *  them. A slot already stored stays. Run on the new cast, in the same save as the rename. */
+export function keepCastColours(cast: CastMember[], renames: ReadonlyMap<string, string>): void {
+  for (const [from, to] of renames) {
+    const m = cast.find((c) => c.name === to);
+    if (m && !isColourSlot(m.colour)) m.colour = colourIndex(from);
+  }
+}
 
 /** Old name -> new name, with no-ops and blanks dropped. Null when nothing is renamed. */
 export function cleanCastRenames(renames: Record<string, string> | undefined): Map<string, string> | null {

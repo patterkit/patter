@@ -12,6 +12,8 @@ import { tmpdir } from "node:os";
 import { loadProject, runScriptDoc, scriptToDocx, scriptToPdf } from "../src/index.js";
 import type { ScriptElement, ScriptDoc } from "../src/index.js";
 import { textRuns, characterColour, colourIndex } from "../src/script-doc.js";
+import { keepCastColours } from "../src/cast-rename.js";
+import type { CastMember } from "@patterkit/model";
 
 /** The concatenated plain text of a run-bearing element (line / narration / option). */
 const runText = (e: ScriptElement): string => ("runs" in e ? e.runs.map((r) => r.text).join("") : "");
@@ -164,6 +166,30 @@ describe("character cue colour", () => {
     expect(colourIndex("SFX")).toBe(3);   // olive
     expect(characterColour("GUIDE")).toBe("3a6aa8");
     expect(characterColour("GUIDE")).toBe(characterColour("GUIDE")); // recomputed, stable
+  });
+
+  it("a stored slot (CastMember.colour) wins over the hash; anything that isn't a slot is ignored", () => {
+    expect(characterColour("GUIDE", 0)).toBe("b23b3b");
+    expect(characterColour("GUIDE", 12)).toBe(characterColour("GUIDE"));
+    expect(characterColour("GUIDE", 2.5)).toBe(characterColour("GUIDE"));
+    expect(characterColour("GUIDE", "3")).toBe(characterColour("GUIDE"));
+  });
+
+  it("a rename stamps the old name's slot on the member, and keeps one already stored", () => {
+    const cast: CastMember[] = [{ name: "WARDEN" }, { name: "SAGE", colour: 5 }];
+    keepCastColours(cast, new Map([["GUIDE", "WARDEN"], ["ORACLE", "SAGE"]]));
+    expect(cast).toEqual([{ name: "WARDEN", colour: colourIndex("GUIDE") }, { name: "SAGE", colour: 5 }]);
+  });
+
+  it("the readable script carries a speaker's stored slot on their lines", () => {
+    const dir = makeProject();
+    const proj = loadProject(dir);
+    const speaker = runScriptDoc(proj).elements.find((e) => e.kind === "line");
+    expect(speaker && speaker.kind === "line").toBe(true);
+    const name = speaker!.kind === "line" ? speaker!.character : "";
+    proj.project.cast = [{ name, colour: 9 }];
+    const line = runScriptDoc(proj).elements.find((e) => e.kind === "line");
+    expect(line && line.kind === "line" ? line.colour : undefined).toBe(9);
   });
 });
 

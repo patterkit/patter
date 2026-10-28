@@ -24,6 +24,7 @@ import { commentsEnabled, hasSaySelection, startComment } from "./comments.js";
 import { suggestionsEnabled, startSuggestion } from "./suggestions.js";
 import { writingStatusEnabled, writingStatusLadder, applyWritingStatus, collectBeatIds, writingStatusOf } from "./writingstatus.js";
 import { iconNode } from "@wildwinter/app-shell";
+import { planMove, runMove, moveShortcutLabel, type MoveDir } from "./move.js";
 
 type GetPos = () => number | undefined;
 type At = HTMLElement | { x: number; y: number };
@@ -47,8 +48,11 @@ const WRAP_KINDS: Array<{ label: string; kind: GroupKind }> = [
 export interface NoteTarget { id: string; kind?: string }
 
 export interface ActionMenu {
-  open(view: EditorView, getPos: GetPos, at: At, mode?: Mode, note?: NoteTarget | null): void;
+  /** @param focusFirst opened from the keyboard: focus the first item, so the arrows, Enter and Escape work
+   *  the menu (Escape gives the focus back to `at` when it's an element). */
+  open(view: EditorView, getPos: GetPos, at: At, mode?: Mode, note?: NoteTarget | null, focusFirst?: boolean): void;
   close(): void;
+  isOpen(): boolean;
   /** Close and take the menu's elements out of the page (the surface's destroy). */
   destroy(): void;
 }
@@ -65,6 +69,23 @@ function enclosingBlockId(state: EditorView["state"], pos: number): string | nul
     if (n.type.name === "block") return modelIdOf(n);
   }
   return null;
+}
+
+/** The line or text beat in the snippet at `pos` that a comment or a suggestion from its ⋯ is about: the
+ *  one holding the caret, else the first. Null for a snippet with neither. */
+function snippetBeat(state: EditorView["state"], pos: number, snippet: import("prosemirror-model").Node): { id: string; kind: string } | null {
+  const head = state.selection.head;
+  let first: { id: string; kind: string } | null = null, atCaret: { id: string; kind: string } | null = null;
+  snippet.descendants((n, off) => {
+    if (n.type.name !== "line" && n.type.name !== "prose") return true;
+    const id = modelIdOf(n); if (!id) return false;
+    const from = pos + 1 + off;
+    const b = { id, kind: n.type.name };
+    first ??= b;
+    if (head > from && head < from + n.nodeSize) atCaret = b;
+    return false;
+  });
+  return atCaret ?? first;
 }
 
 /** One shared structural menu, created lazily on first use. */
@@ -150,8 +171,15 @@ export function createActionMenu(): ActionMenu {
 
   /** The note-target beat (a say/prose beat) when the menu is beat-aware, else null - used to decide
    *  whether a whole-beat comment is offerable. */
-  const commentBeat = (): { id: string; kind?: string } | null =>
-    ctx?.note && (ctx.note.kind === "line" || ctx.note.kind === "prose") ? ctx.note : null;
+  const commentBeat = (): { id: string; kind?: string } | null => {
+    if (!ctx) return null;
+    if (ctx.note) return ctx.note.kind === "line" || ctx.note.kind === "prose" ? ctx.note : null;
+    // The ⋯ on a snippet (no beat targeted): the line the caret is on when it's in this snippet, else the
+    // snippet's first line, so Add comment and Suggest rewrite are there too (Q16).
+    if (ctx.mode !== "full") return null;
+    const p = ctx.getPos(); const n = p == null ? null : ctx.view.state.doc.nodeAt(p);
+    return n?.type.name === "snippet" ? snippetBeat(ctx.view.state, p!, n) : null;
+  };
   /** Whether "Add comment" applies here: comments are wired AND there's either a say-text selection (a
    *  range comment) or a say/prose beat target (a whole-beat comment). */
   const canComment = (): boolean => !!ctx && commentsEnabled() && (hasSaySelection(ctx.view.state) || commentBeat() !== null);
@@ -330,6 +358,7 @@ export function createActionMenu(): ActionMenu {
       // A set of choice OPTIONS cannot be wrapped (wrapChunksAt refuses it: the wrapper would sit in the
       // choice as a child that is not an option), so the item is not offered for one.
       const optionSet = isChoiceGroup(ctx.view.state.doc.resolve(setPositions[0]!).parent);
+      if (editable) { el.appendChild(moveItem(-1, () => multiSelectPositions(ctx!.view.state))); el.appendChild(moveItem(1, () => multiSelectPositions(ctx!.view.state))); }
       if (editable && !optionSet) el.appendChild(parent("Wrap in", WRAP_KINDS.map((k) => ({ label: k.label, cmd: ((s) => wrapChunksAt(s, multiSelectPositions(s), k.kind)) as Cmd }))));
       // Status ripples across the whole selection: every line / prose beat under each selected chunk.
       appendStatus(el, () => setPositions.flatMap((p) => { const sn = ctx?.view.state.doc.nodeAt(p); return sn ? collectBeatIds(sn) : []; }));
@@ -381,6 +410,7 @@ export function createActionMenu(): ActionMenu {
     // Duplicate: the chunk AND everything inside it, dropped in as the next sibling with fresh ids
     // throughout (an option duplicates too - a quick way to add a variant of a choice).
     if (editable) el.appendChild(leaf("Duplicate", "", duplicateCmd));
+    if (editable) { el.appendChild(moveItem(-1, () => [pos])); el.appendChild(moveItem(1, () => [pos])); }
 
     // Play Block: start an interactive run ENTERING this node's block (not the whole scene). A host
     // action (opens the play window), not a doc edit - gated on the host wiring a handler.
@@ -422,14 +452,64 @@ export function createActionMenu(): ActionMenu {
     floating.show(place);
   };
 
+  /** Move up / Move down, with the shortcut beside it. Greyed where it can't go (first or last in its
+   *  parent, or a set with gaps); `positions` is read at open (for greying) and again at the click. */
+  const moveItem = (dir: MoveDir, positions: () => number[]): HTMLElement => {
+    const mi = document.createElement("button"); mi.className = "action-mi action-move";
+    mi.append(document.createTextNode(dir < 0 ? "Move up" : "Move down"));
+    const k = document.createElement("span"); k.className = "action-key"; k.textContent = moveShortcutLabel(dir); mi.appendChild(k);
+    mi.addEventListener("mouseenter", closeSub);
+    const plan = ctx ? planMove(ctx.view.state, positions(), dir) : null;
+    if (!plan || "refuse" in plan) { mi.disabled = true; if (plan && "refuse" in plan) mi.dataset.tip = plan.refuse; }
+    onPick(mi, () => {
+      if (!ctx || mi.disabled) return; const view = ctx.view; const ps = positions(); close();
+      runMove(view, ps, dir); view.focus();
+    });
+    return mi;
+  };
+
+  // --- the keyboard (Q14 / the ⋯ from the keyboard) ---------------------------------------------------
+  // Up / Down move between the items (wrapping), Home / End to the ends, Right (or Enter / Space) on a
+  // submenu opens it with its first item focused, Left or Escape in a submenu goes back to its parent, and
+  // Escape in the menu closes it, handing the focus back to the ⋯ that opened it. Enter / Space on an item
+  // is the button's own click.
+  const items = (panel: HTMLElement): HTMLButtonElement[] => [...panel.querySelectorAll<HTMLButtonElement>(".action-mi")].filter((b) => !b.disabled);
+  const focusAt = (panel: HTMLElement, i: number): void => { const list = items(panel); if (list.length) list[(i + list.length) % list.length]!.focus(); };
+  const openSubFromKey = (mi: HTMLButtonElement): void => { mi.click(); focusAt(sub, 0); };
+  const onMenuKey = (panel: HTMLElement, e: KeyboardEvent): void => {
+    const list = items(panel);
+    const i = list.indexOf(document.activeElement as HTMLButtonElement);
+    const cur = list[i];
+    const inSub = panel === sub;
+    if (e.key === "ArrowDown") { e.preventDefault(); focusAt(panel, i + 1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); focusAt(panel, i < 0 ? -1 : i - 1); }
+    else if (e.key === "Home") { e.preventDefault(); focusAt(panel, 0); }
+    else if (e.key === "End") { e.preventDefault(); focusAt(panel, -1); }
+    else if ((e.key === "ArrowRight" || e.key === "Enter" || e.key === " ") && cur?.classList.contains("has-sub")) { e.preventDefault(); openSubFromKey(cur); }
+    else if (inSub && (e.key === "ArrowLeft" || e.key === "Escape")) {
+      e.preventDefault(); e.stopPropagation();
+      const parentItem = el.querySelector<HTMLButtonElement>(".action-mi.open");
+      closeSub(); parentItem?.focus();
+    } else if (e.key === "Escape") {
+      e.preventDefault(); e.stopPropagation();
+      const anchor = ctx?.at instanceof HTMLElement ? ctx.at : null;
+      const view = ctx?.view;
+      close();
+      if (anchor?.isConnected) anchor.focus(); else view?.focus();
+    }
+  };
+  el.addEventListener("keydown", (e) => onMenuKey(el, e));
+  sub.addEventListener("keydown", (e) => onMenuKey(sub, e));
+
   const headEl = (text: string): HTMLElement => { const h = document.createElement("div"); h.className = "action-head"; h.textContent = text; return h; };
   const sepEl = (): HTMLElement => { const s = document.createElement("div"); s.className = "action-sep"; return s; };
 
-  const open = (view: EditorView, getPos: GetPos, at: At, mode: Mode = "full", note: NoteTarget | null = null): void => {
+  const open = (view: EditorView, getPos: GetPos, at: At, mode: Mode = "full", note: NoteTarget | null = null, focusFirst = false): void => {
     ctx = { view, getPos, at, mode, note };
     render(); // builds the menu, then floating.show(place) positions + follows on scroll
+    if (focusFirst && ctx) focusAt(el, 0);
     window.setTimeout(() => floating.dismissOnOutside(close, insideMenu), 0); // arm click-away after the opening click
   };
   const destroy = (): void => { close(); floating.el.remove(); sub.remove(); };
-  return { open, close, destroy };
+  return { open, close, destroy, isOpen: () => ctx !== null };
 }

@@ -108,11 +108,11 @@ nothing stops, the test **lists each failure it saw**, with what failed, the sce
 number of runs it happened in; click one to jump to it. The Play window marks the same failures in
 its transcript as you play.
 
-## World Properties and coverage drivers
+## Game scopes and coverage drivers
 
 Some branches turn on values your **game** owns rather than the story, written as `@world.name`
-and declared up front in **Project Settings ▸ World Properties**. Declaring them is part of
-[setting up the project](/setup/properties-and-data/#world-values-your-game-owns); what
+and declared up front in **Project Settings ▸ Game scopes** (with any other game scope, such as `@player`). Declaring them is part of
+[setting up the project](/setup/properties-and-data/#game-scopes-values-your-game-owns); what
 matters here is that a declared `@world` value gives the test a **default** to fall back on, and
 a place to hang a driver.
 

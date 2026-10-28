@@ -37,9 +37,9 @@ dialogue scenes, turn it on before your next localisation export.
 The **Game Data** tab sets out the fields each kind of beat can carry (see
 [Conditions, effects & data](/patterpad/conditions-and-data/)).
 
-The **World properties** tab holds the `@world` values your game owns and your story
-reads (declaring them is covered in
-[Properties & Game Data](/setup/properties-and-data/#world-values-your-game-owns)), plus
+The **Game scopes** tab holds the `@world` values your game owns and your story
+reads, and any other scope the game keeps them in, such as `@player` (declaring them is covered in
+[Properties & Game Data](/setup/properties-and-data/#game-scopes-values-your-game-owns)), plus
 the **coverage drivers** that stand in for them during a
 [coverage test](/production/coverage-testing/#coverage-drivers). Where the game shares its scopes
 with its other editing tools, the tab says so: saving writes the game's `game.scopes.json`
@@ -88,7 +88,7 @@ The **Dictionary** tab is spell-check setup (below).
 The `@patter` properties your story remembers aren't here. They're the story's working
 vocabulary rather than configuration, so they have their own
 [**Properties** page](/setup/properties-and-data/#properties-the-storys-variables) at the top of the
-navigator. What stays in this dialog is the contract with your game (**World properties**) and the
+navigator. What stays in this dialog is the contract with your game (**Game scopes**) and the
 settings around it.
 
 The tabs are grouped down the left (Project / Story data / Writing & audio /

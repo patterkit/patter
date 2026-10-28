@@ -175,7 +175,7 @@ to, comes back from [Coverage testing](/production/coverage-testing/).
 
 ## Declaring a quality in Patterpad
 
-On the **Properties** page (or in **Settings ▸ World Properties**, for a value your game owns), pick
+On the **Properties** page (or in **Settings ▸ Game scopes**, for a value your game owns), pick
 **Quality** as the type and add its **Stages (in order)**. Each stage chip carries ‹ › movers,
 because for a ladder the order is the meaning: reordering the chips reorders the story.
 A quality's default is its first stage unless you pick another.

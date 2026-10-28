@@ -35,7 +35,13 @@ and `visits()`, which track where the player has been.
 A snippet can change what the story remembers, either when the player **reaches** it
 (*On begin*) or when they **leave** it (*On end*); a scene can do the same on the way in.
 Open the row and list the changes you want, set `@gold` to 10, turn `@metTheCaptain` on,
-built with the same visual editor as conditions.
+built with the same visual editor as conditions. In the scene file, *On begin* and *On end*
+are a snippet's `onEnter` and `onExit`, and a scene's are its `onEntry` (see
+[Choices & logic](/format/choices-and-logic/)).
+
+A property that doesn't exist yet can be made right there: type its name in the property
+picker and choose **+ New property**. Patterpad asks what kind of value it holds (a number,
+true or false, or text) and adds it to the Properties page.
 
 Effects change what the story remembers. To make something happen out in your **game**
 (play a sound, start a quest), you don't reach for an effect: you leave a **game event** or
@@ -57,7 +63,7 @@ scene.
 
 A `@world` property is owned by your **game**, not the story, the player's class, the
 current threat level. The story only reads these; your game supplies the values while it
-runs. Declare them in Project Settings ▸ World Properties so the editor knows they exist.
+runs. Declare them in Project Settings ▸ Game scopes so the editor knows they exist.
 
 A property can be a **yes/no**, a **number**, some **text**, a **pick-list** (choose one
 value, or choose several), or a **Quality**. And two built-ins, `seen()` and `visits()`,

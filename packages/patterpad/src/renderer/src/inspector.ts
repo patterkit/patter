@@ -17,7 +17,9 @@ import type {
 import type { GameData, GameDataField, GameDataNodeKind, PropertyDecl, DocLine, WritingStatusDecl, RecordingStatusDecl, SpeakerQualifier } from "@patterkit/model";
 import { RERECORD_STATUS_DECL, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import { colourIndex } from "@patterkit/patterpad-surface/colour";
+import { missingLabel, missingTargetEl } from "@patterkit/patterpad-surface/reftext";
 import { el } from "./dom.js";
+import { lowestStatus } from "./status-raise.js";
 import { extensionSections, sweepExtensionRows, type ExtensionHandlers } from "./extension-rows.js";
 
 type Reveal = (id: string) => void;
@@ -320,6 +322,32 @@ function statusRow(id: string | null, h: InspectorHandlers): HTMLElement | null 
   return r;
 }
 
+/** The writing-status dropdown on a scene or block (ruling 3 of the hands-on fixes review, Q17): it shows the
+ *  LOWEST status among the lines inside, with a quiet "Mixed" when they differ. Choosing a status raises
+ *  every line below it and leaves the lines further along; the lowest rung clears them all. Null with no
+ *  ladder or no lines. */
+function containerStatusRow(id: string | null, h: InspectorHandlers): HTMLElement | null {
+  const ladder = h.writingStatuses();
+  if (!ladder.length || !id) return null;
+  const ids = h.statusBeats(id);
+  const shown = lowestStatus(ids, (b) => h.lineStatus(b) ?? undefined, ladder);
+  if (!shown) return null;
+  const lowest = ladder[0]!.name;
+  const r = el("div", "insp-row");
+  r.append(el("span", "insp-key", "Writing"));
+  const wrap = el("div", "insp-status");
+  const sel = statusSelect(ladder, shown.status, lowest, (status) => h.setStatusOf(ids, status));
+  sel.setAttribute("aria-label", "Writing status of every line here");
+  wrap.append(sel);
+  if (shown.mixed) {
+    const note = el("span", "insp-status-mixed", "Mixed");
+    note.dataset.tip = `The lowest status among these lines. Choosing one raises the lines below it; lines further along keep theirs. ${lowest} clears them all.`;
+    wrap.append(note);
+  }
+  r.append(wrap);
+  return r;
+}
+
 /** The recording-status dropdown for a dialogue (line) beat (#206, manual mode): mirrors the writing-status
  *  row - a colour swatch + a select of the recording ladder. Unset reads as the lowest rung; picking the
  *  lowest clears the explicit status. Null when there's no ladder or no beat id. */
@@ -547,7 +575,10 @@ function flagsRow(label: string, flags: Array<{ name: string; on: boolean; tip: 
 function paintJump(btn: HTMLElement, jump: { mode?: string; to: string }, h: InspectorHandlers): void {
   const call = jump.mode === "call";
   btn.classList.add("insp-jump");
-  btn.replaceChildren(iconNode(call ? "call" : "jump", 13), el("span", "", h.jumpLabel(jump.to)));
+  // A target that has gone reads "Missing scene" / "Missing block" in the problem colour, its old id in the
+  // tooltip: the same label and style as the jump chip on the page (the hands-on fixes review, Q15).
+  const label = h.jumpLabel(jump.to);
+  btn.replaceChildren(iconNode(call ? "call" : "jump", 13), label == null ? missingTargetEl(jump.to) : el("span", "", label));
 }
 
 /** An editable Jump row: a chip showing the target's READABLE label (or "+ Set jump"); click
@@ -724,6 +755,8 @@ function scenePropsRow(h: InspectorHandlers): HTMLElement {
 
 function addressBody(lv: SceneLevel | BlockLevel, h: InspectorHandlers): Part[] {
   const rows: Part[] = [addressRow(lv.id, lv.gameId, lv.address, h.editGameId)];
+  const status = containerStatusRow(lv.id, h); // the lines' writing status, as a floor (Q17)
+  if (status) rows.push(status);
   if (lv.kind === "scene") rows.push(h.sceneProps().length ? scenePropsRow(h) : { label: "Scene properties", act: () => h.editSceneProps() });
   rows.push(defaultPadPart(lv, h));
   rows.push(tagsPart(lv.id, lv.tags, h));
@@ -856,7 +889,7 @@ function levelSummary(lv: Exclude<InspectLevel, MultiLevel>, h: InspectorHandler
     if (lv.secretUntilEligible) parts.push("Secret");
   }
   if ((lv.kind === "group" || lv.kind === "snippet") && lv.condition) parts.push("has a condition");
-  if (lv.kind === "snippet" && lv.jump) parts.push(`${lv.jump.mode === "call" ? "calls" : "jumps to"} ${h.jumpLabel(lv.jump.to)}`);
+  if (lv.kind === "snippet" && lv.jump) parts.push(`${lv.jump.mode === "call" ? "calls" : "jumps to"} ${h.jumpLabel(lv.jump.to) ?? missingLabel(lv.jump.to)}`);
   if (lv.kind === "scene" && h.sceneProps().length) parts.push(`${h.sceneProps().length} scene ${h.sceneProps().length === 1 ? "property" : "properties"}`);
   if (lv.kind !== "leaf" && lv.padAfterDefault !== undefined) parts.push(`pad ${formatSeconds(lv.padAfterDefault)}s`);
   const tags = lv.tags?.length ?? 0;
@@ -983,8 +1016,9 @@ export interface InspectorHandlers extends ExtensionHandlers {
   condPreview: (src: string) => HTMLElement;
   /** Render an effects list as a read-only PILL strip for the inspector row. */
   effectsPreview: (effects: EffectLike[]) => HTMLElement;
-  /** Resolve a jump target id to its readable label (block / scene name or gameId). */
-  jumpLabel: (id: string) => string;
+  /** Resolve a jump target id to its readable label (block / scene name or gameId); null when nothing has
+   *  that id now (a deleted target, drawn as "Missing scene" / "Missing block"). */
+  jumpLabel: (id: string) => string | null;
   /** The author-defined gameData fields for a node type (the project's Game Data schema). */
   gameDataFields: (kind: GameDataNodeKind) => GameDataField[];
   /** Set (or clear, with `undefined`) one gameData field value on a node by id. */
@@ -999,6 +1033,11 @@ export interface InspectorHandlers extends ExtensionHandlers {
   lineStatus: (id: string) => string | null;
   /** Set (or clear, with null) a beat's writing status. */
   setLineStatus: (id: string, status: string | null) => void;
+  /** The line and text beats under a scene or block (the whole scene for the scene's id). */
+  statusBeats: (id: string) => string[];
+  /** Set a status on several beats at once: raised to it, those further along left, the lowest rung
+   *  clearing them all (Q17). One undo step. */
+  setStatusOf: (ids: string[], status: string | null) => void;
   /** The recording-status ladder (#206, manual mode): name + colour, for the dropdown on dialogue lines. */
   recordingStatuses: () => RecordingStatusDecl[];
   /** The dialogue line's current recording status (rung name), or null when unset. */

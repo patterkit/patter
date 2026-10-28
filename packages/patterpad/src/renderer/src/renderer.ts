@@ -30,7 +30,12 @@ import "@wildwinter/app-shell/job.css"; // the long-job strip the publish paths 
 import "./shell.css"; // app shell layout, over the surface's page styles
 import "@patterkit/patterpad-surface/fonts.css"; // every face the windows draw, declared once
 
-import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type InspectorContext, type DocNote, type CommentOpenRequest, type SuggestionOpenRequest, type SpellChecker } from "@patterkit/patterpad-surface/surface";
+import { moveMenuState, sceneMoveState, sceneMoveTarget } from "./scene-move.js";
+import { returnToTwin } from "./focus-return.js";
+import { planStatus } from "./status-raise.js";
+import { missingLabel } from "@patterkit/patterpad-surface/reftext";
+import { askPropertyType, withNewProperty } from "./new-property.js";
+import { mountSurface, moveKeyDir, initTooltips, tipBold, type SurfaceHandle, type InspectorContext, type DocNote, type CommentOpenRequest, type SuggestionOpenRequest, type SpellChecker } from "@patterkit/patterpad-surface/surface";
 import { buildSpellEngine } from "./spellcheck.js";
 import { adoptSceneName, relabelNavScene } from "./scene-name.js";
 import { selectAllOutsideEditor, undoRoute } from "./edit-commands.js";
@@ -54,7 +59,7 @@ import { openEditableExport, openEditableReimport, type EditableDialogContext } 
 import { applyTheme } from "./apply-theme.js";
 import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
   paintVcBadges, lockControls, createNavHistory, historyNav, mountPaneShell, mountSettingsDialog, revealRowWhenReady,
-  askIdentity, confirmDialog, dialogFrame, openContextMenu, type ShardVc, type SettingsSectionHandle, type SettingsSection, type SettingsDialog } from "@wildwinter/app-shell";
+  askIdentity, confirmDialog, dialogFrame, openContextMenu, setDialogFocusFallback, type ShardVc, type SettingsSectionHandle, type SettingsSection, type SettingsDialog } from "@wildwinter/app-shell";
 import { extensionAdapter, mountProjectSection, problemSettingsSection, settingsExtensions, settingsSectionId } from "./extension-rows.js";
 import { fieldsState, followTarget, selectedNodes, withoutViewEdited, type FieldsNode } from "./fields-state.js";
 import { createViewHost, takeLengths } from "./view-extensions.js";
@@ -97,7 +102,7 @@ import { openComments as shellComments, openNotesEditor } from "@wildwinter/app-
 import "@wildwinter/app-shell/notes-editor.css"; // the family's Notes editor (ruling I)
 import "@wildwinter/app-shell/comments.css"; // a shared module carries its own CSS
 import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from "./suggestion-popover.js";
-import type { PropertyDecl, DocLine, Comment, Suggestion } from "@patterkit/model";
+import type { PropertyDecl, PropertyType, DocLine, Comment, Suggestion } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES, DEFAULT_PAD_AFTER, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import { openValuePicker, qualifierRows } from "./value-picker.js";
 import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt, SceneVcStatus, VcStatusDto, AddExtensionResult } from "../../shared/api.js";
@@ -134,6 +139,11 @@ const shell = mountPaneShell(frameHost, {
   },
   // The label / shortcut live on the themed tooltip + aria-label (no text word competing in the bar).
   tipFor: (side, open) => tipWithKey(`${open ? "Hide" : "Show"} ${side === "nav" ? "scenes" : "inspector"}`, side === "nav" ? "Mod+1" : "Mod+2"),
+  // Cmd+1 / Cmd+2 move focus INTO an open pane, and close it only when focus is already there (the
+  // hands-on fixes review, Q14). The scenes pane focuses the open scene's row; focus coming back out
+  // lands in the script.
+  focusTarget: { nav: () => navListEl.querySelector<HTMLElement>(".nav-item.active") ?? navListEl.querySelector<HTMLElement>(".nav-item") },
+  focusHome: () => scriptFocusHome(),
   onChange: (state) => {
     const next: PaneState = { ...panes, nav: state.open.nav, inspector: state.open.inspector };
     delete next.navW; delete next.inspW;
@@ -297,8 +307,9 @@ async function ensureProjectStart(): Promise<{ scene: string; block?: string } |
   if (s?.start?.scene) return s.start;
   if (!project.scenes.length) return null;
   const scenes = project.scenes;
-  // Raised by Play from Start / Coverage when the project has no start point (#159).
-  const chosen = await new Promise<string | null>((resolve) => {
+  // Raised by Play from Start / Coverage when the project has no start point (#159). With only one scene
+  // there's nothing to choose: it's the start, set without asking (hands-on fixes review, 1.4).
+  const chosen = scenes.length === 1 ? scenes[0]!.id : await new Promise<string | null>((resolve) => {
     let answer: string | null = null;
     const frame = dialogFrame({ title: "Where does your story start?", sub: "You can change this later in Project Settings.", onClose: () => resolve(answer) });
     const sel = el("select", "field");
@@ -610,6 +621,13 @@ function renderNav(): void {
     b.append(Object.assign(document.createElement("span"), { className: "nav-item-name", textContent: s.name }));
     b.addEventListener("click", () => void loadScene(s.id));
     b.addEventListener("contextmenu", (e) => { e.preventDefault(); sceneContextMenu(s.id, e.clientX, e.clientY); });
+    // The script's move keys move a focused scene row too (Ctrl+Cmd+Up / Down; Ctrl+Alt elsewhere).
+    b.addEventListener("keydown", (e) => {
+      const dir = moveKeyDir(e);
+      if (dir === null) return;
+      e.preventDefault();
+      void moveSceneBy(s.id, dir);
+    });
     row.appendChild(b);
     // The block sub-list: rendered for every scene (rows fill lazily), revealed only while `.open`.
     const blocks = document.createElement("div");
@@ -687,7 +705,7 @@ function newScenePrompt(): void {
       if (name === undefined) return;
       const who = needsSpeaker(kit) ? speaker.value.trim() : undefined;
       void (async () => {
-        const res = await tracked(window.patter.createScene(name, kit, who));
+        const res = await tracked(window.patter.createScene(name, kit, who, newSceneAfter()));
         if (!landed(res, "Couldn't add the scene") || !res.project || !res.sceneId) return;
         project = res.project;
         renderNav();
@@ -696,6 +714,28 @@ function newScenePrompt(): void {
     },
   });
 }
+
+/** A jump picker's create rows (the hands-on fixes review, Q13): a new block goes into the open scene's
+ *  document (an edit like any other, saved with it); a new scene is made by main as New Scene makes one,
+ *  straight after the open scene, without leaving it. Answers what was made, or null when it failed (said
+ *  in a toast). */
+async function createJumpTarget(req: { kind: "scene" | "block"; name: string; scene?: string }): Promise<{ scene: string; block?: string } | null> {
+  if (req.kind === "block") {
+    const scene = surfaceSceneId;
+    const block = surface?.addBlock(req.name);
+    return scene && block ? { scene, block } : null;
+  }
+  const res = await tracked(window.patter.createScene(req.name, "blank", undefined, surfaceSceneId ?? undefined));
+  if (!landed(res, "Couldn't add the scene") || !res.project || !res.sceneId) return null;
+  project = res.project;
+  renderNav();
+  surface?.setJumpTargets(project.scenes.map((sc) => ({ id: sc.id, label: sc.name, blocks: sc.blocks.map((b) => ({ id: b.id, label: b.name })) })));
+  return { scene: res.sceneId };
+}
+
+/** New Scene's place: straight after the scene the author is in (its row in the Scenes list), so it doesn't
+ *  land at the bottom of a long list; at the end when no scene is open. */
+const newSceneAfter = (): string | undefined => currentSceneId ?? undefined;
 
 // --- delete scene (File > Delete Scene / right-click a nav row) ---------------
 // Severity scales with the evidence (design/proposals/delete-scene.md): an untouched scaffold
@@ -778,10 +818,60 @@ async function doDeleteScene(id: string): Promise<ProjectStep | undefined> {
   return res.step;
 }
 
-/** The nav's context menu: the shell's (one action today; room for Rename later). */
+/** The nav's context menu: the shell's. Move up / Move down keep their places when they can't apply (the
+ *  first or last scene), greyed. */
 function sceneContextMenu(sceneId: string, x: number, y: number): void {
-  openContextMenu(x, y, [{ label: "Delete scene", danger: true, onClick: () => void deleteScenePrompt(sceneId) }]);
+  const can = sceneMoveState(project?.scenes.map((s) => s.id) ?? [], sceneId);
+  openContextMenu(x, y, [
+    { label: "Move up", disabled: !can.up, onClick: () => void moveSceneBy(sceneId, -1) },
+    { label: "Move down", disabled: !can.down, onClick: () => void moveSceneBy(sceneId, 1) },
+    { label: "Delete scene", danger: true, onClick: () => void deleteScenePrompt(sceneId) },
+  ]);
 }
+
+/** Move a scene a place up or down in the Scenes list (ruling 3 of the hands-on fixes review): its right-click
+ *  menu, Edit ▸ Move Up / Move Down with focus in the list, and Ctrl+Cmd+Up / Down on a focused row. One
+ *  step of the project history. The rows glide, and a row that had focus keeps it. */
+async function moveSceneBy(sceneId: string, dir: -1 | 1): Promise<void> {
+  if (!project) return;
+  const hadFocus = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(".nav-item")?.dataset["id"] === sceneId;
+  const res = await tracked(window.patter.moveScene(sceneId, dir));
+  if (!landed(res, "Couldn't move the scene")) return;
+  if (!res.moved) { toast(dir < 0 ? "That's the first scene already." : "That's the last scene already.", "info"); return; }
+  if (res.project) project = res.project;
+  flipNav(() => renderNav());
+  if (hadFocus) navListEl.querySelector<HTMLElement>(`.nav-item[data-id="${CSS.escape(sceneId)}"]`)?.focus();
+  scheduleMoveState();
+}
+
+/** Edit ▸ Move Up / Move Down: the scene, with focus in the Scenes list; the script's selection otherwise. */
+function moveCommand(dir: -1 | 1): void {
+  const scene = sceneMoveTarget(navListEl, document.activeElement, currentSceneId);
+  if (scene) { void moveSceneBy(scene, dir); return; }
+  if (surface && !editorEl.hidden) surface.moveSelection(dir);
+}
+
+/** Tell main what Move Up / Move Down can do now, so the Edit menu greys what can't apply. Coalesced to a
+ *  frame (it follows every selection move and focus change) and sent only when it changes. */
+let moveStateSent = "";
+let moveStateFrame = 0;
+function scheduleMoveState(): void {
+  if (moveStateFrame) return;
+  moveStateFrame = requestAnimationFrame(() => {
+    moveStateFrame = 0;
+    const state = moveMenuState({
+      navList: navListEl, active: document.activeElement, openScene: currentSceneId,
+      order: project?.scenes.map((s) => s.id) ?? [],
+      ...(surface && !editorEl.hidden && project ? { canMoveSelection: (d: -1 | 1) => surface!.canMoveSelection(d) } : {}),
+    });
+    const sig = `${state.up}${state.down}`;
+    if (sig === moveStateSent) return;
+    moveStateSent = sig;
+    void window.patter.setMoveEnabled(state);
+  });
+}
+document.addEventListener("focusin", scheduleMoveState);
+document.addEventListener("focusout", scheduleMoveState);
 
 // --- scene reorder (drag a nav row; the order persists to the project) -------
 
@@ -960,7 +1050,22 @@ async function refreshVcStatus(): Promise<void> {
 // closed - the inspector only opens when the user explicitly expands it (no auto-peek on selection).
 // The collapse, the drag-resize and the dblclick reset are the frame's (mountPaneShell, above); every
 // change comes back through its onChange and is remembered there.
-function togglePane(which: "nav" | "inspector"): void { shell.togglePane(which); }
+/** The script, as the place focus goes when where it was has gone: the editor while a scene shows, else
+ *  nothing (the shell then picks the centre's first control). */
+function scriptFocusHome(): HTMLElement | null {
+  return surface && !editorEl.hidden ? (surface.view.dom as HTMLElement) : null;
+}
+// A dialog whose opener and its whole row were redrawn away gives focus to the script, never to <body>.
+setDialogFocusFallback(() => scriptFocusHome());
+
+/** Cmd+1 / Cmd+2 and View > Show Scenes / Show Inspector: focus into an open pane, open a closed one,
+ *  close one that holds focus (app-shell's `focusOrToggle`). Electron flips a checkbox item's tick on
+ *  every click, even when the pane only took focus, so the View menu is re-synced from the real state
+ *  after each press. */
+function togglePane(which: "nav" | "inspector"): void {
+  shell.focusOrToggle(which);
+  void window.patter.setPanes(panes); // refreshes the View menu's ticks from what is really open
+}
 
 /** View > Reset View: side panes back to their default widths and open/closed state. */
 /** View > Reset View: put EVERYTHING display-related back to defaults - the panes, every remembered
@@ -1278,6 +1383,7 @@ async function afterProjectHistory(r: ProjectHistoryOutcome): Promise<void> {
   }
   await buildSpellcheck();
   pushWritingStatus();
+  pushCast(); // an undone add, or a rename taken back, leaves the speaker picker and the cue colours
   surface?.setQualifiers(project.qualifiers ?? []);
   surface?.setJumpTargets(project.scenes.map((sc) => ({ id: sc.id, label: sc.name, blocks: sc.blocks.map((b) => ({ id: b.id, label: b.name })) })));
   await refreshPatterProps();
@@ -1405,6 +1511,16 @@ function cycleQualifierCommand(): void {
  *  beyond this session and shows in Project Settings > Cast. Reuses the add-to-cast project-file write; then
  *  reflects the name in the cached project, rebuilds spell-check (so the new cue isn't squiggled), and
  *  re-validates (a "character not in cast" warning, if any, drops). Idempotent on an existing name. */
+/** Hand the surface the project's cast as it is now: the names its speaker picker offers (which otherwise
+ *  only grow, so an undone add or a rename would linger there: the hands-on fixes review, Q15) and each
+ *  member's kept colour. Called after every step that can change the cast: an add, a Settings save (a
+ *  rename), and any undo or redo of those. */
+function pushCast(): void {
+  if (!project || !surface) return;
+  surface.setCast(project.cast);
+  surface.setCastColours(project.castColours);
+}
+
 async function registerCharacter(name: string): Promise<void> {
   const n = name.trim();
   if (!project || !n) return;
@@ -1412,6 +1528,7 @@ async function registerCharacter(name: string): Promise<void> {
   const res = await tracked(window.patter.applyFix({ kind: "add-to-cast", character: n }));
   if (!landed(res, `Couldn't add ${n} to the cast`)) return;
   project.cast = [...project.cast, n]; // keep castSeed / spell-check in sync without a reload
+  pushCast();
   await buildSpellcheck();
   await refreshProblems();
 }
@@ -1666,17 +1783,18 @@ function pushWritingStatus(): void {
 }
 
 /** Set (status) or clear (null) the writing status of these beats - from the context-menu "Status" submenu
- *  or the inspector dropdown. Updates the map, persists to the .patterx, repaints the gutter badges, and
- *  re-renders the inspector when the shown beat's status changed (its selection signature is unchanged). */
+ *  or an inspector dropdown. One beat takes exactly what's chosen; several (a scene, a block, a container,
+ *  a selection) are raised to it, those further along left as they are, and the lowest rung clears them all
+ *  (status-raise.ts, Q17). Updates the map, persists to the .patterx as one step, repaints the gutter
+ *  badges, and re-renders the inspector (its selection signature is unchanged). */
 function setLineStatus(ids: string[], status: string | null): void {
   if (!currentSceneId || !ids.length) return;
-  for (const id of ids) { if (status) writingMap[id] = status; else delete writingMap[id]; }
+  const changes = planStatus(ids, status, (id) => writingMap[id], project?.writingStatuses ?? []);
+  if (!changes.size) { lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); return; } // the dropdown snaps back
+  for (const [id, next] of changes) { if (next) writingMap[id] = next; else delete writingMap[id]; }
   surface?.setWritingStatus(writingMap);
   void tracked(window.patter.saveWriting(currentSceneId, writingMap));
-  const ctx = lastInspectorCtx;
-  if (ctx && ids.some((id) => ctx.levels.some((l) => (l as { id?: string }).id === id))) {
-    lastInspectorSig = null; showInspector(ctx);
-  }
+  lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // a scene's or block's floor may have moved too
 }
 
 /**
@@ -2088,6 +2206,7 @@ function showInspector(ctx: InspectorContext): void {
   const blockLevel = ctx.levels.find((l) => l.kind === "block");
   highlightNavBlock(blockLevel && "id" in blockLevel ? blockLevel.id : null);
   lastInspectorCtx = ctx; // so the global pills/text toggle can re-render this same view in place
+  scheduleMoveState(); // Edit ▸ Move Up / Move Down follow the selection
   pushFields(); // the fields window follows the selection, and every edit (before the early return below)
   views.selection(); // and so does every open view
   // onSelect fires on every selection move AND every doc edit (typing). The inspector only shows a
@@ -2096,7 +2215,8 @@ function showInspector(ctx: InspectorContext): void {
   const sig = JSON.stringify(ctx.levels);
   if (sig === lastInspectorSig) return;
   lastInspectorSig = sig;
-  const nodeLabel = (nid: string): string => surface?.jumpTargets().find((t) => t.id === nid)?.label ?? nid;
+  // A seen() / visits() naming a scene or block that's gone reads "Missing scene" / "Missing block", as on the page.
+  const nodeLabel = (nid: string): string => surface?.jumpTargets().find((t) => t.id === nid)?.label ?? missingLabel(nid);
   renderInspector(inspectorStackEl, ctx, {
     reveal: (id) => { surface?.revealNode(id); },
     levelOpen: (key) => panes.inspectorOpen?.[key],
@@ -2130,8 +2250,9 @@ function showInspector(ctx: InspectorContext): void {
     editEffects: (id, onEnter, onExit, anchor, phase) => openEffectsEditor({ anchor, onEnter, onExit, ...(phase ? { phase } : {}), properties: sceneProps, // The editor's effect union still carries `emit`; Patter's does not (effects are set-only, and host
 // events ride gameData), so narrow rather than cast. Nothing in this dialect can produce an emit, so
 // the filter is a no-op at runtime and the types stop lying about it.
-onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e.kind === "set")); } }),
-    jumpLabel: (id) => surface?.jumpTargets().find((t) => t.id === id)?.label ?? id,
+onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e.kind === "set")); },
+onCreateProperty: (name) => createPatterProperty(name) }),
+    jumpLabel: (id) => surface?.jumpTargets().find((t) => t.id === id)?.label ?? null, // null: drawn as a missing target
     gameDataFields: (kind) => project?.gameDataFields[kind] ?? [],
     setGameData: (id, key, value) => { surface?.setGameData(id, key, value); },
     setTags: (id, tags) => { surface?.setTags(id, tags); }, // author tags (#215)
@@ -2144,6 +2265,8 @@ onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e
     writingStatuses: () => project?.writingStatuses ?? [], // the ladder (name + colour) for the status dropdown (#196)
     lineStatus: (id) => writingMap[id] ?? null,            // the beat's current status, or null (unset)
     setLineStatus: (id, status) => setLineStatus([id], status),
+    statusBeats: (id) => surface?.statusBeats(id) ?? [],          // a scene's or block's lines, for its status floor (Q17)
+    setStatusOf: (ids, status) => setLineStatus(ids, status),
     // Audio only makes sense for a VOICED story (#206): when the project isn't voiced there is no recording
     // status to track, so the inspector shows no recording row (empty ladder), folder mode is off, and
     // scratch is off - regardless of any stored audio config (kept so toggling Voiced back on restores it).
@@ -2622,6 +2745,8 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
   if (kept && !restore) forgetScene(sceneId);
   keptScenes.delete(sceneId);
   mountingScene = true; // the mount's initial-mirror onChange is not a user edit
+  // The script is in the project's source language: say so, for whatever reads the page's language.
+  if (project.sourceLocale) editorEl.lang = project.sourceLocale; else editorEl.removeAttribute("lang");
   surface = mountSurface({
     editor: editorEl,
     hintbar: hintbarEl,
@@ -2632,6 +2757,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     lockedExtensions: extensionLocksOf(vcMap.get(sceneId)),
     formatting: project.formatting,
     castSeed: project.cast,
+    castColours: project.castColours, // a renamed character keeps their colour
     qualifiers: project.qualifiers ?? [], // the cue's (O.S.), the keyboard cycle
     localiseDialogueText: project.localiseDialogueText, // off: a dialogue scene's text is drawn as action
     // Cross-scene jump targets: every scene + its blocks (the surface adds THIS scene with live blocks).
@@ -2650,6 +2776,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     onSetWritingStatus: (ids, status) => setLineStatus(ids, status), // "Status" submenu sets the writing status (#196)
     onDuplicate: (idMap) => carryDuplicatedMetadata(idMap), // Duplicate: carry status + notes to the copies
     onAddCharacter: (name) => void registerCharacter(name), // "+ Add" in the cue popup persists to the master cast
+    onCreateTarget: (req) => createJumpTarget(req), // a jump picker's "+ New scene" / "+ New block" (Q13)
     // An edit the surface refused because it would lose structure (a condition, effects, a jump, a whole
     // choice): one finished sentence saying what and what to do instead (ruling D, October 2026 review).
     onRefuse: (message) => toast(message, "info"),
@@ -2921,6 +3048,23 @@ async function savePropsDoc(): Promise<void> {
 }
 
 const schedulePropsSave = debounce(() => { void savePropsDoc(); }, 400);
+
+/** "+ New property" in the effects editor's picker: ask the kind of value, then declare `@patter.<name>`
+ *  through the Properties page's own save (one step of the project history), so the page, its count, and
+ *  every editor know it at once. Answers the editor's catalogue entry, or null when the author backed out
+ *  or the save was refused. */
+async function createPatterProperty(name: string): Promise<{ scope: string; name: string; type: PropertyType } | null> {
+  if (!project) return null;
+  const type = await askPropertyType(name);
+  if (!type) return null;
+  const s = await window.patter.readSettings();
+  if (!s) return null;
+  const made = withNewProperty(s.properties, name, type);
+  if (made.added && !(await saveProjectSettings({ ...s, properties: made.props }, { propertiesOnly: true, undo: { label: "New Property", key: `new-property:${name}:${Date.now()}` } }))) return null;
+  patterProps = made.props;
+  paintPropsCount();
+  return { scope: "patter", name: made.decl.name, type: made.decl.type };
+}
 
 /** Open the Properties document (the navigator's fixed row, and every "go to definition" on a
  *  `@patter` property). */
@@ -3385,8 +3529,8 @@ function confirmPackMerge(summary: PackMergeSummary): Promise<boolean> {
       : "",
     // Their World edit goes to the game's shared file too, which the game's other tools read, so say so.
     gameScopes?.error
-      ? `They changed the World properties, but ${gameScopes.path} won't parse, so their change will not be written there: ${gameScopes.error}`
-      : gameScopes ? `They changed the World properties, so ${gameScopes.path}, which the game's other tools share, will take their change too.` : "",
+      ? `They changed the game scopes, but ${gameScopes.path} won't parse, so their change won't be written there: ${gameScopes.error}`
+      : gameScopes ? `They changed the game scopes, so ${gameScopes.path}, which the game's other tools share, will take their change too.` : "",
     "You can undo this.",
   ].filter(Boolean);
   const evidence = el("div", "merge-evidence");
@@ -3447,8 +3591,8 @@ async function mergePatterpack(): Promise<void> {
   // Their World edit went to the game's shared file (or couldn't, which is the error voice's too).
   const world = r.summary.gameScopes;
   const worldNote = !world ? "" : world.error
-    ? `\nTheir World properties were not written to ${world.path}: ${world.error}`
-    : `\nTheir World properties are in ${world.path}`;
+    ? `\nTheir game scopes weren't written to ${world.path}: ${world.error}`
+    : `\nTheir game scopes are in ${world.path}`;
   // A conflict is not a failure - the merge committed - but it is not a quiet success either. The error
   // voice is what stops an author walking away from unresolved conflicts thinking they were done.
   if (r.summary.conflicts > 0) {
@@ -3611,16 +3755,18 @@ function buildSettingsDialog(): SettingsDialog {
       return {};
     } },
     ...projectExtensionSections(),
-    { id: "world", label: "World properties", group: "Story data", mount: (host): SettingsSectionHandle => {
+    { id: "world", label: "Game scopes", group: "Story data", mount: (host): SettingsSectionHandle => {
       const { s } = settingsRead!;
       const worldHost = el("div"); host.append(worldHost);
       const world = mountWorld(worldHost, { scopeRegistry: s.scopeRegistry, coverageDrivers: s.coverageDrivers, onPropose: () => window.patter.proposeCoverageDrivers(), ...(s.worldFile ? { worldFile: s.worldFile } : {}),
         onStageReorder: (target, note) => void fillStageNote(note, target) });
       Object.assign(live, { world, worldHost });
-      // Two gates. A duplicate name is a data hazard. An illegal one is a declared property no
-      // expression can reach (a hyphen reads as subtraction, a leading digit or a keyword will not parse,
-      // a capital is folded away); the field's own rollover says which fault, so the line repeats it.
+      // Three gates. A scope name that can't be used says why. A duplicate name is a data hazard. An
+      // illegal one is a declared property no expression can reach (a hyphen reads as subtraction, a
+      // leading digit or a keyword will not parse, a capital is folded away); the field's own rollover
+      // says which fault, so the line repeats it.
       return { firstInvalid: () => {
+        const scope = world.firstBadScope(); if (scope) return scope;
         const dup = world.firstDuplicate(); if (dup) return { el: dup, message: DUP_MESSAGE };
         const bad = world.firstIllegalName(); return bad ? { el: bad, message: bad.title || "That property name can't be used in an expression." } : null;
       } };
@@ -3721,7 +3867,7 @@ function buildSettingsDialog(): SettingsDialog {
 let settingsDlg = buildSettingsDialog();
 
 /** File > Project Settings: read the project-level settings, open the dialog on a tab (General by default;
- *  the coverage window's "World Properties…" and a `@world` pill's "Go to definition" open "world"). */
+ *  the coverage window's "Game scopes…" and a `@world` pill's "Go to definition" open "world"). */
 async function openProjectSettings(initialTab = "general"): Promise<void> {
   if (!project) return; // nothing open
   const s = await window.patter.readSettings();
@@ -3792,6 +3938,7 @@ async function saveProjectSettings(s: ProjectSettingsDto, opts: { propertiesOnly
       await buildSpellcheck(); // the Dictionary settings (language / words / on-off) may have changed (#177)
       pushWritingStatus(); // the writing-status ladder (names / colours) may have changed - re-push to the surface (#196)
       surface?.setQualifiers(project.qualifiers ?? []); // the qualifier names (and list) may have changed: the cues repaint
+      pushCast(); // the Cast tab may have added, removed, or renamed someone (who keeps their colour)
       surface?.setLocaliseDialogueText(project.localiseDialogueText); // action text may have become shown text, or the reverse
     }
     void refreshProblems();  // revalidate against the new declarations (and, after a full save, the new spelling setup)
@@ -3898,7 +4045,9 @@ async function shareScopes(): Promise<void> {
  *  reveal a row in it, or null with no scene open. */
 function openSceneProps(): HTMLElement | null {
   if (!surface) return null;
-  const frame = dialogFrame({ title: "Scene properties", className: "scene-props-dialog" });
+  // Opened from the inspector, which redraws while the dialog is up: focus comes back to the button the
+  // redraw put where the opener was, never to <body>.
+  const frame = dialogFrame({ title: "Scene properties", className: "scene-props-dialog", returnFocus: returnToTwin(inspectorStackEl, document.activeElement) });
   const note = el("p", "settings-note");
   note.append(el("code", undefined, "@scene"), " properties exist only within this scene. Tick Temporary to reset one on every entry.");
   const host = el("div");
@@ -4214,6 +4363,8 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "play-from-start") void playFromStart();
   else if (cmd === "select-all") selectAllCommand();
   else if (cmd === "duplicate") surface?.duplicate();
+  else if (cmd === "move-up") moveCommand(-1);
+  else if (cmd === "move-down") moveCommand(1);
   else if (cmd === "cycle-qualifier") cycleQualifierCommand();
   else if (cmd === "show-in-storyletter") void showInStoryletter();
   else if (cmd === "undo") void undoCommand("undo");
@@ -4325,7 +4476,7 @@ window.patter.onReplaceApplied(() => void (async () => {
   await refreshProblems();
   // The search window says what it replaced, with Undo, in its own window; this one only catches up.
 })());
-// Coverage window (#159): a clicked result row jumps the editor; the "World Properties…" button opens settings.
+// Coverage window (#159): a clicked result row jumps the editor; the "Game scopes…" button opens settings.
 window.patter.onCoverageNavigate((sceneId, beatId) => void (async () => {
   if (sceneId !== currentSceneId) await loadScene(sceneId);
   surface?.revealNode(beatId);

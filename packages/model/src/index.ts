@@ -534,6 +534,11 @@ export interface CastMember {
    *  (`{ vo: "Your thoughts" }`), where the project's speaker pattern shouldn't apply. Localised as the
    *  `speaker:<name>:<gameId>` string (`speakerLabelKey`). Absent for every pair that follows the pattern. */
   qualifierLabels?: Record<string, string>;
+  /** The character's colour in the editors (their cue, the play window, the readable script): a slot of the
+   *  family's curated palette, 0 to 11. Absent, the colour comes from a hash of the name, so a cast needs no
+   *  setup; renaming a character stamps the old name's slot here, so they keep their colour. Authoring only
+   *  (not shipped in the runtime bundle). */
+  colour?: number;
   gameData?: GameData;
 }
 
@@ -642,12 +647,12 @@ export interface BundleQualifier {
   name: string;
 }
 
-/** The cast as it reaches a compiled bundle: the player-facing fields only. `notes`, `actor` and
- *  `gender` are authoring / production / translation context, and the compiler drops them, so a shipped
+/** The cast as it reaches a compiled bundle: the player-facing fields only. `notes`, `actor`,
+ *  `gender` and `colour` are authoring / production / translation context, and the compiler drops them, so a shipped
  *  game never carries a real person's name or a writer's private notes. The compiler copies the shipping
  *  fields across explicitly (an allow-list), which is what actually keeps a new authoring field out of
  *  the bundle; this type states the resulting contract for anyone reading a bundle. */
-export type BundleCastMember = Omit<CastMember, "notes" | "actor" | "gender">;
+export type BundleCastMember = Omit<CastMember, "notes" | "actor" | "gender" | "colour">;
 
 /** A node TYPE that can carry author-defined gameData fields (the gameData schema, project-level).
  *  Beat kinds map straight through: dialogue = `line`, text = `text`, game event = `gameEvent`.

@@ -195,7 +195,7 @@ List the open suggestions, each marked clean or out of date. `--handoff H-7Q2K` 
 Share the project's scopes with the game's other editing tools, as Patterpad's **File > Share Scopes
 with Other Tools** does: makes the game's `game-scopes/` folder (in `--at`, else at the
 version-control root above the project) with `patter.scopes.json` and a `game.scopes.json` holding
-the project's World properties, which the project keeps as its synced copy. A folder another tool
+the project's game scopes, which the project keeps as its synced copy. A folder another tool
 already made is joined, not replaced: its `game.scopes.json` keeps every scope it holds and gains only
 the ones it lacks. When looking up from the project wouldn't find the folder, the project names it in
 `gameScopes`.

@@ -15,7 +15,7 @@ import { canonicalStringify } from "@patterkit/core";
 import type { AuthoringFile, Comment, HandoffFile, HandoffRow, Suggestion } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import type { PlannedWrite } from "./write.js";
-import type { ReadBox, ReadItem, ReadText, ReturnedDoc } from "./docx-read.js";
+import type { ReadBox, ReadEffect, ReadItem, ReadText, ReturnedDoc } from "./docx-read.js";
 import { readHandoff, handoffWrite } from "./handoff.js";
 import type { Random } from "./handoff.js";
 import { sourceStrings } from "./loaded-helpers.js";
@@ -515,7 +515,10 @@ function alignParagraphs(
     return rows;
   };
 
-  let boxIndex = -1, gap: Array<Exclude<ReadItem, ReadBox>> = [], lastLine: string | undefined;
+  let boxIndex = -1, gap: Array<Exclude<ReadItem, ReadBox | ReadEffect>> = [], lastLine: string | undefined;
+  // Comments on an effect line: a begin line sits before its snippet's lines, so its comments go on the
+  // next line placed; an end line's on the line before.
+  let beforeNext: string[] = [];
   /** `near`: the box index added text is nearest (the box before the gap). */
   const settle = (to: number, near: number): void => {
     const rows = rowsBefore(to);
@@ -543,12 +546,15 @@ function alignParagraphs(
       if (code === undefined) continue; // can't be placed: its gap merges into the next one's
       settle(order.get(code)!, boxIndex - 1);
       const line = code ? lineIdOf(code) : undefined;
-      if (line) { lastLine = line; note([...item.text.comments, ...item.lead.comments, ...item.margin.comments], line); }
+      if (line) { lastLine = line; note([...beforeNext, ...item.text.comments, ...item.lead.comments, ...item.margin.comments], line); beforeNext = []; }
       continue;
     }
+    // An effect line is shown, never edited: whatever came back in it is skipped, but for its comments.
+    if (item.kind === "effect") { if (item.phase === "end") note(item.text.comments, lastLine); else beforeNext.push(...item.text.comments); continue; }
     if (item.text.proposed.trim() === "" && item.text.original.trim() === "" && !item.text.comments.length) continue; // spacers
     gap.push(item);
   }
   settle(segments.length - 1, boxIndex);
+  note(beforeNext, lastLine);
   return anchors;
 }

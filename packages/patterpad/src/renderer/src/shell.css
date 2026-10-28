@@ -850,6 +850,15 @@ body.writing-view #hintbar { padding-right: 192px; }
 .world-at, .world-dot, .world-scope { color: var(--muted); font: var(--text-md) var(--font-mono); padding: 0 1.5px; }
 .world-token { width: 80px; flex: 0 0 auto; }
 .world-driver-actions { display: flex; gap: 8px; margin-top: 3px; }
+/* Game scopes (matched to Storyletter's host-scopes): @world first, then each scope the author added, its
+   "@" name field and Remove in the head, its switches, then its properties. */
+.host-scope + .host-scope { margin-top: 14px; padding-top: 4px; border-top: 1px solid var(--line); }
+.host-scope-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.host-scope-cap { display: inline-flex; align-items: baseline; gap: 1px; }
+.host-scope-cap input.host-scope-token { font: inherit; width: 16ch; padding: 1px 4px; }
+.host-scope-props { margin-top: 6px; display: flex; flex-direction: column; }
+.host-scope-add { margin-top: 10px; }
+.world-driver-scope { flex: 0 0 auto; width: auto; }
 
 /* Never a window-drag region, even over one: in Electron a click inside a drag area (the topbar's
    titlebar strip) goes to the OS as a window drag before the page sees it. The shell exempts its own
@@ -870,3 +879,6 @@ body.writing-view #hintbar { padding-right: 192px; }
     border-color var(--dur-tint) var(--ease-standard), opacity var(--dur-tint) var(--ease-standard);
 }
 .sp-colour-btn { transition: box-shadow var(--dur-tint) var(--ease-standard); }
+/* A scene's or block's writing status when its lines differ (the hands-on fixes review, Q17): quiet, the
+   dropdown beside it showing the lowest. */
+.insp-status-mixed { font: var(--text-xs) var(--font-ui); color: var(--muted); cursor: default; }

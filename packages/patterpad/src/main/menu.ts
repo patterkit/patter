@@ -55,6 +55,19 @@ export function setUndoLabels(labels: { undo?: string; redo?: string }): boolean
   return true;
 }
 
+/** Whether Edit ▸ Move Up and Move Down can do anything now: the renderer works it out from what has focus
+ *  (a scene row moves its scene, the script moves its selection) and sends it as it changes. */
+let moveEnabled = { up: false, down: false };
+/** Set what Move Up / Move Down can do; true when it changed, so the caller rebuilds the menu. */
+export function setMoveEnabled(next: { up: boolean; down: boolean }): boolean {
+  if (next.up === moveEnabled.up && next.down === moveEnabled.down) return false;
+  moveEnabled = { up: next.up, down: next.down };
+  return true;
+}
+/** The move keys as an Electron accelerator: Ctrl+Cmd+Up on a Mac, Ctrl+Alt+Up elsewhere (the surface's
+ *  `moveCombo`, with its portable "Mod" spelled out). */
+export const moveAccelerator = (dir: -1 | 1, mac = isMac): string => `${mac ? "Ctrl+Cmd" : "Ctrl+Alt"}+${dir < 0 ? "Up" : "Down"}`;
+
 /** The Window menu's view extensions: the views the open project offers, and what the items do. */
 export interface ViewMenu {
   offers: readonly ViewOffer[];
@@ -212,6 +225,10 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // Duplicate the selected block / group / snippet (or the one holding the caret) with everything
         // inside it - the copy takes fresh ids throughout, so it never aliases the original.
         { ...EDIT_MENU.duplicate, enabled: hasProject, click: () => send("duplicate") },
+        // Move what's selected a place up or down in its parent (the hands-on fixes review, Q14): a snippet,
+        // group, or block in the script, or the focused scene in the Scenes list.
+        { label: "Move Up", accelerator: moveAccelerator(-1), enabled: hasProject && moveEnabled.up, click: () => send("move-up") },
+        { label: "Move Down", accelerator: moveAccelerator(1), enabled: hasProject && moveEnabled.down, click: () => send("move-down") },
         // The speaker qualifier's keyboard route: the caret's dialogue line steps through the project's
         // qualifiers, then none (TAM, TAM (V.O.), TAM (O.S.), ...). E for a screenplay's character Extension;
         // nothing else in the family takes Shift+Cmd/Ctrl+E.

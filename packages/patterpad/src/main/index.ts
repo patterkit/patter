@@ -17,7 +17,7 @@ import * as project from "./project.js";
 import { fileSafeName } from "../shared/file-name.js";
 import * as dictionaries from "./dictionaries.js";
 import { createStore, type ToolWindowName } from "./store.js";
-import { applyMenu, setUndoLabels } from "./menu.js";
+import { applyMenu, setUndoLabels, setMoveEnabled } from "./menu.js";
 import { createDebugServer, type DebugServer } from "./debug-link.js";
 import { centeredOnPrimary, defineToolWindows, frontForModal, pinToolWindow } from "@wildwinter/app-shell/tool-window";
 import { plural } from "@wildwinter/app-shell/util";
@@ -1246,7 +1246,8 @@ function registerIpc(): void {
     // them: its unsaved edits go to disk first, and it reloads from the rewritten file after.
     const renames = Object.entries(s.qualifierRenames ?? {}).some(([from, to]) => from !== to)
       || Object.entries(s.castRenames ?? {}).some(([from, to]) => from !== to)
-      || (s.stageRenames ?? []).some((r) => r.from !== r.to); // a stage rename rewrites conditions across the project too
+      || (s.stageRenames ?? []).some((r) => r.from !== r.to) // a stage rename rewrites conditions across the project too
+      || Object.entries(s.scopeRenames ?? {}).some(([from, to]) => from !== to); // and so does a game scope's
     if (renames) await flushEditorScene();
     const r = await project.saveSettings(s, undo ?? {});
     if (r.ok && renames) win?.webContents.send("replace:applied");
@@ -1268,9 +1269,13 @@ function registerIpc(): void {
   ipcMain.handle("project:undoLabels", (_e, labels: { undo?: string; redo?: string }) => {
     if (setUndoLabels(labels)) refreshMenu();
   });
+  ipcMain.handle("menu:moveEnabled", (_e, state: { up: boolean; down: boolean }) => {
+    if (setMoveEnabled(state)) refreshMenu();
+  });
   ipcMain.handle("project:setStart", (_e, start: { scene: string; block?: string }) => project.setStart(start));
   ipcMain.handle("project:reorderScenes", (_e, ids: string[]) => project.reorderScenes(ids));
-  ipcMain.handle("project:createScene", (_e, name: string, kit?: SceneKitId, speaker?: string) => project.createScene(name, kit, speaker));
+  ipcMain.handle("project:createScene", (_e, name: string, kit?: SceneKitId, speaker?: string, after?: string) => project.createScene(name, kit, speaker, after));
+  ipcMain.handle("project:moveScene", (_e, sceneId: string, dir: -1 | 1) => project.moveScene(sceneId, dir));
   ipcMain.handle("project:sceneDeleteInfo", (_e, sceneId: string) => project.sceneDeleteInfo(sceneId));
   ipcMain.handle("project:deleteScene", (_e, sceneId: string) => project.deleteScene(sceneId));
   ipcMain.handle("scene:read", (_e, id: string) => project.readScene(id));
@@ -1683,6 +1688,8 @@ if (!app.requestSingleInstanceLock({ argv: process.argv })) {
   app.on("open-file", (event, path) => { event.preventDefault(); openInWindow(path); }); // macOS Finder
 
   app.whenReady().then(() => {
+    // A project written in plain "en" spell-checks in the system's own English (the hands-on fixes review, Q16).
+    project.setSystemLocales(app.getPreferredSystemLanguages());
     registerIpc();
     registerCommandPalette(); // Cmd+K reads the live menu and runs what it picks
     // What's New after an update: the version that last ran, and the tickbox. A machine with a recent

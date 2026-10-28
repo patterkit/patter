@@ -13,8 +13,9 @@ gender**, sent to translators, is free text (blank means not specified), with au
 the everyday values (male / female / neuter) plus any others already used in the cast, so a
 project can name whatever gender a language needs while keeping spellings consistent. **Notes**
 and an **actor** are optional, for production. The **cue colour** is drawn from the name rather
-than picked, so the same character is the same colour everywhere, in the editor and the play
-window alike.
+than picked, so the same character is the same colour everywhere: in the editor, the play
+window, and the readable script alike. Rename a character and they keep their colour: the
+project file remembers it for them (a cast member's `colour`, a slot in the palette).
 
 Gender, notes, and actor sit behind the ▸ expander on each row.
 
@@ -32,7 +33,7 @@ you assign feeds the [voice-recording pipeline](/production/audio/).
 ## What reaches the game
 
 Only the **script name** and the **display name** are compiled into the published `.patterc`
-bundle. Grammatical gender, notes, and the actor's name are project-side context for translators
+bundle. Grammatical gender, notes, the actor's name, and the cue colour are project-side context for translators
 and the production team; they are deliberately left out, so a game you ship never contains a real
 person's name or a writer's private notes about a character.
 

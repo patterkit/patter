@@ -996,7 +996,7 @@ describe("a line that names another engine's scope", () => {
     project.startPlay(sceneId);
     const refused = project.playToStop();
     expect(refused.stop).toBe("error");
-    expect(refused.error).toMatch(/^This project names @story, which the Storylet Engine provides\. To play it here, share scopes with the Storylet Engine \(File > Share Scopes with Other Tools\), or declare @story in Project Settings > World properties/);
+    expect(refused.error).toMatch(/^This project names @story, which the Storylet Engine provides\. To play it here, share scopes with the Storylet Engine \(File > Share Scopes with Other Tools\), or declare @story in Project Settings > Game scopes/);
     expect(refused.error).toContain("this content names @story, which no engine on this registry registered");
 
     const s = project.readSettings()!;

@@ -153,9 +153,9 @@ folder. The person you sent it to gets the same checks on `@story` names, the sa
 pickers, and previews that stand the other tools in, without needing the rest of your game.
 
 The snapshot is read-only in spirit. Merging their pack back never writes it anywhere, even if they
-changed it: your folder stays the truth. The one edit that does come home is to **World properties**,
-which travels in the project file's own copy of the game's scopes. When the returned pack's World
-properties differ from the pack you sent, the merge writes their change to your `game.scopes.json`
+changed it: your folder stays the truth. The one edit that does come home is to the **game scopes**,
+which travels in the project file's own copy of the game's scopes. When the returned pack's game
+scopes differ from the pack you sent, the merge writes their change to your `game.scopes.json`
 (only the scopes they changed; the rest of the file stays as it is now), and says so: Patterpad in the
 merge summary, `patter unpack --merge` with a `game scopes:` line. Without that, your next save would
 bring the project's copy back in line with the shared file and quietly drop their edit.

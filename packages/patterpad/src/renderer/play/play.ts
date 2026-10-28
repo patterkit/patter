@@ -273,7 +273,7 @@ function appendStep(step: PlayStep): HTMLElement {
     // Tint the cue by the SAME hash-selected palette slot the editor uses (#196 colour-by-character), so the
     // cast scans by colour here too. Key off the canonical token, never the localised name, so the slot is
     // stable across locales. Empty/narrator keeps the CSS --accent default.
-    if (step.character) cue.style.color = colourFor(step.character);
+    if (step.character) cue.style.color = colourFor(step.character, step.colour); // a stored slot outlives a rename
     // A step with no label (an IDs-only build carries no names) shows the token, then the qualifier's gameId.
     const qualifier = step.speakerLabel === undefined ? step.qualifierName ?? step.qualifier : undefined;
     if (qualifier) { const q = document.createElement("span"); q.className = "pqual"; q.textContent = `(${qualifier})`; cue.append(q); }

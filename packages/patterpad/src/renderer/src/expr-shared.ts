@@ -42,6 +42,10 @@ export function editorDialect(): Dialect {
  *  Where the folder declares it, its properties are in the catalogue like any other. */
 export const OTHER_ENGINE_SCOPES: readonly string[] = EXTERNAL_SCOPES;
 
+/** Patter's own scope, for the editors' `homeScope`: a property in it reads `@gold`, as an author writes it,
+ *  and one in any other scope in full (`@world.day`). Display only: what's written is unchanged. */
+export const HOME_SCOPE = "patter";
+
 /** Scope display order in the property picker (project globals first, then scene-locals). */
 export const SCOPE_ORDER = ["patter", "scene"];
 
