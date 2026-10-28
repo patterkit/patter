@@ -81,6 +81,16 @@ UPatterAudioResolver* Audio = UPatterAudioResolver::Create(ManifestJson, TEXT("A
 FString Path = Audio->Resolve(Step.Id);                    // full path, or empty
 ```
 
+Unreal plays sound assets rather than loose files, so if you import your takes into the project, the resolver
+can find the asset for you: `SoundAsset(BeatId, ContentRoot)` returns a soft pointer to the asset the import made
+of the beat's take (under `/Game/<ContentRoot>/`, mirroring the folders), and `LoadSound` loads it there and then.
+A bigger game loads the soft pointer asynchronously itself.
+
+```cpp
+if (USoundBase* Sound = Audio->LoadSound(Step.Id, TEXT("VO")))
+    UGameplayStatics::PlaySound2D(this, Sound);
+```
+
 **Godot** (GDScript), deploy under `res://` (or `user://`):
 
 ```gdscript

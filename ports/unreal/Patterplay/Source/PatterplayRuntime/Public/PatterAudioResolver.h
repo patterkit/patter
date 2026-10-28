@@ -8,12 +8,18 @@
 //
 //   UPatterAudioResolver* Audio = UPatterAudioResolver::Create(ManifestJson, TEXT("Audio"));
 //   FString Path = Audio->Resolve(Step.Id);   // full path, or empty when the beat has no recording
+//
+// Optional, for takes imported as sound assets: SoundAsset maps a beat's take to the asset the import made of
+// it, and LoadSound loads it. Nothing else uses them (the runner never touches audio).
 #pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
+#include "UObject/SoftObjectPtr.h"
 #include "Templates/PimplPtr.h"
 #include "PatterAudioResolver.generated.h"
+
+class USoundBase;
 
 namespace patter { class AudioResolver; }
 
@@ -31,6 +37,18 @@ public:
 	// The full path of a beat's winning audio take, or empty when it has none.
 	UFUNCTION(BlueprintPure, Category = "Patterplay|Audio")
 	FString Resolve(const FString& BeatId) const;
+
+	// Optional: the sound asset a beat's take became when the audio folder was imported under ContentRoot, as
+	// a soft pointer, or a null one when the beat has no take. The manifest's file, without its extension,
+	// under the root: with ContentRoot "VO" (or "/Game/VO"), vo/L1.wav is /Game/VO/vo/L1.L1. A root that
+	// starts with "/" is kept as it is (a plugin's content, say). Characters an asset name can't hold become
+	// "_", as the import makes them. Resolves only: load it yourself, asynchronously in a big game.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Audio")
+	TSoftObjectPtr<USoundBase> SoundAsset(const FString& BeatId, const FString& ContentRoot) const;
+
+	// Optional: SoundAsset, loaded synchronously. Null when the beat has no take or the asset isn't there.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay|Audio")
+	USoundBase* LoadSound(const FString& BeatId, const FString& ContentRoot) const;
 
 protected:
 	// Read a manifest into a resolver Create made.

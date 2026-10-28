@@ -1,7 +1,8 @@
 // The Unity tour demo: play the interactive Patter tour. Mirrors the web / Unreal / Godot tour
-// demos: step the flow, offer the choices, and (optionally) play each line's WINNING take via the
-// patteraudio.json resolver (PatterAudioResolver) - whatever rung the audio folder holds; no rung
-// is hard-coded here.
+// demos: the thin runner (PatterRunner) hands over each beat, the demo shows it, offers the choices,
+// and (optionally) plays each line's WINNING take via the patteraudio.json resolver
+// (PatterAudioResolver) - whatever rung the audio folder holds; no rung is hard-coded here. The UI
+// and the audio are the demo's own: the runner only says what comes next.
 //
 // Setup: none. Import this sample, open the Tour scene beside this file, press Play - the scene
 // already carries a wired-up TourDemo. (Or drop TourDemo on any GameObject and assign the
@@ -29,11 +30,11 @@ namespace Patterkit.Patterplay.Samples
         public bool PlayAudio = true;
 
         private Engine _engine;
-        private Flow _flow;
+        private PatterRunner _runner;
         private PatterAudioResolver _audio;
         private AudioSource _source;
         private readonly List<string> _transcript = new List<string>();
-        private StepResult _pending; // the step whose controls are on screen (choice), or null
+        private List<ChoiceOption> _options; // the choice whose controls are on screen, or null
         private bool _ended;
         private Vector2 _scroll;
 
@@ -60,6 +61,19 @@ namespace Patterkit.Patterplay.Samples
                     Debug.LogWarning($"TourDemo: no patteraudio.json under '{root}' - playing silently.");
             }
 
+            // Each beat the runner delivers waits for Next() (the Next button); a choice waits for Choose().
+            _runner = new PatterRunner(_engine);
+            _runner.Line += step =>
+            {
+                // The speaker's label, the name and any qualifier already put together: TAM (O.S.)
+                Show($"<b>{(step.SpeakerLabel ?? step.Character ?? "").ToUpperInvariant()}</b>  {Fmt(step.Text)}");
+                PlayClip(step.Id);
+            };
+            _runner.Text += step => { Show(Fmt(step.Text)); PlayClip(step.Id); };
+            _runner.GameEvent += step => Show($"⚙ game event {step.Id}");
+            _runner.Choice += (groupId, options) => { _options = options; _scroll.y = float.MaxValue; };
+            _runner.Ended += () => { Show("· The End ·"); _ended = true; };
+
             StartRun();
         }
 
@@ -76,39 +90,14 @@ namespace Patterkit.Patterplay.Samples
         {
             _transcript.Clear();
             _ended = false;
-            _flow = _engine.OpenFlow("main"); // the project's start scene
-            Step();
+            _options = null;
+            _runner.Begin(); // the project's start scene; a replay begins the story again
         }
 
-        private void Step()
+        private void Show(string line)
         {
-            var step = _flow.Advance();
-            switch (step.Type)
-            {
-                case StepType.Line:
-                    // The speaker's label, the name and any qualifier already put together: TAM (O.S.)
-                    _transcript.Add($"<b>{(step.SpeakerLabel ?? step.Character ?? "").ToUpperInvariant()}</b>  {Fmt(step.Text)}");
-                    PlayClip(step.Id);
-                    _pending = null;
-                    break;
-                case StepType.Text:
-                    _transcript.Add(Fmt(step.Text));
-                    PlayClip(step.Id);
-                    _pending = null;
-                    break;
-                case StepType.GameEvent:
-                    _transcript.Add($"⚙ game event {step.Id}");
-                    _pending = null;
-                    break;
-                case StepType.Choice:
-                    _pending = step;
-                    break;
-                case StepType.End:
-                    _transcript.Add("· The End ·");
-                    _ended = true;
-                    _pending = null;
-                    break;
-            }
+            _transcript.Add(line);
+            _options = null;
             _scroll.y = float.MaxValue;
         }
 
@@ -152,19 +141,19 @@ namespace Patterkit.Patterplay.Samples
             {
                 if (GUILayout.Button("↺ Play again", GUILayout.Height(32))) StartRun();
             }
-            else if (_pending != null)
+            else if (_options != null)
             {
-                foreach (var o in _pending.Options)
+                foreach (var o in _options)
                 {
                     GUI.enabled = o.Eligible;
-                    if (GUILayout.Button(Plain(o.Prompt?.Text ?? "(choice)"), GUILayout.Height(32))) { _flow.Choose(o.Id); Step(); break; }
+                    if (GUILayout.Button(Plain(o.Prompt?.Text ?? "(choice)"), GUILayout.Height(32))) { _options = null; _runner.Choose(o.Id); break; }
                     GUI.enabled = true;
                 }
                 GUI.enabled = true;
             }
             else if (GUILayout.Button("▸ Next", GUILayout.Height(32)))
             {
-                Step();
+                _runner.Next();
             }
 
             GUILayout.EndArea();

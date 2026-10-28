@@ -41,6 +41,8 @@
     <Compile Include="AudioChecks.cs" />
     <!-- The runtime foundations before 1.0: set-up reports, host-write refusals, the copies handed out. -->
     <Compile Include="FoundationsChecks.cs" />
+    <!-- The thin runner (PatterRunner): the flow API as events (a port of the JS play-helpers tests). -->
+    <Compile Include="RunnerChecks.cs" />
     <!-- The registry corpus runner, vendored from expr/ports/unity/testing. -->
     <Compile Include="RegistryCorpus.cs" />
     <Compile Include="../Patterplay/Runtime/**/*.cs" />

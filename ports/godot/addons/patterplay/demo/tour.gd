@@ -1,7 +1,8 @@
 # The Godot tour demo: play the interactive Patter tour. Mirrors the web / Unity / Unreal tour
-# demos: step the flow, offer the choices, and (optionally) play each line's WINNING take via the
-# patteraudio.json resolver (PatterAudioResolver) - whatever rung the audio folder holds; no rung is
-# hard-coded here.
+# demos: a PatterRunner hands over each beat, the demo shows it and offers Next or the choices, and
+# (optionally) plays each line's WINNING take via the patteraudio.json resolver (PatterAudioResolver) -
+# whatever rung the audio folder holds; no rung is hard-coded here. The UI and the audio are the demo's
+# own: the runner dictates neither.
 #
 # The bundle ships INSIDE the addon (demo/tour.patterc), so the demo runs straight from the
 # downloaded zip. Audio files are NOT bundled (playback is your platform call): inside the
@@ -16,7 +17,7 @@ extends Control
 const PatterAudioResolverScript := preload("res://addons/patterplay/runtime/audio_resolver.gd")
 
 var _engine: PatterEngine
-var _flow: PatterFlow
+var _runner := PatterRunner.new()
 var _audio = null  # PatterAudioResolver, or null when the manifest is missing
 var _audio_base: String = ""
 
@@ -28,6 +29,7 @@ var _audio_base: String = ""
 
 
 func _ready() -> void:
+	add_child(_runner)
 	# The bundle ships with the addon, so the demo runs straight from a downloaded zip.
 	var json := FileAccess.get_file_as_string("res://addons/patterplay/demo/tour.patterc")
 	if json == "":
@@ -38,6 +40,12 @@ func _ready() -> void:
 		_append("[demo] tour bundle failed to parse")
 		return
 	_engine = PatterEngine.new(bundle)
+	_runner.attach(_engine)
+	_runner.line.connect(_on_line)
+	_runner.text.connect(_on_text)
+	_runner.game_event.connect(_on_game_event)
+	_runner.choice.connect(func(step: Dictionary) -> void: _show_choices(step["options"]))
+	_runner.ended.connect(_on_ended)
 
 	# Audio is optional and NOT bundled: inside the PatterKit repo the shared scratch takes are
 	# picked up automatically; elsewhere, point _audio_base at your own Patter audio folder.
@@ -53,31 +61,31 @@ func _ready() -> void:
 func _start() -> void:
 	for child in _transcript.get_children():
 		child.queue_free()
-	_flow = _engine.open_flow("main", "")  # the project's start scene
-	_step()
+	_runner.begin()  # the project's start scene; a later begin() starts the story again
 
 
-func _step() -> void:
-	var step: Dictionary = _flow.advance()
-	match step["type"]:
-		"line":
-			# The speaker's label: the shown name, with its qualifier as the project words it.
-			var who: String = step.get("speakerLabel", step.get("character", ""))
-			_append("[b]%s[/b]  %s" % [who.to_upper(), _fmt(step["text"])])
-			_play_clip(step["id"])
-			_show_next()
-		"text":
-			_append("[i]%s[/i]" % _fmt(step["text"]))
-			_play_clip(step["id"])
-			_show_next()
-		"gameEvent":
-			_append("[color=#8a8069]⚙ game event %s[/color]" % step["id"])
-			_show_next()
-		"choice":
-			_show_choices(step["options"])
-		"end":
-			_append("[center]· The End ·[/center]")
-			_show_restart()
+func _on_line(step: Dictionary) -> void:
+	# The speaker's label: the shown name, with its qualifier as the project words it.
+	var who: String = step.get("speakerLabel", step.get("character", ""))
+	_append("[b]%s[/b]  %s" % [who.to_upper(), _fmt(step["text"])])
+	_play_clip(step["id"])
+	_show_next()
+
+
+func _on_text(step: Dictionary) -> void:
+	_append("[i]%s[/i]" % _fmt(step["text"]))
+	_play_clip(step["id"])
+	_show_next()
+
+
+func _on_game_event(step: Dictionary) -> void:
+	_append("[color=#8a8069]⚙ game event %s[/color]" % step["id"])
+	_show_next()
+
+
+func _on_ended() -> void:
+	_append("[center]· The End ·[/center]")
+	_show_restart()
 
 
 ## Fire the beat's winning take, if the manifest resolves one for it.
@@ -123,7 +131,7 @@ func _append(bbcode: String) -> void:
 
 
 func _show_next() -> void:
-	_set_controls([_button("▸ Next", _step)])
+	_set_controls([_button("▸ Next", _runner.next)])
 
 
 func _show_choices(options: Array) -> void:
@@ -132,9 +140,7 @@ func _show_choices(options: Array) -> void:
 		var opt: Dictionary = o
 		var prompt: Dictionary = opt.get("prompt", {})
 		var label: String = _plain(prompt.get("text", "(choice)"))
-		var b := _button(label, func() -> void:
-			_flow.choose(opt["id"])
-			_step())
+		var b := _button(label, func() -> void: _runner.choose(opt["id"]))
 		b.disabled = not opt.get("eligible", true)
 		buttons.append(b)
 	_set_controls(buttons)

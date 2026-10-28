@@ -266,6 +266,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (AdvancedDisplay = "Block,bUseSeed,Seed"))
 	UPatterFlow* OpenFlow(const FString& Id, const FString& Scene, const FString& Block = TEXT(""), bool bUseSeed = false, int64 Seed = 0);
 
+	// OpenFlow for C++ callers that report why it was refused (UPatterRunnerComponent): the same call, with
+	// the refusal also handed back in OutRefusal ("" when the flow opened).
+	UPatterFlow* OpenFlowOrRefuse(const FString& Id, const FString& Scene, const FString& Block, FString& OutRefusal, bool bUseSeed = false, int64 Seed = 0);
+
 	// Every open flow.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	TArray<UPatterFlow*> Flows();

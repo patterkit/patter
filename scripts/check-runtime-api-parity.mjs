@@ -25,15 +25,15 @@ const read = (rel) => (existsSync(resolve(root, rel)) ? readFileSync(resolve(roo
 
 /** The surfaces we hold to parity. `bp` (the Unreal Blueprint wrapper) is the API Unreal USERS see. */
 const SURFACES = {
-  js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/engine.ts", "packages/runtime/src/describe.ts", "packages/runtime/src/gamedata.ts", "packages/play-helpers/src/bundle-inspector.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts"] },
-  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/GameDataHelpers.cs", "ports/unity/Patterplay/Runtime/BundleDescription.cs", "ports/unity/Patterplay/Editor/PatterBundleAssetEditor.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs"] },
+  js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/engine.ts", "packages/runtime/src/describe.ts", "packages/runtime/src/gamedata.ts", "packages/play-helpers/src/bundle-inspector.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts", "packages/play-helpers/src/runner.ts"] },
+  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/GameDataHelpers.cs", "ports/unity/Patterplay/Runtime/BundleDescription.cs", "ports/unity/Patterplay/Editor/PatterBundleAssetEditor.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs", "ports/unity/Patterplay/Runtime/PatterRunner.cs"] },
   godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/bundle.gd", "ports/godot/addons/patterplay/runtime/describe.gd", "ports/godot/addons/patterplay/editor/patter_bundle_inspector_plugin.gd", "ports/godot/addons/patterplay/runtime/logger.gd",
       // The vendored shared core the logger extends: diff_state and friends are declared
       // there and inherited, and the addon ships both files.
       "ports/godot/addons/patterplay/runtime/expr/state_logger.gd",
-      "ports/godot/addons/patterplay/runtime/save.gd"] },
-  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Bundle.h", "ports/unreal/Patterplay/Source/PatterplayEditor/Private/PatterBundleDetails.cpp", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h"] },
-  bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterSave.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterGameData.h"] },
+      "ports/godot/addons/patterplay/runtime/save.gd", "ports/godot/addons/patterplay/runtime/runner.gd"] },
+  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Bundle.h", "ports/unreal/Patterplay/Source/PatterplayEditor/Private/PatterBundleDetails.cpp", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Runner.h"] },
+  bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterSave.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterGameData.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterRunnerComponent.h"] },
 };
 
 /** How a declaration of `name` looks in each language. */
@@ -56,6 +56,15 @@ const DECL = {
 // the member genuinely does not belong on that surface (with a reason - never use null to paper over
 // a gap). C++ uses `gotoAddress` because `goto` is a reserved word.
 const API = [
+  // --- the thin runner (hands-on review ruling 1, Q5 2026-10-28): the flow API turned from pull to push.
+  // Its events are each runtime's idiom (JS `on`, Unity UnityEvents and C# events, Godot signals, Unreal
+  // multicast delegates), so only the calls are held here.
+  { on: "Runner", js: "begin", unity: "Begin", godot: "begin", unreal: "begin", bp: "Begin" },
+  { on: "Runner", js: "next", unity: "Next", godot: "next", unreal: "next", bp: "Next" },
+  { on: "Runner", js: "choose", unity: "Choose", godot: "choose", unreal: "choose", bp: "Choose" },
+  { on: "Runner", js: "stop", unity: "Stop", godot: "stop", unreal: "stop", bp: "Stop" },
+  { on: "Runner", js: "rebind", unity: "Rebind", godot: "rebind", unreal: "rebind", bp: "Rebind" },
+
   // --- playing a flow -------------------------------------------------------
   { on: "Flow", js: "advance", unity: "Advance", godot: "advance", unreal: "advance", bp: "Advance" },
   { on: "Flow", js: "advanceToStop", unity: "AdvanceToStop", godot: "advance_to_stop", unreal: "advanceToStop", bp: "AdvanceToStop" },

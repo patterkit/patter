@@ -109,6 +109,7 @@ namespace Patterkit.Patterplay.TestHost
             RunPlayErrorChecks();
             RunOldSaveRuleChecks();
             RunFoundationsChecks();
+            RunRunnerChecks();
 
             RunDescribeSmoke();
             RunAudioJoinCheck();

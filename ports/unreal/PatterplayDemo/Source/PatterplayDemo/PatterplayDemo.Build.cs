@@ -15,6 +15,7 @@ public class PatterplayDemo : ModuleRules
 			"InputCore",
 			"Slate",
 			"SlateCore",
+			"UMG",   // the UMG example widget (TourRunnerWidget)
 			"PatterplayRuntime",
 		});
 	}

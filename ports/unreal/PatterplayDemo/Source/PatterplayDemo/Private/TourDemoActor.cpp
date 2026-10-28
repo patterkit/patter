@@ -1,5 +1,7 @@
 #include "TourDemoActor.h"
 #include "PatterEngine.h"
+#include "PatterRunnerComponent.h"
+#include "TourRunnerWidget.h"
 #include "PatterBundle.h"
 #include "PatterAudioResolver.h"
 #include "PatterDebug.h"
@@ -80,18 +82,38 @@ ATourDemoActor::ATourDemoActor()
 	Voice = CreateDefaultSubobject<UAudioComponent>(TEXT("Voice"));
 	Voice->bAutoActivate = false;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	Runner = CreateDefaultSubobject<UPatterRunnerComponent>(TEXT("Runner"));
 }
 
 void ATourDemoActor::BeginPlay()
 {
 	Super::BeginPlay();
-	BuildUi();
 
 	// A dialogue demo wants a cursor and clickable buttons, not game input.
-	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (PC)
 	{
 		PC->bShowMouseCursor = true;
 		PC->SetInputMode(FInputModeUIOnly());
+	}
+
+	// Who shows the beats: the UMG example, which the demo only voices, or the Slate transcript.
+	if (bUseUmgExample && PC)
+	{
+		UmgWidget = CreateWidget<UTourRunnerWidget>(PC, UTourRunnerWidget::StaticClass());
+		UmgWidget->AddToViewport();
+		UmgWidget->Bind(Runner);
+		Runner->OnLine.AddDynamic(this, &ATourDemoActor::HandleVoice);
+		Runner->OnText.AddDynamic(this, &ATourDemoActor::HandleVoice);
+	}
+	else
+	{
+		BuildUi();
+		Runner->OnLine.AddDynamic(this, &ATourDemoActor::HandleLine);
+		Runner->OnText.AddDynamic(this, &ATourDemoActor::HandleText);
+		Runner->OnGameEvent.AddDynamic(this, &ATourDemoActor::HandleGameEvent);
+		Runner->OnChoice.AddDynamic(this, &ATourDemoActor::HandleChoice);
+		Runner->OnEnded.AddDynamic(this, &ATourDemoActor::HandleEnded);
 	}
 
 	// The bundle: an assigned asset wins; otherwise load the .patterc shipped beside the project.
@@ -125,6 +147,8 @@ void ATourDemoActor::EndPlay(const EEndPlayReason::Type Reason)
 	if (RootWidget.IsValid() && GetWorld() && GetWorld()->GetGameViewport())
 		GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(RootWidget.ToSharedRef());
 	RootWidget.Reset();
+	if (UmgWidget) UmgWidget->RemoveFromParent();
+	UmgWidget = nullptr;
 	Super::EndPlay(Reason);
 }
 
@@ -168,70 +192,78 @@ void ATourDemoActor::BuildUi()
 void ATourDemoActor::StartTour()
 {
 	GetWorldTimerManager().ClearTimer(StepTimer);
-	Transcript->ClearChildren();
+	if (Transcript.IsValid()) Transcript->ClearChildren();
 	ClearChoices();
 
 	Engine = UPatterEngine::Create(Bundle ? Bundle : LoadedBundle, {});
 	if (!Engine) { AddLine(TEXT(""), TEXT("TourDemo: the bundle did not parse."), NoticeColour); return; }
 	FPatterDebug::Register(Engine, TEXT("Tour demo")); // visible in Window > Patterplay Runtime State
-	Flow = Engine->OpenFlow(TEXT("main"), TEXT(""));   // the project's start scene
-	if (!Flow) { AddLine(TEXT(""), TEXT("TourDemo: no 'main' flow in the bundle."), NoticeColour); return; }
-
-	Step();
+	Runner->SetEngine(Engine, TEXT("main"));
+	const FString Refusal = Runner->Begin();   // the project's start scene; the first beat arrives at once
+	if (!Refusal.IsEmpty()) AddLine(TEXT(""), FString::Printf(TEXT("TourDemo: %s"), *Refusal), NoticeColour);
 }
 
-void ATourDemoActor::Step()
+void ATourDemoActor::Advance()
 {
-	const FPatterStep S = Flow->Advance();
-	float Hold = StepDelay;
-	switch (S.Type)
-	{
-		case EPatterStepType::Line:
-		{
-			// The speaker's label is the name to show, a qualifier included (TAM (O.S.)), already put together
-			// and translated; an IDs-only build has none, so the token stands in.
-			const FString Speaker = (S.bHasSpeakerLabel ? S.SpeakerLabel : S.Character).ToUpper();
-			AddLine(Speaker, S.Text, LineColour);
-			const float Clip = PlayClip(S.Id);
-			if (Clip > 0.f) Hold = Clip + 0.25f; // a voiced line holds for its take
-			break;
-		}
-		case EPatterStepType::Text:
-			AddLine(TEXT(""), S.Text, NarrationColour);
-			{ const float Clip = PlayClip(S.Id); if (Clip > 0.f) Hold = Clip + 0.25f; }
-			break;
-		case EPatterStepType::GameEvent:
-			AddLine(TEXT(""), FString::Printf(TEXT("[game event] %s"), *S.Id), EventColour);
-			break;
-		case EPatterStepType::Choice:
-			ShowChoices(S);   // the player clicks; stepping resumes in OnChoose
-			return;
-		case EPatterStepType::End:
-		{
-			AddLine(TEXT(""), TEXT("- The End -"), NoticeColour);
-			// Offer another run: the tour branches, so a replay actually differs.
-			ChoiceBox->AddSlot().AutoHeight().Padding(0.f, 4.f)
-			[
-				SNew(SButton)
-				.HAlign(HAlign_Center)
-				.OnClicked(FOnClicked::CreateWeakLambda(this, [this]() { ClearChoices(); StartTour(); return FReply::Handled(); }))
-				[
-					SNew(STextBlock)
-					.Text(NSLOCTEXT("TourDemo", "Replay", "Play again"))
-					.Font(FCoreStyle::GetDefaultFontStyle("Bold", 14))
-				]
-			];
-			return;
-		}
-	}
-	GetWorldTimerManager().SetTimer(StepTimer, this, &ATourDemoActor::Step, Hold, false);
+	Runner->Next();
 }
 
-void ATourDemoActor::ShowChoices(const FPatterStep& S)
+void ATourDemoActor::HoldThenAdvance(float Hold)
 {
+	GetWorldTimerManager().SetTimer(StepTimer, this, &ATourDemoActor::Advance, Hold, false);
+}
+
+void ATourDemoActor::HandleLine(const FPatterStep& Step)
+{
+	// The speaker's label is the name to show, a qualifier included (TAM (O.S.)), already put together
+	// and translated; an IDs-only build has none, so the token stands in.
+	const FString Speaker = (Step.bHasSpeakerLabel ? Step.SpeakerLabel : Step.Character).ToUpper();
+	AddLine(Speaker, Step.Text, LineColour);
+	const float Clip = PlayClip(Step.Id);
+	HoldThenAdvance(Clip > 0.f ? Clip + 0.25f : StepDelay); // a voiced line holds for its take
+}
+
+void ATourDemoActor::HandleText(const FPatterStep& Step)
+{
+	AddLine(TEXT(""), Step.Text, NarrationColour);
+	const float Clip = PlayClip(Step.Id);
+	HoldThenAdvance(Clip > 0.f ? Clip + 0.25f : StepDelay);
+}
+
+void ATourDemoActor::HandleGameEvent(const FPatterStep& Step)
+{
+	AddLine(TEXT(""), FString::Printf(TEXT("[game event] %s"), *Step.Id), EventColour);
+	HoldThenAdvance(StepDelay);
+}
+
+void ATourDemoActor::HandleVoice(const FPatterStep& Step)
+{
+	PlayClip(Step.Id);
+}
+
+void ATourDemoActor::HandleEnded()
+{
+	AddLine(TEXT(""), TEXT("- The End -"), NoticeColour);
+	// Offer another run: the tour branches, so a replay actually differs.
+	ChoiceBox->AddSlot().AutoHeight().Padding(0.f, 4.f)
+	[
+		SNew(SButton)
+		.HAlign(HAlign_Center)
+		.OnClicked(FOnClicked::CreateWeakLambda(this, [this]() { ClearChoices(); StartTour(); return FReply::Handled(); }))
+		[
+			SNew(STextBlock)
+			.Text(NSLOCTEXT("TourDemo", "Replay", "Play again"))
+			.Font(FCoreStyle::GetDefaultFontStyle("Bold", 14))
+		]
+	];
+}
+
+void ATourDemoActor::HandleChoice(const FString& GroupId, const TArray<FPatterOption>& Options)
+{
+	// The player clicks; OnChoose hands the pick to the runner.
 	ClearChoices();
 	bool bAny = false;
-	for (const FPatterOption& O : S.Options)
+	for (const FPatterOption& O : Options)
 	{
 		bAny |= O.bEligible;
 		ChoiceBox->AddSlot().AutoHeight().Padding(0.f, 3.f)
@@ -252,9 +284,9 @@ void ATourDemoActor::ShowChoices(const FPatterStep& S)
 	}
 	if (!bAny)
 	{
-		// No eligible option: the flow gathers past the choice on the next advance.
+		// No eligible option: the flow gathers past the choice on the next Next.
 		AddLine(TEXT(""), TEXT("(no eligible option - the choice falls through)"), NoticeColour);
-		GetWorldTimerManager().SetTimer(StepTimer, this, &ATourDemoActor::Step, StepDelay, false);
+		HoldThenAdvance(StepDelay);
 	}
 }
 
@@ -262,17 +294,19 @@ void ATourDemoActor::OnChoose(const FString& OptionId, const FString& OptionText
 {
 	ClearChoices();
 	AddLine(TEXT(""), FString::Printf(TEXT("> %s"), *OptionText), PickedColour);
-	Flow->Choose(OptionId);
-	GetWorldTimerManager().SetTimer(StepTimer, this, &ATourDemoActor::Step, 0.35f, false);
+	// A short beat after the pick, then the runner plays what it leads to.
+	GetWorldTimerManager().SetTimer(StepTimer, FTimerDelegate::CreateWeakLambda(this, [this, OptionId]() { Runner->Choose(OptionId); }), 0.35f, false);
 }
 
 void ATourDemoActor::ClearChoices()
 {
-	ChoiceBox->ClearChildren();
+	if (ChoiceBox.IsValid()) ChoiceBox->ClearChildren();
 }
 
 void ATourDemoActor::AddLine(const FString& Speaker, const FString& Text, const FLinearColor& Colour)
 {
+	UE_LOG(LogTemp, Display, TEXT("%s%s%s"), *Speaker, Speaker.IsEmpty() ? TEXT("") : TEXT("  "), *Text);
+	if (!Transcript.IsValid()) return;   // the UMG example shows the beats itself
 	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
 	if (!Speaker.IsEmpty())
 	{
@@ -295,8 +329,6 @@ void ATourDemoActor::AddLine(const FString& Speaker, const FString& Text, const 
 		[Row]
 	];
 	Transcript->ScrollToEnd();
-
-	UE_LOG(LogTemp, Display, TEXT("%s%s%s"), *Speaker, Speaker.IsEmpty() ? TEXT("") : TEXT("  "), *Text);
 }
 
 float ATourDemoActor::PlayClip(const FString& BeatId)

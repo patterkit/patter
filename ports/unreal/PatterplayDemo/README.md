@@ -33,7 +33,10 @@ State** shows the story's properties live.
 
 - **`ATourDemoActor`** - the interactive tour above. Auto-spawned by `ATourDemoGameMode`,
   or place one in your own level (assign an imported `UPatterBundle` to override the
-  from-disk default).
+  from-disk default). It plays through the **Patter Runner** component: each beat arrives
+  as an event, and the actor calls `Next` when its timer runs out, or `Choose` when you
+  click. Tick **Use Umg Example** to see the beats in `UTourRunnerWidget` instead, a small
+  UMG widget built in C++ (one beat at a time, with a Continue button).
 - **`APatterplayDemoActor`** + `Demos/demo.patterc` - the minimal shared API flow every
   Patterplay runtime plays, logged to the Output Log: the smallest possible integration to
   read first.

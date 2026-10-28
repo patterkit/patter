@@ -1,8 +1,9 @@
 # Tour demo
 
 Plays **the interactive Patter tour** inside Unity: a scrolling OnGUI transcript with clickable
-choices, driven by the same step loop your game will use. The tour is itself a Patter story that
-walks through choices, selectors, properties, conditions, and closed captions.
+choices, driven by the thin runner (`PatterRunner`), which hands each beat over as an event. The
+tour is itself a Patter story that walks through choices, selectors, properties, conditions, and
+closed captions.
 
 ## Run it
 
@@ -28,8 +29,10 @@ Leave the field empty and the tour plays silently.
 ## What it demonstrates
 
 - Loading a compiled bundle through the **PatterBundleAsset** importer and `CreateEngine()`.
-- The step loop: `OpenFlow` → `Advance()` → render `Line` / `Text` / `GameEvent`, offer `Choice`
-  options (ineligible ones disabled), handle `End`.
+- The thin runner, for straightforward games: `Begin()`, then its `Line` / `Text` / `GameEvent`
+  events each wait for `Next()` (the Next button), `Choice` offers its options (ineligible ones
+  disabled) and waits for `Choose(id)`, and `Ended` ends the run. The transcript and the audio are
+  the demo's own: the runner dictates neither.
 - Runtime audio **resolution** (resolve-not-play) via `PatterAudioResolver`.
 
 The demo is deliberately plain (a transcript + buttons) so the Patter integration is the only

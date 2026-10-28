@@ -43,6 +43,21 @@ Changes marked **Breaking (1.0)** change what an existing game sees. The conform
   rather than to `LogTemp`.
 - **`FPatterDebugLink::TypeName(Step.Type)`** spells a step's type for `Observe`, as Unity's
   `PatterDebugLink.TypeName` does. The docs named a `StepTypeName` that never existed.
+- **The Patter Runner component** (`UPatterRunnerComponent`, "Patter Runner"; `patter::Runner` in the core's
+  `Patter/Runner.h`): the flow API turned from pull to push, for straightforward games. `Begin(Scene, Block)`
+  opens the flow (or moves it there, or with no scene starts the story again) and delivers the first beat;
+  each line, text, or game event arrives on `OnLine`, `OnText`, or `OnGameEvent` and waits for `Next`, a
+  choice arrives on `OnChoice` and waits for `Choose`, and the end raises `OnEnded`. Handlers may call
+  `Next` or `Choose` themselves without deepening the stack, `Stop` drops what they asked for, and `Rebind`
+  hands it a new engine. It dictates no UI and no audio, and keeps no save state: `OnLine` carries the step
+  with its beat id, and the engine's save and load stay the one way to save. `Begin`, `Next`, and `Choose`
+  return why they were refused (`""` when they weren't), keep it in `GetLastError`, and log it. The same
+  runner on all four runtimes; a fuller dialogue manager for more complex games, Patterstage, is coming.
+  `UPatterEngine::OpenFlowOrRefuse` is `OpenFlow` with the refusal handed back, for C++ callers.
+- **An optional sound-asset lookup** on `UPatterAudioResolver`: `SoundAsset(BeatId, ContentRoot)` gives the
+  `TSoftObjectPtr<USoundBase>` a beat's take became when the audio folder was imported under a content root
+  (`/Game/<root>/<file without its extension>`), and `LoadSound` loads it synchronously. Nothing else uses
+  them; a big game loads the soft pointer asynchronously itself.
 
 ### Changed
 

@@ -508,7 +508,14 @@ UPatterWorld* UPatterEngine::GetHostScope(const FString& Token) const
 
 UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene, const FString& Block, bool bUseSeed, int64 Seed)
 {
-	if (!Engine) return nullptr;
+	FString Refusal;
+	return OpenFlowOrRefuse(Id, Scene, Block, Refusal, bUseSeed, Seed);
+}
+
+UPatterFlow* UPatterEngine::OpenFlowOrRefuse(const FString& Id, const FString& Scene, const FString& Block, FString& OutRefusal, bool bUseSeed, int64 Seed)
+{
+	OutRefusal.Reset();
+	if (!Engine) { OutRefusal = TEXT("the engine has no core"); return nullptr; }
 	DeliverHeldErrors();   // what the engine reported while it was built, now OnError can have been bound
 	try
 	{
@@ -522,7 +529,12 @@ UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene, co
 		WrappedFlows.Add(Flow); // so a live hot swap can re-bind the wrapper by id
 		return Flow;
 	}
-	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
+	catch (const std::exception& Ex)
+	{
+		OutRefusal = UTF8_TO_TCHAR(Ex.what());
+		UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), *OutRefusal);
+		return nullptr;
+	}
 }
 
 TArray<UPatterFlow*> UPatterEngine::Flows()

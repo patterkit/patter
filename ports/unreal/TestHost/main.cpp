@@ -23,6 +23,7 @@
 #include "Patter/Mulberry32.h"
 #include "Patter/BundleJson.h"
 #include "Patter/Audio.h"
+#include "Patter/Runner.h"
 #include "../Patterplay/Source/PatterplayRuntime/Private/Tests/PatterBundleReaderCase.h"   // shared with the plugin's test
 #include "RegistryCorpus.h"   // the shared registry corpus runner, vendored from ../expr
 
@@ -2689,6 +2690,200 @@ static void runFlowStateCases()
     std::cout << "  [flow-state] flows captured as data, restored under any id, and refused where they must be: " << g_fsPass << "/" << g_fsTotal << "\n";
 }
 
+// ----- runner -----------------------------------------------------------------------------------------
+//
+// The thin runner (Patter/Runner.h): the flow API turned from pull to push. Ports of the JS reference's
+// runner.test.ts (packages/play-helpers/test), over its bundle as the JS compiler exports it: each
+// delivered beat waits for next(), a choice for choose(), and the end raises ended; handlers that call
+// next() themselves don't deepen the stack; stop() drops what was asked for and leaves the flow where it
+// is; a later begin(scene) moves the same flow, keeping the playthrough; rebind() plays on after a hot swap.
+
+static int g_runPass = 0, g_runTotal = 0;
+
+static void runCase(const std::string& name, const std::function<void()>& body)
+{
+    ++g_runTotal;
+    try { body(); ++g_runPass; }
+    catch (const std::exception& ex) { fail("runner", name, ex.what()); }
+}
+
+// talk: a line, a text and a game event, then a choice of two options, each a line and the end. shop: one
+// line and the end.
+static const Bundle& runnerBundle()
+{
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"run","hash":"1mn9ico","structureHash":"1bg0cg5"},"voiced":false,"locales":{"default":"en","included":["en"]},"cast":[{"name":"NPC"}],"scenes":{"talk":{"id":"talk","type":"scene","name":"Talk","blocks":[{"id":"b1","type":"block","name":"B1","children":[{"id":"sn1","type":"snippet","beats":[{"id":"L1","kind":"line","character":"NPC"},{"id":"T1","kind":"text","action":true},{"id":"E1","kind":"gameEvent"}]},{"id":"grp","type":"group","selector":"choice","children":[{"id":"opt_a","type":"group","children":[{"id":"sn_a","type":"snippet","beats":[{"id":"L_a","kind":"line","character":"NPC"}],"jump":{"to":"END"}}],"prompt":{"id":"C_a","kind":"text"}},{"id":"opt_b","type":"group","children":[{"id":"sn_b","type":"snippet","beats":[{"id":"L_b","kind":"line","character":"NPC"}],"jump":{"to":"END"}}],"prompt":{"id":"C_b","kind":"text"}}]}]}]},"shop":{"id":"shop","type":"scene","name":"Shop","blocks":[{"id":"b2","type":"block","name":"B2","children":[{"id":"sn_s","type":"snippet","beats":[{"id":"L_s","kind":"line","character":"NPC"}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"L1":"Hello.","T1":"A door creaks.","C_a":"Ask.","C_b":"Leave.","L_a":"Asked.","L_b":"Bye.","L_s":"Welcome."}}})JSON"));
+    return b;
+}
+
+/** A runner whose every event is written down as kind:id. */
+struct Recorded
+{
+    std::unique_ptr<Engine> engine = standalone(runnerBundle(), 0);
+    Runner runner{*engine};
+    std::vector<std::string> seen;
+    Recorded()
+    {
+        runner.onLine([this](const StepResult& s) { seen.push_back("line:" + s.id); });
+        runner.onText([this](const StepResult& s) { seen.push_back("text:" + s.id); });
+        runner.onGameEvent([this](const StepResult& s) { seen.push_back("gameEvent:" + s.id); });
+        runner.onChoice([this](const RunnerChoice& c)
+        {
+            std::string ids;
+            for (const ChoiceOption& o : c.options) ids += (ids.empty() ? "" : ",") + o.id;
+            seen.push_back("choice:" + ids);
+        });
+        runner.onEnded([this] { seen.push_back("ended"); });
+    }
+    std::string last() const { return seen.empty() ? std::string() : seen.back(); }
+};
+
+static void expectSeen(const std::vector<std::string>& got, const std::vector<std::string>& want, const std::string& what)
+{
+    if (got != want) throw std::runtime_error(what + ": expected [" + joined(want) + "], got [" + joined(got) + "]");
+}
+
+static void runRunnerCases()
+{
+    runCase("delivers one beat per next(), a game event included, then the choice, then the end", []
+    {
+        Recorded r;
+        r.runner.begin("talk");
+        expectSeen(r.seen, {"line:L1"}, "after start");
+        r.runner.next();
+        r.runner.next();
+        expectSeen(r.seen, {"line:L1", "text:T1", "gameEvent:E1"}, "after two next()s");
+        r.runner.next();
+        need(r.last() == "choice:opt_a,opt_b", "expected the choice, got " + r.last());
+        r.runner.choose("opt_b");
+        need(r.last() == "line:L_b", "expected line:L_b after choosing, got " + r.last());
+        r.runner.next();
+        need(r.last() == "ended", "expected ended, got " + r.last());
+    });
+
+    runCase("hands each event the step itself", []
+    {
+        auto engine = standalone(runnerBundle(), 0);
+        Runner runner(*engine);
+        std::string text;
+        runner.onLine([&](const StepResult& s) { text = s.speakerLabel + ": " + s.text; });
+        runner.begin("talk");
+        need(text == "NPC: Hello.", "expected \"NPC: Hello.\", got \"" + text + "\"");
+    });
+
+    runCase("starts at the first scene with no address", []
+    {
+        Recorded r;
+        r.runner.begin();
+        expectSeen(r.seen, {"line:L1"}, "after begin()");
+    });
+
+    runCase("plays a whole run from handlers that call next() themselves, without deepening the stack", []
+    {
+        auto engine = standalone(runnerBundle(), 0);
+        Runner runner(*engine);
+        std::vector<std::string> seen;
+        int depth = 0, deepest = 0;
+        const auto step = [&](const StepResult& s) { ++depth; deepest = std::max(deepest, depth); seen.push_back(s.id); runner.next(); --depth; };
+        runner.onLine(step);
+        runner.onText(step);
+        runner.onGameEvent(step);
+        runner.onChoice([&](const RunnerChoice&) { runner.choose("opt_a"); });
+        runner.onEnded([&] { seen.push_back("ended"); });
+        runner.begin("talk");
+        expectSeen(seen, {"L1", "T1", "E1", "L_a", "ended"}, "the run");
+        need(deepest == 1, "handlers nested " + std::to_string(deepest) + " deep");
+    });
+
+    runCase("stop() drops a next() a handler asked for and leaves the flow where it is, unended", []
+    {
+        auto engine = standalone(runnerBundle(), 0);
+        Runner runner(*engine);
+        std::vector<std::string> seen;
+        runner.onLine([&](const StepResult& s) { seen.push_back(s.id); runner.next(); runner.stop(); });
+        runner.onText([&](const StepResult& s) { seen.push_back(s.id); });
+        runner.onEnded([&] { seen.push_back("ended"); });
+        runner.begin("talk");
+        expectSeen(seen, {"L1"}, "after start");
+        need(runner.flow() && !runner.flow()->isEnded(), "the flow ended");
+        runner.next();
+        expectSeen(seen, {"L1", "T1"}, "after next()");
+    });
+
+    runCase("a later begin(scene) moves the same flow, keeping its visit counts", []
+    {
+        Recorded r;
+        r.runner.begin("talk");
+        Flow* flow = r.engine->getFlow("main");
+        r.runner.begin("shop");
+        need(r.engine->getFlow("main") == flow, "begin(\"shop\") opened another flow");
+        need(r.last() == "line:L_s", "expected line:L_s, got " + r.last());
+        auto it = flow->getVisitCounts().find("talk");
+        need(it != flow->getVisitCounts().end() && it->second == 1, "talk's visit count was lost");
+    });
+
+    runCase("begin() on an open flow begins the story again", []
+    {
+        Recorded r;
+        r.runner.begin("shop");
+        r.runner.begin();
+        expectSeen(r.seen, {"line:L_s", "line:L1"}, "after begin(\"shop\") then begin()");
+    });
+
+    runCase("refuses an address that doesn't resolve, and leaves the flow as it was", []
+    {
+        Recorded r;
+        r.runner.begin("talk");
+        expectThrow([&] { r.runner.begin("nowhere"); }, "address not found", "begin(\"nowhere\")");
+        r.runner.next();
+        expectSeen(r.seen, {"line:L1", "text:T1"}, "after the refusal and next()");
+    });
+
+    runCase("refuses a block without its scene on an open flow", []
+    {
+        Recorded r;
+        r.runner.begin("talk");
+        expectThrow([&] { r.runner.begin("", "b1"); }, "a block needs its scene", "begin(\"\", \"b1\")");
+    });
+
+    runCase("refuses next() and choose() before begin()", []
+    {
+        auto engine = standalone(runnerBundle(), 0);
+        Runner runner(*engine);
+        expectThrow([&] { runner.next(); }, "begin() first", "next() before begin()");
+        expectThrow([&] { runner.choose("opt_a"); }, "begin() first", "choose() before begin()");
+    });
+
+    runCase("carries on after a load with next(), and after a hot swap once rebound", []
+    {
+        Recorded r;
+        r.runner.begin("talk");
+        r.runner.next();
+        const SaveGame save = r.engine->saveGame();
+        r.runner.next();
+        r.engine->loadGame(save);
+        r.runner.next();
+        need(r.last() == "gameEvent:E1", "after the load, expected gameEvent:E1, got " + r.last());
+
+        std::unique_ptr<Engine> swapped = r.engine->hotSwap(runnerBundle());
+        r.runner.rebind(*swapped);
+        r.runner.next();
+        need(r.last() == "choice:opt_a,opt_b", "after the hot swap, expected the choice, got " + r.last());
+    });
+
+    runCase("stops listening when asked", []
+    {
+        auto engine = standalone(runnerBundle(), 0);
+        Runner runner(*engine);
+        std::vector<std::string> seen;
+        const Runner::Subscription ticket = runner.onLine([&](const StepResult& s) { seen.push_back(s.id); });
+        runner.off(ticket);
+        runner.begin("talk");
+        expectSeen(seen, {}, "after off()");
+    });
+
+    std::cout << "  [runner] the thin runner: beats pushed as events, next() and choose() queued, stop(), begin() moving the flow, rebind(): " << g_runPass << "/" << g_runTotal << "\n";
+}
+
 static void runOneRegistry()
 {
     runOneRegistryCases();
@@ -3449,6 +3644,7 @@ int main(int argc, char** argv)
     runInspectorSmoke();
     runOneRegistry();
     runFlowStateCases();
+    runRunnerCases();
     runKernelErrorCases();
     runBundleReaderCase();
     runPendingClearedCheck();

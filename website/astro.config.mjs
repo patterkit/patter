@@ -125,6 +125,7 @@ export default defineConfig({
             "play/unity",
             "play/unreal",
             "play/godot",
+            "play/runner",
             "play/engine",
             "play/integration",
             "play/localisation",

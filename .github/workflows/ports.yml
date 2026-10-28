@@ -98,6 +98,8 @@ jobs:
       # returns its refusal, and advance() and choose() keep theirs for last_error().
       - name: Set-up reports, returned refusals, and last_error()
         run: GODOT="$PWD/godot" ports/godot/test/run.sh test_runtime_foundations.gd
+      - name: The thin runner plays a flow as signals, as the JS reference's does
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_runner.gd
 
   # The Unity EDITOR assembly and the samples are not compiled here. A licence is not what
   # makes that hard: an installed, activated Unity compiles from the command line, and

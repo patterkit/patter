@@ -34,6 +34,14 @@ Changes marked **Breaking (1.0)** change what an existing game sees. Pinned by t
   its place has really gone: a gone snippet is skipped; a gone next beat ends its snippet there (its onExit
   and jump run), so nothing plays twice; a gone option offers its choice again; a pending choice none of
   whose options survive is offered again with what its group has now, or play carries on after it.
+- **`PatterRunner`, the thin runner**: the flow API turned from pull to push, for straightforward games. A
+  `Node` that plays one flow (`attach(engine, flow_id)`), emitting `line`, `text`, `game_event`, and
+  `choice` signals for each beat and `ended` at the end; the game calls `next()` when it's ready and
+  `choose(id)` for a choice. `begin(scene, block)` opens the flow, or moves it there once open; `stop()`
+  drops any `next()` a handler asked for; `rebind(engine)` plays on after a hot swap. Handlers may call
+  `next()` themselves without deepening the stack. It dictates no UI and no audio, and keeps no save state.
+  A refusal is `push_error`'d and kept for `runner.last_error()`, as `flow.choose()` keeps its. A fuller
+  dialogue manager for more complex games, Patterstage, is coming. The Tour demo now plays through it.
 
 ### Changed
 

@@ -11,6 +11,15 @@ The runtime foundations before 1.0, from the hands-on review of October 2026. Ch
 
 ### Added
 
+- **The thin runner, `PatterRunner`**: the flow API turned from pull to push, for straightforward games.
+  `Begin(scene, block)` opens the flow (or moves it, or with no scene starts the story again) and delivers the
+  first beat; the `Line`, `Text`, and `GameEvent` events each wait for `Next()`, `Choice` waits for
+  `Choose(id)`, and `Ended` is raised at the end. Handlers may call `Next()` themselves without deepening the
+  stack; `Stop()` drops what they asked for and leaves the flow open and saveable; `Rebind(engine)` plays on
+  after a hot swap. It keeps no save state and dictates no UI and no audio: a line carries its beat id, and
+  the game plays it however it likes. `PatterRunnerBehaviour` wraps it as a component whose UnityEvents a
+  designer wires in the Inspector, with the same `Begin`. The tour demo now plays
+  on it. A fuller dialogue manager for more complex games, Patterstage, is coming.
 - **The project's start scene.** A flow opened, or reset, without a scene starts at the bundle's `start`
   (`Bundle.Start`, a `BundleStart` with `Scene` and `Block`), at its block when it names one, so a game opens
   where the writer chose. A bundle without one starts at the first scene, as before.

@@ -29,5 +29,8 @@ export type { PropertyInspector, PropertyInspectorOptions } from "./inspector.js
 export { createBundleInspector } from "./bundle-inspector.js";
 export type { BundleInspector, BundleInspectorOptions, BundleSection } from "./bundle-inspector.js";
 
+export { Runner } from "./runner.js";
+export type { RunnerEvent, RunnerEvents } from "./runner.js";
+
 export { createAudioResolver } from "./audio.js";
 export type { AudioResolver } from "./audio.js";
