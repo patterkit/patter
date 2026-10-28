@@ -1594,6 +1594,10 @@ function openComments(req: CommentOpenRequest): void {
     : req.range ? []
     : comments.filter((c) => c.anchor === req.nodeId && !c.range);
   const pending = req.range;
+  // The threads the popover is about, answered after each change so it shows them as they now stand: the ones
+  // it opened with, and a new one once its first message is posted.
+  const about = new Set(threads.map((t) => t.id));
+  const current = (): Comment[] => comments.filter((c) => about.has(c.id));
 
   shellComments({
     anchor: req.anchor, subject: "this line", threads, showResolved,
@@ -1611,13 +1615,16 @@ function openComments(req: CommentOpenRequest): void {
         comments.push(t);
       }
       t.messages.push({ author: authorName || "Me", ts: new Date().toISOString(), body });
+      about.add(threadId);
       commentsDirty = true; pushCommentMarks(); void flushReview();
+      return current();
     },
     setResolved: (threadId, resolved) => {
       const t = comments.find((c) => c.id === threadId);
       if (!t) return;
       t.resolved = resolved;
       commentsDirty = true; pushCommentMarks(); void flushReview();
+      return current();
     },
     // One rule, per comment-delete.md: the message becomes a tombstone, and the
     // thread goes when nothing readable would be left. The body is EMPTIED here
@@ -1630,6 +1637,7 @@ function openComments(req: CommentOpenRequest): void {
       m.body = "";
       if (t.messages.every((x) => x.deleted === true)) comments.splice(comments.indexOf(t), 1);
       commentsDirty = true; pushCommentMarks(); void flushReview();
+      return current();
     },
   });
 }
@@ -2370,15 +2378,28 @@ function currentExtensionAdapter(): ReturnType<typeof extensionAdapter> {
   });
 }
 
+/** Set while the open scene is read again after a save refused over an outside change. */
+let rereading: Promise<void> | null = null;
+
 /** The write itself. The controller decides WHEN; this only decides what. */
 async function writeScene(): Promise<boolean> {
   if (!surface || !currentSceneId) return true; // no scene open: nothing to write, and not a failure
+  if (rereading) return true; // the scene is being read again from disk: what's in the editor is stale
   const sceneId = currentSceneId;
   const src = surface.getSource({ prune: true }); // a real save tidies stray blank text lines
   const res = await window.patter.saveScene(sceneId, src.flow, src.loc, src.extensions);
   if (res.ok) {
     if (sceneId === surfaceSceneId && openDisk) openDisk = afterWrite(openDisk, src);
     void refreshProblems(); void refreshVcStatus(); return true; // re-validate + re-badge what's on disk
+  }
+  if (res.reread && sceneId === currentSceneId) {
+    // A file of the scene changed outside Patterpad since it was read, and main has read it again: show it,
+    // writing nothing more from the editor until it has.
+    toast(`Couldn't save: ${res.error ?? "the scene changed outside Patterpad"}`, "error");
+    saver.cancel();
+    rereading = reloadOpenScene().finally(() => { rereading = null; });
+    void refreshProblems(); void refreshVcStatus();
+    return true;
   }
   toast(res.error ? `Save refused: ${res.error}` : "Save failed", "error");
   void refreshVcStatus();
@@ -2448,6 +2469,13 @@ function writeLeftScene(sceneId: string, name: string, src: { flow: string; loc:
     await Promise.allSettled([before, after]);
     const res = await window.patter.saveScene(sceneId, src.flow, src.loc, src.extensions);
     if (res.ok) { void refreshProblems(); void refreshVcStatus(); return true; }
+    if (res.reread) {
+      // Changed outside Patterpad since it was read: the kept state is stale, so opening it reads the disk.
+      forgetScene(sceneId);
+      toast(`Couldn't save “${name}”: ${res.error ?? "it changed outside Patterpad"}`, "error");
+      void refreshProblems(); void refreshVcStatus();
+      return false;
+    }
     // Its edits are still in the kept state: opening it again shows them, and tries the write again.
     const kept = keptScenes.get(sceneId); if (kept) { kept.unsaved = true; kept.src = src; }
     toast(`Couldn't save \u201c${name}\u201d${res.error ? `: ${res.error}` : ""}\nIts changes are kept. Open it again to try once more.`, "error");

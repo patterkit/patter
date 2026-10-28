@@ -468,6 +468,9 @@ export interface LiveSceneSource {
 export interface SaveResult {
   ok: boolean;
   error?: string;
+  /** A scene save was refused because a file of the scene changed outside Patterpad since it was read: main
+   *  has read it again, so the window shows the scene as it now is. */
+  reread?: true;
   /** The write was a step of the project history: the new step, or the one it merged into. */
   step?: ProjectStep;
 }

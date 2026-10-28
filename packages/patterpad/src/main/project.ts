@@ -42,7 +42,7 @@ import { editorScopes } from "../shared/host-scopes.js";
 import type { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { startAudioIndex, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
 import { keepUnresolvedMark } from "./unresolved-mark.js";
-import { History, captureBefore, UNDO_LIMIT, type FileState, type Applied, type FileRestorer } from "@wildwinter/app-shell/history";
+import { DiskStamps, History, captureBefore, UNDO_LIMIT, type FileState, type Applied, type FileRestorer } from "@wildwinter/app-shell/history";
 import { patterxRestorer, conversationChanged } from "./patterx-restore.js";
 
 interface SceneShards {
@@ -108,7 +108,7 @@ function buildShards(p: LoadedProject): Map<string, SceneShards> {
     locPath ??= join(p.root, projectLayout(p.project).strings, defaultLocale, `${stem}.patterloc`);
     map.set(scene.id, { flowPath, locPath, authoringPath, name: scene.name });
   }
-  sourceMirror.clear(); // the shard set changed - drop the source mirror + the vcStatus path memo
+  forgetAllSceneSources(); // the shard set changed - drop the source mirror + the vcStatus path memo
   vcShardsMemo = null;
   return map;
 }
@@ -121,10 +121,36 @@ const authoringCache = new Map<string, { mtimeMs: number; af: AuthoringFile }>()
 // readScene / saveScene serve + diff against an in-memory MIRROR of each scene's on-disk source (flow +
 // loc) - the EXACT last-read / last-written bytes (no re-serialisation) - so a scene switch doesn't sync-read
 // both shards and a save doesn't sync-read them just to diff. Refreshed on every read + successful save;
-// dropped whenever the shard map is rebuilt (open / hydrate / loc-import). External edits to a scene's
-// source are picked up on reopen, matching how the parsed `loaded` model already behaves.
-// `ext` holds the scene's extension shards the same way, by extension id ("" for a shard not on disk).
+// dropped whenever the shard map is rebuilt (open / hydrate / loc-import) or another write rewrites the
+// scene. `ext` holds the scene's extension shards the same way, by extension id ("" for a shard not on disk).
 const sourceMirror = new Map<string, { flow: string; loc: string; ext: Record<string, string> }>();
+// What each mirrored scene's files were on disk when the mirror was taken (the shell's disk stamps). A file
+// changed outside Patterpad since (a pull in a terminal, a synced folder, another app) is read again on
+// reopen, and refuses a save that would overwrite it (the hands-on review, 2026-10): a save writes the
+// editor's whole scene, so writing over the change would have thrown it away without a word.
+const sceneStamps = new DiskStamps();
+
+/** A mirrored scene's files: its flow, its strings, and the extension shards the mirror holds. */
+function sceneFiles(s: { flowPath: string; locPath?: string | null }, ext: Record<string, string>): string[] {
+  const files = [s.flowPath];
+  if (s.locPath) files.push(s.locPath);
+  for (const id of Object.keys(ext)) { const path = sceneExtensionPath(s.flowPath, id); if (path) files.push(path); }
+  return files;
+}
+
+/** Drop a scene's mirror and stamps: its next read comes from disk. */
+function forgetSceneSource(sceneId: string): void {
+  const src = sourceMirror.get(sceneId);
+  const s = shards.get(sceneId);
+  if (src && s) sceneStamps.forget(sceneFiles(s, src.ext));
+  sourceMirror.delete(sceneId);
+}
+
+/** Drop every scene's mirror and stamps. */
+function forgetAllSceneSources(): void {
+  sourceMirror.clear();
+  sceneStamps.clear();
+}
 // vcStatus's per-shard path list (+ which scene each path belongs to). Rebuilt only when the shard set
 // changes (buildShards) or a write may have created a new shard (commitWrites) - not on every poll.
 let vcShardsMemo: ShardRef[] | null = null;
@@ -494,6 +520,9 @@ async function writeStates(all: StepWrite[], opts: { writeLocalThroughVc?: boole
       const why = (refused.length ? refused : prep.results.filter((r) => !r.success)).map((r) => r.message || `${basename(r.filePath)} (${r.status})`);
       return { ok: false, error: `Nothing was written. ${why.join("; ")}`, wrote: false };
     }
+    // A scene whose files this rewrites (an undo, a Replace, a pin, or its own save, which takes its mirror
+    // again once written) is read from disk next time, so neither the mirror nor its stamps outlive the bytes.
+    for (const id of scenesOfPaths(paths).scenes) forgetSceneSource(id);
   }
   const prior = new Map(captureBefore(deletes).map((s) => [s.path, s.content]));
   const deleted: string[] = [];
@@ -845,7 +874,7 @@ function resetProjectState(): void {
   resetShardStatus();          // lock/out-of-date state must be re-queried, not inherited
   resetPlaySession();          // no play state from the project being left
   authoringCache.clear();      // no parsed shards cached from it
-  sourceMirror.clear();        // nor its scenes' bytes
+  forgetAllSceneSources();     // nor its scenes' bytes
   importPlans.clear();         // nor an editable-script import planned against it
   if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; } // a pending rebuild was for it
   lastBuiltHash = undefined;   // the Auto-Rebuild dedup must not carry across projects
@@ -1187,7 +1216,7 @@ export function applyReplace(opts: ReplaceOptions): Promise<SaveResult & { step?
     for (const ns of plan.shards) {
       const i = loaded.locales.findIndex((l) => l.scene === ns.scene && l.locale === ns.locale);
       if (i >= 0) loaded.locales[i] = ns;
-      sourceMirror.delete(ns.scene); // the mirror holds the pre-replace bytes: the reload must read the new ones
+      forgetSceneSource(ns.scene); // the mirror holds the pre-replace bytes: the reload must read the new ones
     }
     // And the authoring shards Replace stamped (each replaced line's modifiedAt, so its translations go
     // stale): without the swap, a second Replace would start from the old shard and drop these stamps.
@@ -1200,7 +1229,7 @@ export function applyReplace(opts: ReplaceOptions): Promise<SaveResult & { step?
     for (const { scene } of plan.flows) {
       const i = loaded.scenes.findIndex((s) => s.id === scene.id);
       if (i >= 0) loaded.scenes[i] = scene;
-      sourceMirror.delete(scene.id);
+      forgetSceneSource(scene.id);
     }
     return { ok: true, count: plan.hits.length, scenes: plan.scenes, ...(res.step ? { step: res.step } : {}) };
   });
@@ -1236,15 +1265,9 @@ export function readScene(sceneId: string): SceneSource {
   const s = shards.get(sceneId);
   if (!s) throw new Error(`unknown scene: ${sceneId}`);
   let src = sourceMirror.get(sceneId);
-  if (!src) { // first read of this scene this session - hit disk once, then serve from the mirror
-    const ext: Record<string, string> = {};
-    for (const id of sceneExtensionIds(s.flowPath)) {
-      const path = sceneExtensionPath(s.flowPath, id);
-      ext[id] = path && existsSync(path) ? readFileSync(path, "utf8") : "";
-    }
-    src = { flow: readFileSync(s.flowPath, "utf8"), loc: s.locPath && existsSync(s.locPath) ? readFileSync(s.locPath, "utf8") : "", ext };
-    sourceMirror.set(sceneId, src);
-  }
+  // A file changed outside Patterpad since the mirror was taken: read the scene again.
+  if (src && sceneStamps.changedSince(sceneFiles(s, src.ext)) !== undefined) src = rereadScene(sceneId, s);
+  if (!src) src = readSceneFromDisk(sceneId, s); // first read of this scene this session, then served from the mirror
   return {
     flowSource: src.flow,
     locSource: src.loc,
@@ -1253,6 +1276,34 @@ export function readScene(sceneId: string): SceneSource {
     hostScopes: projectEditorScopes().tokens,
     extensions: sceneExtensionSources(sceneId, src.ext),
   };
+}
+
+type SceneShard = { flowPath: string; locPath?: string | null };
+
+/** Read a scene's files from disk into the mirror, stamped before the read so a change during it reads as a
+ *  change next time rather than as already seen. */
+function readSceneFromDisk(sceneId: string, s: SceneShard): { flow: string; loc: string; ext: Record<string, string> } {
+  const ids = sceneExtensionIds(s.flowPath);
+  sceneStamps.note(sceneFiles(s, Object.fromEntries(ids.map((id) => [id, ""]))));
+  const ext: Record<string, string> = {};
+  for (const id of ids) {
+    const path = sceneExtensionPath(s.flowPath, id);
+    ext[id] = path && existsSync(path) ? readFileSync(path, "utf8") : "";
+  }
+  const src = { flow: readFileSync(s.flowPath, "utf8"), loc: s.locPath && existsSync(s.locPath) ? readFileSync(s.locPath, "utf8") : "", ext };
+  sourceMirror.set(sceneId, src);
+  return src;
+}
+
+/** Read a scene again after a file of it changed outside Patterpad, and bring the loaded project up to date
+ *  with it, so validation and play see what's on disk. */
+function rereadScene(sceneId: string, s: SceneShard): { flow: string; loc: string; ext: Record<string, string> } {
+  forgetSceneSource(sceneId);
+  const src = readSceneFromDisk(sceneId, s);
+  const extensions = Object.fromEntries(Object.entries(src.ext).map(([id, text]) => [id, text === "" ? null : text]));
+  try { if (loaded) applyLiveSource(loaded, { sceneId, flow: src.flow, loc: src.loc, extensions }); }
+  catch (e) { console.warn(`patterpad: read scene ${sceneId} again but couldn't refresh the in-memory copy:`, e); }
+  return src;
 }
 
 // --- a scene's Patter extension data (patterkit design/patterpad-undo.md, half A) -------------------------
@@ -1388,6 +1439,15 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
     // mirror (the last bytes we read / wrote) instead of re-reading disk; fall back to a read only when the
     // scene was never read this session. A missing file always "changed".
     const onDisk = (p: string): string | null => { try { return readFileSync(p, "utf8"); } catch { return null; } };
+    // The editor's scene was built from the files as the mirror holds them. One changed outside Patterpad
+    // since would be overwritten, so the save is refused, the scene read again, and the window shows it.
+    const stale = sourceMirror.get(sceneId);
+    const drifted = stale ? sceneStamps.changedSince(sceneFiles(s, stale.ext)) : undefined;
+    if (drifted !== undefined) {
+      rereadScene(sceneId, s);
+      const name = loaded ? relative(loaded.root, drifted) : basename(drifted);
+      return { ok: false, reread: true, error: `${name.startsWith("..") ? drifted : name} changed outside Patterpad since it was read, and saving would have overwritten that. Patterpad has read it again: check your last edit is still there` };
+    }
     const prev = sourceMirror.get(sceneId);
     // A merge's `unresolved` mark on either shard survives the save: the editor's model has no place for
     // it. The merge that wrote it happened outside the app, so the mirror only answers for a file whose size
@@ -1439,6 +1499,7 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
         }
       }
       sourceMirror.set(sceneId, { flow: flowSource, loc: locSource, ext: extAfter }); // the mirror now matches what we wrote
+      sceneStamps.note(sceneFiles(s, extAfter)); // and the stamps take our own write as seen
       // Keep the in-memory project current with the save, so validate / play don't re-read disk.
       try { if (loaded) applyLiveSource(loaded, { sceneId, flow: flowSource, loc: locSource, extensions }); }
       catch (e) { console.warn(`patterpad: saved scene ${sceneId} but couldn't refresh the in-memory copy (reloads on reopen):`, e); }
@@ -2572,7 +2633,7 @@ export function buildBundle(opts?: { pin?: boolean }): Promise<{ ok: boolean; pa
         for (const next of plan.scenes) {
           const i = loaded.scenes.findIndex((s) => s.id === next.id);
           if (i >= 0) loaded.scenes[i] = next;
-          sourceMirror.delete(next.id);
+          forgetSceneSource(next.id);
         }
         pinned = plan.pinned.length;
       }

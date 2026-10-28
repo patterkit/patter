@@ -71,6 +71,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **The font theme changes only the script.** View ▸ Font Theme no longer changes the typeface of the menus,
   panes, and dialogs.
 
+### Fixed
+
+- **A scene changed outside Patterpad is no longer overwritten.** If a scene's files changed on disk after
+  Patterpad read them (a pull in a terminal, a synced folder, another app), the next save used to write the
+  editor's copy over them. Now the save is refused, the scene is read again so you see the change, and a
+  message asks you to check your last edit is still there. Reopening a scene also reads it from disk if it has
+  changed, rather than showing the copy Patterpad had in memory.
+- **A comment appears as soon as you post it.** A reply posted with the Reply button didn't show until the comment
+  popover was closed and opened again, and a second post on a new comment started a second thread. The popover
+  now shows each thread as it stands after every change.
+
 ## [0.39.0] - 2026-10-22
 
 ### Added

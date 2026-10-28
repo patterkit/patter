@@ -54,15 +54,22 @@ describe("a marked scene in Patterpad", () => {
   it("keeps the mark on both shards through a save", async () => {
     const dir = openTavern();
     const sceneId = "scn_tavern";
-    const src = project.readScene(sceneId); // the mirror holds the bytes before the merge
+    const before = project.readScene(sceneId); // the mirror holds the bytes before the merge
     const flowFile = join(dir, "scenes/tavern.patterflow");
     const locFile = join(dir, "loc/en/tavern.patterloc");
     markFile(flowFile);
     markFile(locFile); // a merge outside the app marks both
 
-    const flow = parseSource(src.flowSource) as { scene: { name: string } };
+    // A save built from the bytes before the merge would overwrite it: refused, and the scene read again
+    // (the hands-on review, 2026-10).
+    expect((await project.saveScene(sceneId, before.flowSource, `${before.locSource}\n`)).reread).toBe(true);
+    // The editor holds the merged scene, without the mark its model has no place for.
+    const src = project.readScene(sceneId);
+    const flow = parseSource(src.flowSource) as { scene: { name: string }; unresolved?: unknown };
+    delete flow.unresolved;
     flow.scene.name = "The Tavern, renamed";
-    const loc = parseSource(src.locSource) as { strings: Obj };
+    const loc = parseSource(src.locSource) as { strings: Obj; unresolved?: unknown };
+    delete loc.unresolved;
     loc.strings["L_greet"] = "Evening.";
     expect((await project.saveScene(sceneId, canonicalStringify(flow), canonicalStringify(loc))).ok).toBe(true);
 
@@ -381,9 +388,15 @@ describe("a scene's extension data in Patterpad", () => {
 
   it("keeps an unresolved mark a merge wrote since the scene was read", async () => {
     const { shard } = openProbeCopy();
-    const src = project.readScene("scn_harbour");
+    const before = project.readScene("scn_harbour");
     markFile(shard);
-    expect((await project.saveScene("scn_harbour", src.flowSource, src.locSource, undefined, { probe: withNote(src.extensions[0]!.source, "y") })).ok).toBe(true);
+    // Built from the shard before the merge: refused, and the scene read again (the hands-on review, 2026-10).
+    expect((await project.saveScene("scn_harbour", before.flowSource, before.locSource, undefined, { probe: withNote(before.extensions[0]!.source, "y") })).reread).toBe(true);
+    // Built from the merged shard, without the mark (the editor's model has no place for it): kept.
+    const src = project.readScene("scn_harbour");
+    const merged = parseSource(src.extensions[0]!.source) as Obj;
+    delete merged["unresolved"];
+    expect((await project.saveScene("scn_harbour", src.flowSource, src.locSource, undefined, { probe: withNote(canonicalStringify(merged), "y") })).ok).toBe(true);
     const after = read(shard) as { unresolved?: unknown; entries: { line: Record<string, Obj> } };
     expect(after.unresolved).toEqual(MARK);
     expect(after.entries.line["L_bell"]!["note"]).toBe("y");
