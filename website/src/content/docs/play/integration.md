@@ -29,7 +29,7 @@ Save/load differs per engine (see each engine guide's *Save and load*).
 One call snapshots the whole game; one restores it:
 
 ```ts
-const save = engine.saveGame();   // a plain serialisable object (version 3)
+const save = engine.saveGame();   // a plain serialisable object (version 4)
 // ...later...
 engine.loadGame(save);
 ```
@@ -39,8 +39,27 @@ and shuffle bags, each flow's position and call/return stack, the PRNG position,
 choice (saved as its exact option set and replayed verbatim on load, so conditions aren't
 re-evaluated and the PRNG never double-draws). An engine you built on its own also carries every
 property value, `@patter`, `@scene`, and a self-backed `@world` alike, so one call is still the
-whole game. **Locale is not in the save**: it's presentation, not game state. A saved position
-that points at content you've since deleted resumes best-effort rather than throwing.
+whole game. **Locale is not in the save**: it's presentation, not game state. A pending choice keeps
+which options it offered, not their text, so a save loaded into an engine in another language shows the
+choice in that language. (A prompt that `replayPromptOnChoose` is still to speak back is the exception:
+it's kept as the player saw it.)
+
+### Loading a save into an edited build
+
+A save names its place by id: the snippet, the next beat in it, and the next child of every block and
+group on the way down. So a patch that adds, moves, or rewords content around a player's place doesn't
+move them. When the place itself has gone, the flow resumes at the nearest safe point:
+
+- **The snippet has gone**: play carries on after it, from what survives around it.
+- **The next beat has gone from a snippet that's still there**: the snippet ends there (its exit effects
+  run and its jump is followed), so nothing plays twice.
+- **The option the player was inside has gone**: its choice is offered again, without it.
+- **Every option of a pending choice has gone**: the choice is offered again with the options it has
+  now, or, if the choice itself has gone, play carries on after it.
+
+Each of these is reported to `onError` as a `save` problem (see
+[When something goes wrong](/play/engine/#when-something-goes-wrong)), and only these: a load that finds
+its place has nothing to say.
 
 A saved value that the content no longer allows goes back to its default as the save loads: a stage
 you've deleted from a quality, an enum value or a flag you've removed, or a value of a type the
@@ -71,8 +90,9 @@ in Unity. The shape is the JS runtime's, documented in `@patterkit/model`, and t
 holds every engine to it by carrying a save the JS runtime wrote that each engine must load, write
 back in the same shape, and continue. Semantically equivalent is the promise, not byte-identical.
 Key order and number formatting can differ between engines, and nothing should compare the text.
-A save written before property values moved into the registry (version 2) still loads on every
-runtime, and its values move into the registry as it does.
+Every runtime reads saves of version 3 and 4, and writes version 4. A version 3 save's pending prompt
+text is discarded as it loads, since prompts are built in the language in use. Saves of version 2, from
+before property values moved into the registry, no longer load.
 
 The **`@patterkit/play-helpers`** package wraps this for storage:
 

@@ -236,3 +236,17 @@ void FPatterDebugLink::Close() {}
 FString FPatterDebugLink::State() const { return TEXT("closed"); } // Shipping: the link is compiled out
 
 #endif
+
+// Outside the Shipping switch: a game's call to it compiles either way, as Observe's does.
+FString FPatterDebugLink::TypeName(EPatterStepType Type)
+{
+	switch (Type)
+	{
+		case EPatterStepType::Line: return TEXT("line");
+		case EPatterStepType::Text: return TEXT("text");
+		case EPatterStepType::GameEvent: return TEXT("gameEvent");
+		case EPatterStepType::Choice: return TEXT("choice");
+		case EPatterStepType::End: return TEXT("end");
+	}
+	return TEXT("end");
+}

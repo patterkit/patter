@@ -1352,6 +1352,10 @@ export interface Bundle {
   content: { project: string; version?: string; hash?: string; structureHash?: string };
   voiced: boolean;                 // project-wide VO mode (spec §16)
   locales: { default: string; included: string[] };
+  /** Where a flow opened without a scene starts: the project's authored start (scene id, and block id when
+   *  it names one). Absent when the project sets none, or names one that has gone: every runtime then starts
+   *  at the first scene. */
+  start?: { scene: string; block?: string };
   /** Player-facing cast only: the compiler strips notes / actor / gender (see `BundleCastMember`). */
   cast?: BundleCastMember[];
   /** The speaker qualifiers the content uses, in the project's order. Absent when no line has one, so a
@@ -1431,8 +1435,13 @@ export const DEFAULT_CAPTION_CHARACTER = "SFX";
 // Version 3 (the one-registry model): property values are the game's ScopeRegistry's, not the
 // engine's. A save holds only what is NOT a property (cursors, PRNGs, visits, selectors), plus, when
 // the engine made its own registry (a standalone game), that registry's values under `registry`. A
-// game that passed a registry saves it once itself. Version 2 saves still load on every runtime:
-// their property sections move into the registry under the keys below.
+// game that passed a registry saves it once itself.
+//
+// Version 4 (Patterplay 1.0): a pending choice keeps its options' ids, not their text, so the prompts
+// are built again in the language in use whenever the choice is delivered; the cursor names the next
+// beat by id (`beatId`) rather than by its index; and a frame inside a choice's option carries the
+// choice's id (`choiceId`), so a load whose option has gone offers the choice again. Every runtime
+// reads versions 3 and 4 and writes 4; a version 3 save's prompt text is discarded as it loads.
 //
 // Registry keys (identical on every runtime, since they are in the save): `patter` for the shared
 // globals; `patter/scene/<sceneId>` for a scene's shared `@scene` props; `patter/flow/<flowId>/patter`
@@ -1442,7 +1451,7 @@ export const DEFAULT_CAPTION_CHARACTER = "SFX";
 
 export const SAVE_SCHEMA = "patter/save@0";
 /** The `save.version` inside the envelope. Bumped only when a reader would MISREAD an older save. */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 /** The tagged envelope a host stores: `serializeState` writes it, `deserializeState` refuses anything else. */
 export interface SaveEnvelope {
@@ -1473,9 +1482,12 @@ export interface StackFrame {
    *  restore against an EDITED bundle re-finds the position by id. Absent when the frame sat at its
    *  container's end (no next child), or in an older save. */
   nextId?: string;
+  /** SNAPSHOT-ONLY: on a frame whose container is an option of a choice, that choice group's id, so a load
+   *  whose option has gone offers the choice again. Absent on every other frame, and in a version 3 save. */
+  choiceId?: string;
 }
 
-/** The prompt of a saved choice option: the choice text as a structured line/text beat. */
+/** A prompt as the choice showed it: a replayed prompt still to be spoken (`FlowCursor.pendingPrompt`). */
 export interface SavedChoicePrompt {
   kind: "line" | "text";
   text: string;
@@ -1490,10 +1502,12 @@ export interface SavedChoicePrompt {
   padAfter?: number;
 }
 
-/** One option of a pending choice, saved VERBATIM: re-deriving on load would re-evaluate conditions. */
+/** One option of a pending choice: which option, and whether it could be taken, saved VERBATIM, since
+ *  re-deriving on load would re-evaluate conditions. Its prompt is not saved: it is built again in the
+ *  language in use each time the choice is delivered. (A version 3 save's option also has a `prompt`,
+ *  which a load discards.) */
 export interface SavedChoiceOption {
   id: string;
-  prompt?: SavedChoicePrompt;
   eligible: boolean;
   gameData?: GameData;
 }
@@ -1511,17 +1525,21 @@ export interface FlowCursor {
   /** The continuation stack (call frames + the active block run), root first. */
   stack: StackFrame[];
   activeSnippetId: string | null;
-  beatIndex: number;
+  /** The id of the next beat the active snippet delivers, so a load against an edited bundle finds its
+   *  place by id. Absent when no snippet is active or the active one has delivered every beat. */
+  beatId?: string;
+  /** Version 3 only, read and never written: the index of the next beat in the active snippet. */
+  beatIndex?: number;
   /** Present (non-null) iff the flow is stopped at a choice. */
   pendingChoice: SavedChoice | null;
   /** The chosen option owning a prompt still to be replayed (a save taken between choose + advance).
    *  Optional / null in older saves -> no pending prompt. */
   pendingPromptOwnerId?: string | null;
-  /** The prompt still to be replayed, exactly as the choice SHOWED it (text and speaker fields, the same
-   *  shape as a saved option's `prompt`), so the replay after a load says what the player saw. Written only
-   *  alongside a `pendingPromptOwnerId` (the choose -> advance window, with `replayPromptOnChoose`), and
-   *  absent otherwise. A save without it (written before Patterplay 0.18.0) resolves the owner's prompt beat
-   *  when it is delivered, as before. */
+  /** The prompt still to be replayed, exactly as the choice SHOWED it (text and speaker fields), so the
+   *  replay after a load says what the player saw, in the language they saw it in: the one prompt a save
+   *  keeps as text. Written only alongside a `pendingPromptOwnerId` (the choose -> advance window, with
+   *  `replayPromptOnChoose`), and absent otherwise. A save without it (written before Patterplay 0.18.0)
+   *  resolves the owner's prompt beat when it is delivered, as before. */
   pendingPrompt?: SavedChoicePrompt;
   /** This flow's (non-shared) selector cursors, keyed by group id. */
   selectors: Record<string, SelectorSnapshot>;
@@ -1536,10 +1554,10 @@ export interface FlowSnapshot {
   cursor: FlowCursor;
 }
 
-/** A full resumable save-game (version 3): everything that is not a property, plus the registry's
+/** A full resumable save-game (version 4): everything that is not a property, plus the registry's
  *  values when the engine made its own registry. */
 export interface SaveGame {
-  version: 3;
+  version: typeof SAVE_VERSION;
   /** The engine's own registry's values, keyed by registry key: present only when the engine made the
    *  registry itself (a standalone game). A game that passed a registry saves it once, beside this. */
   registry?: EngineSave;
@@ -1551,17 +1569,19 @@ export interface SaveGame {
   flows: Record<string, FlowSnapshot>;
 }
 
-/** One flow's own property values, without its id: the sections a version 2 save carried per flow, and a
- *  `FlowState` carries now. */
+/** A version 3 save, still read: the same shape apart from the cursor (`beatIndex` for `beatId`, no
+ *  `choiceId` on its frames) and a pending choice's options (each with its prompt text, discarded). */
+export interface SaveGameV3 extends Omit<SaveGame, "version"> {
+  version: 3;
+}
+
+/** One flow's own property values, without its id: what a `FlowState` carries beside its snapshot. */
 export interface FlowValues {
   /** The NOT-shared `@patter` globals, under token "patter". */
   scopes: EngineSave;
   /** Per-scene NOT-shared `@scene` bags (scene id -> name -> value). */
   sceneBags: Record<string, Record<string, ScalarValue>>;
 }
-
-/** A version 2 flow snapshot, which carried the flow's property values itself. Still read. */
-export interface FlowSnapshotV2 extends FlowSnapshot, FlowValues {}
 
 /**
  * One flow taken out of an engine (`engine.captureFlow`) to be put back later (`engine.restoreFlow`), under the
@@ -1570,20 +1590,8 @@ export interface FlowSnapshotV2 extends FlowSnapshot, FlowValues {}
  * visit counts, shared selectors) is never in it, so restoring one rewinds nothing else.
  */
 export interface FlowState extends FlowSnapshot, FlowValues {
-  version: typeof SAVE_VERSION;
-}
-
-/** A version 2 save, from before the registry held the properties. Every runtime still reads it: its
- *  property sections move into the registry (under the keys in the header above) as it loads. */
-export interface SaveGameV2 {
-  version: 2;
-  /** Shared `@patter` globals (owned scope "patter"). */
-  shared: EngineSave;
-  sharedVisits: Record<string, number>;
-  sharedSelectors: Record<string, SelectorSnapshot>;
-  /** Shared, scene-namespaced `@scene` bags (scene id -> name -> value). */
-  stageBags: Record<string, Record<string, ScalarValue>>;
-  flows: Record<string, FlowSnapshotV2>;
+  /** `SAVE_VERSION` when written; a version 3 state still restores. */
+  version: typeof SAVE_VERSION | 3;
 }
 
 /** Where a project keeps its shards unless its `layout` says otherwise, relative to the project root. */

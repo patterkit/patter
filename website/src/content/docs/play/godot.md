@@ -58,7 +58,27 @@ shown text, and a replayed prompt is never action.
 
 `open_flow` returns null, with `push_error`, when the address does not resolve: an unknown scene, or
 a block that is not in the scene you named. Nothing opens, and a flow already open under that name
-carries on as it was.
+carries on as it was. Leave the scene out (`open_flow("main")`) and the flow starts where the project
+says the story starts, or at the first scene when it doesn't say.
+
+GDScript has no exceptions, so a call the engine refuses tells you in its own way, and always with a
+`push_error` too. `flow.advance()` and `flow.choose(id)` keep the reason for `flow.last_error()` (a flow
+that hasn't started, no choice pending, an option that's unknown or greyed out), and the next of those
+calls that succeeds clears it; a refused `advance()` returns `{"type": "end"}`. `set_property` returns
+the reason, as below.
+
+Problems the engine plays past go to your `on_error` option, a Callable taking `{flow, kind, node,
+message}` (`push_warning` when you set none). Beside a content error (`"condition"`, `"effect"`,
+`"best-match"`), it reports how the engine was set up (`"setup"`, with `flow` empty: an option key it
+doesn't take, a locale the bundle doesn't have, a host scope it doesn't declare), as the engine finishes
+building, and a load whose place has gone from an edited build (`"save"`).
+
+The `locale` option and `engine.set_locale(locale)` resolve a locale by
+[one rule](/play/localisation/) (`"fr_FR"` finds `"fr-FR"`, then `"fr"`, then the default);
+`engine.locale()` is the locale in use, and `engine.locales()` gives the bundle's `{"default", "included"}`.
+
+The Game Data and tags a step, an option, or a lookup hands you are your own copies: change them as you
+like. Extension values are the bundle's own, so read them and never change them.
 
 Two demos ship **inside the addon**, under `addons/patterplay/demo/` (delete the folder freely):
 a headless **play-through demo** (`demo.gd`, the smallest possible integration) and the **Tour
@@ -86,8 +106,20 @@ save holds them, so your game saves them. Leave `host_scopes` out and a standalo
 **self-backs** `@world` from the declared defaults, as a property it stores and saves with the rest of
 the run. A property declared `writable: false` in the project is the *story's* promise, so the engine
 refuses the story's write with a `push_error` (`'@world.x' is read-only`) and no write, bound or
-self-backed. Your own `set_property` isn't refused, because the value is the game's. A per-name policy
-of your own is yours to refuse from `set`. [World Properties](/play/world-properties/) has the full
+self-backed. Your own `set_property` isn't refused for that, because the value is the game's, but it
+is refused, changing nothing, when the value doesn't fit what the project declared (a string for a
+number, a value an enum doesn't list) or names a property the project doesn't declare. It returns the
+reason, or `""` when the value was written:
+
+```gdscript
+var refused := engine.set_property("@world.time_of_day", 7)
+if refused != "":
+    print(refused)   # "@world.time_of_day" takes text; 7 doesn't fit
+```
+
+A scope that declares no properties takes anything. A per-name policy of your own is yours to refuse
+from `set`. Tokens are case-sensitive: binding `"World"` when the project declares `world` is reported
+(`"setup"`) and binds nothing the story reads. [World Properties](/play/world-properties/) has the full
 picture.
 
 ## One registry per game
@@ -201,10 +233,11 @@ tagged JSON envelope. An engine you built on its own also carries every property
 registry leaves them to [the registry's save](#one-registry-per-game). `deserialize_state` returns
 `false`, with a `push_error`, for a blob it cannot read. It is the **same `patter/save@0` format every
 Patterplay runtime uses**, so a save written by a web build or by Patterpad loads here, and a save
-written here loads in Unity or Unreal. A save written before property values moved into the registry
-(version 2) still loads, and its values move into the registry as it does. Saves written by this addon
-before 0.11.0 (its old snake_case shape) still load too, and are written back in the shared shape on
-the next save. [Save/load & Game Data](/play/integration/) covers the format.
+written here loads in Unity or Unreal. Saves are version 4, and a version 3 save still loads; older
+ones (version 2, and this addon's snake_case shape from before 0.11.0) don't. A save at a choice keeps
+which options were offered, not their text, so a load shows them in the language in use. A load against
+an edited build whose saved place has gone resumes at the nearest safe point (it offers the choice
+again, or carries on after what was removed) and reports it to `on_error` as `"save"`. [Save/load & Game Data](/play/integration/) covers the format.
 
 To set one flow aside instead, `engine.capture_flow(id)` returns its part of a save as a Dictionary, and
 `engine.restore_flow(new_id, state)` opens it again later (null, with a `push_error`, if it is refused). See

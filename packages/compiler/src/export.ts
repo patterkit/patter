@@ -276,6 +276,13 @@ export function exportBundle(input: ExportInput): Bundle {
     }
   }
 
+  // The project's start, kept only when it resolves in this bundle.
+  const startScene = project.start ? scenesOut[project.start.scene] : undefined;
+  const start: Bundle["start"] = startScene === undefined ? undefined
+    : project.start!.block !== undefined && startScene.blocks.some((b) => b.id === project.start!.block)
+      ? { scene: project.start!.scene, block: project.start!.block }
+      : { scene: project.start!.scene };
+
   return {
     schema: "patter/bundle@0",
     content: {
@@ -292,6 +299,7 @@ export function exportBundle(input: ExportInput): Bundle {
         ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
         // Each node's values are in `scenes`; the declarations and the project's own values are here.
         ...(extensionSection !== undefined ? { extensions: extensionSection } : {}),
+        ...(start !== undefined ? { start } : {}),
       }, { trailingComma: false })),
       // Structure-only fingerprint (live bundle refresh): the same hash with the string tables left
       // out. Same structureHash + a different hash = a text-only edit, safe to swap in place with
@@ -303,10 +311,14 @@ export function exportBundle(input: ExportInput): Bundle {
         ...(qualifiers.length > 0 ? { qualifiers } : {}),
         ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
         ...(extensionSection !== undefined ? { extensions: extensionSection } : {}),
+        ...(start !== undefined ? { start } : {}),
       }, { trailingComma: false })),
     },
     voiced: project.voiced ?? false,
     locales: { default: project.locales.default, included: Object.keys(strings) },
+    // Where a flow opened without a scene starts: the project's start, when it names a scene (and block) the
+    // bundle has. Absent otherwise, and every runtime starts at the first scene (validate says so).
+    ...(start !== undefined ? { start } : {}),
     // The cast is copied field by field, on purpose. Most of a CastMember is authoring context that must
     // never reach players: `notes` are production chatter, `gender` is translator context (it rides the
     // localisation formats), and `actor` is a real person's name (it belongs in the VO script). Listing

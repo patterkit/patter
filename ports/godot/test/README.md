@@ -37,7 +37,7 @@ seconds (default 600) where `timeout` exists. `parse_check.sh` covers the addon'
 - `test_one_registry.gd` - one registry per game, from the GAME's side (the GDScript half of the JS
   runtime's `one-registry.test.ts` and `combined-game.test.ts`): the keys and owner label the engine
   registers under, `save_game()` leaving the values out given a game registry and carrying them
-  standalone, loading in either order, a version 2 save's values moving into the registry, a token
+  standalone, loading in either order, a version 2 save refused, a token
   clash leaving the registry as it was, reset and a fresh flow dropping only Patter's waiting values,
   `hot_swap` handing bags over, the `host_scopes` option, a combined game with a stand-in engine
   that registers `@story`, and other engines' scopes (the JS test's "other engines' scopes": a
@@ -49,8 +49,8 @@ seconds (default 600) where `timeout` exists. `parse_check.sh` covers the addon'
   godot --headless --path ports/godot --script res://test/test_one_registry.gd
   ```
 
-- `test_save_shape.gd` - the save's SHAPE, pinned against hand-written saves: version 3 as written,
-  version 2 and the pre-0.11.0 snake_case shape as still read, and a flow state from `capture_flow`
+- `test_save_shape.gd` - the save's SHAPE, pinned against hand-written saves: version 4 as written,
+  version 3 as still read and written back as 4, version 2 refused, and a flow state from `capture_flow`
   (the flow's snapshot plus its own values, parked ones included, without its id), and a restore
   dropping what a load left waiting under its id.
 
@@ -86,12 +86,20 @@ seconds (default 600) where `timeout` exists. `parse_check.sh` covers the addon'
 
 - `test_speaker_label.gd` - a line's `speakerLabel`, from its one resolver: a `speaker:` string a locale
   still holds for a pair the bundle doesn't override is ignored, an overridden pair reads its own, a
-  saved choice prompt from before prompts carried the label gets it again on load (in the loading
-  engine's locale), as does a saved prompt still to be spoken back, the beat sequence gives it in the source locale, IDs-only mode gives none, and the
+  saved choice's prompt is built again on load (in the loading engine's locale), as does a saved prompt still to be spoken back, the beat sequence gives it in the source locale, IDs-only mode gives none, and the
   pattern's placeholders are plain text replacement.
 
   ```sh
   godot --headless --path ports/godot --script res://test/test_speaker_label.gd
+  ```
+
+- `test_runtime_foundations.gd` - where GDScript can't throw: unknown option keys (the retired `"world"`
+  among them) reported as the engine is built, in order with the locale and host-scope reports;
+  `set_property` on the engine and a flow returning its refusal and changing nothing; and `advance()` and
+  `choose()` keeping theirs for `last_error()`, cleared by the next success.
+
+  ```sh
+  godot --headless --path ports/godot --script res://test/test_runtime_foundations.gd
   ```
 
 - `tour_check.gd` - a smoke check that the bundled tour demo loads and steps:

@@ -30,6 +30,10 @@ namespace Patterkit.Patterplay
         /// <summary>content.version - the authored bundle version, if the project stamps one.</summary>
         public string ContentVersion;
         public Locales Locales = new Locales();
+        /// <summary>Where a flow opened without a scene starts: the project's authored start (scene id, and
+        /// block id when it names one). Null when the project sets none, or names one that has gone: every
+        /// runtime then starts at the first scene.</summary>
+        public BundleStart Start;
         public List<Cast> Cast = new List<Cast>();
         /// <summary>The speaker qualifiers the content uses (`gameId` + authored name), in the project's order.
         /// Empty when no line has one (an older bundle carries none).</summary>
@@ -122,6 +126,16 @@ namespace Patterkit.Patterplay
         public bool SourceDebug;
     }
 
+    /// <summary>A bundle's start (<see cref="Bundle.Start"/>): a scene id, and a block id in it, or null for
+    /// the scene's first block.</summary>
+    public sealed class BundleStart
+    {
+        public string Scene;
+        public string Block;
+    }
+
+    /// <summary>A bundle's locales: its default, and every locale it includes. <see cref="Engine.Locales"/> hands
+    /// out a copy.</summary>
     public sealed class Locales
     {
         public string Default = "en";

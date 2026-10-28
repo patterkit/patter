@@ -46,7 +46,7 @@ just a demo shell and is freely deletable.
 
 The demo ships **without audio files**: how you load and play audio is your platform call,
 and the runtime deliberately only *resolves* takes (`patteraudio.json` →
-`UPatterAudio::Resolve` → a path; playback stays yours). The tour actor still shows the
+`UPatterAudioResolver::Resolve` → a path; playback stays yours). The tour actor still shows the
 full wiring: point its **Audio Root** at any Patter audio folder and each line plays its
 winning take through a minimal PCM16 WAV loader (a real game would route resolved paths
 into its own audio pipeline instead). Inside the PatterKit repo the shared scratch takes

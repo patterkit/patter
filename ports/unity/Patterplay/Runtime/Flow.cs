@@ -306,11 +306,20 @@ namespace Patterkit.Patterplay
 
         // -- host API -----------------------------------------------------------
 
-        /// <summary>Begin this flow at a scene (null: the first authored scene), and optionally a block within
-        /// it. The engine's own entry point: OpenFlow and a Goto on an unstarted flow begin a flow here. A
-        /// game calls <see cref="Reset"/>.</summary>
+        /// <summary>Begin this flow at a scene (null: the bundle's start, else the first authored scene), and
+        /// optionally a block within it. The engine's own entry point: OpenFlow and a Goto on an unstarted flow
+        /// begin a flow here. A game calls <see cref="Reset"/>.</summary>
         internal void Begin(string sceneId, string blockId)
         {
+            // No scene named: the project's start, when the bundle carries one; else the first scene, below.
+            var start = _host.Bundle.Start;
+            // A start naming a scene, or block, the bundle doesn't have (only a hand-edited bundle can) is passed over.
+            if (sceneId == null && blockId == null && start != null && start.Scene != null && _host.Bundle.Scenes.ContainsKey(start.Scene))
+            {
+                sceneId = start.Scene;
+                if (start.Block != null && _host.BlockToScene.TryGetValue(start.Block, out var startSid) && startSid == start.Scene)
+                    blockId = start.Block;
+            }
             // Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
             // inside the checkpoint may start in one.
             if (_host.Journal != null && !_host.Journal.Opened.Contains(this))
@@ -351,13 +360,8 @@ namespace Patterkit.Patterplay
         /// <summary>Forget everything in this flow and begin again: its per-flow state (not-shared @patter
         /// globals and @scene props), cursor, call stack, selector cursors, visit counts, and anything waiting to
         /// be delivered. Shared state is untouched. The one public way to begin a flow again (OpenFlow begins a
-        /// new one), on every runtime.</summary>
+        /// new one), on every runtime. No scene: the bundle's start, else the first authored scene.</summary>
         public void Reset(string sceneId = null, string blockId = null) => Begin(sceneId, blockId);
-
-        /// <summary>Use <see cref="Reset"/>, the one public name for beginning a flow again on every runtime.
-        /// Start was the same call under a second name, and goes in a later release.</summary>
-        [Obsolete("Use Reset, the same call under the name every Patterplay runtime uses.")]
-        public void Start(string sceneId, string blockId) => Reset(sceneId, blockId);
 
         public StepResult Advance()
         {
@@ -372,7 +376,7 @@ namespace Patterkit.Patterplay
             }
             Settle();
             if (_flowEnded) return StepResult.End();
-            if (_pendingChoice != null) return new StepResult { Type = StepType.Choice, GroupId = _pendingChoice.GroupId, Options = _pendingChoice.Options };
+            if (_pendingChoice != null) return new StepResult { Type = StepType.Choice, GroupId = _pendingChoice.GroupId, Options = Offer(_pendingChoice) };
             if (_activeSnippet == null) { _flowEnded = true; return StepResult.End(); }
             return BeatResult(_activeSnippet.Beats[_beatIndex++]);
         }
@@ -388,7 +392,29 @@ namespace Patterkit.Patterplay
         public StepResult StepFor(string beatId)
             => beatId != null && _host.BeatIndex.TryGetValue(beatId, out var beat) ? BeatResult(beat) : null;
 
-        public List<ChoiceOption> GetChoices() => _pendingChoice?.Options ?? new List<ChoiceOption>();
+        /// <summary>The options of a pending choice (empty when not at a choice point), their prompts built in the
+        /// language in use, as Advance delivers them.</summary>
+        public List<ChoiceOption> GetChoices() => _pendingChoice != null ? Offer(_pendingChoice) : new List<ChoiceOption>();
+
+        /// <summary>A pending choice's options as the game is handed them: each prompt built now, in the language
+        /// in use and against the current values (and remembered, for a replay to speak as shown), and the game's
+        /// own copy of each option's gameData.</summary>
+        private List<ChoiceOption> Offer(ChoiceStateInternal choice)
+        {
+            var offered = new List<ChoiceOption>();
+            foreach (var o in choice.Options)
+            {
+                var node = choice.ById[o.Id];
+                var prompt = PromptFor(node);
+                choice.Shown[o.Id] = prompt;
+                offered.Add(new ChoiceOption
+                {
+                    Id = o.Id, Prompt = prompt, Eligible = o.Eligible,
+                    GameData = GameDataHelpers.CopyGameData(o.GameData), Extensions = Engine.ExtensionsOrNull(node.Extensions),
+                });
+            }
+            return offered;
+        }
 
         /// <summary>This flow's decisions, in order. Empty unless the run was opened with
         /// Log = true. The engine's log carries the same events tagged with the flow; this one
@@ -434,11 +460,14 @@ namespace Patterkit.Patterplay
             if (_host.Tracing) Emit(new LogEntry { Type = "chose", Group = choice.GroupId, Option = id });
             _pendingChoice = null;
             // Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and
-            // exactly as the choice showed it. A prompt borrowed from the option's own first content line is
-            // not replayed, since that line is about to play as content anyway.
+            // exactly as the choice showed it (the one prompt that doesn't follow the language: a documented
+            // exception). A prompt borrowed from the option's own first content line is not replayed, since that
+            // line is about to play as content anyway. A choice never delivered since a load shows its prompt as
+            // it would be now, before the option's onEnter runs.
             var authored = _host.ReplayPromptOnChoose ? AuthoredPromptOf(node) : null;
-            _pendingPromptBeat = authored != null && option.Prompt != null ? authored : null;
-            _pendingPromptShown = _pendingPromptBeat != null ? ClonePrompt(option.Prompt) : null;
+            var shown = authored == null ? null : choice.Shown.TryGetValue(id, out var was) ? was : PromptFor(node);
+            _pendingPromptBeat = authored != null && shown != null ? authored : null;
+            _pendingPromptShown = _pendingPromptBeat != null ? ClonePrompt(shown) : null;
             _pendingPromptOwnerId = _pendingPromptBeat != null ? node.Id : null;
             EnterChild(node);
         }
@@ -454,7 +483,9 @@ namespace Patterkit.Patterplay
         }
 
         /// <summary>Write a property by ref. The GAME's surface, so a host declaration's `writable: false`
-        /// binds the story, not the game that owns the value. Effects use WriteProperty(.., host: false).</summary>
+        /// binds the story, not the game that owns the value. Effects use WriteProperty(.., host: false). THROWS,
+        /// changing nothing, on a value that doesn't fit the declaration, or a name the content doesn't declare
+        /// (an @scene name in the scene this flow is in), as Engine.SetProperty does.</summary>
         public void SetProperty(string refStr, ExprValue value) => WriteProperty(refStr, value, true);
 
         /// <summary>The position of <paramref name="value"/> on the ladder of the quality <paramref name="refStr"/>
@@ -500,6 +531,12 @@ namespace Patterkit.Patterplay
         private void WritePropertyTo(string refStr, ExprValue value, bool host)
         {
             var (scope, name) = Engine.SplitRef(refStr, _host.IsScopeToken);
+            // The game's value must fit what the content declared; the story's own writes were checked as they compiled.
+            if (host)
+            {
+                if (scope == "scene" && _currentSceneId == null) throw new Exception($"'{refStr}': the flow has not entered a scene yet");
+                Engine.CheckHostWrite(_host, scope, name, value, _currentSceneId);
+            }
             var journal = _host.Journal;
             if (scope == "patter")
             {
@@ -620,7 +657,7 @@ namespace Patterkit.Patterplay
 
         private void SetupChoice(Node group)
         {
-            var options = new List<ChoiceOption>();
+            var options = new List<SavedChoiceOption>();
             var byId = new Dictionary<string, Node>();
             var fallbacks = new List<Node>();
             foreach (var child in group.Children)
@@ -630,7 +667,7 @@ namespace Patterkit.Patterplay
                 bool eligible = Eligible(child);
                 bool hidden = child.SecretUntilEligible;
                 if (!eligible && hidden) continue;
-                options.Add(new ChoiceOption { Id = child.Id, Prompt = PromptFor(child), Eligible = eligible, GameData = child.GameData, Extensions = Engine.ExtensionsOrNull(child.Extensions) });
+                options.Add(new SavedChoiceOption { Id = child.Id, Eligible = eligible, GameData = child.GameData });
                 byId[child.Id] = child;
             }
             // A choice is offered only when the player can take something. One whose every remaining option is
@@ -894,9 +931,14 @@ namespace Patterkit.Patterplay
         private void ReportError(string kind, string node, Expression expr, Exception err)
         {
             string source = string.IsNullOrEmpty(expr?.Src) ? null : expr.Src;
-            var error = new PlayError { Flow = Id, Kind = kind, Node = node, Source = source, Message = err.Message };
-            (_host.OnError ?? Engine.DefaultOnError)?.Invoke(error);
-            if (_host.Tracing) Emit(new LogEntry { Type = "diagnostic", Kind = kind, Node = node, Source = source, Message = err.Message });
+            Report(new PlayError { Flow = Id, Kind = kind, Node = node, Source = source, Message = err.Message });
+        }
+
+        /// <summary>Report a problem this flow carried on past: to the host's OnError, and to the log.</summary>
+        private void Report(PlayError e)
+        {
+            _host.ReportError(e);
+            if (_host.Tracing) Emit(new LogEntry { Type = "diagnostic", Kind = e.Kind, Node = e.Node, Source = e.Source, Message = e.Message });
         }
 
         private ExprValue EvalExpr(Expression expr)
@@ -940,13 +982,14 @@ namespace Patterkit.Patterplay
         private StepResult BeatResult(Beat beat)
         {
             // Accumulated author tags (#215): null when none, so the step omits them (parity with GameData).
-            var tags = _host.TagIndex.TryGetValue(beat.Id, out var t) && t.Count > 0 ? t : null;
+            var tags = TagsOf(beat.Id);
+            var gameData = GameDataHelpers.CopyGameData(beat.GameData); // the game's own copy
             switch (beat.Kind)
             {
                 case "gameEvent":
-                    return new StepResult { Type = StepType.GameEvent, Id = beat.Id, GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
+                    return new StepResult { Type = StepType.GameEvent, Id = beat.Id, GameData = gameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
                 case "text":
-                    return new StepResult { Type = StepType.Text, Id = beat.Id, Text = Interpolate(ResolveString(beat.Id)), PadAfter = PadOf(beat.Id), Action = beat.Action, GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
+                    return new StepResult { Type = StepType.Text, Id = beat.Id, Text = Interpolate(ResolveString(beat.Id)), PadAfter = PadOf(beat.Id), Action = beat.Action, GameData = gameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
                 case "line":
                 {
                     string raw = ResolveString(beat.Id);
@@ -970,7 +1013,7 @@ namespace Patterkit.Patterplay
                         QualifierName = silent ? null : ResolveQualifierName(beat.Qualifier),
                         SpeakerLabel = silent ? null : _host.SpeakerLabelOf(beat.Character, beat.Qualifier),
                         PadAfter = PadOf(beat.Id), // a silent line still fires, so it still carries its pause
-                        GameData = beat.GameData,
+                        GameData = gameData,
                         Extensions = Engine.ExtensionsOrNull(beat.Extensions),
                         Tags = tags,
                     };
@@ -1017,30 +1060,27 @@ namespace Patterkit.Patterplay
         /// fields the choice showed.</summary>
         private StepResult PromptResult(Beat beat, ChoicePrompt shown)
         {
-            var tags = _host.TagIndex.TryGetValue(beat.Id, out var t) && t.Count > 0 ? t : null;
+            var tags = TagsOf(beat.Id);
             if (shown.Kind == "text")
-                return new StepResult { Type = StepType.Text, Id = beat.Id, Text = shown.Text, PadAfter = PadOf(beat.Id), GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
+                return new StepResult { Type = StepType.Text, Id = beat.Id, Text = shown.Text, PadAfter = PadOf(beat.Id), GameData = GameDataHelpers.CopyGameData(beat.GameData), Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
             return new StepResult
             {
                 Type = StepType.Line, Id = beat.Id, Text = shown.Text,
                 Character = shown.Character, CharacterName = shown.CharacterName, Direction = shown.Direction,
                 Qualifier = shown.Qualifier, QualifierName = shown.QualifierName, SpeakerLabel = shown.SpeakerLabel, PadAfter = PadOf(beat.Id),
-                GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags,
+                GameData = GameDataHelpers.CopyGameData(beat.GameData), Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags,
             };
         }
+
+        /// <summary>A beat's accumulated author tags (#215) as a COPY, or null when none (so the step omits them,
+        /// parity with GameData): the index is shared by every engine on the bundle.</summary>
+        private List<string> TagsOf(string id)
+            => _host.TagIndex.TryGetValue(id, out var t) && t.Count > 0 ? new List<string>(t) : null;
 
         /// <summary>A line or text beat's resolved pause (line padding): its own `padAfter`, else the nearest
         /// default above it, else the project's, else the built-in one; clamped to zero on a snippet's last line.</summary>
         private double PadOf(string beatId)
             => _host.PadIndex.TryGetValue(beatId, out var pad) ? pad.Resolved : Bundle.DefaultPadAfter;
-
-        /// <summary>The resolved pause of the beat an option shows as its prompt (its authored prompt, else its
-        /// first content line), for a saved option that predates prompts carrying one.</summary>
-        private double PromptPadOf(Node node)
-        {
-            var beat = PromptBeatOf(node);
-            return beat != null ? PadOf(beat.Id) : Bundle.DefaultPadAfter;
-        }
 
         private Beat PromptBeatOf(Node node)
         {
@@ -1213,18 +1253,29 @@ namespace Patterkit.Patterplay
             snap.Visits = new Dictionary<string, int>(_visitCounts);
             snap.FlowEnded = _flowEnded;
             snap.CurrentSceneId = _currentSceneId;
-            // Stamp each frame with the id of the child it would run next, so a restore against an
-            // EDITED bundle re-finds the position by id instead of trusting the raw index (§9.8).
+            // Stamp each frame with the id of the child it would run next, so a restore against an EDITED bundle
+            // re-finds the position by id instead of trusting the raw index (§9.8). A frame saved at its
+            // container's end has no next child, so no stamp. A frame an option's content runs in carries its
+            // choice (ChoiceId), to be offered again if the option has gone.
             snap.Stack = _stack.Select(f =>
             {
                 var clone = f.Clone();
                 var children = ChildrenOf(f.ContainerId);
-                if (children != null && f.Index < children.Count) clone.NextId = children[f.Index].Id;
+                clone.NextId = children != null && f.Index < children.Count ? children[f.Index].Id : null;
+                clone.ChoiceId = _host.OptionChoice.TryGetValue(f.ContainerId, out var choiceId) ? choiceId : null;
                 return clone;
             }).ToList();
             snap.ActiveSnippetId = _activeSnippet?.Id;
-            snap.BeatIndex = _beatIndex;
-            snap.PendingOptions = _pendingChoice?.Options.Select(CloneOption).ToList();
+            // The next beat by id, so an edit to the snippet can't move it; none once every beat is delivered.
+            var beats = _activeSnippet?.Beats;
+            snap.BeatId = beats != null && _beatIndex < beats.Count ? beats[_beatIndex].Id : null;
+            snap.BeatIndex = null;
+            // Which options, never their text: a prompt is built again in the language in use whenever the
+            // choice is delivered. An option's extension values are the bundle's, read off its node again.
+            snap.PendingOptions = _pendingChoice?.Options.Select(o => new SavedChoiceOption
+            {
+                Id = o.Id, Eligible = o.Eligible, GameData = GameDataHelpers.CopyGameData(o.GameData),
+            }).ToList();
             snap.PendingGroupId = _pendingChoice?.GroupId;
             snap.PendingPromptOwnerId = _pendingPromptOwnerId;
             snap.PendingPrompt = ClonePrompt(_pendingPromptShown);
@@ -1233,11 +1284,12 @@ namespace Patterkit.Patterplay
         }
 
         /// <summary>Restore this flow from a snapshot: its cursor, PRNG, visits, and selector cursors. Its
-        /// property values are the registry's and stay as they are (a load puts the saved ones there first).</summary>
+        /// property values are the registry's and stay as they are (a load puts the saved ones there first). A
+        /// place that has gone from the build resumes at the nearest safe point, reported ("save").</summary>
         public void Restore(FlowSnapshot snap)
         {
             if (_host.Journal != null) throw new Exception("a flow can't be restored while a checkpoint is open");
-            RestoreCursor(snap);
+            var drift = RestoreCursor(snap);
             // Register this flow's bags: each claims the values the registry holds for it (loaded by the
             // game, by LoadGame from the save, or handed back by the engine this one replaces), laid over
             // fresh defaults. Released KEEPING their values, so a live flow restored in place keeps its
@@ -1249,65 +1301,102 @@ namespace Patterkit.Patterplay
             if (_currentSceneId != null) standing.Add(_currentSceneId);
             foreach (var f in _stack) if (f.SceneId != null && !standing.Contains(f.SceneId)) standing.Add(f.SceneId);
             foreach (var s in standing) EnsureSceneBags(s);
+            // Only now, with the values back, can a choice be offered again: its conditions read them.
+            if (drift != null)
+            {
+                Report(new PlayError { Flow = Id, Kind = "save", Node = drift.Node, Message = "the save's place has gone from this build: " + drift.Instead });
+                if (drift.Reoffer != null) SetupChoice(drift.Reoffer);
+            }
         }
 
-        /// <summary>The cursor half of Restore, without touching the bags (a rollback has already put those back).</summary>
-        private void RestoreCursor(FlowSnapshot snap)
+        /// <summary>The cursor half of Restore, without touching the bags. Says where the saved place had gone, if
+        /// it had.</summary>
+        private Drift RestoreCursor(FlowSnapshot snap)
         {
             _rngState = snap.RngState;
             _visitCounts = new Dictionary<string, int>(snap.Visits ?? new Dictionary<string, int>());
             _started = true;
             _flowEnded = snap.FlowEnded;
-            _beatIndex = snap.BeatIndex;
             _currentSceneId = snap.CurrentSceneId;
-            // Re-bind each frame to the CURRENT bundle: prefer the saved next-child id (survives
-            // siblings inserted / removed / reordered before the cursor); fall back to the raw index
-            // when absent or its node drifted out of the bundle (§9.8 best-effort).
-            _stack = (snap.Stack ?? new List<StackFrame>()).Select(f =>
+            Drift drift = null;
+            // Re-bind each frame to the CURRENT bundle: prefer the saved next-child id (survives siblings
+            // inserted / removed / reordered before the cursor); fall back to the raw index when the id is absent
+            // (at the container's end) or its node drifted out of the bundle (§9.8 best-effort). A frame whose
+            // OPTION has gone, with its choice still there, ends the stack: the choice is offered again.
+            _stack = new List<StackFrame>();
+            foreach (var f in snap.Stack ?? new List<StackFrame>())
             {
-                var frame = f.Clone();
-                frame.NextId = null; // live frames never carry it
-                if (f.NextId != null)
+                var children = ChildrenOf(f.ContainerId);
+                Node choice = null;
+                if (children == null && f.ChoiceId != null) _host.NodeIndex.TryGetValue(f.ChoiceId, out choice);
+                if (choice != null && choice.IsGroup && choice.Selector == "choice")
                 {
-                    var children = ChildrenOf(f.ContainerId);
-                    int at = children?.FindIndex(ch => ch.Id == f.NextId) ?? -1;
-                    if (at >= 0) frame.Index = at;
+                    drift = new Drift
+                    {
+                        Node = snap.ActiveSnippetId ?? (snap.PendingOptions != null ? snap.PendingGroupId : null) ?? f.ContainerId,
+                        Instead = $"option {f.ContainerId} has gone, so choice {choice.Id} is offered again",
+                        Reoffer = choice,
+                    };
+                    break;
                 }
-                return frame;
-            }).ToList();
+                var frame = f.Clone();
+                frame.NextId = null; frame.ChoiceId = null; // live frames never carry them
+                int at = f.NextId != null ? children?.FindIndex(ch => ch.Id == f.NextId) ?? -1 : -1;
+                if (at >= 0) frame.Index = at;
+                _stack.Add(frame);
+            }
 
+            // Content-drift policy (§9.8): if a saved position points at content deleted since the save, resume at
+            // the nearest safe point rather than throwing. A gone snippet is skipped: play carries on from the
+            // surviving stack. A gone NEXT beat in a surviving snippet finishes the snippet (its onExit and jump
+            // run), so nothing plays twice. A version 3 save names the beat by its raw index, trusted as it always was.
             _activeSnippet = null;
-            if (snap.ActiveSnippetId != null && _host.NodeIndex.TryGetValue(snap.ActiveSnippetId, out var node) && node.IsSnippet)
-                _activeSnippet = node;
+            _beatIndex = 0;
+            if (drift?.Reoffer == null && snap.ActiveSnippetId != null)
+            {
+                if (_host.NodeIndex.TryGetValue(snap.ActiveSnippetId, out var node) && node.IsSnippet)
+                {
+                    var beats = node.Beats ?? new List<Beat>();
+                    _activeSnippet = node;
+                    if (snap.BeatId != null)
+                    {
+                        int at = beats.FindIndex(b => b.Id == snap.BeatId);
+                        _beatIndex = at >= 0 ? at : beats.Count;
+                        if (at < 0) drift = new Drift { Node = snap.ActiveSnippetId, Instead = $"beat {snap.BeatId} has gone from snippet {snap.ActiveSnippetId}, so the snippet ends there" };
+                    }
+                    else _beatIndex = snap.BeatIndex ?? beats.Count; // version 4 writes no beat once every one is delivered
+                }
+                else drift = new Drift { Node = snap.ActiveSnippetId, Instead = $"snippet {snap.ActiveSnippetId} has gone, so play carries on after it" };
+            }
 
             _selectors = (snap.Selectors ?? new Dictionary<string, SelectorState>())
                 .ToDictionary(k => k.Key, k => k.Value.Clone());
 
+            // Replay the saved option set VERBATIM (schema 9.3) - re-deriving would re-evaluate conditions
+            // (double-consuming PRNG draws) and could change the choice under the player. Prompts are not in the
+            // save (a version 3 save's are discarded): they are built when the choice is delivered. Options whose
+            // nodes drifted out of the bundle are dropped. A choice with no surviving option is offered again,
+            // when its group is still there, or dissolves (9.8).
             _pendingChoice = null;
-            if (snap.PendingOptions != null)
+            if (drift?.Reoffer == null && snap.PendingOptions != null)
             {
                 var byId = new Dictionary<string, Node>();
-                var options = new List<ChoiceOption>();
+                var options = new List<SavedChoiceOption>();
                 foreach (var o in snap.PendingOptions)
                 {
-                    if (!_host.NodeIndex.TryGetValue(o.Id, out var n)) continue;
+                    if (o?.Id == null || !_host.NodeIndex.TryGetValue(o.Id, out var n)) continue;
                     byId[o.Id] = n;
-                    // A save from before prompts carried their pause, or a speaker's label, has none: work them out
-                    // again (the pause from the prompt's beat, the label from the speaker the choice showed, in the
-                    // current locale).
-                    var opt = CloneOption(o);
-                    // An option's extension values are the bundle's, never the save's: read off its node again.
-                    opt.Extensions = Engine.ExtensionsOrNull(n.Extensions);
-                    if (opt.Prompt != null)
-                    {
-                        opt.Prompt = ClonePrompt(opt.Prompt);
-                        if (opt.Prompt.PadAfter == null) opt.Prompt.PadAfter = PromptPadOf(n);
-                        if (opt.Prompt.Kind == "line" && opt.Prompt.SpeakerLabel == null)
-                            opt.Prompt.SpeakerLabel = _host.SpeakerLabelOf(opt.Prompt.Character, opt.Prompt.Qualifier);
-                    }
-                    options.Add(opt);
+                    options.Add(new SavedChoiceOption { Id = o.Id, Eligible = o.Eligible, GameData = o.GameData });
                 }
-                if (options.Count > 0) _pendingChoice = new ChoiceStateInternal { GroupId = snap.PendingGroupId, Options = options, ById = byId };
+                if (options.Count > 0)
+                    _pendingChoice = new ChoiceStateInternal { GroupId = snap.PendingGroupId, Options = options, ById = byId };
+                else
+                {
+                    string groupId = snap.PendingGroupId;
+                    drift = groupId != null && _host.NodeIndex.TryGetValue(groupId, out var group) && group.IsGroup && group.Selector == "choice"
+                        ? new Drift { Node = groupId, Instead = $"none of choice {groupId}'s options is left, so it's offered again", Reoffer = group }
+                        : new Drift { Node = groupId, Instead = $"choice {groupId} has gone, so play carries on after it" };
+                }
             }
 
             // A save taken between Choose() and the next Advance() left a prompt still to be replayed: the
@@ -1317,7 +1406,7 @@ namespace Patterkit.Patterplay
             // bundle or has no authored prompt (spec 9.8): the live Choose() would replay nothing.
             _pendingPromptBeat = null;
             _pendingPromptShown = null;
-            _pendingPromptOwnerId = snap.PendingPromptOwnerId;
+            _pendingPromptOwnerId = drift?.Reoffer != null ? null : snap.PendingPromptOwnerId;
             if (_pendingPromptOwnerId != null && _host.NodeIndex.TryGetValue(_pendingPromptOwnerId, out var owner))
                 _pendingPromptBeat = AuthoredPromptOf(owner);
             if (_pendingPromptBeat == null) _pendingPromptOwnerId = null;
@@ -1325,10 +1414,11 @@ namespace Patterkit.Patterplay
             {
                 _pendingPromptShown = ClonePrompt(snap.PendingPrompt);
                 if (_pendingPromptShown != null && _pendingPromptShown.PadAfter == null) _pendingPromptShown.PadAfter = PadOf(_pendingPromptBeat.Id);
-                // As for the pending choice's options: a save from before prompts carried a speaker's label works it out again.
+                // A save from before prompts carried a speaker's label works it out again.
                 if (_pendingPromptShown != null && _pendingPromptShown.Kind == "line" && _pendingPromptShown.SpeakerLabel == null)
                     _pendingPromptShown.SpeakerLabel = _host.SpeakerLabelOf(_pendingPromptShown.Character, _pendingPromptShown.Qualifier);
             }
+            return drift;
         }
 
         private static ChoicePrompt ClonePrompt(ChoicePrompt p) => p == null ? null : new ChoicePrompt
@@ -1336,11 +1426,6 @@ namespace Patterkit.Patterplay
             Kind = p.Kind, Text = p.Text, Character = p.Character, CharacterName = p.CharacterName, Direction = p.Direction,
             Qualifier = p.Qualifier, QualifierName = p.QualifierName, SpeakerLabel = p.SpeakerLabel, PadAfter = p.PadAfter,
         };
-
-        /// <summary>An option as a snapshot keeps it. Its extension values are left out: they're the bundle's,
-        /// and a restore reads them off the option's node again.</summary>
-        private static ChoiceOption CloneOption(ChoiceOption o)
-            => new ChoiceOption { Id = o.Id, Prompt = o.Prompt, Eligible = o.Eligible, GameData = o.GameData };
 
         // -- helpers ------------------------------------------------------------
 

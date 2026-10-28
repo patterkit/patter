@@ -1,6 +1,7 @@
 #include "PatterGameData.h"
 
 #include "PatterBundle.h"
+#include "PatterLog.h"
 #include "Patter/Bundle.h"
 #include "PatterConvert.h"
 
@@ -238,12 +239,12 @@ bool UPatterGameData::CompareStages(const FPatterGameDataField& Field, const FSt
 {
 	OutOrder = 0;
 	try { OutOrder = wildwinter::expr::CompareStages(LadderOf(Field), patter::PatterValue::Str(Std(A)), patter::PatterValue::Str(Std(B))); return true; }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
 bool UPatterGameData::NextStage(const FPatterGameDataField& Field, const FString& Stage, FString& OutStage)
 {
 	OutStage = FString();
 	try { OutStage = Ue(wildwinter::expr::NextStage(LadderOf(Field), patter::PatterValue::Str(Std(Stage)))); return true; }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }

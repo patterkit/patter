@@ -38,8 +38,30 @@ Switch language live without losing the player's place:
 engine.setLocale("fr");   // subsequent beats render in French; flow state is untouched
 ```
 
+A pending choice follows the switch too: its options are built each time it's delivered, so the next
+`advance()` or `getChoices()` shows them in French. The one exception is a prompt that
+`replayPromptOnChoose` is about to speak back, which keeps the language the player chose it in.
+
 A string missing in the active locale falls back to the source text flagged
 `<Untranslated: {id}> …`, so a half-finished translation is impossible to miss.
+
+### Which locale is used
+
+The locale you pass to the engine, or to `setLocale`, is matched against the bundle's locales by one rule,
+on every runtime:
+
+1. **The locale itself.** Case and `_` or `-` don't matter, so `FR`, `fr_FR`, and `fr-fr` find `fr-FR`.
+2. **Its language**, when the bundle doesn't have the locale: `fr-CA` uses `fr`. It never works the other
+   way: `fr` doesn't go looking for `fr-FR`.
+3. **The bundle's default**, when it has neither. Every string is then flagged `<Untranslated: {id}>`,
+   so the gap shows.
+
+Anything but an exact match is reported to `onError` as a `setup` problem (see
+[When something goes wrong](/play/engine/#when-something-goes-wrong)), naming the locale you asked for.
+`engine.locale` is the locale in use (`fr` after asking for `fr-CA`), and `engine.locales` is the
+bundle's `{ default, included }`. A hot swap builds a new engine, so it matches the locale you asked
+for against the new bundle, and reports again. An IDs-only bundle takes the locale as given and says
+nothing, since your game localises the text.
 
 ## IDs-only: your game does it
 

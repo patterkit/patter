@@ -18,7 +18,7 @@ import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
 import { Engine, effectiveGameData, extensionDecls, extensionsOf, gameDataFields } from "@patterkit/runtime";
-import type { Checkpoint, EngineOptions, LoadMisfit, StepResult } from "@patterkit/runtime";
+import type { Checkpoint, EngineOptions, HostScope, LoadMisfit, PlayError, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, FlowState, GameData, SaveEnvelope } from "@patterkit/model";
@@ -34,6 +34,8 @@ const sorted = (v: unknown): unknown =>
     : v !== null && typeof v === "object"
       ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sorted((v as Record<string, unknown>)[k])])) : v);
 const showJson = (v: unknown): string => JSON.stringify(sorted(v));
+/** A transcript's own copy of what a step carried, so a later `scribble` on the step can't reach it. */
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
 /** Evaluate one expression case; returns the actual value to compare with `expected`. */
 export function runExpressionCase(c: ExpressionCase): ScalarValue {
@@ -102,11 +104,13 @@ export function runRuntimeCase(c: RuntimeCase, maxSteps = 1000): TranscriptStep[
  */
 export function runScript(
   engine: Engine, ops: ScriptOp[],
-  /** `refits` collects what every engine's `onRefit` reported, when the options feed it (caseOptions does). */
-  ctx: { bundle: Bundle; bundleB?: Bundle; options: EngineOptions; refits?: LoadMisfit[] }, current = "",
+  /** `refits` and `errors` collect what every engine's `onRefit` and `onError` reported, when the options feed
+   *  them (caseOptions does). */
+  ctx: { bundle: Bundle; bundleB?: Bundle; options: EngineOptions; refits?: LoadMisfit[]; errors?: PlayError[] }, current = "",
 ): { chunks: TranscriptStep[][]; engine: Engine } {
   const chunks: TranscriptStep[][] = [];
   let checkpoint: Checkpoint | undefined;
+  let handed: StepResult | undefined; // what the last advance or stepFor handed the host, for `scribble`
   const captured = new Map<string, FlowState>(); // captureFlow states, by name, for restoreFlow
   // A call the runtime must refuse: it throws, and the engine is as it was (still inside its checkpoint).
   const refused = (what: string, call: () => unknown): void => {
@@ -143,14 +147,21 @@ export function runScript(
       case "advance": {
         const r = engine.getFlow(current)!.advance();
         chunk.push(normaliseStep(r, isIdsOnly(ctx.bundle)));
+        handed = r;
         break;
       }
       case "stepFor": {
         // The step the flow would deliver for a beat now, recorded as a delivered one is; none for an unknown id.
         const r = engine.getFlow(op.flow ?? current)!.stepFor(op.beat);
         if (r) chunk.push(normaliseStep(r, isIdsOnly(ctx.bundle)));
+        handed = r;
         break;
       }
+      case "scribble":
+        // A careless host defaces what it was handed. It is its own copy, so nothing the engine says next changes.
+        if (handed?.type === "choice") for (const o of handed.options) scribble(o.gameData);
+        else if (handed && handed.type !== "end") scribble(handed.gameData);
+        break;
       case "choose":
         engine.getFlow(current)!.choose(op.id);
         break;
@@ -272,6 +283,25 @@ export function runScript(
         if (op.expectRefused) { refused(`setProperty ${op.ref}`, () => engine.setProperty(op.ref, op.value)); break; }
         engine.setProperty(op.ref, op.value);
         break;
+      case "expectErrors": {
+        // Kind, node, and (when the expectation names one) flow: never the message, which is each runtime's own.
+        const got = (ctx.errors ?? []).map((e, i) => {
+          const want = op.expectResult[i];
+          return { kind: e.kind, node: e.node, ...(want?.flow !== undefined ? { flow: e.flow } : {}) };
+        });
+        if (JSON.stringify(got) !== JSON.stringify(op.expectResult.map((e) => ({ kind: e.kind, node: e.node, ...(e.flow !== undefined ? { flow: e.flow } : {}) })))) {
+          throw new Error(`expectErrors: expected ${JSON.stringify(op.expectResult)}, got ${JSON.stringify((ctx.errors ?? []).map(({ kind, node, flow }) => ({ kind, node, flow })))}`);
+        }
+        ctx.errors?.splice(0);
+        break;
+      }
+      case "expectLocale": {
+        const got = { locale: engine.locale, ...engine.locales };
+        if (JSON.stringify(got) !== JSON.stringify(op.expectResult)) {
+          throw new Error(`expectLocale: expected ${JSON.stringify(op.expectResult)}, got ${JSON.stringify(got)}`);
+        }
+        break;
+      }
       case "expectRefits": {
         const got = JSON.parse(JSON.stringify(ctx.refits ?? [])) as unknown[];
         if (JSON.stringify(got) !== JSON.stringify(op.expectResult)) {
@@ -294,16 +324,30 @@ export function runScript(
   return { chunks, engine };
 }
 
-/** The options a scripted or save case constructs every engine with: its seed and its engine options, and an
- *  `onRefit` that records into `refits`, for the script's `expectRefits`. */
-function caseOptions(c: { seed?: number; engineOptions?: ScriptedCase["engineOptions"] }, refits: LoadMisfit[] = []): EngineOptions {
-  return { ...(c.seed !== undefined ? { seed: c.seed } : {}), ...c.engineOptions, onRefit: (m) => { refits.push(...m); } };
+/** The options a scripted or save case constructs every engine with: its seed, locale, host scopes, and engine
+ *  options, an `onRefit` that records into `refits` for the script's `expectRefits`, and an `onError` that records
+ *  into `errors` for its `expectErrors`. Each host scope is a resolver over a store kept for the whole case. */
+function caseOptions(
+  c: { seed?: number; locale?: string; hostScopes?: string[]; engineOptions?: ScriptedCase["engineOptions"] },
+  refits: LoadMisfit[] = [], errors: PlayError[] = [],
+): EngineOptions {
+  const hostScopes: Record<string, HostScope> = {};
+  for (const token of c.hostScopes ?? []) {
+    const store = new Map<string, ScalarValue>();
+    hostScopes[token] = { get: (name) => store.get(name), set: (name, value) => { store.set(name, value); } };
+  }
+  return {
+    ...(c.seed !== undefined ? { seed: c.seed } : {}), ...(c.locale !== undefined ? { locale: c.locale } : {}),
+    ...(c.hostScopes !== undefined ? { hostScopes } : {}), ...c.engineOptions,
+    onRefit: (m) => { refits.push(...m); }, onError: (e) => { errors.push(e); },
+  };
 }
 
 export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
   const refits: LoadMisfit[] = [];
-  const options = caseOptions(c, refits);
-  return runScript(new Engine(c.bundle, options), c.script, { bundle: c.bundle, bundleB: c.bundleB, options, refits }).chunks;
+  const errors: PlayError[] = [];
+  const options = caseOptions(c, refits, errors); // recording from the first engine's construction on
+  return runScript(new Engine(c.bundle, options), c.script, { bundle: c.bundle, bundleB: c.bundleB, options, refits, errors }).chunks;
 }
 
 /**
@@ -314,7 +358,8 @@ export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
  */
 export function runSaveCase(c: SaveCase): TranscriptStep[][] {
   const refits: LoadMisfit[] = [];
-  const options = caseOptions(c, refits);
+  const errors: PlayError[] = [];
+  const options = caseOptions(c, refits, errors);
   const engine = new Engine(c.bundle, options);
   if (c.envelope.schema !== SAVE_SCHEMA) throw new Error(`not a ${SAVE_SCHEMA} envelope`);
   engine.loadGame(JSON.parse(JSON.stringify(c.envelope.save)));
@@ -324,7 +369,16 @@ export function runSaveCase(c: SaveCase): TranscriptStep[][] {
     const extra = back.filter((k) => !c.keyPaths.includes(k));
     throw new Error(`re-serialised save has different key paths; missing: [${missing.join(", ")}] extra: [${extra.join(", ")}]`);
   }
-  return runScript(engine, c.script, { bundle: c.bundle, options, refits }).chunks;
+  return runScript(engine, c.script, { bundle: c.bundle, options, refits, errors }).chunks;
+}
+
+/** The `scribble` op on one gameData: every flags list gains "scribbled", then every value becomes "scribbled"
+ *  and the map gains the key too. */
+function scribble(gameData: Record<string, unknown> | undefined): void {
+  if (!gameData) return;
+  for (const value of Object.values(gameData)) if (Array.isArray(value)) value.push("scribbled");
+  for (const key of Object.keys(gameData)) gameData[key] = "scribbled";
+  gameData["scribbled"] = "scribbled";
 }
 
 /**
@@ -382,7 +436,7 @@ export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
       const label = labelField(r.character, r.characterName, r.speakerLabel, idsOnly);
       if (label !== undefined) s.speakerLabel = label;                      // the speaker's label, where it differs
       if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = padField(r.padAfter);          // line padding, when not the default
-      if (r.gameData !== undefined) s.gameData = r.gameData;
+      if (r.gameData !== undefined) s.gameData = clone(r.gameData);
       if (r.extensions !== undefined) s.extensions = r.extensions; // Patter extension values, raw
       if (r.tags !== undefined) s.tags = r.tags; // accumulated author tags (#215)
       return s;
@@ -391,14 +445,14 @@ export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
       const s: TranscriptStep = { type: "text", id: r.id, text: r.text };
       if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = padField(r.padAfter);
       if (r.action) s.action = true; // action text: not shown to the player
-      if (r.gameData !== undefined) s.gameData = r.gameData;
+      if (r.gameData !== undefined) s.gameData = clone(r.gameData);
       if (r.extensions !== undefined) s.extensions = r.extensions;
       if (r.tags !== undefined) s.tags = r.tags;
       return s;
     }
     case "gameEvent": {
       const s: TranscriptStep = { type: "gameEvent", id: r.id };
-      if (r.gameData !== undefined) s.gameData = r.gameData;
+      if (r.gameData !== undefined) s.gameData = clone(r.gameData);
       if (r.extensions !== undefined) s.extensions = r.extensions;
       if (r.tags !== undefined) s.tags = r.tags;
       return s;
@@ -421,7 +475,7 @@ export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
           if (o.prompt.padAfter !== DEFAULT_PAD_AFTER) p.padAfter = padField(o.prompt.padAfter);
           opt.prompt = p;
         }
-        if (o.gameData !== undefined) opt.gameData = o.gameData;
+        if (o.gameData !== undefined) opt.gameData = clone(o.gameData);
         if (o.extensions !== undefined) opt.extensions = o.extensions;
         return opt;
       }) };

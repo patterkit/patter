@@ -10,13 +10,14 @@
 //   Link = FPatterDebugLink::Create(Engine->BuildId(), TEXT("My Game"));
 //   Link->FlowOpened(TEXT("main"));
 //   // ...after each Advance()/Choose():
-//   Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, StepTypeName(Step.Type));
+//   Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, FPatterDebugLink::TypeName(Step.Type));
 //   // ...and when the flow ends:
 //   Link->FlowClosed(TEXT("main"));
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Templates/SharedPointer.h"
+#include "PatterTypes.h"
 
 class IWebSocket;
 
@@ -33,6 +34,9 @@ public:
 	void FlowClosed(const FString& FlowId);
 	/** Report a flow's current position - call after each Advance()/Choose(). An empty SceneId or BeatId goes as null on the wire. */
 	void Observe(const FString& FlowId, const FString& SceneId, const FString& BeatId, const FString& Type, const FString& ChoiceId = FString());
+	/** A step type as the wire spells it, for Observe's Type: "line", "text", "gameEvent", "choice", or "end".
+	 *  Unity's PatterDebugLink.TypeName. */
+	static FString TypeName(EPatterStepType Type);
 	/** Close the link. */
 	void Close();
 
@@ -55,11 +59,6 @@ public:
 	const FString& Build() const { return BuildId; }
 	/** The editor address this link dials. */
 	const FString& Url() const { return DialUrl; }
-
-	UE_DEPRECATED(5.7, "Use Build(), the name every Patterplay runtime uses.")
-	const FString& GetBuild() const { return BuildId; }
-	UE_DEPRECATED(5.7, "Use Url(), the name every Patterplay runtime uses.")
-	const FString& GetUrl() const { return DialUrl; }
 
 private:
 	FPatterDebugLink(const FString& InBuild, const FString& InProject, const FString& InUrl);

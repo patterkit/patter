@@ -12,7 +12,7 @@ void APatterplayDemoActor::BeginPlay()
 		return;
 	}
 
-	UPatterEngine* Engine = UPatterEngine::Create(Bundle);
+	UPatterEngine* Engine = UPatterEngine::Create(Bundle, {});
 	if (!Engine) return;
 	UPatterFlow* Flow = Engine->OpenFlow(TEXT("main"), TEXT("demo"));
 	if (!Flow) return;
@@ -36,7 +36,7 @@ void APatterplayDemoActor::BeginPlay()
 			case EPatterStepType::Choice:
 				if (Step.Options.Num() > 0)
 				{
-					UE_LOG(LogTemp, Display, TEXT("> %s"), *Step.Options[0].Text);
+					UE_LOG(LogTemp, Display, TEXT("> %s"), *Step.Options[0].Prompt.Text);
 					Flow->Choose(Step.Options[0].Id);
 				}
 				break;

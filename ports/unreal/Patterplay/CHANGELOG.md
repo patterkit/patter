@@ -7,6 +7,104 @@ runtime behaviour.
 
 ## [Unreleased]
 
+The runtime foundations before 1.0, from the hands-on review of October 2026, the same on all four runtimes.
+Changes marked **Breaking (1.0)** change what an existing game sees. The conformance corpus is version 8.
+
+### Added
+
+- **The project's start scene.** A flow opened (`OpenFlow` with an empty scene) or reset (`Reset`) without a
+  scene starts at the bundle's `start`, at its block when it names one, so a game opens where the writer
+  chose. A bundle without one starts at the first scene, as before. The core reads it as `Bundle::start`.
+- **Set-up problems and moved saves are reported.** `EPatterPlayErrorKind` gains `Setup` (a locale the bundle
+  doesn't have, a host scope it doesn't declare; `Flow` is empty and `Node` is the locale or token) and `Save`
+  (a load whose place has gone from the build; `Node` is the saved snippet, or the pending choice's group).
+  Both reach `OnError`, `LogPatterplay`, and the decision log as a `diagnostic` entry (`setup` and `save` in
+  the core's `PlayError::kind`). The core reports one found while the engine is built as its constructor
+  ends. `OnError` can only be bound once `Create` has returned, so the wrapper logs such a report and records
+  it at once, and delivers it to `OnError` on the first `OpenFlow`.
+- **`Locales()`** (`locales()` on the core): the bundle's default locale and every locale it includes, as
+  `FPatterLocales`.
+- **One rule for a locale**, used by the `Locale` option, `SetLocale`, `ReplaceStrings`, and a hot swap: case
+  and `_` / `-` don't matter, so the locale itself wins, then its language (`fr` for `fr-FR`), then the
+  bundle's default, whose text keeps the `<Untranslated: id>` marker. Anything but an exact match (a
+  case-only one included) is reported as `Setup`. `fr` never looks for `fr-FR`. A hot swap resolves the locale
+  asked for against the new bundle and reports again; `ReplaceStrings` reports only a fallback that changed.
+  An IDs-only bundle takes the locale as given, unreported.
+- **A host scope bound under a token the bundle doesn't declare is reported** (`Setup`), naming the declared
+  spelling when only the case differs. Tokens stay case-sensitive: nothing is folded.
+- **A save loaded into an edited build resumes at the nearest safe point**, reported as `Save` only when its
+  place has really gone: a gone snippet is skipped; a gone next line ends its snippet there (its exit effects
+  and jump run), so nothing plays twice; a gone option offers its choice again; a pending choice none of
+  whose options survive is offered again with what its group has now, or play carries on after it.
+- **`UPatterFlow::GetLastError`**: why the flow's last `Advance`, `AdvanceToStop`, `Choose`, `Goto`, or
+  `Reset` was refused, empty when it wasn't; set on a refusal and cleared by the next one that succeeds.
+  Blueprint can't catch what the core throws, and a refused `Advance` used to hand back a silent empty step.
+- **`LogPatterplay`**, the plugin's log category (`PatterLog.h`): every message the wrapper logs goes there
+  rather than to `LogTemp`.
+- **`FPatterDebugLink::TypeName(Step.Type)`** spells a step's type for `Observe`, as Unity's
+  `PatterDebugLink.TypeName` does. The docs named a `StepTypeName` that never existed.
+
+### Changed
+
+- **Breaking (1.0): `UPatterEngine::Create(Bundle, HostScopes)` binds the host scopes a game owns**, a map of
+  token to `UPatterWorld` (`"world"` for World Properties), and replaces `Create(Bundle, World)`, so all four
+  runtimes bind host scopes one way (JS `hostScopes`, Unity `EngineOptions.HostScopes`, Godot `host_scopes`).
+  `CreateWithOptions(Bundle, Options, HostScopes)` and `CreateWithRegistry(Bundle, Registry, HostScopes,
+  Options)` take the same map, and `GetHostScope(Token)` replaces `GetBoundWorld`. In Blueprint the map pin may
+  be left empty; in C++ pass `{}` to bind none.
+- **Breaking (1.0): `SetProperty` refuses a value that doesn't fit its declaration**, on the engine and on a
+  flow, changing nothing, as the Storylet Engine does: the kernel's `ValueFits`, so a value a game may set is
+  exactly one a save may carry, and an enum whose own default is `""` takes `""` back. A name the content
+  doesn't declare (in `@patter`, `@scene`, or a host scope the bundle declares) is refused too; an opaque host
+  scope takes anything. Every `SetProperty*` (`SetProperty`, `SetPropertyNumber`, `SetPropertyBool`,
+  `SetPropertyString`, `SetPropertyFlags`, and `UPatterFlow::SetProperty`) now returns an `FString`: empty when
+  the write landed, otherwise why it didn't (`"@patter.gold" takes a number; "lots" doesn't fit`), logged. The
+  core's `setProperty` throws `patter::EvalError`.
+- **Breaking (1.0): a pending choice follows the language and the values.** Its options' prompts are built
+  each time the choice is delivered (`Advance`, `GetChoices`), so `SetLocale` reaches a choice already on
+  screen, a property the game sets shows in its prompts, and a save loads in the language of the engine that
+  loads it. The replayed prompt (`bReplayPromptOnChoose`) is the documented exception: it's spoken exactly as
+  the choice showed it. The core's `Flow::getChoices` is no longer `const`.
+- **Breaking (1.0): `Locale()` is the locale in use**, the one the rule resolved to (`fr` after asking for
+  `fr-FR`; the default after asking for a locale the bundle doesn't have), rather than the string asked for.
+- **Breaking (1.0): the gameData the core hands out is the game's own copy**, flags lists included: on every
+  step (`StepResult::gameData`) and option, as Blueprint's structs already were. A game that edits one changes
+  nothing the engine, or another engine on the same bundle, hands out next. Extension values are not copied:
+  they're the bundle's own, documented as read-only.
+- **Breaking (1.0): saves are version 4.** A pending choice keeps its options' ids, eligibility, and gameData,
+  not their prompts; the cursor names the next line by id (`beatId`, absent when none is left) instead of its
+  index (`beatIndex`); and a frame inside a choice's option carries the choice's id (`choiceId`). Version 3
+  and 4 saves load, and 4 is written; a version 3 save's prompt text is discarded as it loads. `CaptureFlow`
+  writes version 4, and `RestoreFlow` reads 3 and 4. In the core, `FlowSnapshot::pendingOptions` is a list of
+  `patter::PendingOption`, and a `FlowState` carries its own `scopes` and `sceneBags`.
+
+### Removed
+
+- **Breaking (1.0): version 2 saves no longer load**, nor the pre-0.11 flat save shape. Load a version 2 save
+  with a 0.x runtime and save it again to bring it forward.
+- **Breaking (1.0): the deprecated API.** `UPatterSave::SaveStateToJson` and `LoadStateFromJson` (use
+  `SerializeState` and `DeserializeState`); `UPatterFlow::GetFlowId` (use `Id`); `UPatterEngine::GetBuildId`,
+  `GetLog`, and `IsInCheckpoint` (use `BuildId`, `Log`, and `InCheckpoint`); `UPatterAudio` (use
+  `UPatterAudioResolver::Create`); `FPatterDebugLink::GetBuild` and `GetUrl` (use `Build` and `Url`);
+  `FPatterOption`'s `Text`, `PromptKind`, `Character`, `CharacterName`, and `Direction` (use `Prompt` and
+  `bHasPrompt`); `FPatterLogEntry`'s `Subject`, `Considered`, and `Detail` (use `Group`, `To`, `Target`,
+  `Node`, `Children`, `Options`, `Mode`, and `Message`). On the core: `Flow::start` (use `reset`),
+  `Engine::listOutline` and `beatSequence` (use `getOutline` and `getBeatSequence`), `OutlineBeat` and
+  `OutlineFlatBeat` (use `BeatInfo` and `FlatBeat`), `ParseBundle` (use `parseBundle`), and
+  `gameDataFieldsFor` (use `gameDataFields`).
+- **Breaking (1.0): `UPatterEngine::Create(Bundle, World)`, `CreateWithOptions(Bundle, Options, World)`, and
+  `GetBoundWorld`**, replaced by the host-scopes map above.
+
+### Fixed
+
+- **A saved "" loads as saved on an enum whose default is "".** A host scope's enum declared with default ""
+  (none chosen) had a saved "" reported as drifted when it loaded. It now loads as saved; any other enum still
+  puts a saved "" back to its default. (The shared expression kernel, fixed in every runtime.)
+- **A refused hot swap reports set-up once, and a start the bundle doesn't have is passed over.** When a hot swap's
+  load is refused, the engine it falls back on no longer repeats the replacement's set-up reports. A hand-edited
+  bundle whose `start` names a scene, or block, it doesn't have now starts at the first scene, or that scene's
+  first block, rather than throwing.
+
 ## [0.34.0] - 2026-10-21
 
 ### Removed

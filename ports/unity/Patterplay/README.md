@@ -91,7 +91,8 @@ names and `SpeakerLabel`, `PadAfter`, Game Data, and tags. It doesn't move the f
 effect, and it's null for an id that's neither a beat nor an option's prompt.
 
 A step's `GameData` is the writer's own values for that beat, raw and sparse: what the beat sets, and nothing
-it leaves to the field's default. `GameDataHelpers.EffectiveGameData(GameDataHelpers.GameDataFields(bundle,
+it leaves to the field's default. It's your own copy, as are a step's `Tags`, so editing one changes nothing
+the engine hands out next. `Extensions` aren't copied: treat them as read-only. `GameDataHelpers.EffectiveGameData(GameDataHelpers.GameDataFields(bundle,
 "line"), step.GameData)` fills in the defaults. A choice option, and each scene and block
 (`engine.GameDataForScene`, `engine.GameDataForBlock`), carry theirs the same way.
 
@@ -120,14 +121,23 @@ scene** - import, open the scene, press Play, nothing to set up:
 ## Beyond the basics
 
 - **Save / load**: `PatterSave.SerializeState(engine)` / `DeserializeState` snapshot and
-  restore the whole run as JSON (the family's `patter/save@0`, version 3; version 2 saves still
-  load).
+  restore the whole run as JSON (the family's `patter/save@0`, version 4; version 3 saves still
+  load). A pending choice is saved by its options' ids, so it loads in the language of the engine
+  that loads it. A save loaded into an edited build resumes at the nearest safe point, and says so
+  through `EngineOptions.OnError` (kind `"save"`).
+- **Where a flow starts**: `engine.OpenFlow("main")` with no scene starts at the project's start
+  (`Bundle.Start`), else at the first scene.
+- **Problems the engine carried on past** reach `EngineOptions.OnError` as a `PlayError`: content that
+  failed at run time, a set-up problem (`"setup"`: a locale the bundle doesn't have, a host scope it
+  doesn't declare), and a moved save (`"save"`). Without a handler, each is a `[Patterplay]` warning.
 - **Set one flow aside**: `engine.CaptureFlow(id)` returns its part of a save as a `FlowState` (its
   position, PRNG, visits, selectors, and its own property values, without its id). Close the flow after
   capturing, keep the state as JSON with `PatterSave.SaveFlowState` / `ReadFlowState`, and
   `engine.RestoreFlow(newId, state)` opens it again later, under any id, without rewinding shared state.
 - **Your game's state**: bind `@world` through `EngineOptions.HostScopes` (an `IHostScope` per
   token), or leave it unbound and the engine self-backs it from the declared defaults, and saves it.
+  `SetProperty` refuses, by throwing, a value that doesn't fit the property's declaration or a name
+  the content doesn't declare.
 - **One registry per game**: every property lives in a `ScopeRegistry`. Pass your own through
   `EngineOptions.Registry` to share it with another engine (a Storylet Engine, say) and save it once
   with `PatterSave.SaveRegistry` / `LoadRegistry`; leave it out and the engine keeps its own.
@@ -146,7 +156,9 @@ scene** - import, open the scene, press Play, nothing to set up:
   cursor to the editor and hot-reloading edited bundles back in.
   See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
 - **Localisation**: play any locale of an Embedded bundle (`engine.SetLocale`), or ship an
-  IDs-only bundle and localise in your own system.
+  IDs-only bundle and localise in your own system. A locale the bundle doesn't have falls back to its
+  language, then to the default, and is reported; `engine.Locale` is the one in use, and
+  `engine.Locales` the bundle's.
   See [the localisation guide](https://patterkit.dev/play/localisation/).
 
 Changes per release: [CHANGELOG.md](CHANGELOG.md).

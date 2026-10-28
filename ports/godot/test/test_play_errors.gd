@@ -188,19 +188,19 @@ func _check_save_refusals() -> void:
 		"an envelope holding a save with no flows is refused")
 	_untouched(engine, flow, "after an envelope with no flows")
 
-	# A version that is not exactly 2 or 3.
+	# A version that is not exactly 3 or 4.
 	var bad_version: Dictionary = good.duplicate(true)
 	bad_version["version"] = 3.9
 	_expect(not engine.load_game(bad_version), "save version 3.9 is refused")
 	_untouched(engine, flow, "after version 3.9")
 
-	# The envelope still loads, and so does a version 2 save inside one.
+	# The envelope still loads; a version 2 save inside one no longer does (1.0 reads versions 3 and 4).
 	_expect(PatterSave.load_state(engine, {"schema": PatterSave.SCHEMA, "save": good}), "the envelope loads")
 	var next: Dictionary = engine.get_flow("main").advance()
 	_expect(next.get("text") == "ok", "the loaded flow carries on: " + str(next))
-	_expect(PatterSave.load_state(engine, {"schema": PatterSave.SCHEMA, "save": bare_v2}),
-		"a version 2 save inside the envelope still loads")
-	_expect(engine.get_property("@a") == 9.0, "the version 2 save's values reach the registry: " + str(engine.get_property("@a")))
+	_expect(not PatterSave.load_state(engine, {"schema": PatterSave.SCHEMA, "save": bare_v2}),
+		"a version 2 save inside the envelope is refused")
+	_expect(engine.get_property("@a") == 5.0, "and the values stay as they were: " + str(engine.get_property("@a")))
 
 
 ## restore_flow refuses an id that is open, an open checkpoint, a version it cannot read, and a state
@@ -221,8 +221,8 @@ func _check_flow_state_refusals() -> void:
 	_expect(_same(engine.save_game(), before), "a restore over an open id changes nothing")
 
 	var stale: Dictionary = state.duplicate(true)
-	stale["version"] = 4
-	_expect(engine.restore_flow("spare", stale) == null, "flow state version 4 is refused")
+	stale["version"] = 2
+	_expect(engine.restore_flow("spare", stale) == null, "flow state version 2 is refused")
 	_expect(engine.get_flow("spare") == null and _same(engine.save_game(), before), "a refused version changes nothing")
 
 	var cp := engine.checkpoint()
@@ -257,7 +257,8 @@ func _untouched(engine: PatterEngine, flow: PatterFlow, when: String) -> void:
 	_expect(not flow.is_closed(), "the flow is not closed " + when)
 	_expect(engine.get_property("@a") == 5.0, "@a keeps its value " + when + ": " + str(engine.get_property("@a")))
 	var snap: Dictionary = flow.snapshot()
-	_expect(snap["cursor"]["activeSnippetId"] == "sn_set" and int(snap["cursor"]["beatIndex"]) == 1,
+	# Its one beat delivered, so the cursor names no next beat.
+	_expect(snap["cursor"]["activeSnippetId"] == "sn_set" and not snap["cursor"].has("beatId"),
 		"the flow's cursor did not move " + when)
 
 

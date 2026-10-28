@@ -10,6 +10,7 @@ import type { ProjectFile, Scene } from "@patterkit/model";
 const base = (): ProjectFile => ({
   schema: "patter/project@0", project: { id: "p", name: "P" },
   locales: { default: "en", all: ["en"] },
+  start: { scene: "s" },
 });
 const scene = (): Scene => ({
   id: "s", type: "scene", name: "S",

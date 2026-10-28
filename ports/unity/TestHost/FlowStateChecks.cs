@@ -58,7 +58,7 @@ namespace Patterkit.Patterplay.TestHost
                 var engine = new Engine(bundle);
                 InT(engine, "npc/bob");
                 var state = engine.CaptureFlow("npc/bob");
-                Check("flow state: version", state.Version == 3, $"{state.Version}");
+                Check("flow state: version", state.Version == Engine.SaveVersion, $"{state.Version}");
                 Check("flow state: its @patter values", state.Scopes != null && state.Scopes.Count == 1 && Num(state.Scopes.GetValueOrDefault("gold")) == 3,
                     Json(state));
                 Check("flow state: the bag of a scene it has left",

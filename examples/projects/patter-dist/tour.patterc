@@ -9,9 +9,9 @@
     }
   ],
   "content": {
-    "hash": "18h6afa",
+    "hash": "1c5jma0",
     "project": "proj_sa3v44hd",
-    "structureHash": "0jh01q2"
+    "structureHash": "09hrg8k"
   },
   "locales": {
     "default": "en",
@@ -1114,6 +1114,9 @@
     }
   },
   "schema": "patter/bundle@0",
+  "start": {
+    "scene": "scn_8007kfrw"
+  },
   "strings": {
     "en": {
       "L_02irf71j": "Now go and build something wonderful. ",

@@ -46,7 +46,7 @@ bool FPatterplayFlowsTest::RunTest(const FString& Parameters)
 {
 	UPatterBundle* Bundle = UPatterBundle::LoadFromString(FlowsBundleJson);
 	if (!TestNotNull(TEXT("bundle loads"), Bundle)) return false;
-	UPatterEngine* Engine = UPatterEngine::Create(Bundle);
+	UPatterEngine* Engine = UPatterEngine::Create(Bundle, {});
 	if (!TestNotNull(TEXT("engine"), Engine)) return false;
 
 	// --- reopening a name REPLACES; GetFlow answers with the replacement ---------------
@@ -85,7 +85,7 @@ bool FPatterplayFlowsTest::RunTest(const FString& Parameters)
 	}
 
 	// --- a load into an engine that never opened the flow --------------------------------------
-	UPatterEngine* Fresh = UPatterEngine::Create(Bundle);
+	UPatterEngine* Fresh = UPatterEngine::Create(Bundle, {});
 	if (!TestNotNull(TEXT("a fresh engine"), Fresh)) return false;
 	if (TestTrue(TEXT("the save loads into a fresh engine"), UPatterSave::DeserializeState(Fresh, Saved)))
 	{
@@ -98,7 +98,7 @@ bool FPatterplayFlowsTest::RunTest(const FString& Parameters)
 	}
 
 	// --- Reset begins a flow again from Blueprint, as Flow.reset does on every runtime -----------------
-	UPatterEngine* Again = UPatterEngine::Create(Bundle);
+	UPatterEngine* Again = UPatterEngine::Create(Bundle, {});
 	if (!TestNotNull(TEXT("an engine to restart in"), Again)) return false;
 	UPatterFlow* Run = Again->OpenFlow(TEXT("run"), TEXT("s1"));
 	if (!TestNotNull(TEXT("a flow to restart"), Run)) return false;

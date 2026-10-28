@@ -30,7 +30,6 @@ func _initialize() -> void:
 	# Nothing is listening in a test, so this is connecting or closed - never a lie about being
 	# connected, which is the whole reason the panel shows it.
 	_expect(link.state() in ["connecting", "connected", "closed"], "and an honest state (got %s)" % link.state())
-	_expect(link.status()["build"] == "build-hash", "the deprecated status() still reads")
 	PatterDebug.unregister_link(link)
 	_expect(PatterDebug.links.is_empty(), "unregistering drops it")
 

@@ -1,5 +1,6 @@
 #include "PatterBundleFactory.h"
 #include "PatterBundle.h"
+#include "PatterLog.h"
 
 UPatterBundleFactory::UPatterBundleFactory()
 {
@@ -18,7 +19,7 @@ UObject* UPatterBundleFactory::FactoryCreateText(UClass* InClass, UObject* InPar
 	Bundle->Json = Json;
 	if (!Bundle->Parse())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Patterplay: '%s' is not a valid .patterc bundle."), *InName.ToString());
+		UE_LOG(LogPatterplay, Error, TEXT("Patterplay: '%s' is not a valid .patterc bundle."), *InName.ToString());
 	}
 	return Bundle;
 }

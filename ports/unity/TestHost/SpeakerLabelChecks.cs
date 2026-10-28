@@ -1,8 +1,8 @@
 // A line's speaker label, from the port's own side. Only a pair the bundle overrides (the cast's
 // qualifierLabels) reads a `speaker:<name>:<gameId>` string: one a locale still holds for a pair the project
-// no longer overrides is left alone, and that pair follows the pattern. A save written before choice prompts
-// carried their label has none, so on load each saved line prompt (the pending choice's options, and the
-// prompt still to be spoken back) works it out again in the current locale, and the next save carries it.
+// no longer overrides is left alone, and that pair follows the pattern. A pending choice's prompts aren't saved
+// (version 4), so a loaded one shows its label in the loading engine's locale. A save written before a prompt
+// still to be spoken back carried its label has none, so on load it is worked out again in the current locale.
 
 using System;
 using System.Linq;
@@ -50,22 +50,16 @@ namespace Patterkit.Patterplay.TestHost
             var info = frEngine.GetBeatSequence().First(f => f.Beat.Id == "L_vo").Beat;
             Check("speaker label: the step info is at the source locale, a stale string ignored", info.SpeakerLabel == "You (V.O.)", $"got {info.SpeakerLabel}");
 
-            // An older save: its pending choice prompt carries no label, so loading works it out in the current locale.
+            // A save at a pending choice keeps no prompt text (version 4): each prompt is built as the choice is
+            // delivered, in the loading engine's locale, its label with it.
             var engine = new Engine(bundle);
             var stop = engine.OpenFlow("main", "s").AdvanceToStop().Stop;
             if (stop == null || stop.Type != StepType.Choice) { Fail("speaker-label", "choice", "the fixture did not stop at its choice"); return; }
             string json = PatterSave.SerializeState(engine);
-            string aged = new System.Text.RegularExpressions.Regex(",\"speakerLabel\":\"[^\"]*\"").Replace(json, "");
-            if (aged == json) { Fail("speaker-label", "envelope", "no prompt speakerLabel in the save to strip; the check would prove nothing"); return; }
-            var loaded = new Engine(bundle);
-            PatterSave.DeserializeState(loaded, aged);
-            var prompt = loaded.GetFlow("main").GetChoices().Single().Prompt;
-            Check("speaker label: an older saved prompt re-resolves its label", prompt.SpeakerLabel == "You (V.O.)", $"got {prompt.SpeakerLabel}");
-            Check("speaker label: the re-saved prompt carries its label again", PatterSave.SerializeState(loaded) == json, PatterSave.SerializeState(loaded));
             var loadedFr = new Engine(bundle, new EngineOptions { Locale = "fr" });
-            PatterSave.DeserializeState(loadedFr, aged);
+            PatterSave.DeserializeState(loadedFr, json);
             var promptFr = loadedFr.GetFlow("main").GetChoices().Single().Prompt;
-            Check("speaker label: an older saved prompt re-resolves in the current locale", promptFr.SpeakerLabel == "V.O. : Vous", $"got {promptFr.SpeakerLabel}");
+            Check("speaker label: a saved pending choice shows its label in the loading engine's locale", promptFr.SpeakerLabel == "V.O. : Vous", $"got {promptFr.SpeakerLabel}");
 
             // An older save taken between Choose and the next Advance: the prompt still to be spoken back carries
             // no label, so loading works it out too, and the replay shows it.
@@ -74,7 +68,7 @@ namespace Patterkit.Patterplay.TestHost
             rf.AdvanceToStop();
             rf.Choose("o");
             json = PatterSave.SerializeState(replaying);
-            aged = new System.Text.RegularExpressions.Regex(",\"speakerLabel\":\"[^\"]*\"").Replace(json, "");
+            string aged = new System.Text.RegularExpressions.Regex(",\"speakerLabel\":\"[^\"]*\"").Replace(json, "");
             if (aged == json) { Fail("speaker-label", "envelope", "no pending prompt speakerLabel in the save to strip; the check would prove nothing"); return; }
             var replayLoaded = new Engine(bundle, new EngineOptions { ReplayPromptOnChoose = true, Locale = "fr" });
             PatterSave.DeserializeState(replayLoaded, aged);
@@ -82,7 +76,7 @@ namespace Patterkit.Patterplay.TestHost
             Check("speaker label: an older save works out the label of a prompt still to be spoken back",
                 replayed.Id == "P" && replayed.SpeakerLabel == "V.O. : Vous", $"got {replayed.Id} with {replayed.SpeakerLabel}");
 
-            if (_fails == before) Console.WriteLine("  [speaker-label] a stale speaker string for a pair not overridden is ignored; an older saved prompt, pending or to be spoken back, re-resolves its label");
+            if (_fails == before) Console.WriteLine("  [speaker-label] a stale speaker string for a pair not overridden is ignored; a pending choice's label follows the locale; an older prompt still to be spoken back re-resolves its label");
         }
     }
 }

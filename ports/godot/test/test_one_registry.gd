@@ -216,51 +216,21 @@ func _either_order() -> void:
 	_check("into a game already playing: a flow the save does not have is gone", strays.is_empty(), str(strays))
 
 
-# -- a version 2 save (property values in the save itself) ---------------------------
+# -- a version 2 save (property values in the save itself) is no longer read ------------
 
 func _old_save() -> void:
-	# Every section carries a value, so a section left behind is seen.
 	var v2 := {
 		"version": 2,
 		"shared": {"patter": {"fame": 4}},
 		"sharedVisits": {},
 		"sharedSelectors": {},
 		"stageBags": {"s": {"tally": 6}},
-		"flows": {"f": {
-			"scopes": {"patter": {"mood": 8}},
-			"sceneBags": {"s": {"count": 3}},
-			"rngState": 1,
-			"visits": {},
-			"cursor": {
-				"flowEnded": false, "currentSceneId": "s",
-				"stack": [{"sceneId": "s", "containerId": "b", "index": 0, "nextId": "sn"}],
-				"activeSnippetId": null, "beatIndex": 0, "pendingChoice": null,
-				"pendingPromptOwnerId": null, "selectors": {},
-			},
-		}},
-	}
-	var moved := {
-		"patter": {"fame": 4},
-		"patter/flow/f/patter": {"mood": 8},
-		"patter/flow/f/scene/s": {"count": 3},
-		"patter/scene/s": {"tally": 6},
+		"flows": {},
 	}
 	var g := _game()
-	_check("a version 2 save loads into the game's registry", g["patter"].load_game(v2.duplicate(true)), "")
-	var want := moved.duplicate(true)
-	want["world"] = {"gold": 0}
-	_check("its values move into the registry under Patter's keys", _eq(g["registry"].save(), want), JSON.stringify(g["registry"].save()))
-	var f = g["patter"].get_flow("f")
-	_check("and the flow reads them", f != null and _eq(f.get_property("@mood"), 8) and _eq(f.get_property("@scene.count"), 3)
-		and _eq(f.get_property("@scene.tally"), 6) and _eq(f.get_property("@fame"), 4), "")
-
-	var alone := PatterEngine.new(_bundle(), {"seed": 1})
-	alone.load_game(v2.duplicate(true))
-	var back: Dictionary = alone.save_game()
-	var want_alone := moved.duplicate(true)
-	want_alone["world"] = {"gold": 0}
-	_check("a standalone engine writes a version 2 save back as version 3, values under `registry`",
-		_eq(back.get("version"), 3) and _eq(back.get("registry"), want_alone), JSON.stringify(back.get("registry")))
+	var before: Dictionary = g["registry"].save()
+	_check("a version 2 save is refused (1.0 reads versions 3 and 4)", g["patter"].load_game(v2.duplicate(true)) == false, "")
+	_check("and the game's registry is as it was", _eq(g["registry"].save(), before), JSON.stringify(g["registry"].save()))
 
 
 # -- a scope another engine registers again after the flow opened ---------------------

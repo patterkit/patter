@@ -33,6 +33,71 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+The runtime foundations before 1.0, from the hands-on review of October 2026. Changes marked **Breaking
+(1.0)** change what an existing game sees. The conformance corpus is version 8.
+
+### Added
+
+- **The project's start scene.** A flow opened, or reset, without a scene starts at the bundle's `start`, at its
+  block when it names one, so a game opens where the writer chose. A bundle without one starts at the first scene,
+  as before.
+- **Set-up problems and moved saves are reported.** `PlayError.kind` gains `"setup"` (how the engine was set
+  up: a locale the bundle doesn't have, a host scope it doesn't declare, an engine option it doesn't take;
+  `flow` is `""` and `node` is the locale, token, or option) and `"save"` (a load whose place has gone from
+  the build; `node` is the saved snippet, or the pending choice's group). Both reach `onError` and the
+  decision log as a `diagnostic` entry, as a content error does. A report found while the engine is built is
+  made as the constructor ends, so the handler hears it. The default handler, with no `onError`, still writes
+  each to `console.warn`.
+- **`engine.locales`**: the bundle's `{ default, included }`, a fresh copy each call.
+- **One rule for a locale**, used by the `locale` option, `setLocale`, `replaceStrings`, and `hotSwap`: case
+  and `_` / `-` don't matter, so the locale itself wins, then its language (`fr` for `fr-FR`), then the
+  bundle's default, whose text keeps the `<Untranslated: id>` marker. Anything but an exact match (a case-only
+  one included) is reported as `setup`. `fr` never looks for `fr-FR`. A hot swap resolves the locale asked for
+  against the new bundle and reports again; `replaceStrings` reports only a fallback that changed. An IDs-only
+  bundle takes the locale as given, unreported.
+- **A host scope bound under a token the bundle doesn't declare is reported** (`setup`), naming the declared
+  spelling when only the case differs. Tokens stay case-sensitive: nothing is folded.
+- **An engine option the engine doesn't take is reported** (`setup`), so a plain-JS caller's mistyped or
+  retired key (`world`, say) isn't ignored in silence.
+- **A save loaded into an edited build resumes at the nearest safe point**, reported as `save` only when its
+  place has really gone: a gone snippet is skipped; a gone next beat ends its snippet there (its onExit and
+  jump run), so nothing plays twice; a gone option offers its choice again; a pending choice none of whose
+  options survive is offered again with what its group has now, or play carries on after it.
+
+### Changed
+
+- **Breaking (1.0): `setProperty` refuses a value that doesn't fit its declaration**, on the engine and on a
+  flow, by throwing and changing nothing, as the Storylet Engine does: the kernel's `valueFits`, so a value a
+  game may set is exactly one a save may carry, and an enum whose own default is `""` takes `""` back. A name
+  the content doesn't declare (in `@patter`, `@scene`, or a host scope the bundle declares) is refused too.
+  The message says what the property takes: `"@patter.gold" takes a number; "lots" doesn't fit`. Another
+  engine's scope is that engine's to check.
+- **Breaking (1.0): a pending choice follows the language and the values.** Its options' prompts are built
+  each time the choice is delivered (`advance`, `getChoices`), so `setLocale` reaches a choice already on
+  screen, a property the game sets shows in its prompts, and a save loads in the language of the engine that
+  loads it. The replayed prompt (`replayPromptOnChoose`) is the documented exception: it's spoken exactly as
+  the choice showed it.
+- **Breaking (1.0): `engine.locale` is the locale in use**, the one the rule resolved to (`fr` after asking
+  for `fr-FR`; the default after asking for a locale the bundle doesn't have), rather than the string asked
+  for.
+- **Breaking (1.0): the gameData the engine hands out is the game's own copy**, flags lists included: on every
+  step, option, `getOutline` and `getBeatSequence` entry, and from `gameDataForScene` and `gameDataForBlock`.
+  A game that edits one changes nothing the engine, or another engine on the same bundle, hands out next.
+  Extension values are not copied: they're the bundle's own, documented as read-only.
+- **Breaking (1.0): saves are version 4.** A pending choice keeps its options' ids, eligibility, and gameData,
+  not their prompts; the cursor names the next beat by id (`beatId`, absent when none is left) instead of its
+  index (`beatIndex`); and a frame inside a choice's option carries the choice's id (`choiceId`). Every
+  runtime reads versions 3 and 4 and writes 4; a version 3 save's prompt text is discarded as it loads.
+  `captureFlow` writes version 4, and `restoreFlow` reads 3 and 4.
+
+### Removed
+
+- **Breaking (1.0): version 2 saves no longer load**, nor the `SaveGameV2` and `FlowSnapshotV2` types. Load a
+  version 2 save with a 0.x runtime and save it again to bring it forward.
+- **Breaking (1.0): the deprecated API.** `engine.save()` and `engine.load()` (save the registry, or call
+  `saveGame()`), `flow.start()` (use `flow.reset()`), the `world` option (use `hostScopes: { world }`), and
+  the `WorldResolver` and `TraceHandler` types (use `HostScope` and `EngineTraceHandler`).
+
 ## [0.34.0] - 2026-10-21
 
 ### Removed

@@ -64,6 +64,10 @@ namespace Wildwinter.Expr
         public static bool Fits(ScopeDeclaration decl, ExprValue value, bool noneChosen = false) =>
             Fits(decl.Type, decl.Values, decl.Stages, value, noneChosen);
 
+        /// <summary>Whether a declaration chose none: an enum whose own default is "".</summary>
+        public static bool ChoosesNone(ScopeDeclaration decl) =>
+            decl.Type == PropertyTypes.Enum && decl.Default != null && decl.Default.IsString && decl.Default.AsString == "";
+
         private static bool Contains(IReadOnlyList<string> list, string s)
         {
             for (int i = 0; i < list.Count; i++) if (list[i] == s) return true;
@@ -343,7 +347,8 @@ namespace Wildwinter.Expr
             foreach (var pair in _decls)
             {
                 if (!saved.TryGetValue(pair.Key, out var value)) continue;
-                if (ValueFit.Fits(pair.Value, value)) continue;
+                // An enum whose own default is "" (none chosen) takes "" back, as a host write does.
+                if (ValueFit.Fits(pair.Value, value, ValueFit.ChoosesNone(pair.Value))) continue;
                 Values.Set(pair.Key, pair.Value.DefaultOrTypeDefault());
                 misfits.Add(new BagMisfit { Name = pair.Key, Value = value });
             }

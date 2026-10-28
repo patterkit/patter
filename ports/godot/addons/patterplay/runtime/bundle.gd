@@ -80,11 +80,6 @@ static func game_data_fields(bundle: Dictionary, kind: String) -> Array:
 	return bundle.get("gameDataFields", {}).get(kind, [])
 
 
-## Deprecated: use game_data_fields, the name every Patterplay runtime uses. Goes in a later release.
-static func game_data_fields_for(bundle: Dictionary, kind: String) -> Array:
-	return game_data_fields(bundle, kind)
-
-
 # One node's effective value for a field: its sparse OVERRIDE if present, else the field's declared
 # default (null if neither is set). `fields` is the schema for the node's type: its gameData fields, or
 # an extension's declarations for the kind (extension_decls), whose values may be any JSON. `node` may be

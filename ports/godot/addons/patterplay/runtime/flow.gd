@@ -37,7 +37,11 @@ var _beat_index := 0
 ## This flow's decision trace; see log(). `_seq` is monotonic and survives clear_log().
 var _log: Array = []
 var _seq := 0
-var _pending = null                   # { "group_id":, "options":[step options], "by_id":{id:node} } or null
+## The pending choice, or null: { "group_id":, "options": [{"id", "eligible", "gameData"?}] (what a save
+## keeps; no prompts, which are built in the language in use each time the choice is delivered),
+## "by_id": {id: node}, "shown": {id: prompt or null} (each prompt as last delivered, for a replay to
+## speak exactly what the player saw) }.
+var _pending = null
 var _pending_prompt_beat = null       # replay_prompt_on_choose: the chosen option's authored prompt beat Dictionary, or null
 var _pending_prompt_shown = null      # ...that prompt as the choice showed it; null only after loading a save that did not carry it
 var _pending_prompt_owner: String = "" # chosen option owning _pending_prompt_beat, found again across a save in the choose->advance window
@@ -45,12 +49,14 @@ var _selectors: Dictionary = {}
 var _visit_counts: Dictionary = {}
 var _eval_ctx: Dictionary
 var _dialect: Dictionary = PatterDialect.dialect()
+## Why the last advance() or choose() was refused, or "" when it wasn't: see last_error().
+var _last_error := ""
 
 
 func _init(host: FlowHost, seed_value: float) -> void:
 	_host = host
 	_prng = PatterMulberry32.new(seed_value)
-	_local = _fresh_local()   # registered by start() / restore()
+	_local = _fresh_local()   # registered by _begin() / restore()
 	# Every entry is a METHOD Callable, never a lambda. A lambda that reads a member holds this flow
 	# strongly, and the flow holds the context, so a flow that built one was never freed, closed or
 	# not. A method Callable names the flow without keeping it alive.
@@ -216,7 +222,7 @@ func close() -> void:
 
 
 ## Drop everything waiting to be delivered: an open choice, and a chosen option's prompt still to be
-## replayed. Every move that abandons the flow's place (start, goto, close) does this, so none leaves a
+## replayed. Every move that abandons the flow's place (reset, goto, close) does this, so none leaves a
 ## stale prompt behind. start() cleared only the choice, so a restart between choose() and the next
 ## advance() replayed the abandoned run's prompt as the new run's first beat.
 func _clear_pending() -> void:
@@ -328,8 +334,43 @@ func step_for(beat_id: String):
 	return _beat_result(beat) if beat != null else null
 
 
+## The options of the pending choice ([] when not at a choice point), their prompts built in the language
+## in use, as advance() delivers them.
 func get_choices() -> Array:
-	return _pending["options"] if _pending != null else []
+	return _offer() if _pending != null else []
+
+
+## Why the last advance() or choose() was refused (also push_error'd), or "" when it wasn't: a flow that
+## hasn't started, no choice pending, an unknown or greyed option, a jump to nowhere, or a jump cycle
+## that never settles. Set on a refusal and cleared by the next of those calls that succeeds. GDScript
+## can't throw, so a refused advance() returns {"type": "end"} and says why here.
+func last_error() -> String:
+	return _last_error
+
+
+## Refuse the call under way: push_error the message and keep it for last_error().
+func _refuse(message: String) -> void:
+	_last_error = message
+	push_error(message)
+
+
+## The pending choice's options as the game is handed them: each prompt built now, in the language in use
+## and against the current values (and remembered, for a replay to speak as shown), and the game's own copy
+## of each option's gameData. Extension values are the bundle's own, read-only by contract.
+func _offer() -> Array:
+	var out: Array = []
+	for o in _pending["options"]:
+		var node: Dictionary = _pending["by_id"][o["id"]]
+		var opt := {"id": o["id"], "eligible": o["eligible"]}
+		var prompt = _prompt_for(node)
+		_pending["shown"][o["id"]] = prompt
+		if prompt != null:
+			opt["prompt"] = prompt
+		if o.get("gameData") is Dictionary:
+			opt["gameData"] = _norm_gamedata(o["gameData"])
+		_put_extensions(opt, node)
+		out.append(opt)
+	return out
 
 
 func is_ended() -> bool:
@@ -346,18 +387,20 @@ func reset(scene_id: String = "", block_id: String = "") -> void:
 	_begin(scene_id, block_id)
 
 
-## Deprecated: use reset(), the one public name for beginning a flow again on every runtime. start() was
-## the same call under a second name, and goes in a later release.
-func start(scene_id: String = "", block_id: String = "") -> void:
-	reset(scene_id, block_id)
-
-
-## Begin this flow at a scene (empty: the first authored scene), and optionally a block within it. The
-## engine's own entry point: open_flow and a goto on an unstarted flow begin a flow here. A game calls
-## reset().
+## Begin this flow at a scene (empty: the bundle's start, else the first authored scene), and optionally
+## a block within it. The engine's own entry point: open_flow and a goto on an unstarted flow begin a flow
+## here. A game calls reset().
 func _begin(scene_id: String = "", block_id: String = "") -> void:
 	if _start_refused():
 		return
+	# No scene named: the project's start, when the bundle carries one; else the first scene, below.
+	# A start naming a scene, or block, the bundle doesn't have (only a hand-edited bundle can) is passed over.
+	var start = _host.bundle.get("start")
+	if scene_id == "" and block_id == "" and start is Dictionary and _host.bundle["scenes"].has(str(start.get("scene", ""))):
+		scene_id = str(start["scene"])
+		var start_block = start.get("block")
+		if start_block != null and str(_host.block_index.get(str(start_block), "")) == scene_id:
+			block_id = str(start_block)
 	# A start is a reset: this flow's bags go, and so does anything a load left waiting for them.
 	_release_bags(false)
 	_host.registry.discard_parked(key_flow(id))
@@ -397,10 +440,11 @@ func _begin(scene_id: String = "", block_id: String = "") -> void:
 
 
 func advance() -> Dictionary:
+	_last_error = ""
 	if _closed:
 		return {"type": "end"}  # a stale reference to a closed flow drives nothing
 	if not _started:
-		push_error("flow has not been started")
+		_refuse("flow has not been started")
 		return {"type": "end"}
 	_touch()
 	if _pending_prompt_beat != null:
@@ -411,10 +455,12 @@ func advance() -> Dictionary:
 		_pending_prompt_owner = ""
 		return _prompt_result(b, shown) if shown != null else _beat_result(b)
 	_settle()
+	if _last_error != "":
+		return {"type": "end"}   # refused part way: last_error() says why
 	if _flow_ended:
 		return {"type": "end"}
 	if _pending != null:
-		return {"type": "choice", "groupId": _pending["group_id"], "options": _pending["options"]}
+		return {"type": "choice", "groupId": _pending["group_id"], "options": _offer()}
 	if _active_snippet == null:
 		_flow_ended = true
 		return {"type": "end"}
@@ -423,32 +469,39 @@ func advance() -> Dictionary:
 	return _beat_result(beat)
 
 
+## Pick an eligible option by id; the next advance() runs it. A refusal (no choice pending, an unknown
+## option, a greyed one) is push_error'd and kept for last_error(), and changes nothing.
 func choose(option_id: String) -> void:
+	_last_error = ""
 	if _pending == null:
-		push_error("no choice is pending")
+		_refuse("no choice is pending")
 		return
 	if not _pending["by_id"].has(option_id):
-		push_error("unknown choice option: " + option_id)
+		_refuse("unknown choice option: " + option_id)
 		return
 	# A greyed option is offered so the player can see it, never so it can be taken. The other three
 	# runtimes refuse it; this one used to play its content and spend it.
 	for o in _pending["options"]:
 		if o["id"] == option_id and not o["eligible"]:
-			push_error("choice option is not eligible: " + option_id)
+			_refuse("choice option is not eligible: " + option_id)
 			return
 	_touch()
 	var node = _pending["by_id"][option_id]
+	# Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and exactly
+	# as the choice showed it (the one prompt that doesn't follow the language: a documented exception). A
+	# prompt borrowed from the option's own first content line is not replayed, since that line is about to
+	# play as content anyway. A choice never delivered since a load shows its prompt as it would be now,
+	# before the option's onEnter runs.
+	var authored = _authored_prompt_of(node) if _host.replay_prompt_on_choose else null
 	var shown = null
-	for o in _pending["options"]:
-		if o["id"] == option_id and o.has("prompt"):
-			shown = (o["prompt"] as Dictionary).duplicate()
+	if authored != null:
+		var was: Dictionary = _pending["shown"]
+		shown = was[option_id] if was.has(option_id) else _prompt_for(node)
+		if shown != null:
+			shown = (shown as Dictionary).duplicate()
 	if _host.tracing:
 		_emit({"type": "chose", "group": _pending["group_id"], "option": option_id})
 	_pending = null
-	# Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and exactly
-	# as the choice showed it. A prompt borrowed from the option's own first content line is not replayed,
-	# since that line is about to play as content anyway.
-	var authored = _authored_prompt_of(node) if _host.replay_prompt_on_choose else null
 	_pending_prompt_beat = authored if authored != null and shown != null else null
 	_pending_prompt_shown = shown if _pending_prompt_beat != null else null
 	_pending_prompt_owner = node["id"] if _pending_prompt_beat != null else ""
@@ -467,8 +520,13 @@ func get_property(ref: String):
 ## Write a property by ref. The GAME's surface, so it writes with HOST authority: a host
 ## declaration's "writable": false binds the story, not the game that owns the value. The story's
 ## own writes (effects) go through _write_property(.., false).
-func set_property(ref: String, value) -> void:
-	_write_property(ref, value, true)
+##
+## Returns "" when the value was written, else why it was refused (also push_error'd), with nothing
+## changed: a value that doesn't fit the property's declaration, a name the content doesn't declare
+## (an @scene name in the scene this flow is in), an @scene write before the flow has entered a scene,
+## or a write the registry turns down. As PatterEngine.set_property.
+func set_property(ref: String, value) -> String:
+	return _write_property(ref, value, true)
 
 
 ## A quality's ladder, for game code holding one of its values: the position of `value` on the ladder
@@ -507,6 +565,13 @@ func _ladder_of(ref: String):
 ## is a failed effect (see _run_effects).
 func _write_property(ref: String, value, host: bool) -> String:
 	var sp := split_host_ref(_host, ref)
+	# The game's value must fit what the content declared; the story's own writes were checked as they
+	# compiled.
+	if host and not (sp[0] == "scene" and _current_scene_id == ""):
+		var unfit := host_write_refusal(_host, sp[0], sp[1], value, _current_scene_id)
+		if unfit != "":
+			push_error(unfit)
+			return unfit
 	var journal = _host.journal
 	if sp[0] == "patter":
 		# Inside a checkpoint, each write records how to put the old value back, against the bag it
@@ -620,7 +685,7 @@ func _settle() -> void:
 	while true:
 		transitions += 1
 		if transitions > 10000:
-			push_error("flow did not settle after 10000 transitions")
+			_refuse("flow did not settle after 10000 transitions - likely a jump cycle with no deliverable content")
 			return
 		if _flow_ended or _pending != null:
 			return
@@ -724,13 +789,10 @@ func _setup_choice(group: Dictionary) -> void:
 		var elig := _eligible(child)
 		if not elig and child.get("secretUntilEligible", false):
 			continue
+		# Which option, and whether it can be taken: its prompt is built when the choice is delivered.
 		var opt := {"id": child["id"], "eligible": elig}
-		var prompt = _prompt_for(child)
-		if prompt != null:
-			opt["prompt"] = prompt
-		if child.has("gameData"):
-			opt["gameData"] = _norm_gamedata(child["gameData"])
-		_put_extensions(opt, child)
+		if child.get("gameData") is Dictionary:
+			opt["gameData"] = child["gameData"]
 		options.append(opt)
 		by_id[child["id"]] = child
 	# A choice is offered only when the player can take something. One whose every remaining option is
@@ -744,7 +806,7 @@ func _setup_choice(group: Dictionary) -> void:
 			for o in options:
 				offered.append({"id": o["id"], "eligible": o["eligible"]})
 			_emit({"type": "choice", "group": group["id"], "options": offered})
-		_pending = {"group_id": group["id"], "options": options, "by_id": by_id}
+		_pending = {"group_id": group["id"], "options": options, "by_id": by_id, "shown": {}}
 		return
 	for f in fallbacks:
 		if _eligible(f):
@@ -791,7 +853,7 @@ func _enter_target(to: String, mode: String) -> void:
 		container_id = blocks[0]["id"]
 	else:
 		if not _host.block_index.has(to):
-			push_error("jump target not found: " + to)
+			_refuse("jump target not found: " + to)
 			return
 		var sid: String = _host.block_index[to]
 		if sid != _current_scene_id:
@@ -1058,22 +1120,21 @@ func _eligible(node: Dictionary) -> bool:
 ## `node` is the snippet, group, or option whose condition failed, or the snippet or scene owning the
 ## effect; `expr` the compiled expression, whose `src` rides along when the bundle carries it.
 func _report_error(kind: String, node: String, expr, message: String) -> void:
-	var source := ""
-	if expr is Dictionary and expr.get("src") != null:
-		source = str(expr["src"])
 	var err := {"flow": id, "kind": kind, "node": node, "message": message}
-	if source != "":
-		err["source"] = source
-	var on_error = _host.on_error
-	if on_error is Callable and (on_error as Callable).is_valid():
-		(on_error as Callable).call(err)
-	else:
-		push_warning("Patterplay: %s on %s in flow '%s' failed, played through: %s" % [kind, node, id, message])
+	if expr is Dictionary and expr.get("src") != null and str(expr["src"]) != "":
+		err["source"] = str(expr["src"])
+	_report(err)
+
+
+## Report a problem this flow carried on past: to the game's "on_error" (see FlowHost.report), and to the
+## log as a `diagnostic` entry.
+func _report(err: Dictionary) -> void:
+	_host.report(err)
 	if not _host.tracing:
 		return
-	var ev := {"type": "diagnostic", "kind": kind, "node": node, "message": message}
-	if source != "":
-		ev["source"] = source
+	var ev := {"type": "diagnostic", "kind": err["kind"], "node": err["node"], "message": err["message"]}
+	if err.has("source"):
+		ev["source"] = err["source"]
 	_emit(ev)
 
 
@@ -1104,7 +1165,7 @@ func _rng() -> float:
 func _beat_result(beat: Dictionary) -> Dictionary:
 	var kind: String = beat["kind"]
 	# Accumulated author tags (#215): omitted from the step when empty (parity with gameData).
-	var tags: Array = _host.tag_index.get(beat["id"], [])
+	var tags: Array = (_host.tag_index.get(beat["id"], []) as Array).duplicate()
 	if kind == "gameEvent":
 		var ra := {"type": "gameEvent", "id": beat["id"]}
 		if beat.has("gameData"):
@@ -1239,13 +1300,6 @@ func _prompt_for(node: Dictionary):
 	return p
 
 
-# The resolved pause of the beat an option shows as its prompt (its authored prompt, else its first content
-# line), for a saved option that predates prompts carrying one.
-func _prompt_pad_of(node: Dictionary) -> float:
-	var beat = _prompt_beat_of(node)
-	return _pad_of(beat["id"]) if beat != null else PatterBundle.DEFAULT_PAD_AFTER
-
-
 # A saved prompt's pause: the one it carries (an int or a float after a JSON round-trip), as a float, else
 # `fallback`, worked out again from the prompt's beat (a save from before prompts carried one).
 static func _saved_pad(prompt: Dictionary, fallback: Callable) -> float:
@@ -1263,7 +1317,7 @@ func _authored_prompt_of(node: Dictionary):
 # A replayed prompt as a step: the beat's id, gameData, extension values, and tags, and the text and speaker fields the
 # choice showed.
 func _prompt_result(beat: Dictionary, shown: Dictionary) -> Dictionary:
-	var tags: Array = _host.tag_index.get(beat["id"], [])
+	var tags: Array = (_host.tag_index.get(beat["id"], []) as Array).duplicate()
 	var r := {"type": "text" if shown.get("kind", "") == "text" else "line", "id": beat["id"], "text": str(shown.get("text", ""))}
 	if r["type"] == "line":
 		for k in ["character", "characterName", "direction", "qualifier", "qualifierName", "speakerLabel"]:
@@ -1573,31 +1627,99 @@ static func split_host_ref(host: FlowHost, ref: String) -> Array:
 	return cache[ref]
 
 
-## A version 2 save's property values, as registry sections under the engine's keys. Reads the
-## family's camelCase shape and the snake_case one this addon wrote before 0.11.0.
-static func sections_from_v2(save: Dictionary) -> Dictionary:
-	var out := {}
-	if save.get("shared") is Dictionary:
-		out["patter"] = _unwrap_scope(save["shared"], "patter")
-	var stage = _k(save, "stageBags", "stage_bags")
-	if stage is Dictionary:
-		for sid in stage:
-			out[key_stage(str(sid))] = stage[sid]
-	var flows = save.get("flows", {})
-	if flows is Dictionary:
-		for fid in flows:
-			if flows[fid] is Dictionary:
-				out.merge(flow_sections(str(fid), flows[fid]), true)
-	return out
+## Why a host write is refused, or "" when it isn't (the hands-on review, 2026-10): a value that doesn't
+## fit what the content declared (a string for a number, a value an enum or a quality doesn't list, a flag
+## a flags property doesn't), or a name the content doesn't declare. The rule is the kernel's value_fits,
+## the one a load walks saved values with, so a value the game may set is exactly one a save may carry;
+## an enum whose own default is "" (none chosen) takes "" back. A scope the bundle doesn't declare
+## (another engine's, or one the game keeps) is its owner's to check, and one that declares no names (an
+## opaque scope) takes any name and value. `name` is lowercased, as split_host_ref gives it; `scene_id`
+## is the scene an @scene write lands in. The same rule and message on every runtime, and in the Storylet
+## Engine's. JS's checkHostWrite.
+static func host_write_refusal(host: FlowHost, scope: String, name: String, value, scene_id: String) -> String:
+	var decls = null
+	if scope == "patter":
+		decls = host.bundle.get("properties", [])
+	elif scope == "scene":
+		decls = (host.bundle["scenes"] as Dictionary).get(scene_id, {}).get("sceneProps", [])
+	else:
+		var spec := {}
+		for s in host.bundle.get("scopeRegistry", {}).get("scopes", []):
+			if str(s.get("token", "")) == scope:
+				spec = s
+				break
+		# An opaque scope declares no names: any name and value is the game's.
+		if spec.is_empty() or spec.get("declarations") == null:
+			return ""
+		decls = spec["declarations"]
+	var decl = null
+	for d in (decls if decls is Array else []):
+		if str(d.get("name", "")).to_lower() == name:
+			decl = d
+			break
+	var path := "@%s.%s" % [scope, name]
+	if decl == null:
+		return 'no property at "%s": the content declares no %s' % [path, path]
+	var none_chosen: bool = str(decl.get("type", "")) == "enum" and decl.get("default") is String and str(decl["default"]) == ""
+	if not PatterPropertyBag.value_fits(decl, value, none_chosen):
+		return '"%s" takes %s; %s doesn\'t fit' % [path, _takes(decl), _js_json(value)]
+	return ""
 
 
-## One flow's own values (a version 2 save's per-flow sections, or a PatterEngine.capture_flow
-## state's) as registry sections under flow `flow_id`'s keys.
+## What a declared property takes, in words, for a refused host write.
+static func _takes(decl: Dictionary) -> String:
+	var quoted := func(xs) -> String:
+		var out: Array[String] = []
+		for x in (xs if xs is Array else []):
+			out.append(JSON.stringify(str(x)))
+		return ", ".join(out)
+	match str(decl.get("type", "")):
+		"number":
+			return "a number"
+		"boolean":
+			return "true or false"
+		"enum":
+			return "one of %s" % quoted.call(decl.get("values"))
+		"flags":
+			var values = decl.get("values")
+			if values is Array and not (values as Array).is_empty():
+				return "a list of flags from %s" % quoted.call(values)
+			return "a list of flags"
+		"quality":
+			return "one of its stages %s" % quoted.call(decl.get("stages"))
+	return "text"
+
+
+## A value as JavaScript's JSON.stringify writes it, for a refusal that quotes what the game handed over:
+## a whole number with no ".0", a string quoted, a list with no spaces.
+static func _js_json(value) -> String:
+	if value == null:
+		return "null"
+	if value is bool:
+		return "true" if value else "false"
+	if value is int or value is float:
+		var n := float(value)
+		return "null" if is_nan(n) or is_inf(n) else PatterValues.js_number(n)
+	if value is Array or value is PackedStringArray:
+		var items: Array[String] = []
+		for item in value:
+			items.append(_js_json(item))
+		return "[" + ",".join(items) + "]"
+	if value is Dictionary:
+		var fields: Array[String] = []
+		for key in value:
+			fields.append(JSON.stringify(str(key)) + ":" + _js_json(value[key]))
+		return "{" + ",".join(fields) + "}"
+	return JSON.stringify(str(value))
+
+
+## One flow's own values (a PatterEngine.capture_flow state's) as registry sections under flow
+## `flow_id`'s keys.
 static func flow_sections(flow_id: String, f: Dictionary) -> Dictionary:
 	var out := {}
-	if f.get("scopes") is Dictionary:
-		out[key_flow_globals(flow_id)] = _unwrap_scope(f["scopes"], "patter")
-	var bags = _k(f, "sceneBags", "scene_bags")
+	if f.get("scopes") is Dictionary and f["scopes"].get("patter") is Dictionary:
+		out[key_flow_globals(flow_id)] = f["scopes"]["patter"]
+	var bags = f.get("sceneBags")
 	if bags is Dictionary:
 		for sid in bags:
 			out[key_flow_scene(flow_id, str(sid))] = bags[sid]
@@ -1624,39 +1746,17 @@ static func flow_values_from(flow_id: String, saved: Dictionary) -> Dictionary:
 
 
 # -- save / restore ------------------------------------------------------------
-
-# The stack, each frame stamped with the id of the child it would run next (mirrors the JS
-# runtime's StackFrame.nextId): a frame saved at its container's end gets no stamp.
-# -- the save shape --------------------------------------------------------------
 #
 # A save is written in the FAMILY's shape: `patter/save@0`, the JS reference's, documented in
 # @patterkit/model and design/patter-schema.md 9. camelCase literal keys, the execution position
 # under `cursor`, a pending choice as `{groupId, options}`, selector cursors with every key optional.
-# Every Patterplay runtime writes and reads exactly this, so a save crosses engines. Version 3 holds no
+# Every Patterplay runtime writes and reads exactly this, so a save crosses engines. A save holds no
 # property values: those are the registry's, carried under `registry` only when the engine made its
-# own. Version 2 carried them itself (`shared`, `stageBags`, each flow's `scopes` and `sceneBags`) and
-# still loads, its values moving into the registry (sections_from_v2). Until 0.11.0 this addon wrote snake_case keys with the cursor fields flat,
-# which loaded nowhere else and refused a JS save on its first key
-# (from-storylets/save-shape-across-engines, 2026-09-03); restore() and load_game() still READ that
-# shape, so a player's save on disk keeps loading.
-
-## Read `canonical` if present, else the pre-0.11.0 `legacy` key, else null.
-static func _k(d: Dictionary, canonical: String, legacy: String):
-	if d.has(canonical):
-		return d[canonical]
-	return d.get(legacy, null)
-
-
-## A scope map is `{"patter": {name: value}}` in the family's shape; this addon wrote the inner map
-## bare. A bare map's values are scalars and arrays, never Dictionaries, which tells the two apart.
-static func _unwrap_scope(scopes, token: String) -> Dictionary:
-	if not (scopes is Dictionary):
-		return {}
-	var d: Dictionary = scopes
-	if d.has(token) and d[token] is Dictionary:
-		return d[token]
-	return d
-
+# own. Version 4 (1.0) keeps a pending choice's options as `{id, eligible, gameData?}` with no prompt
+# text (built again in the language in use on delivery), names the cursor's next beat by `beatId`, and
+# stamps a frame inside an option with its `choiceId`. Version 3 still loads: its cursor's `beatIndex`
+# is trusted as it always was, and its options' prompt text is discarded. Version 2, and the
+# snake_case shape this addon wrote before 0.11.0, no longer load.
 
 ## Selector cursors in the family's shape: every key optional, present once used - `seq` after the
 ## first sequential pick, `bag` once a shuffle has drawn, `last` once there is a no-repeat memory.
@@ -1688,19 +1788,17 @@ static func _load_selectors(saved) -> Dictionary:
 		if s.has("bag"):
 			st["bag"] = (s["bag"] as Array).duplicate()
 			st["bag_init"] = true
-		elif s.get("bag_init", false):   # a pre-0.11.0 entry carried the flag explicitly
-			st["bag"] = []
-			st["bag_init"] = true
 		if s.has("last"):
 			st["last"] = s["last"]
 		out[id] = st
 	return out
 
 
-## Live frames are {scene, container, index}; the save carries {sceneId, containerId, index, nextId?}.
-## Each frame is stamped with the id of the child it would run next, so a restore against an EDITED
-## bundle re-finds the position by id rather than trusting the raw index (spec 9.8). A frame at its
-## container's end has no next child and no stamp.
+## Live frames are {scene, container, index}; the save carries {sceneId, containerId, index, nextId?,
+## choiceId?}. Each frame is stamped with the id of the child it would run next, so a restore against an
+## EDITED bundle re-finds the position by id rather than trusting the raw index (spec 9.8). A frame at its
+## container's end has no next child and no stamp. A frame an option's content runs in carries its
+## choice (choiceId), to be offered again if the option has gone.
 func _snapshot_stack() -> Array:
 	var out: Array = []
 	for f in _stack:
@@ -1711,6 +1809,8 @@ func _snapshot_stack() -> Array:
 			var idx: int = int(f["index"])
 			if idx < kids.size():
 				frame["nextId"] = (kids[idx] as Dictionary)["id"]
+		if _host.option_choice.has(f["container"]):
+			frame["choiceId"] = _host.option_choice[f["container"]]
 		out.append(frame)
 	return out
 
@@ -1728,50 +1828,55 @@ func list_bags() -> Array:
 func snapshot() -> Dictionary:
 	var pending = null
 	if _pending != null:
-		# An option's extension values are the bundle's, not the save's: left out, and read off the
-		# option's node again on load.
+		# Which options, never their text: a prompt is built again in the language in use whenever the
+		# choice is delivered. An option's extension values are the bundle's, read off its node again.
 		var saved_opts: Array = []
 		for o in _pending["options"]:
-			var so: Dictionary = (o as Dictionary).duplicate(true)
-			so.erase("extensions")
+			var so := {"id": o["id"], "eligible": o["eligible"]}
+			if o.get("gameData") is Dictionary:
+				so["gameData"] = _norm_gamedata(o["gameData"])
 			saved_opts.append(so)
 		pending = {"groupId": _pending["group_id"], "options": saved_opts}
-	# The cursor, PRNG and visits. This flow's properties are the registry's, saved with it.
-	var out := {
-		"rngState": _prng.a,
-		"visits": _visit_counts.duplicate(true),
-		"cursor": {
-			"flowEnded": _flow_ended,
-			"currentSceneId": _current_scene_id if _current_scene_id != "" else null,
-			"stack": _snapshot_stack(),
-			"activeSnippetId": _active_snippet["id"] if _active_snippet != null else null,
-			"beatIndex": _beat_index,
-			"pendingChoice": pending,
-			"pendingPromptOwnerId": _pending_prompt_owner if _pending_prompt_owner != "" else null,
-			"selectors": _save_selectors(_selectors),
-		},
+	var cursor := {
+		"flowEnded": _flow_ended,
+		"currentSceneId": _current_scene_id if _current_scene_id != "" else null,
+		"stack": _snapshot_stack(),
+		"activeSnippetId": _active_snippet["id"] if _active_snippet != null else null,
+		"pendingChoice": pending,
+		"pendingPromptOwnerId": _pending_prompt_owner if _pending_prompt_owner != "" else null,
+		"selectors": _save_selectors(_selectors),
 	}
+	# The next beat by id, so an edit to the snippet can't move it; none once every beat is delivered.
+	if _active_snippet != null:
+		var beats: Array = _active_snippet.get("beats", [])
+		if _beat_index < beats.size():
+			cursor["beatId"] = beats[_beat_index]["id"]
 	# The prompt still to replay, as the choice showed it: written only in the choose->advance window.
 	if _pending_prompt_shown != null:
-		out["cursor"]["pendingPrompt"] = (_pending_prompt_shown as Dictionary).duplicate()
-	return out
+		cursor["pendingPrompt"] = (_pending_prompt_shown as Dictionary).duplicate()
+	# The cursor, PRNG and visits. This flow's properties are the registry's, saved with it.
+	return {
+		"rngState": _prng.a,
+		"visits": _visit_counts.duplicate(true),
+		"cursor": cursor,
+	}
 
 
 ## Restore this flow from a snapshot: its cursor, PRNG, visits, and selector cursors. Its property
-## values are the registry's and stay as they are (a load puts the saved ones there first). Refused
-## (push_error, nothing changed) while a checkpoint is open.
+## values are the registry's and stay as they are (a load puts the saved ones there first). A place
+## that has gone from the build resumes at the nearest safe point, reported through on_error ("save").
+## Refused (push_error, nothing changed) while a checkpoint is open.
 func restore(snap: Dictionary) -> void:
 	if _host.journal != null:
 		push_error("a flow can't be restored while a checkpoint is open")
 		return
-	_restore_cursor(snap)
+	var drift := _restore_cursor(snap)
 	# Register this flow's bags: each claims the values the registry holds for it (loaded by the game,
 	# by load_game from the save, or handed back by the engine this one replaces), laid over fresh
 	# defaults. Released KEEPING their values, so a live flow restored in place keeps its property
 	# values (a fresh one, made by a load, is claiming the loaded values either way). The scenes the
-	# cursor stands in are registered now; any other scene's bag is claimed on entry. A version 2
-	# snapshot's own "scopes" / "sceneBags" were moved into the registry by load_game (or a flow
-	# state's by PatterEngine.restore_flow) before this ran.
+	# cursor stands in are registered now; any other scene's bag is claimed on entry. A flow state's
+	# own "scopes" / "sceneBags" were moved into the registry by PatterEngine.restore_flow before this ran.
 	_release_bags(true)
 	_mount_local()
 	var here := {}
@@ -1782,93 +1887,119 @@ func restore(snap: Dictionary) -> void:
 	for s in here:
 		if _host.bundle["scenes"].has(s):
 			_ensure_scene_bags(s)
+	# Only now, with the values back, can a choice be offered again: its conditions read them.
+	if not drift.is_empty():
+		_report({"flow": id, "kind": "save", "node": drift["node"],
+			"message": "the save's place has gone from this build: " + str(drift["instead"])})
+		if drift.has("reoffer"):
+			_setup_choice(drift["reoffer"])
 
 
 ## The cursor half of restore(): cursor, PRNG, visits, and selector cursors, without touching the bags.
-func _restore_cursor(snap: Dictionary) -> void:
-	# The family's shape, or the snake_case flat shape this addon wrote before 0.11.0 (`cursor` absent).
-	var legacy := not snap.has("cursor")
-	var c: Dictionary = snap if legacy else snap["cursor"]
-	# Through to_uint32, not a bare mask: the JS runtime persisted this state SIGNED
-	# until it was fixed, so saves in the wild carry a negative number here.
-	_prng.a = PatterMulberry32.to_uint32(float(_k(snap, "rngState", "rng_state")))
+## Returns where the saved place had gone, or {} when it hadn't: {"node": the report's node (the saved
+## snippet, or at a pending choice its group), "instead": what has gone and what the flow does instead,
+## "reoffer"?: the choice group to offer again}.
+func _restore_cursor(snap: Dictionary) -> Dictionary:
+	var c: Dictionary = snap["cursor"]
+	# Through to_uint32, not a bare mask: the JS runtime persisted this state SIGNED until it was fixed,
+	# so saves in the wild carry a negative number here.
+	_prng.a = PatterMulberry32.to_uint32(float(snap.get("rngState", 0)))
 	_visit_counts = (snap.get("visits", {}) as Dictionary).duplicate(true)
 	_started = true
-	_flow_ended = bool(_k(c, "flowEnded", "flow_ended"))
-	_beat_index = int(_k(c, "beatIndex", "beat_index"))
-	var csid = _k(c, "currentSceneId", "current_scene_id")
+	_flow_ended = bool(c.get("flowEnded", false))
+	var csid = c.get("currentSceneId")
 	_current_scene_id = str(csid) if csid != null else ""
-	# Re-bind each frame to the CURRENT bundle: prefer the saved next-child id (survives siblings
-	# inserted / removed / reordered before the cursor); fall back to the raw index when absent or
-	# its node drifted out of the bundle (spec 9.8 best-effort).
+	var asid = c.get("activeSnippetId")
+	var saved_snippet := str(asid) if asid != null and str(asid) != "" else ""
+	var pc = c.get("pendingChoice")
+	var drift := {}
+	# Re-bind each frame to the CURRENT bundle: prefer the saved next-child id (survives siblings inserted /
+	# removed / reordered before the cursor); fall back to the raw index when the id is absent (at the
+	# container's end) or its node drifted out of the bundle (spec 9.8 best-effort). A frame whose OPTION
+	# has gone, with its choice still there, ends the stack: the choice is offered again.
 	_stack = []
 	for saved_frame in (c.get("stack", []) as Array):
 		var sf: Dictionary = saved_frame
-		var f := {"scene": str(_k(sf, "sceneId", "scene")), "container": str(_k(sf, "containerId", "container")), "index": int(sf["index"])}
-		var next_id = _k(sf, "nextId", "next_id")
-		if next_id != null and str(next_id) != "":
-			var children = _children_of(f["container"])
-			if children != null:
-				var kids: Array = children
-				for i in range(kids.size()):
-					var child: Dictionary = kids[i]
-					if child["id"] == str(next_id):
-						f["index"] = i
-						break
+		var f := {"scene": str(sf.get("sceneId", "")), "container": str(sf.get("containerId", "")), "index": int(sf.get("index", 0))}
+		var children = _children_of(f["container"])
+		var choice_id = sf.get("choiceId")
+		if children == null and choice_id != null and _host.node_index.has(str(choice_id)):
+			var choice: Dictionary = _host.node_index[str(choice_id)]
+			if choice.get("type", "") == "group" and choice.get("selector", "") == "choice":
+				var node := saved_snippet
+				if node == "":
+					node = str(pc.get("groupId", "")) if pc is Dictionary else f["container"]
+				drift = {"node": node, "reoffer": choice,
+					"instead": "option %s has gone, so choice %s is offered again" % [f["container"], choice["id"]]}
+				break
+		var next_id = sf.get("nextId")
+		if next_id != null and children != null:
+			var kids: Array = children
+			for i in range(kids.size()):
+				if (kids[i] as Dictionary)["id"] == str(next_id):
+					f["index"] = i
+					break
 		_stack.append(f)
+
+	# Content-drift policy (spec 9.8): if a saved position points at content deleted since the save, resume
+	# at the nearest safe point rather than refusing. A gone snippet is skipped: play carries on from the
+	# surviving stack. A gone NEXT beat in a surviving snippet finishes the snippet (its onExit and jump
+	# run), so nothing plays twice. A version 3 save names the beat by its raw index, trusted as it was.
 	_active_snippet = null
-	var asid = _k(c, "activeSnippetId", "active_snippet_id")
-	if asid != null and str(asid) != "" and _host.node_index.has(str(asid)):
-		var node: Dictionary = _host.node_index[str(asid)]
+	_beat_index = 0
+	if not drift.has("reoffer") and saved_snippet != "":
+		var node: Dictionary = _host.node_index.get(saved_snippet, {})
 		if node.get("type", "") == "snippet":
+			var beats: Array = node.get("beats", [])
 			_active_snippet = node
+			var beat_id = c.get("beatId")
+			if beat_id != null:
+				var at := -1
+				for i in range(beats.size()):
+					if beats[i]["id"] == str(beat_id):
+						at = i
+						break
+				_beat_index = at if at >= 0 else beats.size()
+				if at < 0:
+					drift = {"node": saved_snippet,
+						"instead": "beat %s has gone from snippet %s, so the snippet ends there" % [beat_id, saved_snippet]}
+			else:
+				# Version 4 writes no beat once every one is delivered.
+				var bi = c.get("beatIndex")
+				_beat_index = int(bi) if bi != null else beats.size()
+		else:
+			drift = {"node": saved_snippet, "instead": "snippet %s has gone, so play carries on after it" % saved_snippet}
+
 	_selectors = _load_selectors(c.get("selectors", {}))
-	# Replay the saved option set VERBATIM: re-deriving would re-evaluate conditions and could change
-	# the choice under the player. Options whose nodes drifted out of the bundle are dropped; a choice
-	# with no surviving options dissolves (spec 9.8).
+
+	# Replay the saved option set VERBATIM (schema 9.3): re-deriving would re-evaluate conditions
+	# (double-consuming PRNG draws) and could change the choice under the player. Prompts are not in the
+	# save (a version 3 save's are discarded): they are built when the choice is delivered. Options whose
+	# nodes drifted out of the bundle are dropped. A choice with no surviving option is offered again, when
+	# its group is still there, or dissolves (9.8).
 	_pending = null
-	var saved_options: Array = []
-	var group_id := ""
-	var pc = c.get("pendingChoice", null)
-	if pc is Dictionary:
-		saved_options = (pc as Dictionary).get("options", [])
-		group_id = str((pc as Dictionary).get("groupId", ""))
-	elif legacy:
-		saved_options = snap.get("pending_options", [])
-		group_id = str(snap.get("pending_group_id", ""))
-	if not saved_options.is_empty():
+	if not drift.has("reoffer") and pc is Dictionary:
+		var group_id := str(pc.get("groupId", ""))
 		var options: Array = []
 		var by_id: Dictionary = {}
-		for o in saved_options:
-			if not _host.node_index.has(o["id"]):
+		for o in (pc.get("options", []) as Array):
+			var oid := str(o.get("id", ""))
+			if not _host.node_index.has(oid):
 				continue
-			var node: Dictionary = _host.node_index[o["id"]]
-			by_id[o["id"]] = node
-			var opt: Dictionary = (o as Dictionary).duplicate(true)
-			# A save from an older version of this addon carries a flat "text" where the family's
-			# shape has a "prompt". Re-derive the prompt from the bundle, so a loaded choice reads
-			# the same as a live one.
-			if opt.has("text") and not opt.has("prompt"):
-				var prompt = _prompt_for(node)
-				if prompt == null:
-					prompt = {"kind": "text", "text": str(opt["text"]), "padAfter": PatterBundle.DEFAULT_PAD_AFTER}
-				opt["prompt"] = prompt
-			elif opt.get("prompt") is Dictionary:
-				# A save from before prompts carried their pause, or a speaker's label, has none: work
-				# them out again (the pause from the prompt's beat, the label from the speaker the
-				# choice showed, in the current locale).
-				var saved: Dictionary = opt["prompt"]
-				saved["padAfter"] = _saved_pad(saved, func(): return _prompt_pad_of(node))
-				if saved.get("kind", "") == "line" and not saved.has("speakerLabel"):
-					var label = _speaker_label_of(_host, saved.get("character"), saved.get("qualifier"))
-					if label != null:
-						saved["speakerLabel"] = label
-			opt.erase("text")
-			opt.erase("extensions")
-			_put_extensions(opt, node)  # the bundle's, never the save's
+			by_id[oid] = _host.node_index[oid]
+			var opt := {"id": oid, "eligible": bool(o.get("eligible", false))}
+			if o.get("gameData") is Dictionary:
+				opt["gameData"] = o["gameData"]
 			options.append(opt)
 		if not options.is_empty():
-			_pending = {"group_id": group_id, "options": options, "by_id": by_id}
+			_pending = {"group_id": group_id, "options": options, "by_id": by_id, "shown": {}}
+		else:
+			var group: Dictionary = _host.node_index.get(group_id, {})
+			if group.get("type", "") == "group" and group.get("selector", "") == "choice":
+				drift = {"node": group_id, "reoffer": group,
+					"instead": "none of choice %s's options is left, so it's offered again" % group_id}
+			else:
+				drift = {"node": group_id, "instead": "choice %s has gone, so play carries on after it" % group_id}
 
 	# A save taken between choose() and the next advance() left a prompt still to be replayed: the chosen
 	# option's authored prompt beat, found again by its owner, and the prompt as the choice showed it,
@@ -1877,8 +2008,8 @@ func _restore_cursor(snap: Dictionary) -> void:
 	# authored prompt (spec 9.8): the live choose() would replay nothing.
 	_pending_prompt_beat = null
 	_pending_prompt_shown = null
-	var ppo = _k(c, "pendingPromptOwnerId", "pending_prompt_owner")
-	_pending_prompt_owner = str(ppo) if ppo != null else ""
+	var ppo = c.get("pendingPromptOwnerId")
+	_pending_prompt_owner = str(ppo) if ppo != null and not drift.has("reoffer") else ""
 	if _pending_prompt_owner != "" and _host.node_index.has(_pending_prompt_owner):
 		_pending_prompt_beat = _authored_prompt_of(_host.node_index[_pending_prompt_owner])
 	if _pending_prompt_beat == null:
@@ -1887,9 +2018,10 @@ func _restore_cursor(snap: Dictionary) -> void:
 		_pending_prompt_shown = (c["pendingPrompt"] as Dictionary).duplicate()
 		var beat_id: String = _pending_prompt_beat["id"]
 		_pending_prompt_shown["padAfter"] = _saved_pad(_pending_prompt_shown, func(): return _pad_of(beat_id))
-		# As for the pending choice's options: a save from before prompts carried a speaker's label works
-		# it out again, from the speaker the choice showed, in the current locale.
+		# A save from before prompts carried a speaker's label works it out again, from the speaker the
+		# choice showed, in the current locale.
 		if _pending_prompt_shown.get("kind", "") == "line" and not _pending_prompt_shown.has("speakerLabel"):
 			var label = _speaker_label_of(_host, _pending_prompt_shown.get("character"), _pending_prompt_shown.get("qualifier"))
 			if label != null:
 				_pending_prompt_shown["speakerLabel"] = label
+	return drift

@@ -6,6 +6,87 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+The runtime foundations before 1.0, from the hands-on review of October 2026. Changes marked **Breaking
+(1.0)** change what an existing game sees. The conformance corpus is version 8.
+
+### Added
+
+- **The project's start scene.** A flow opened, or reset, without a scene starts at the bundle's `start`
+  (`Bundle.Start`, a `BundleStart` with `Scene` and `Block`), at its block when it names one, so a game opens
+  where the writer chose. A bundle without one starts at the first scene, as before.
+- **Set-up problems and moved saves are reported.** `PlayError.Kind` gains `"setup"` (how the engine was set
+  up: a locale the bundle doesn't have, or a host scope it doesn't declare; `Flow` is `""` and `Node` is the
+  locale or token) and `"save"` (a load whose place has gone from the build; `Node` is the saved snippet, or the
+  pending choice's group). Both reach `EngineOptions.OnError` and the decision log as a `diagnostic` entry, as a
+  content error does. A report found while the engine is built is made as the constructor ends, so the handler
+  hears it. With no `OnError`, each still goes to `Engine.DefaultOnError`.
+- **`engine.Locales`**: the bundle's `Default` and `Included` locales, a fresh copy each call.
+- **One rule for a locale**, used by `EngineOptions.Locale`, `SetLocale`, `ReplaceStrings`, and `HotSwap`: case
+  and `_` / `-` don't matter, so the locale itself wins, then its language (`fr` for `fr-FR`), then the
+  bundle's default, whose text keeps the `<Untranslated: id>` marker. Anything but an exact match (a case-only
+  one included) is reported as `setup`. `fr` never looks for `fr-FR`. A hot swap resolves the locale asked for
+  against the new bundle and reports again; `ReplaceStrings` reports only a fallback that changed. An IDs-only
+  bundle takes the locale as given, unreported.
+- **A host scope bound under a token the bundle doesn't declare is reported** (`setup`), naming the declared
+  spelling when only the case differs. Tokens stay case-sensitive: nothing is folded.
+- **A save loaded into an edited build resumes at the nearest safe point**, reported as `save` only when its
+  place has really gone: a gone snippet is skipped; a gone next beat ends its snippet there (its onExit and
+  jump run), so nothing plays twice; a gone option offers its choice again; a pending choice none of whose
+  options survive is offered again with what its group has now, or play carries on after it.
+
+### Changed
+
+- **Breaking (1.0): `SetProperty` refuses a value that doesn't fit its declaration**, on the engine and on a
+  flow, by throwing and changing nothing, as the Storylet Engine does: the kernel's `ValueFit`, so a value a
+  game may set is exactly one a save may carry, and an enum whose own default is `""` takes `""` back. A name
+  the content doesn't declare (in `@patter`, `@scene`, or a host scope the bundle declares) is refused too. An
+  opaque host scope, one that declares no names, takes anything. The message says what the property takes:
+  `"@patter.gold" takes a number; "lots" doesn't fit`. Another engine's scope is that engine's to check. The
+  editor's Runtime State window shows a refusal as a warning.
+- **Breaking (1.0): a pending choice follows the language and the values.** Its options' prompts are built
+  each time the choice is delivered (`Advance`, `GetChoices`), so `SetLocale` reaches a choice already on
+  screen, a property the game sets shows in its prompts, and a save loads in the language of the engine that
+  loads it. The replayed prompt (`ReplayPromptOnChoose`) is the documented exception: it's spoken exactly as
+  the choice showed it.
+- **Breaking (1.0): `engine.Locale` is the locale in use**, the one the rule resolved to (`fr` after asking for
+  `fr-FR`; the default after asking for a locale the bundle doesn't have), rather than the string asked for.
+- **Breaking (1.0): what the engine hands out is the game's own copy.** The gameData on every step, option,
+  `GetOutline` and `GetBeatSequence` entry, and from `GameDataForScene` and `GameDataForBlock`, with its flags
+  lists; and the tags on a step and from `TagsForBeat`, `TagsForScene`, and `TagsForBlock`, which handed out the
+  engine's own index lists. A game that edits one changes nothing the engine, or another engine on the same
+  bundle, hands out next. Extension values are not copied: they're the bundle's own, documented as read-only.
+- **Breaking (1.0): saves are version 4** (`Engine.SaveVersion`). A pending choice keeps its options' ids,
+  eligibility, and gameData, not their prompts (`FlowSnapshot.PendingOptions` is a list of the new
+  `SavedChoiceOption`); the cursor names the next beat by id (`FlowSnapshot.BeatId`, absent when none is left)
+  instead of its index (`BeatIndex` is now `int?`, read from a version 3 save and never written); and a frame
+  inside a choice's option carries the choice's id (`StackFrame.ChoiceId`). The runtime reads versions 3 and 4
+  and writes 4; a version 3 save's prompt text is discarded as it loads. `CaptureFlow` writes version 4, and
+  `RestoreFlow` reads 3 and 4. A flow's own values (`Scopes`, `SceneBags`) are on `FlowState` alone now.
+- `PatterSave` reads keys exactly as the family writes them (camelCase), now that no older shape needs a
+  case-insensitive read.
+
+### Removed
+
+- **Breaking (1.0): version 2 saves no longer load**, nor this port's pre-0.11.0 PascalCase saves, and
+  `SaveGame.Shared` and `SaveGame.StageBags` are gone. Load an older save with a 0.x runtime and save it again
+  to bring it forward.
+- **Breaking (1.0): the deprecated API.** `Flow.Start` (use `Flow.Reset`), `BundleInfo.Describe` (use
+  `DescribeBundle`), `PatterLiveBundle.Apply` (use `ApplyLiveBundle`), `GameDataHelpers.FieldsFor` and
+  `Effective` (use `GameDataFields` and `EffectiveGameData`), `PatterValueConverter` and `Uint32Converter`
+  (`PatterSave` reads and writes saves itself), `PatterSave.Envelope` (use `SaveState`), and the log entry's
+  `Subject`, `Considered`, and `Detail` (use `Group`, `To`, `Target`, `Node`, `Children`, `Options`, `Mode`, or
+  `Message`).
+
+### Fixed
+
+- **A saved "" loads as saved on an enum whose default is "".** A host scope's enum declared with default ""
+  (none chosen) had a saved "" reported as drifted when it loaded. It now loads as saved; any other enum still
+  puts a saved "" back to its default. (The shared expression kernel, fixed in every runtime.)
+- **A refused hot swap reports set-up once, and a start the bundle doesn't have is passed over.** When `HotSwap`'s
+  load is refused, the engine it falls back on no longer repeats the replacement's set-up reports. A hand-edited
+  bundle whose `start` names a scene, or block, it doesn't have now starts at the first scene, or that scene's
+  first block, rather than throwing.
+
 ## [0.34.0] - 2026-10-21
 
 ### Removed

@@ -71,6 +71,9 @@ namespace Patterkit.Patterplay
         public Func<double> Rng;
         /// <summary>Default seed for each flow's built-in serialisable PRNG.</summary>
         public double? Seed;
+        /// <summary>The locale for string lookups (embedded localisation); null for the bundle's default. A locale
+        /// the bundle doesn't have resolves as <see cref="Engine.SetLocale"/> resolves one, and is reported
+        /// ("setup"). Ignored by an IDs-only bundle, which emits beat IDs for the game to localise itself.</summary>
         public string Locale;
         public bool ReplayPromptOnChoose;
         /// <summary>Closed captions (#214): show caption cues in dialogue lines. Default true (full text);
@@ -84,11 +87,11 @@ namespace Patterkit.Patterplay
         /// whenever a choice runs dry. Unaffected by Log and useful with it off - it is live
         /// feedback, not an audit read afterwards.</summary>
         public Action<string> OnDryChoice;
-        /// <summary>Called with each content error the engine played through (see <see cref="PlayError"/>): a
-        /// condition that failed and counted as false, an effect that failed and was skipped, or a part of a
-        /// Best-match condition that failed and scored as false. Unset, each goes to
-        /// <see cref="Engine.DefaultOnError"/>, so a content bug is never silent. Parity with the JS
-        /// runtime's onError.</summary>
+        /// <summary>Called with each problem the engine reported and carried on past (see <see cref="PlayError"/>):
+        /// a condition that failed and counted as false, an effect that failed and was skipped, a part of a
+        /// Best-match condition that failed and scored as false, a set-up problem (reported as the constructor
+        /// ends), or a load whose place has gone. Unset, each goes to <see cref="Engine.DefaultOnError"/>, so
+        /// none is ever silent. Parity with the JS runtime's onError.</summary>
         public Action<PlayError> OnError;
         /// <summary>Called with the saved values a load put back to their defaults because they no longer fit
         /// their declarations: a stage, an enum value or a flag deleted since the save was taken, or a value of
@@ -106,7 +109,8 @@ namespace Patterkit.Patterplay
         /// from its defaults, as a property its registry stores and saves. Given <see cref="Registry"/>, the
         /// engine self-backs nothing: an unbound token is the game's to register (owned if the registry
         /// should store it, foreign if the game keeps it), or another engine's. Leave null for the
-        /// standalone case.</summary>
+        /// standalone case. Tokens are case-sensitive: a token the bundle doesn't declare is reported
+        /// ("setup"), naming the declared spelling when only the case differs.</summary>
         public Dictionary<string, IHostScope> HostScopes;
         /// <summary>The game's registry: ONE per game, holding every engine's properties except those the
         /// game keeps itself, saved once. Given one, the engine registers its own scopes in it (@patter under
@@ -121,12 +125,17 @@ namespace Patterkit.Patterplay
         /// registry's values). Not public API.</summary>
         internal bool OwnsRegistry;
 
+        /// <summary>Internal: set on the engine a refused HotSwap load falls back on, which stands in for a
+        /// replacement that has already made its set-up reports, so it makes none. Not public API.</summary>
+        internal bool SetupReported;
+
         /// <summary>A copy on another registry, for a HotSwap replacement.</summary>
-        internal EngineOptions OnRegistry(ScopeRegistry registry, bool ownsRegistry)
+        internal EngineOptions OnRegistry(ScopeRegistry registry, bool ownsRegistry, bool setupReported = false)
         {
             var copy = (EngineOptions)MemberwiseClone();
             copy.Registry = registry;
             copy.OwnsRegistry = ownsRegistry;
+            copy.SetupReported = setupReported;
             return copy;
         }
     }
@@ -141,7 +150,11 @@ namespace Patterkit.Patterplay
         // / reordered before the cursor (live bundle refresh / patched-game saves); absent falls back
         // to the raw Index. Mirrors the JS runtime's StackFrame.nextId.
         public string NextId;
-        public StackFrame Clone() => new StackFrame { SceneId = SceneId, ContainerId = ContainerId, Index = Index, NextId = NextId };
+        // SNAPSHOT-ONLY: on a frame whose container is an option of a choice, that choice group's id, so a
+        // load whose option has gone offers the choice again. Null on every other frame, and in a version 3
+        // save. Mirrors the JS runtime's StackFrame.choiceId.
+        public string ChoiceId;
+        public StackFrame Clone() => new StackFrame { SceneId = SceneId, ContainerId = ContainerId, Index = Index, NextId = NextId, ChoiceId = ChoiceId };
     }
 
     public sealed class SelectorState
@@ -155,35 +168,71 @@ namespace Patterkit.Patterplay
     internal sealed class ChoiceStateInternal
     {
         public string GroupId;
-        public List<ChoiceOption> Options;
+        /// <summary>The options offered, without their prompts: those are built again, in the language in use,
+        /// each time the choice is delivered.</summary>
+        public List<SavedChoiceOption> Options;
         public Dictionary<string, Node> ById;
+        /// <summary>Each option's prompt as it was last delivered (null for none), for a replay to speak exactly
+        /// what the player saw.</summary>
+        public Dictionary<string, ChoicePrompt> Shown = new Dictionary<string, ChoicePrompt>();
+    }
+
+    /// <summary>One option of a pending choice as a save keeps it: which option, whether it could be taken, and
+    /// its gameData, saved VERBATIM, since re-deriving on load would re-evaluate conditions. Its prompt is not
+    /// saved: it is built again in the language in use each time the choice is delivered. (A version 3 save's
+    /// option also has a prompt, which a load discards.) Mirrors the JS runtime's SavedChoiceOption.</summary>
+    public sealed class SavedChoiceOption
+    {
+        public string Id;
+        public bool Eligible;
+        public GameData GameData;
+    }
+
+    /// <summary>Where a load found its saved place gone from the build (spec 9.8), to resume from once the
+    /// flow's bags are back.</summary>
+    internal sealed class Drift
+    {
+        /// <summary>The report's node: the saved snippet, or at a pending choice its group.</summary>
+        public string Node;
+        /// <summary>What has gone and what the flow does instead, for the report's message.</summary>
+        public string Instead;
+        /// <summary>The choice to offer again: the one the gone option belonged to, or a pending choice none of
+        /// whose options survive.</summary>
+        public Node Reoffer;
     }
 
     /// <summary>
-    /// A content error the engine played through. Content can fail at run time in ways the compiler cannot
-    /// see: a division by zero, a host value of the wrong type, a story write to a read-only `@world` value.
-    /// The story never stops for one. A condition that fails counts as false; an effect that fails is
+    /// A problem the engine reported and carried on past. Content can fail at run time in ways the compiler
+    /// cannot see: a division by zero, a host value of the wrong type, a story write to a read-only `@world`
+    /// value. The story never stops for one. A condition that fails counts as false; an effect that fails is
     /// skipped and the rest of its list still runs; a part of a Best-match condition that fails scores as
-    /// false. Each is reported, through <see cref="EngineOptions.OnError"/> and as a `diagnostic` entry in
-    /// the decision log. The same rule holds on all four runtimes. Parity with the JS runtime's PlayError.
+    /// false. The engine also reports how it was set up ("setup": a locale the bundle doesn't have, a host
+    /// scope it doesn't declare) and a load whose place has gone from the build ("save"). Each is reported,
+    /// through <see cref="EngineOptions.OnError"/> and as a `diagnostic` entry in the decision log; a report
+    /// made while the engine is being built reaches them as the constructor ends. The same rule holds on all
+    /// four runtimes. Parity with the JS runtime's PlayError.
     /// </summary>
     public sealed class PlayError
     {
-        /// <summary>The flow it happened in.</summary>
+        /// <summary>The flow it happened in; "" for a "setup" report, which belongs to no flow.</summary>
         public string Flow;
-        /// <summary>What failed: "condition", "effect", or "best-match" (a part of a condition being scored
-        /// for Best match).</summary>
+        /// <summary>What it was: "condition", "effect", or "best-match" (a part of a condition being scored
+        /// for Best match) that failed; "setup", how the engine was set up; or "save", a load whose saved place
+        /// has gone.</summary>
         public string Kind;
         /// <summary>The snippet, group, or option whose condition failed, or that owns the effect (a scene,
-        /// for its onEntry).</summary>
+        /// for its onEntry). For "setup", the locale or host-scope token at fault. For "save", the saved
+        /// snippet (or, at a pending choice, its group) that has gone.</summary>
         public string Node;
         /// <summary>The expression's source text, when the bundle carries it; null otherwise.</summary>
         public string Source;
         public string Message;
 
-        /// <summary>One line for a console: what failed, where, and why.</summary>
+        /// <summary>One line for a console: what it was, where, and why.</summary>
         public override string ToString()
-            => $"{Kind} on {Node} in flow '{Flow}' failed, played through: {Message}";
+            => Kind == "setup" ? Message
+            : Kind == "save" ? $"flow '{Flow}': {Message}"
+            : $"{Kind} on {Node} in flow '{Flow}' failed, played through: {Message}";
     }
 
     /// <summary>One retained decision: what the engine chose and why, not what it produced. The JS runtime's
@@ -224,19 +273,12 @@ namespace Patterkit.Patterplay
         public string Target;
         public ExprValue Value;
         public ExprValue Prev;
-        /// <summary>A diagnostic's <see cref="PlayError.Kind"/>: condition | effect | best-match.</summary>
+        /// <summary>A diagnostic's <see cref="PlayError.Kind"/>: condition | effect | best-match | setup | save.</summary>
         public string Kind;
         public string Node;
         /// <summary>A diagnostic's expression source, when the bundle carries it.</summary>
         public string Source;
         public string Message;
-
-        [Obsolete("Use Group, To, Target, or Node, the fields every Patterplay runtime's entry has.")]
-        public string Subject => Group ?? To ?? Target ?? Node;
-        [Obsolete("Use Children or Options, the fields every Patterplay runtime's entry has.")]
-        public List<(string Id, bool Eligible)> Considered => Children ?? Options;
-        [Obsolete("Use Mode or Message, the fields every Patterplay runtime's entry has.")]
-        public string Detail => Mode ?? Message;
 
         /// <summary>A copy, for the engine's stream.</summary>
         internal LogEntry Copy() => (LogEntry)MemberwiseClone();
@@ -297,6 +339,20 @@ namespace Patterkit.Patterplay
         public Action<PlayError> OnError;
         /// <summary>The game's EngineOptions.OnRefit, or null to report through Engine.DefaultOnRefit.</summary>
         public Action<List<LoadMisfit>> OnRefit;
+        /// <summary>Report a problem the engine carried on past: to the game's OnError (or
+        /// Engine.DefaultOnError).</summary>
+        public void ReportError(PlayError error) => (OnError ?? Engine.DefaultOnError)?.Invoke(error);
+
+        /// <summary>A decision that belongs to no flow (a "setup" diagnostic), on the engine's stream only.</summary>
+        public void EmitEngine(LogEntry e)
+        {
+            if (!Tracing) return;
+            e.Flow = "";
+            if (LogEnabled) { e.Seq = EngineLogSeq++; EngineLog.Add(e); }
+            if (TraceHandlers.Count > 0)
+                foreach (var h in TraceHandlers.ToArray()) h("", e);
+        }
+
         /// <summary>Say what the registry's refitting loads have put back since it last said.</summary>
         public void ReportRefits()
         {
@@ -329,6 +385,9 @@ namespace Patterkit.Patterplay
         public Dictionary<string, List<string>> TagIndex; // author tags (#215): node id -> accumulated tags
         public Dictionary<string, BeatPad> PadIndex;      // line padding: line / text beat id -> its pause
         public Dictionary<string, Beat> BeatIndex;        // every beat by id (a snippet's beats and an option's prompt), for Flow.StepFor
+        /// <summary>Each option of a choice, by its id, to the id of the choice it belongs to: a save stamps the
+        /// frame an option's content runs in with its choice (StackFrame.ChoiceId).</summary>
+        public Dictionary<string, string> OptionChoice;
         /// <summary>The game's one registry: @patter (the SHARED globals), host scopes, every instance bag.</summary>
         public ScopeRegistry Registry;
         /// <summary>True when the engine made the registry (a standalone game): SaveGame then carries its values.</summary>
@@ -438,7 +497,11 @@ namespace Patterkit.Patterplay
         // Every locale's table, kept so SetLocale can re-point the active one live (no engine rebuild).
         // Reassigned wholesale by ReplaceStrings (live bundle refresh, tier 1), hence not readonly.
         private Dictionary<string, Dictionary<string, string>> _allStrings;
-        private string _currentLocale;
+        /// <summary>The locale in use (string lookups + character names resolve in it), as the resolver found it.</summary>
+        private LocaleChoice _currentLocale;
+        /// <summary>The locale the game asked for (the option, or the last SetLocale), which HotSwap and
+        /// ReplaceStrings resolve again against the bundle they take. Null for the bundle's default.</summary>
+        private string _requestedLocale;
         // The options this engine was built with - reused verbatim by HotSwap so the replacement
         // engine keeps the same seed source and settings.
         private readonly EngineOptions _creationOptions;
@@ -491,16 +554,20 @@ namespace Patterkit.Patterplay
         {
             options = options ?? new EngineOptions();
             _creationOptions = options;
-            string locale = options.Locale ?? bundle.Locales.Default;
+            // Set-up problems found while building, reported as the constructor ends, when the engine can report.
+            // (Unknown option keys can't happen: EngineOptions is typed.)
+            var setup = new List<(string node, string message)>();
             var allStrings = bundle.Strings;
             _allStrings = allStrings;
-            _currentLocale = locale;
+            _requestedLocale = options.Locale;
+            _currentLocale = ResolveLocale(bundle, options.Locale);
+            if (_currentLocale.Problem != null) setup.Add((options.Locale, _currentLocale.Problem));
             // Localisation mode (spec §11): "ids" + no source-debug -> emit beat IDs + omit character names.
             var loc = bundle.Localisation;
             bool emitIds = loc != null && loc.Mode == "ids" && !loc.SourceDebug;
             _sourceDebug = loc != null && loc.Mode == "ids" && loc.SourceDebug;
             if (_sourceDebug) System.Console.Error.WriteLine("[Patterplay] source-only DEBUG build: strings are the source language for debugging, not a shippable localised build.");
-            var strings = allStrings != null && allStrings.TryGetValue(locale, out var s) ? s : new Dictionary<string, string>();
+            var strings = TableOf(allStrings, _currentLocale);
             var defaultStrings = allStrings != null && allStrings.TryGetValue(bundle.Locales.Default, out var ds) ? ds : new Dictionary<string, string>();
 
             var castDisplay = new Dictionary<string, string>();
@@ -562,11 +629,22 @@ namespace Patterkit.Patterplay
                 registered.Add("patter");
                 // Each host-scope binding is an external scope: the game keeps the values, the registry never
                 // saves them. Its declarations (types, read-only) come from the compiled bundle.
+                var declared = bundle.ScopeRegistry?.Scopes?.Where(s => s != null && s.Token != null).ToList() ?? new List<HostScopeSpec>();
                 if (options.HostScopes != null)
                     foreach (var kv in options.HostScopes)
                     {
                         if (kv.Value == null || string.IsNullOrEmpty(kv.Key)) continue;
-                        var spec = bundle.ScopeRegistry?.Scopes?.Find(s => s != null && s.Token == kv.Key);
+                        var spec = declared.Find(s => s.Token == kv.Key);
+                        // Tokens are case-sensitive everywhere, so a near miss is reported, never folded: folding
+                        // would make a second spelling of the scope. Another engine's scope the content names is
+                        // that engine's to declare.
+                        if (spec == null && (bundle.ExternalScopes == null || !bundle.ExternalScopes.Contains(kv.Key)))
+                        {
+                            var near = declared.Find(s => string.Equals(s.Token, kv.Key, StringComparison.OrdinalIgnoreCase));
+                            setup.Add((kv.Key, near != null
+                                ? $"HostScopes binds \"{kv.Key}\", which this bundle doesn't declare: it declares \"{near.Token}\", and a scope's token is case-sensitive"
+                                : $"HostScopes binds \"{kv.Key}\", which this bundle doesn't declare"));
+                        }
                         var decls = (spec?.Declarations ?? new List<HostScopeDecl>())
                             .Where(d => d != null && d.Name != null).Select(ToForeignDecl).ToList();
                         registry.DefineForeign(kv.Key, new HostScopeResolver(kv.Value), decls,
@@ -619,7 +697,7 @@ namespace Patterkit.Patterplay
                 Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay, QualifierDisplay = qualifierDisplay,
                 SpeakerLabels = speakerLabels, SpeakerPattern = bundle.SpeakerPattern ?? Bundle.DefaultSpeakerPattern,
                 NodeIndex = nodeIndex, BlockToScene = blockToScene, BlockById = blockById, TagIndex = tagIndex,
-                PadIndex = BuildPadIndex(bundle), BeatIndex = BuildBeatIndex(bundle),
+                PadIndex = BuildPadIndex(bundle), BeatIndex = BuildBeatIndex(bundle), OptionChoice = BuildOptionChoice(bundle),
                 SceneGameIdToId = _sceneGameIdToId, BlockGameIdToId = _blockGameIdToId,
                 Registry = registry, OwnsRegistry = ownsRegistry, SelfBackedTokens = selfBacked, BoundTokens = bound,
                 SharedPatter = sharedPatter, PatterSharedDecls = sharedDecls, PatterLocalDecls = localDecls,
@@ -636,10 +714,29 @@ namespace Patterkit.Patterplay
             // which that promise never binds (ruled across the family 2026-09-05).
             // The `patter` bag (and any self-backed host scope) claimed values the game may have loaded first.
             _host.ReportRefits();
+            // Last, so the game's handler and the decision log hear about an engine that is ready to be asked.
+            // The engine a refused HotSwap load falls back on makes none: the replacement before it already did.
+            if (!options.SetupReported) foreach (var (node, message) in setup) ReportSetup(node, message);
         }
 
-        /// <summary>The active locale (string + character-name lookups resolve in it).</summary>
-        public string Locale => _currentLocale;
+        /// <summary>Report a set-up problem (a "setup" PlayError, which belongs to no flow): to the game's
+        /// OnError, and to the decision log.</summary>
+        private void ReportSetup(string node, string message)
+        {
+            _host.ReportError(new PlayError { Flow = "", Kind = "setup", Node = node, Message = message });
+            _host.EmitEngine(new LogEntry { Type = "diagnostic", Kind = "setup", Node = node, Message = message });
+        }
+
+        /// <summary>The locale in use (string + character-name lookups resolve in it): the one the game asked for,
+        /// or the one it fell back to (`fr` for `fr-FR`, the default for a locale the bundle doesn't have).</summary>
+        public string Locale => _currentLocale.Locale;
+
+        /// <summary>The bundle's locales: its default, and every locale it includes. A fresh copy each call.</summary>
+        public Locales Locales => new Locales
+        {
+            Default = _host.Bundle.Locales.Default,
+            Included = new List<string>(_host.Bundle.Locales.Included ?? new List<string>()),
+        };
 
         /// <summary>True for a source-only DEBUG build: the embedded strings are the source language (for
         /// debugging), not a shippable localised build. An IDs-only ship build is false.</summary>
@@ -647,17 +744,70 @@ namespace Patterkit.Patterplay
 
         /// <summary>
         /// Switch the active locale LIVE - a game's "language" setting can change mid-session. Subsequent
-        /// string lookups (new beats, re-resolved character names, {@ref} interpolation) render in the new
-        /// locale; flow position / state / visits / PRNG are untouched. All open flows share the engine's
-        /// string table, so the swap reaches them at once. A locale with no table degrades to the source via
-        /// the &lt;Untranslated&gt; fallback.
+        /// string lookups (new beats, a pending choice's options, re-resolved character names, {@ref}
+        /// interpolation) render in the new locale; flow position / state / visits / PRNG are untouched. All
+        /// open flows share the engine's string table, so the swap reaches them at once.
+        ///
+        /// The locale resolves by one rule, the same for the Locale option: case and `_` / `-` don't matter, so
+        /// an exact match wins, then the language alone (`fr` for `fr-FR`), then the bundle's default, whose
+        /// text then keeps the `&lt;Untranslated: id&gt;` marker so the gap shows. Anything but an exact match is
+        /// reported ("setup"). `fr` never looks for `fr-FR`. An IDs-only bundle takes the locale as given,
+        /// unreported.
         /// </summary>
         public void SetLocale(string locale)
         {
-            _currentLocale = locale;
-            _host.Strings = _allStrings != null && _allStrings.TryGetValue(locale, out var t)
-                ? t : new Dictionary<string, string>();
+            _requestedLocale = locale;
+            UseLocale(ResolveLocale(_host.Bundle, locale));
+            if (_currentLocale.Problem != null) ReportSetup(locale, _currentLocale.Problem);
         }
+
+        private void UseLocale(LocaleChoice choice)
+        {
+            _currentLocale = choice;
+            _host.Strings = TableOf(_allStrings, choice);
+        }
+
+        /// <summary>How a requested locale resolved (see ResolveLocale): the locale in use, the string table it
+        /// reads (null: every string falls back to the default locale, marked untranslated), and what to report
+        /// when it isn't an exact match.</summary>
+        private struct LocaleChoice
+        {
+            public string Locale;
+            public string Table;
+            public string Problem;
+        }
+
+        /// <summary>The one rule for a locale, used wherever one is set (the constructor, SetLocale,
+        /// ReplaceStrings, and HotSwap through the constructor). Case and `_` / `-` don't matter: an exact match,
+        /// then the language alone (`fr` for `fr-FR`), then the bundle's default. Anything but an exact match
+        /// carries a problem to report. The default reads no table of its own here, so its text keeps the
+        /// `&lt;Untranslated: id&gt;` marker and the gap shows. `fr` never looks for `fr-FR`. An IDs-only bundle
+        /// takes the locale as given: the game localises it.</summary>
+        private static LocaleChoice ResolveLocale(Bundle bundle, string requested)
+        {
+            string def = bundle.Locales.Default;
+            if (requested == null) return new LocaleChoice { Locale = def, Table = def };
+            if (bundle.Localisation != null && bundle.Localisation.Mode == "ids") return new LocaleChoice { Locale = requested, Table = requested };
+            var have = new List<string>();
+            void Add(string l) { if (l != null && !have.Contains(l)) have.Add(l); }
+            Add(def);
+            foreach (var l in bundle.Locales.Included ?? new List<string>()) Add(l);
+            if (bundle.Strings != null) foreach (var l in bundle.Strings.Keys) Add(l);
+            if (have.Contains(requested)) return new LocaleChoice { Locale = requested, Table = requested };
+            string Norm(string l) => l.ToLowerInvariant().Replace('_', '-');
+            var exact = have.Find(l => Norm(l) == Norm(requested));
+            if (exact != null)
+                return new LocaleChoice { Locale = exact, Table = exact, Problem = $"the locale \"{requested}\" is spelled \"{exact}\" in this bundle, so it's using \"{exact}\"" };
+            string language = Norm(requested).Split('-')[0];
+            var near = have.Find(l => Norm(l) == language);
+            if (near != null)
+                return new LocaleChoice { Locale = near, Table = near, Problem = $"this bundle has no locale \"{requested}\", so it's using its language, \"{near}\"" };
+            return new LocaleChoice { Locale = def, Problem = $"this bundle has no locale \"{requested}\", so it's using the default, \"{def}\", with every string marked untranslated" };
+        }
+
+        /// <summary>The string table a resolved locale reads: empty when it fell back to the default.</summary>
+        private static Dictionary<string, string> TableOf(Dictionary<string, Dictionary<string, string>> all, LocaleChoice choice)
+            => choice.Table != null && all != null && all.TryGetValue(choice.Table, out var t) ? t : new Dictionary<string, string>();
 
         /// <summary>
         /// Live bundle refresh, tier 1 (strings only): swap every locale's string table in place from a
@@ -668,15 +818,22 @@ namespace Patterkit.Patterplay
         public void ReplaceStrings(Bundle bundle)
         {
             _allStrings = bundle.Strings;
-            _host.Strings = _allStrings != null && _allStrings.TryGetValue(_currentLocale, out var t) ? t : new Dictionary<string, string>();
+            // The requested locale resolves again against the new tables; a fallback is reported only when it
+            // changed, so a live text edit doesn't repeat what the game has already heard.
+            string was = _currentLocale.Problem;
+            UseLocale(ResolveLocale(bundle, _requestedLocale));
             _host.DefaultStrings = _allStrings != null && _allStrings.TryGetValue(_host.Bundle.Locales.Default, out var d) ? d : new Dictionary<string, string>();
+            string now = _currentLocale.Problem;
+            if (now != null && now != was) ReportSetup(_requestedLocale, now);
         }
 
         /// <summary>
         /// Live bundle refresh, tier 2 (full swap): rebuild on an edited bundle with the whole run carried
-        /// over (SaveGame -> fresh engine -> LoadGame) plus the presentation state that isn't save state
-        /// (active locale, captions toggle). Content drift resolves per §9.8: stack frames re-find their
-        /// next child by id, drifted options drop, a vanished snippet is skipped.
+        /// over (SaveGame -> fresh engine -> LoadGame) plus the presentation state that isn't save state (the
+        /// locale asked for, resolved again against the new bundle and reported again if it falls back; the
+        /// captions toggle). Content drift resolves per §9.8: stack frames re-find their next child and the
+        /// next beat by id, drifted options drop, and a place that has gone resumes at the nearest safe point,
+        /// reported ("save").
         ///
         /// Returns the REPLACEMENT engine, on the same registry. This one hands its bags over (each is
         /// removed from the registry with its values kept, and the replacement claims them as it
@@ -691,13 +848,14 @@ namespace Patterkit.Patterplay
             var snapshot = SaveGame();
             Engine CarryOver(Engine next)
             {
-                next.SetLocale(_currentLocale);
                 next.SetClosedCaptions(_host.CaptionsOn);
                 return next;
             }
             // The replacement registers on the SAME registry, and a standalone engine's replacement is still
-            // its own game (so its SaveGame keeps carrying the registry's values).
+            // its own game (so its SaveGame keeps carrying the registry's values). It is built in the locale this
+            // one was asked for, so the new bundle's locales resolve it, as the constructor reports.
             var options = _creationOptions.OnRegistry(_host.Registry, _host.OwnsRegistry);
+            if (_requestedLocale != null) options.Locale = _requestedLocale;
             // On a game's registry, this engine's own values are parked again to be REFITTED as the replacement
             // claims them: the edit may have deleted a stage, an enum value or a flag one of them holds, and the
             // snapshot does not carry the game's registry. A standalone engine's snapshot carries its registry,
@@ -728,7 +886,8 @@ namespace Patterkit.Patterplay
                 // the fallback claims them, so a stage the edit deleted is put back here too.
                 var again = _host.OwnsRegistry ? snapshot.Registry : own;
                 if (again != null) _host.Registry.Load(again, keepParked: true, refit: true);
-                var fresh = new Engine(bundle, options);
+                // The fallback stands in for the replacement, which has made the set-up reports: it makes none.
+                var fresh = new Engine(bundle, options.OnRegistry(_host.Registry, _host.OwnsRegistry, setupReported: true));
                 foreach (var kv in snapshot.Flows)
                 {
                     try { fresh.OpenFlow(kv.Key, kv.Value.CurrentSceneId); }
@@ -864,22 +1023,24 @@ namespace Patterkit.Patterplay
         // -- author tags (#215) -------------------------------------------------
 
         /// <summary>A beat's accumulated tags (own + every ancestor's), the same value its step carries.
-        /// Empty list for an unknown id or a beat with no tags anywhere up the chain.</summary>
+        /// Empty list for an unknown id or a beat with no tags anywhere up the chain. The game's own copy: the
+        /// index is shared by every engine on the bundle.</summary>
         public List<string> TagsForBeat(string beatId)
-            => _host.TagIndex.TryGetValue(beatId, out var t) ? t : new List<string>();
+            => beatId != null && _host.TagIndex.TryGetValue(beatId, out var t) ? new List<string>(t) : new List<string>();
 
-        /// <summary>A scene's own tags, by internal id or gameId address.</summary>
+        /// <summary>A scene's own tags, by internal id or gameId address. A copy, as TagsForBeat's.</summary>
         public List<string> TagsForScene(string sceneRef)
         {
             var id = ResolveSceneRef(sceneRef);
-            return id != null && _host.TagIndex.TryGetValue(id, out var t) ? t : new List<string>();
+            return id != null && _host.TagIndex.TryGetValue(id, out var t) ? new List<string>(t) : new List<string>();
         }
 
-        /// <summary>A block's accumulated tags (scene + block), by scene + block ref (id or gameId).</summary>
+        /// <summary>A block's accumulated tags (scene + block), by scene + block ref (id or gameId). A copy, as
+        /// TagsForBeat's.</summary>
         public List<string> TagsForBlock(string sceneRef, string blockRef)
         {
             var id = ResolveBlockRef(ResolveSceneRef(sceneRef), blockRef);
-            return id != null && _host.TagIndex.TryGetValue(id, out var t) ? t : new List<string>();
+            return id != null && _host.TagIndex.TryGetValue(id, out var t) ? new List<string>(t) : new List<string>();
         }
 
         // -- scene / block gameData -------------------------------------------
@@ -887,27 +1048,21 @@ namespace Patterkit.Patterplay
         /// <summary>A scene's own author gameData, by internal id or gameId address: the RAW sparse
         /// overrides, exactly as a beat's step carries its own, NOT merged with the project's declared
         /// field defaults (resolve those with GameDataHelpers.EffectiveGameData(GameDataHelpers.GameDataFields(bundle,
-        /// "scene"), ...)). Not inherited by the scene's blocks. A fresh copy each call; empty (never null)
-        /// when the scene sets none or the ref is unknown.</summary>
+        /// "scene"), ...)). Not inherited by the scene's blocks. The game's own copy each call; empty (never
+        /// null) when the scene sets none or the ref is unknown.</summary>
         public GameData GameDataForScene(string sceneRef)
         {
             var id = ResolveSceneRef(sceneRef);
-            var copy = new GameData();
-            if (id != null && _host.Bundle.Scenes.TryGetValue(id, out var scene) && scene.GameData != null)
-                foreach (var kv in scene.GameData) copy[kv.Key] = kv.Value;
-            return copy;
+            return (id != null && _host.Bundle.Scenes.TryGetValue(id, out var scene) ? GameDataHelpers.CopyGameData(scene.GameData) : null) ?? new GameData();
         }
 
         /// <summary>A block's own author gameData, by scene + block ref (id or gameId). Raw overrides, like
         /// GameDataForScene: not merged with the "block" defaults (see GameDataHelpers), and the scene's
-        /// gameData is not folded in. A fresh copy each call; empty (never null) when none or unknown.</summary>
+        /// gameData is not folded in. The game's own copy each call; empty (never null) when none or unknown.</summary>
         public GameData GameDataForBlock(string sceneRef, string blockRef)
         {
             var id = ResolveBlockRef(ResolveSceneRef(sceneRef), blockRef);
-            var copy = new GameData();
-            if (id != null && _host.BlockById.TryGetValue(id, out var block) && block.GameData != null)
-                foreach (var kv in block.GameData) copy[kv.Key] = kv.Value;
-            return copy;
+            return (id != null && _host.BlockById.TryGetValue(id, out var block) ? GameDataHelpers.CopyGameData(block.GameData) : null) ?? new GameData();
         }
 
         /// <summary>A scene's own Patter extension values (by internal id or gameId address), by extension id: raw
@@ -1110,17 +1265,18 @@ namespace Patterkit.Patterplay
                 else info.PadAfter = Bundle.DefaultPadAfter;
                 if (_host.DefaultStrings.TryGetValue(beat.Id, out var src)) info.Text = src; // source, un-interpolated
             }
-            if (beat.GameData != null && beat.GameData.Count > 0) info.GameData = beat.GameData;
+            if (beat.GameData != null && beat.GameData.Count > 0) info.GameData = GameDataHelpers.CopyGameData(beat.GameData);
             info.Extensions = ExtensionsOrNull(beat.Extensions);
             info.Tags = TagsOrNull(beat.Id);
             return info;
         }
 
         private List<string> TagsOrNull(string id)
-            => _host.TagIndex.TryGetValue(id, out var t) && t.Count > 0 ? t : null;
+            => _host.TagIndex.TryGetValue(id, out var t) && t.Count > 0 ? new List<string>(t) : null;
 
-        /// <summary>An outline node's gameData, present only when it sets any (parity with BeatInfo's).</summary>
-        private static GameData GameDataOrNull(GameData gd) => gd != null && gd.Count > 0 ? gd : null;
+        /// <summary>An outline node's gameData, present only when it sets any (parity with BeatInfo's): the game's
+        /// own copy.</summary>
+        private static GameData GameDataOrNull(GameData gd) => gd != null && gd.Count > 0 ? GameDataHelpers.CopyGameData(gd) : null;
 
         /// <summary>A node's Patter extension values, present only when it has any (as its gameData's): what a
         /// step, an option and the outline carry.</summary>
@@ -1181,15 +1337,70 @@ namespace Patterkit.Patterplay
 
         /// <summary>Write a shared property by ref. The GAME's surface, so a host declaration's
         /// `writable: false` does not refuse it: that is the story's promise about the story's writes
-        /// (from-storylets/host-writes-to-read-only-world). Effects write through Flow instead.</summary>
+        /// (from-storylets/host-writes-to-read-only-world). Effects write through Flow instead.
+        ///
+        /// THROWS, changing nothing, on a value that doesn't fit the property's declaration (a string for a
+        /// number, a value an enum or a quality doesn't list, a flag a flags property doesn't), and on a name
+        /// the content doesn't declare. An opaque host scope (one that declares no names), and another
+        /// engine's scope, are their owners' to check.</summary>
         public void SetProperty(string refStr, ExprValue value)
         {
             var (scope, name) = SplitShared(refStr);
+            CheckHostWrite(_host, scope, name, value, null);
             var journal = _host.Journal;
             var prev = journal != null ? _host.Registry.Get(scope, name) : null;
             try { _host.Registry.Set(scope, name, value, host: true); }
             catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
             if (journal != null && prev != null) journal.Undo.Add(() => _host.Registry.Set(scope, name, prev, host: true));
+        }
+
+        /// <summary>
+        /// Refuse a host write that doesn't fit what the content declared: a string for a number, a value an enum
+        /// or a quality doesn't list, a flag a flags property doesn't, or a name the content doesn't declare. The
+        /// rule is the kernel's valueFits, the one a load walks saved values with, so a value the game may set
+        /// is exactly one a save may carry; an enum whose own default is "" (none chosen) takes "" back. A scope
+        /// the bundle doesn't declare (another engine's, or one the game keeps), and an opaque one, are their
+        /// owners' to check. The same rule and message on every runtime, and in the Storylet Engine's.
+        /// </summary>
+        internal static void CheckHostWrite(FlowHost host, string scope, string name, ExprValue value, string sceneId)
+        {
+            string type = null; IReadOnlyList<string> values = null, stages = null; ExprValue def = null;
+            bool found = false;
+            if (scope == "patter" || scope == "scene")
+            {
+                var props = scope == "patter" ? host.Bundle.Properties
+                    : sceneId != null && host.Bundle.Scenes.TryGetValue(sceneId, out var scene) ? scene.SceneProps : null;
+                var d = props?.Find(p => p?.Name != null && p.Name.ToLowerInvariant() == name);
+                if (d != null) { found = true; type = d.Type; values = d.Values; stages = d.Stages; def = d.Default; }
+            }
+            else
+            {
+                var spec = host.Bundle.ScopeRegistry?.Scopes?.Find(s => s != null && s.Token == scope);
+                // An opaque scope declares no names: any name and value is the game's.
+                if (spec == null || spec.Declarations == null) return;
+                var d = spec.Declarations.Find(x => x?.Name != null && x.Name.ToLowerInvariant() == name);
+                if (d != null) { found = true; type = d.Type; values = d.Values; stages = d.Stages; def = d.Default; }
+            }
+            string path = "@" + scope + "." + name;
+            if (!found) throw new Exception($"no property at \"{path}\": the content declares no {path}");
+            bool noneChosen = type == PropertyTypes.Enum && def != null && def.IsString && def.AsString == "";
+            if (!ValueFit.Fits(type, values, stages, value, noneChosen))
+                throw new Exception($"\"{path}\" takes {Takes(type, values, stages)}; {(value == null ? "null" : value.ToJsonString())} doesn't fit");
+        }
+
+        /// <summary>What a declared property takes, in words, for a refused host write.</summary>
+        private static string Takes(string type, IReadOnlyList<string> values, IReadOnlyList<string> stages)
+        {
+            string Quoted(IReadOnlyList<string> xs) => string.Join(", ", (xs ?? new List<string>()).Select(x => ExprValue.Str(x).ToJsonString()));
+            switch (type)
+            {
+                case "number": return "a number";
+                case "boolean": return "true or false";
+                case "enum": return $"one of {Quoted(values)}";
+                case "flags": return values != null && values.Count > 0 ? $"a list of flags from {Quoted(values)}" : "a list of flags";
+                case "quality": return $"one of its stages {Quoted(stages)}";
+                default: return "text";
+            }
         }
 
         /// <summary>A quality's ladder, for game code holding one of its values: the position of
@@ -1282,7 +1493,7 @@ namespace Patterkit.Patterplay
         ///
         /// One checkpoint at a time. Inside one, the calls that replace or drop flows or their bags
         /// wholesale (Reset, LoadGame, HotSwap, CloseFlow, OpenFlow on the name of an open flow, and a
-        /// flow's own Start, Reset, and Restore) throw. Not undone: log entries already recorded, and draws
+        /// flow's own Reset and Restore) throw. Not undone: log entries already recorded, and draws
         /// from a custom Rng the game supplied.
         /// </summary>
         public Checkpoint Checkpoint()
@@ -1353,19 +1564,20 @@ namespace Patterkit.Patterplay
             };
         }
 
-        /// <summary>The save version SaveGame writes. Version 2 saves (which carried the property values
-        /// in the engine's own sections) still load.</summary>
-        public const int SaveVersion = 3;
+        /// <summary>The save version SaveGame writes. Version 3 saves (which named the next beat by its index and
+        /// kept a pending choice's prompt text) still load.</summary>
+        public const int SaveVersion = 4;
 
         /// <summary>Restore a SaveGame: visit counts, shared selector cursors, and every flow. Property
-        /// values come from the registry. A save that carries them (a standalone engine's, or a version 2
-        /// save from before the registry held them) has them moved into the registry here; otherwise the
-        /// game loads its registry itself, before or after this call. Either order works: this engine's bags
-        /// are handed back to the registry (values kept) and the restored flows claim them as they register.</summary>
+        /// values come from the registry. A save that carries them (a standalone engine's) has them moved into
+        /// the registry here; otherwise the game loads its registry itself, before or after this call. Either
+        /// order works: this engine's bags are handed back to the registry (values kept) and the restored flows
+        /// claim them as they register. Reads versions 3 and 4. A flow whose saved place has gone from this
+        /// build resumes at the nearest safe point, reported ("save").</summary>
         public void LoadGame(SaveGame save)
         {
             RefuseInCheckpoint("LoadGame");
-            if (save.Version != 2 && save.Version != SaveVersion) throw new Exception($"unsupported save version: {save.Version}");
+            if (save.Version != 3 && save.Version != SaveVersion) throw new Exception($"unsupported save version: {save.Version}");
             // Everything a load reads is checked BEFORE anything changes: a save missing its flows used to close
             // every flow and load the registry, then fail, leaving the engine half-loaded.
             if (save.Flows == null) throw new Exception("malformed save: no flows");
@@ -1379,7 +1591,7 @@ namespace Patterkit.Patterplay
             foreach (var s in _host.StageBags.Keys) reg.Remove(PatterKeys.Stage(s), keep: true);
             _host.StageBags.Clear();
 
-            var values = save.Version == 2 ? SectionsFromV2(save) : save.Registry;
+            var values = save.Registry;
             if (values != null)
             {
                 // The engine's own registry takes the save wholesale. A game's registry may hold values the
@@ -1423,7 +1635,7 @@ namespace Patterkit.Patterplay
         public Flow RestoreFlow(string id, FlowState state)
         {
             RefuseInCheckpoint("RestoreFlow");
-            if (state.Version != 2 && state.Version != SaveVersion) throw new Exception($"unsupported flow state version: {state.Version}");
+            if (state.Version != 3 && state.Version != SaveVersion) throw new Exception($"unsupported flow state version: {state.Version}");
             if (_flows.ContainsKey(id)) throw new Exception($"a flow '{id}' is already open; close it before restoring another under that id");
             AssertExternalScopes();
             // Anything a load left waiting under this id belonged to a flow that has gone, as when a flow starts.
@@ -1446,23 +1658,9 @@ namespace Patterkit.Patterplay
             return flow;
         }
 
-        /// <summary>A version 2 save's property values, as registry sections under this engine's keys.</summary>
-        private static OrderedMap<string, OrderedMap<string, ExprValue>> SectionsFromV2(SaveGame save)
-        {
-#pragma warning disable CS0618 // the version 2 fields are read here, and only here
-            var out_ = new OrderedMap<string, OrderedMap<string, ExprValue>>();
-            if (save.Shared != null) out_.Set("patter", OrderedOf(save.Shared));
-            foreach (var kv in save.StageBags ?? new Dictionary<string, Dictionary<string, ExprValue>>())
-                out_.Set(PatterKeys.Stage(kv.Key), OrderedOf(kv.Value));
-#pragma warning restore CS0618
-            foreach (var f in save.Flows ?? new Dictionary<string, FlowSnapshot>())
-                foreach (var kv in FlowSections(f.Key, f.Value)) out_.Set(kv.Key, kv.Value);
-            return out_;
-        }
-
-        /// <summary>One flow's own values (a version 2 save's per-flow sections, or a <see cref="FlowState"/>'s)
-        /// as registry sections under flow <paramref name="id"/>'s keys.</summary>
-        private static OrderedMap<string, OrderedMap<string, ExprValue>> FlowSections(string id, FlowSnapshot f)
+        /// <summary>One flow's own values (a <see cref="FlowState"/>'s) as registry sections under flow
+        /// <paramref name="id"/>'s keys.</summary>
+        private static OrderedMap<string, OrderedMap<string, ExprValue>> FlowSections(string id, FlowState f)
         {
             var out_ = new OrderedMap<string, OrderedMap<string, ExprValue>>();
             if (f.Scopes != null) out_.Set(PatterKeys.FlowGlobals(id), OrderedOf(f.Scopes));
@@ -1474,7 +1672,7 @@ namespace Patterkit.Patterplay
         /// <summary>The inverse of <see cref="FlowSections"/>: flow <paramref name="id"/>'s sections in a registry
         /// save, without the id, onto <paramref name="into"/>. Values still waiting in the registry for a scene the
         /// flow hasn't re-entered are in the save, so they come too.</summary>
-        private static void FlowValuesFrom(string id, OrderedMap<string, OrderedMap<string, ExprValue>> saved, FlowSnapshot into)
+        private static void FlowValuesFrom(string id, OrderedMap<string, OrderedMap<string, ExprValue>> saved, FlowState into)
         {
             into.Scopes = null;
             into.SceneBags = new Dictionary<string, Dictionary<string, ExprValue>>();
@@ -1531,6 +1729,21 @@ namespace Patterkit.Patterplay
             if (r == null) return null;
             if (sceneId == null) return r;
             return ResolveBlock(_host, sceneId, r); // within its scene: another scene's block is not found here
+        }
+
+        /// <summary>Each option of a choice, by its id, to the id of the choice it belongs to (FlowHost.OptionChoice).
+        /// Structural, so worked out once per engine.</summary>
+        internal static Dictionary<string, string> BuildOptionChoice(Bundle bundle)
+        {
+            var index = new Dictionary<string, string>();
+            foreach (var scene in bundle.Scenes.Values)
+                foreach (var block in scene.Blocks)
+                    WalkNodes(block.Children, n =>
+                    {
+                        if (n.IsGroup && n.Selector == "choice" && n.Children != null)
+                            foreach (var option in n.Children) index[option.Id] = n.Id;
+                    });
+            return index;
         }
 
         /// <summary>The ONE rule for resolving a scene address, used by OpenFlow, Goto, and every engine lookup:
@@ -1751,7 +1964,7 @@ namespace Patterkit.Patterplay
 
     // -- save-game records ------------------------------------------------------
 
-    /// <summary>A full resumable save (version 3): everything that is not a property, plus the registry's
+    /// <summary>A full resumable save (version 4): everything that is not a property, plus the registry's
     /// values when the engine made its own registry. The shape is the family's (`patter/save@0`, written
     /// by PatterSave): every runtime writes the same key paths.</summary>
     public sealed class SaveGame
@@ -1767,33 +1980,26 @@ namespace Patterkit.Patterplay
         public Dictionary<string, SelectorState> SharedSelectors;
         /// <summary>Each live flow's snapshot, keyed by flow id.</summary>
         public Dictionary<string, FlowSnapshot> Flows;
-
-        /// <summary>Version 2 only: the shared @patter globals. Read from an older save, never written.</summary>
-        [Obsolete("Version 2 saves only. Property values are the registry's now: see Registry.")]
-        public Dictionary<string, ExprValue> Shared;
-        /// <summary>Version 2 only: the shared @scene bags (scene id -> name -> value). Read, never written.</summary>
-        [Obsolete("Version 2 saves only. Property values are the registry's now: see Registry.")]
-        public Dictionary<string, Dictionary<string, ExprValue>> StageBags;
     }
 
-    /// <summary>The serialised cursor, PRNG, and visits of one flow. In a version 3 save its properties are the
-    /// registry's (SaveGame.Registry), so the save doesn't write <see cref="Scopes"/> or <see cref="SceneBags"/>.</summary>
+    /// <summary>The serialised cursor, PRNG, and visits of one flow. Its properties are the registry's
+    /// (SaveGame.Registry); a <see cref="FlowState"/> carries a flow's own values beside it.</summary>
     public class FlowSnapshot
     {
-        /// <summary>The flow's not-shared @patter globals, carried by a <see cref="FlowState"/> and by a version 2
-        /// save; a version 3 save leaves them to the registry.</summary>
-        public Dictionary<string, ExprValue> Scopes;
-        /// <summary>The flow's per-scene @scene bags (scene id -> name -> value), carried by a
-        /// <see cref="FlowState"/> and by a version 2 save; a version 3 save leaves them to the registry.</summary>
-        public Dictionary<string, Dictionary<string, ExprValue>> SceneBags;
         public uint RngState;
         public Dictionary<string, int> Visits;
         public bool FlowEnded;
         public string CurrentSceneId;
         public List<StackFrame> Stack;
         public string ActiveSnippetId;
-        public int BeatIndex;
-        public List<ChoiceOption> PendingOptions;  // null = no pending choice
+        /// <summary>The id of the next beat the active snippet delivers, so a load against an edited bundle finds
+        /// its place by id. Null when no snippet is active or the active one has delivered every beat.</summary>
+        public string BeatId;
+        /// <summary>Version 3 only, read and never written: the index of the next beat in the active snippet.</summary>
+        public int? BeatIndex;
+        /// <summary>The options of the pending choice, without their prompts (built again in the language in use
+        /// whenever the choice is delivered); null = no pending choice.</summary>
+        public List<SavedChoiceOption> PendingOptions;
         public string PendingGroupId;
         public string PendingPromptOwnerId;        // chosen option owning a prompt still to replay (save in the choose->advance window)
         public ChoicePrompt PendingPrompt;         // that prompt as the choice showed it; null when none, or in a save written before it was carried
@@ -1808,7 +2014,12 @@ namespace Patterkit.Patterplay
     /// selectors) is never in it, so restoring one rewinds nothing else.</summary>
     public sealed class FlowState : FlowSnapshot
     {
-        /// <summary>The save version it was written at (<see cref="Engine.SaveVersion"/>).</summary>
+        /// <summary>The save version it was written at (<see cref="Engine.SaveVersion"/>); a version 3 state still
+        /// restores.</summary>
         public int Version;
+        /// <summary>The flow's not-shared @patter globals.</summary>
+        public Dictionary<string, ExprValue> Scopes;
+        /// <summary>The flow's per-scene @scene bags (scene id -> name -> value).</summary>
+        public Dictionary<string, Dictionary<string, ExprValue>> SceneBags;
     }
 }

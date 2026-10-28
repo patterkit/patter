@@ -46,7 +46,7 @@ bool FPatterplayFlowStateTest::RunTest(const FString& Parameters)
 {
 	UPatterBundle* Bundle = UPatterBundle::LoadFromString(FlowStateBundleJson);
 	if (!TestNotNull(TEXT("bundle loads"), Bundle)) return false;
-	UPatterEngine* Engine = UPatterEngine::Create(Bundle);
+	UPatterEngine* Engine = UPatterEngine::Create(Bundle, {});
 	if (!TestNotNull(TEXT("engine"), Engine)) return false;
 
 	// Each refusal is logged as an Error, which UE counts as a test failure unless declared.
@@ -77,7 +77,7 @@ bool FPatterplayFlowStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("capturing inside a checkpoint is allowed: it only reads"), Engine->CaptureFlow(TEXT("main")), Mid);
 	Engine->Commit();
 	FString Fractional = Mid;
-	Fractional.ReplaceInline(TEXT("\"version\":3"), TEXT("\"version\":3.9"));
+	Fractional.ReplaceInline(TEXT("\"version\":4"), TEXT("\"version\":3.9"));
 	TestNull(TEXT("a version of 3.9 is refused, not read as 3"), Engine->RestoreFlow(TEXT("spare"), Fractional));
 	const FString NoCursor = TEXT(R"({"version":3,"rngState":0,"visits":{},"scopes":{"patter":{}},"sceneBags":{}})");
 	TestNull(TEXT("a state with no cursor is refused"), Engine->RestoreFlow(TEXT("spare"), NoCursor));

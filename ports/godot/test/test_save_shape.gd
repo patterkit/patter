@@ -8,14 +8,13 @@ extends SceneTree
 # round-tripped perfectly through its own save_game()/load_game() and loaded in no other runtime -
 # a save written by a web build died here on its first key. A test that only saves and loads cannot
 # see that, so this one checks what is written, and loads saves written out by HAND:
-#   1. what save_game() writes is version 3: no property values but the registry's, each bag a PLAIN
+#   1. what save_game() writes is version 4: no property values but the registry's, each bag a PLAIN
 #      record under its registry key, and only when the engine made its own registry
-#   2. a hand-written version 3 save, as the JS reference writes it, loads and writes back the same
-#   3. a hand-written version 2 save (the shape every runtime wrote before the registry held the
-#      properties) loads, its values moving into the registry, alone or beside a game's own load
-#   4. a hand-written PRE-0.11.0 save (snake_case, flat cursor, version 2) still loads
+#   2. a hand-written version 3 save, as the JS reference wrote it, loads and writes back as version 4
+#      (the cursor's beat by id, not index), into its own registry or beside one the game supplied
+#   3. a version 2 save no longer loads (Patterplay 1.0 reads versions 3 and 4)
 #   5. a version it cannot read is refused
-#   6. a flow state (capture_flow) is the flow's save snapshot plus a version 2 flow's own sections
+#   6. a flow state (capture_flow) is the flow's save snapshot plus its own values
 #   7. restoring one drops what a load left waiting under its id
 #
 #   godot --headless --path ports/godot --script res://test/test_save_shape.gd
@@ -81,7 +80,7 @@ func _played(options: Dictionary = {}):
 func _initialize() -> void:
 	# 1. what is written
 	var save: Dictionary = _played().save_game()
-	_check("the save is version 3", _eq(save.get("version"), 3), str(save.get("version")))
+	_check("the save is version 4", _eq(save.get("version"), 4), str(save.get("version")))
 	_check("top-level keys are the family's, and only those",
 		_sorted(save.keys()) == ["flows", "registry", "sharedSelectors", "sharedVisits", "version"], str(save.keys()))
 	_check("a standalone engine carries its registry's values, each bag a plain record under its key",
@@ -135,86 +134,40 @@ func _initialize() -> void:
 	_check("its stage value", f2.get_property("@scene.alarm") == true, str(f2.get_property("@scene.alarm")))
 	_check("its shared global", _eq(engine2.get_property("@gold"), 7), str(engine2.get_property("@gold")))
 	_check("the stack came back", f2.current_scene() == "s", str(f2.current_scene()))
-	_check("and it writes back exactly what was read", _eq(JSON.parse_string(JSON.stringify(engine2.save_game())), on_disk),
+	var written: Dictionary = on_disk.duplicate(true)
+	written["version"] = 4
+	(written["flows"]["main"]["cursor"] as Dictionary).erase("beatIndex")   # version 4 names a beat by id, and none is pending here
+	_check("and it writes back what was read, as version 4", _eq(JSON.parse_string(JSON.stringify(engine2.save_game())), written),
 		JSON.stringify(engine2.save_game()))
 
-	# 3. a version 2 save written by HAND: players have these on disk, and they must keep loading
-	var v2 := {
-		"version": 2,
-		"shared": {"patter": {"gold": 7}},
-		"sharedVisits": {"s": 1, "b": 1, "sn": 1},
-		"sharedSelectors": {},
-		"stageBags": {"s": {"alarm": true}},
-		"flows": {"main": {
-			"scopes": {"patter": {}},
-			"sceneBags": {"s": {"mood": "furious"}},
-			"rngState": 1,
-			"visits": {"s": 1, "b": 1, "sn": 1},
-			"cursor": on_disk["flows"]["main"]["cursor"].duplicate(true),
-		}},
-	}
-	var engine3 = PatterEngine.new(_bundle, {})
-	_check("a hand-written version 2 save loads", engine3.load_game(v2.duplicate(true)), "")
-	var f3 = engine3.get_flow("main")
-	_check("its scene value moved into the registry", f3.get_property("@scene.mood") == "furious", str(f3.get_property("@scene.mood")))
-	_check("its stage value", f3.get_property("@scene.alarm") == true, str(f3.get_property("@scene.alarm")))
-	_check("its shared global", _eq(engine3.get_property("@gold"), 7), str(engine3.get_property("@gold")))
-	var back: Dictionary = engine3.save_game()
-	_check("and it is written back as version 3, values under their keys",
-		_eq(back.get("version"), 3) and _eq(back.get("registry"), on_disk["registry"]), JSON.stringify(back))
-
-	# ... into a registry the game supplied, beside values the game already loaded for another engine
+	# ... beside a registry the game supplied and loaded itself, values for another engine included
 	var game_reg := PatterScopeRegistry.new()
 	game_reg.load({"another-engine/deck/inn": {"drawn": 3}})
+	game_reg.load(on_disk["registry"].duplicate(true), {"keep_parked": true})
 	var engine4 = PatterEngine.new(_bundle, {"registry": game_reg})
-	engine4.load_game(v2.duplicate(true))
-	_check("a version 2 save into the game's registry reaches the flow", engine4.get_flow("main").get_property("@scene.mood") == "furious",
+	var game_save3: Dictionary = on_disk.duplicate(true)
+	game_save3.erase("registry")
+	engine4.load_game(game_save3)
+	_check("a version 3 save beside the game's registry reaches the flow", engine4.get_flow("main").get_property("@scene.mood") == "furious",
 		str(engine4.get_flow("main").get_property("@scene.mood")))
 	var want: Dictionary = on_disk["registry"].duplicate(true)
 	want["another-engine/deck/inn"] = {"drawn": 3}
 	_check("and keeps what the game had loaded", _eq(game_reg.save(), want), JSON.stringify(game_reg.save()))
 
-	# 4. a save written by hand in the PRE-0.11.0 shape (snake_case, flat cursor) still loads
-	var engine5 = PatterEngine.new(_bundle, {})
-	var legacy := {
-		"version": 2,
-		"shared": {"gold": 3},
-		"shared_visits": {},
-		"shared_selectors": {},
-		"stage_bags": {"s": {"alarm": true}},
-		"flows": {"main": {
-			"scopes": {},
-			"scene_bags": {"s": {"mood": "wary"}},
-			"rng_state": 1.0,
-			"visits": {},
-			"flow_ended": false,
-			"current_scene_id": "s",
-			"stack": [{"scene": "s", "container": "b", "index": 0, "next_id": "sn"}],
-			"active_snippet_id": "",
-			"beat_index": 0,
-			"pending_group_id": "",
-			"pending_options": [],
-			"pending_prompt_owner": "",
-			"selectors": {},
-		}},
-	}
-	engine5.load_game(legacy)
-	var f5 = engine5.get_flow("main")
-	_check("a pre-0.11.0 scene value still loads", f5.get_property("@scene.mood") == "wary", str(f5.get_property("@scene.mood")))
-	_check("a pre-0.11.0 stage value still loads", f5.get_property("@scene.alarm") == true, str(f5.get_property("@scene.alarm")))
-	_check("a pre-0.11.0 bare shared map still loads", _eq(f5.get_property("@gold"), 3), str(f5.get_property("@gold")))
-	var resaved: Dictionary = engine5.save_game()
-	_check("a legacy save is written back in the family's shape",
-		_eq(resaved.get("version"), 3) and resaved.has("registry") and resaved["flows"]["main"].has("cursor"), str(resaved.keys()))
+	# 3. a version 2 save is refused, changing nothing: 1.0 reads versions 3 and 4
+	var engine3 = _played()
+	var before3: Dictionary = engine3.save_game()
+	_check("a version 2 save is refused", engine3.load_game({"version": 2, "shared": {"patter": {"gold": 7}}, "flows": {}}) == false, "")
+	_check("and leaves the game as it was", _eq(engine3.save_game(), before3), JSON.stringify(engine3.save_game()))
 
 	# 5. a version it cannot read is refused, and changes nothing
 	var engine6 = _played()
 	var before: Dictionary = engine6.save_game()
-	_check("an unsupported version is refused", engine6.load_game({"version": 4, "flows": {}}) == false, "")
+	_check("an unsupported version is refused", engine6.load_game({"version": 5, "flows": {}}) == false, "")
 	_check("and leaves the game as it was", _eq(engine6.save_game(), before), JSON.stringify(engine6.save_game()))
 
-	# 6. a flow state (capture_flow) is the flow's save snapshot, a version, and its own values in a
-	# version 2 save's per-flow sections, without its id: values still parked for a scene it hasn't
+	# 6. a flow state (capture_flow) is the flow's save snapshot, a version, and its own values, without
+	# its id: values still parked for a scene it hasn't
 	# re-entered come too, and an escaped id (or scene id) comes back as it was
 	var flow_reg := PatterScopeRegistry.new()
 	var engine7 = _played({"registry": flow_reg})
@@ -224,9 +177,9 @@ func _initialize() -> void:
 		"patter/flow/npc/patter": {"not": "mine"},
 	}, {"keep_parked": true})
 	var state: Dictionary = engine7.capture_flow("npc/bob%")
-	_check("a flow state's keys are a snapshot's, a version, and a version 2 flow's sections",
+	_check("a flow state's keys are a snapshot's, a version, and the flow's own values",
 		_sorted(state.keys()) == ["cursor", "rngState", "sceneBags", "scopes", "version", "visits"], str(state.keys()))
-	_check("its version is the save's", _eq(state.get("version"), 3), str(state.get("version")))
+	_check("its version is the save's", _eq(state.get("version"), 4), str(state.get("version")))
 	var snap: Dictionary = engine7.save_game()["flows"]["npc/bob%"]
 	_check("its snapshot is what the save writes for the flow",
 		_eq({"cursor": state["cursor"], "rngState": state["rngState"], "visits": state["visits"]}, snap), JSON.stringify(state))

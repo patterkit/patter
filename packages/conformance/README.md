@@ -7,7 +7,7 @@ first, then in the implementations.
 
 ## The corpus
 
-[`corpus.json`](./corpus.json) (`version: 2`) is the portable artifact. It carries
+[`corpus.json`](./corpus.json) (`version: 8`) is the portable artifact. It carries
 **compiled** forms only, so a runtime-only port (an AST walker) consumes it with no
 parser or compiler. Four case kinds, each with a reference runner in
 [`src/runner.ts`](./src/runner.ts):
@@ -23,10 +23,13 @@ parser or compiler. Four case kinds, each with a reference runner in
   in that locale; an **IDs-only** bundle (`bundle.localisation.mode === "ids"`)
   ships no strings, so the engine must emit beat IDs and omit character names.
   `engineOptions` (see below) sets the engine's construction options.
-- **`scripted[]`** - `{ name, bundle, bundleB?, seed?, engineOptions?, script }`. Execute the `script`
-  ops (`openFlow` / `useFlow` / `advance` / `choose` / `saveLoad` / `setLocale` /
-  `setClosedCaptions` / `hotSwap` / `reset` / `stage`, among others) against your engine; each op carrying
-  `expect` must produce exactly that transcript chunk, ops without it none.
+- **`scripted[]`** - `{ name, bundle, bundleB?, seed?, locale?, hostScopes?, engineOptions?, script }`. Execute the
+  `script` ops (`openFlow` / `useFlow` / `advance` / `choose` / `saveLoad` / `setLocale` /
+  `setClosedCaptions` / `hotSwap` / `reset` / `stage` / `expectErrors`, among others, each documented in
+  [`src/types.ts`](./src/types.ts)) against your engine; each op carrying
+  `expect` must produce exactly that transcript chunk, ops without it none. Every engine in the case is
+  made in `locale`, with each token in `hostScopes` bound to a store the runner keeps, and with an
+  `onError` the runner records from the first engine's construction on, for `expectErrors`.
   `saveLoad` = serialise the whole game, discard the engine, restore into a fresh one
   (semantic parity, not byte parity). `hotSwap` does the same but restores into the
   case's **edited** `bundleB` (the live-refresh contract). Covers save/load

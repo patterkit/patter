@@ -42,12 +42,15 @@ new Engine(bundle, options?)
 ```
 
 `options` (all optional): `seed` (the default per-flow PRNG seed), `locale` (the active
-locale; defaults to the bundle's default), `replayPromptOnChoose` (speak a chosen option's
-authored prompt back as its first beat, exactly as the choice showed it; a prompt the choice
-borrowed from the option's own first line is not repeated, since that line plays anyway), and
-`foreignScopes` (host-owned property scopes).
+locale; defaults to the bundle's default, see [Localisation](/play/localisation/#which-locale-is-used)),
+`replayPromptOnChoose` (speak a chosen option's authored prompt back as its first beat, exactly as the
+choice showed it; a prompt the choice borrowed from the option's own first line is not repeated, since
+that line plays anyway), `hostScopes` (the scopes your game binds, such as
+[`@world`](/play/world-properties/)), `onError` (see [When something goes wrong](#when-something-goes-wrong)),
+and `log` (the [decision log](#why-that-line)).
 There's also an `rng` override, but for resumable, save-safe runs use the built-in
-seeded PRNG.
+seeded PRNG. An option the engine doesn't take, a mistyped key, say, is reported rather than ignored in
+silence.
 
 ### Opening a flow
 
@@ -55,8 +58,10 @@ seeded PRNG.
 engine.openFlow(id, { scene?, block?, seed? })
 ```
 
-`scene` and `block` accept either a host-facing **gameId/address** or an internal id;
-both default sensibly (first scene, first block). The block is **scene-scoped**, as for
+`scene` and `block` accept either a host-facing **gameId/address** or an internal id.
+With neither, the flow starts where the project starts: the scene (and block) chosen in
+Patterpad's Project Settings, or the first scene when the project hasn't chosen one. A scene on
+its own starts at its first block. The block is **scene-scoped**, as for
 `goto`: it must be in the scene you named. Re-opening an existing id replaces it. An
 address that does not resolve throws before anything changes, so nothing opens and a flow
 already open under that id carries on. Other engine methods: `getFlow(id)`, `flows()`, `closeFlow(id)`, and `reset()`
@@ -86,7 +91,7 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 - **`flow.advance()`**: the next step (line, text, game event, choice, or end).
 - **`flow.advanceToStop()`**: `{ played, stop }`, collecting beats until the next choice
   or the end (handy when you render a whole exchange at once).
-- **`flow.getChoices()`**: the options of a pending choice.
+- **`flow.getChoices()`**: the options of a pending choice, as `advance()` delivers them.
 - **`flow.stepFor(beatId)`**: the step this flow would deliver for that line or text beat right now, as
   `advance()` would give it (in the current language, with this flow's values filled in, closed captions applied,
   and the speaker's names and label), without moving the flow or running anything. For a game that keeps lines by
@@ -96,7 +101,7 @@ does not resolve throws. See [Host navigation](/play/navigation/).
   It throws if there's no pending choice, or the id is unknown or ineligible.
 - **`flow.isEnded()`, `flow.currentScene`**: state for tooling that follows the
   story across scenes.
-- **`flow.reset(scene?, block?)`**: begin this flow again at a scene (the first one by default), forgetting
+- **`flow.reset(scene?, block?)`**: begin this flow again at a scene (where the project starts by default), forgetting
   everything that is its own: its position, its own properties, its visit counts, and anything waiting to be
   delivered. Shared state is kept. Every runtime calls it `reset` (`Reset` in C# and Blueprint).
 - **`flow.goto(scene, block?)`**: returns a `boolean` and moves the cursor to an address, exactly as an
@@ -164,8 +169,19 @@ first step after `choose()`, carrying the same `padAfter`. A choice is only offe
 when at least one option can be taken: if every remaining option is greyed out, the choice runs dry,
 as one with no options does, so its fallback plays if it has one and otherwise the flow moves on.
 
+An option's prompt is built each time the choice is delivered, in the language in use and with the
+current values filled in, so a pending choice follows [`setLocale`](/play/localisation/), and a choice
+in a loaded save shows in the language of the engine that loaded it. The one exception is the replayed
+prompt: with `replayPromptOnChoose`, it's spoken back exactly as the choice showed it, in that language,
+since that's what the player picked.
+
 **`tags`** is the beat's accumulated author tags (its own plus every ancestor's), absent when empty:
 see [Tags at runtime](/play/tags/).
+
+**`gameData`** on a step, an option, or an [outline](/play/structure/) entry is your game's own copy,
+flags lists included, so changing it changes nothing the engine hands out next. **`extensions`** is
+different: it's the bundle's own data, handed over as it is, since an extension's data can be large and
+is its runtime's to read. Treat it as read-only.
 
 ## Properties
 
@@ -179,7 +195,12 @@ flow.setProperty("@scene.locked", false);
 ```
 
 `@patter` globals are reachable from the engine; `@scene` properties (and per-flow
-property values) are read and written on a `Flow`. The
+property values) are read and written on a `Flow`. A write must fit the property's declaration: a
+number for a number, one of an enum's values (or `""` when that's the enum's own default), flags the
+property lists, one of a quality's stages. One that doesn't fit, or that names a property the content
+doesn't declare, throws and changes nothing. The message says what the property takes:
+`"@patter.gold" takes a number; "lots" doesn't fit`. Another engine's scope is that engine's to check.
+The
 [`@patterkit/play-helpers`](/play/integration/) package adds conveniences like
 `setProperties(engine, { "@hp": 10 })`.
 
@@ -208,7 +229,7 @@ Visit counts, which a story reads with `visits()` and `seen()`, are there for a 
 flow's own, each by node id. Every runtime has the same call (`GetVisitCounts` in C# and Blueprint,
 `get_visit_counts` in Godot).
 
-## When content fails
+## When something goes wrong
 
 A condition or effect can fail while the story plays, in ways the compiler can't see: a division by
 zero, a value from your game of an unexpected type, or the story setting a `@world` value your game
@@ -216,9 +237,22 @@ marks read-only. The story never stops for one. A failing condition counts as fa
 option, or branch is skipped, and a failing effect is skipped while the rest of its list still runs.
 Every runtime does the same.
 
-Each failure is reported, so it's never silent. Pass `onError` to hear about it: it receives the flow,
-what failed (`condition`, `effect`, or `best-match`), the node, the expression's source, and the
-error. With the decision log on, each is also a `diagnostic` entry in it.
+The engine also carries on past two other kinds of problem, and reports them the same way:
+
+- **`setup`**: how the engine was set up. A locale the bundle doesn't have (it uses the
+  [nearest one](/play/localisation/#which-locale-is-used)), a host scope bound under a token the bundle
+  doesn't declare (when only the case differs, the report names the declared spelling: tokens are
+  case-sensitive, so `World` is never `world`), or an engine option it doesn't take. These belong to no
+  flow, so `flow` is `""`, and `node` is the locale, token, or option at fault. One found while the engine
+  is being built is reported as the constructor ends, so your handler hears it.
+- **`save`**: a load whose place has gone from the build, as after a patch that deleted the line a
+  player saved at. The flow resumes at the nearest safe point (see
+  [Loading a save into an edited build](/play/integration/#loading-a-save-into-an-edited-build)), and `node`
+  is the saved snippet, or the pending choice, that has gone.
+
+Each is reported, so none is silent. Pass `onError` to hear about it: it receives the flow, the kind
+(`condition`, `effect`, `best-match`, `setup`, or `save`), the node, the expression's source when there
+is one, and a message. With the decision log on, each is also a `diagnostic` entry in it.
 
 ```ts
 const engine = new Engine(bundle, {
@@ -230,7 +264,7 @@ const engine = new Engine(bundle, {
 |---|---|---|
 | JS | `onError` in the engine options | `console.warn` |
 | Unity | `EngineOptions.OnError` (a `PlayError`) | `Debug.LogWarning` |
-| Unreal | the engine's `OnError` event (an `FPatterPlayError`); `EngineOptions::onError` in C++ | a log warning |
+| Unreal | the engine's `OnError` event (an `FPatterPlayError`); `EngineOptions::onError` in C++. A `setup` report made as the engine is created goes to the log and the decision log at once, and to `OnError` on the first `OpenFlow`, since the event is bound after the engine exists | a log warning |
 | Godot | `"on_error"` in the options, a `Callable` taking a Dictionary | `push_warning` |
 
 Patterpad's Play window marks each failure in its transcript, and the
@@ -246,7 +280,7 @@ reasoning:
 - each choice it offered, with the options it greyed out, and the option chosen;
 - each jump;
 - each property it set, with the value it replaced;
-- each content error it played through.
+- each problem it reported and carried on past.
 
 Turn it on with `log: true` in the engine options. `engine.log()` is the whole run in order, each entry
 naming its flow and scene. A flow's own `log()` holds only that flow's decisions. `clearLog()` empties a

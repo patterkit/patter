@@ -13,14 +13,13 @@
 //
 // Version 3 (the one-registry model) holds no property values of the engine's own: those are the
 // registry's. A standalone engine's save carries its registry's values under `registry`; a game that
-// passed its own registry saves that once, beside this.
+// passed its own registry saves that once, beside this. Version 4 (Patterplay 1.0) keeps a pending choice's
+// options' ids and not their text, names the next beat by id (`beatId`), and stamps a frame inside an option
+// with its choice (`choiceId`).
 //
-// Reading accepts three shapes, each inside the envelope. The canonical version 3 one; version 2, whose
-// property sections (`shared`, `stageBags`, each flow's `scopes` and `sceneBags`) the engine moves into the
-// registry as it loads; and the shape this port wrote before 0.11.0 (PascalCase keys, flat `Shared` and
-// `Scopes`, cursor fields flat on the flow, `PendingOptions` + `PendingGroupId`), so a player's save on disk
-// still loads. A bare snapshot with no envelope is refused, as the JS reference refuses it. Lookups are
-// case-insensitive, so one reader serves.
+// Reading accepts versions 3 and 4, each inside the envelope; a version 3 save's prompt text is discarded as
+// it loads, and its `beatIndex` trusted. A bare snapshot with no envelope is refused, as the JS reference
+// refuses it. Keys are read exactly as the family writes them.
 //
 // A flow state (Engine.CaptureFlow: one flow as a save writes it, with its own values) goes through the same
 // code: SaveFlowState writes it, and ReadFlowState reads it as the flow part of a save is read.
@@ -36,36 +35,6 @@ using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
-    /// <summary>ExprValue as JSON: bool / number / string / flags (a string array). A save value is a
-    /// bare scalar, never an object - the two-level scope maps are handled by the save reader itself.</summary>
-    [Obsolete("Nothing in Patterplay uses it: PatterSave reads and writes saves itself. It goes in a later release.")]
-    public sealed class PatterValueConverter : JsonConverter<ExprValue>
-    {
-        public override void WriteJson(JsonWriter w, ExprValue v, JsonSerializer s) => PatterSave.ValueToken(v).WriteTo(w);
-
-        public override ExprValue ReadJson(JsonReader r, Type t, ExprValue existing, bool hasExisting, JsonSerializer s)
-            => PatterSave.ReadValue(JToken.Load(r));
-    }
-
-    /// <summary>
-    /// Reads a persisted uint that may have been written SIGNED. The JS runtime accumulated
-    /// its rngState with `| 0` until this was fixed, so saves in the wild carry a negative
-    /// number where the schema says uint32; Newtonsoft's default binding throws an
-    /// OverflowException on those. Coerce with the same ToUint32 every other runtime uses,
-    /// so an old save loads and lands on the identical PRNG position.
-    /// </summary>
-    [Obsolete("Nothing in Patterplay uses it: PatterSave reads and writes saves itself. It goes in a later release.")]
-    public sealed class Uint32Converter : JsonConverter<uint>
-    {
-        public override void WriteJson(JsonWriter w, uint v, JsonSerializer s) => w.WriteValue(v);
-
-        public override uint ReadJson(JsonReader r, Type t, uint existing, bool hasExisting, JsonSerializer s)
-        {
-            var tok = JToken.Load(r);
-            return Mulberry32.ToUint32((double)tok);
-        }
-    }
-
     public static class PatterSave
     {
         public const string Schema = "patter/save@0";
@@ -90,9 +59,6 @@ namespace Patterkit.Patterplay
             engine.LoadGame(ReadSave(save));
         }
 
-        [System.Obsolete("Use SaveState, the name every Patterplay runtime uses.")]
-        public static JObject Envelope(SaveGame s) => EnvelopeOf(s);
-
         private static JObject EnvelopeOf(SaveGame s) => new JObject { ["schema"] = Schema, ["save"] = SaveToken(s) };
 
         /// <summary>Restore a <see cref="SerializeState"/> string into an engine. Throws on anything but a
@@ -114,8 +80,7 @@ namespace Patterkit.Patterplay
         }
 
         /// <summary>A <see cref="FlowState"/> (Engine.CaptureFlow) as JSON: a flow as a save writes it, with its
-        /// `version` first and its own values after, in a version 2 save's per-flow sections (`scopes.patter`,
-        /// `sceneBags`). The same shape `JSON.stringify(engine.captureFlow(id))` writes on the web.</summary>
+        /// `version` first and its own values after (`scopes.patter`, `sceneBags`). The same shape `JSON.stringify(engine.captureFlow(id))` writes on the web.</summary>
         public static JObject SaveFlowState(FlowState state)
         {
             var o = FlowToken(state);
@@ -160,7 +125,8 @@ namespace Patterkit.Patterplay
             foreach (var fr in f.Stack ?? new List<StackFrame>())
             {
                 var frame = new JObject { ["sceneId"] = fr.SceneId, ["containerId"] = fr.ContainerId, ["index"] = fr.Index };
-                if (fr.NextId != null) frame["nextId"] = fr.NextId;   // absent at a container's end, as the JS writes it
+                if (fr.NextId != null) frame["nextId"] = fr.NextId;       // absent at a container's end, as the JS writes it
+                if (fr.ChoiceId != null) frame["choiceId"] = fr.ChoiceId; // only on a frame inside a choice's option
                 stack.Add(frame);
             }
             JToken pending = JValue.CreateNull();
@@ -170,26 +136,27 @@ namespace Patterkit.Patterplay
                 foreach (var o in f.PendingOptions) options.Add(OptionToken(o));
                 pending = new JObject { ["groupId"] = f.PendingGroupId, ["options"] = options };
             }
-            var flow = new JObject
+            // The execution position sits under `cursor`; absent ids are null, not "".
+            var cursor = new JObject
+            {
+                ["flowEnded"] = f.FlowEnded,
+                ["currentSceneId"] = Str(f.CurrentSceneId),
+                ["stack"] = stack,
+                ["activeSnippetId"] = Str(f.ActiveSnippetId),
+            };
+            // The next beat by id; absent when no snippet is active or every beat is delivered.
+            if (f.BeatId != null) cursor["beatId"] = f.BeatId;
+            cursor["pendingChoice"] = pending;
+            cursor["pendingPromptOwnerId"] = Str(f.PendingPromptOwnerId);
+            // The prompt still to replay, as the choice showed it: written only in the choose->advance window.
+            if (f.PendingPrompt != null) cursor["pendingPrompt"] = PromptToken(f.PendingPrompt);
+            cursor["selectors"] = SelectorMap(f.Selectors);
+            return new JObject
             {
                 ["rngState"] = f.RngState,
                 ["visits"] = IntMap(f.Visits),
-                // The execution position sits under `cursor`; absent ids are null, not "".
-                ["cursor"] = new JObject
-                {
-                    ["flowEnded"] = f.FlowEnded,
-                    ["currentSceneId"] = Str(f.CurrentSceneId),
-                    ["stack"] = stack,
-                    ["activeSnippetId"] = Str(f.ActiveSnippetId),
-                    ["beatIndex"] = f.BeatIndex,
-                    ["pendingChoice"] = pending,
-                    ["pendingPromptOwnerId"] = Str(f.PendingPromptOwnerId),
-                    ["selectors"] = SelectorMap(f.Selectors),
-                },
+                ["cursor"] = cursor,
             };
-            // The prompt still to replay, as the choice showed it: written only in the choose->advance window.
-            if (f.PendingPrompt != null) ((JObject)flow["cursor"]).Add("pendingPrompt", PromptToken(f.PendingPrompt));
-            return flow;
         }
 
         private static JObject PromptToken(ChoicePrompt prompt)
@@ -215,10 +182,10 @@ namespace Patterkit.Patterplay
             PadAfter = NumOrNull(p, "padAfter"), // absent in a save written before prompts carried it: re-resolved on load
         };
 
-        private static JObject OptionToken(ChoiceOption o)
+        // Which option, and whether it could be taken: never its text, which is built again on delivery.
+        private static JObject OptionToken(SavedChoiceOption o)
         {
             var t = new JObject { ["id"] = o.Id };
-            if (o.Prompt != null) t["prompt"] = PromptToken(o.Prompt);
             t["eligible"] = o.Eligible;
             if (o.GameData != null) t["gameData"] = ValueMap(o.GameData);
             return t;
@@ -278,9 +245,9 @@ namespace Patterkit.Patterplay
             }
         }
 
-        // -- reading: the family's shape, this port's pre-0.11.0 shape, or a bare snapshot ----------
+        // -- reading: the family's shape, versions 3 and 4 -----------------------------------------
 
-        private static JToken Get(JObject o, string key) => o?.GetValue(key, StringComparison.OrdinalIgnoreCase);
+        private static JToken Get(JObject o, string key) => o?.GetValue(key, StringComparison.Ordinal);
         private static JObject Obj(JObject o, string key) => Get(o, key) as JObject;
 
         private static string StrOrNull(JObject o, string key)
@@ -316,10 +283,6 @@ namespace Patterkit.Patterplay
                 SharedSelectors = ReadSelectorMap(Obj(o, "sharedSelectors")),
                 Flows = flows,
             };
-#pragma warning disable CS0618 // version 2's property sections, read so the engine can move them into the registry
-            save.Shared = ReadScope(Obj(o, "shared"));
-            save.StageBags = ReadBagMap(Obj(o, "stageBags"));
-#pragma warning restore CS0618
             return save;
         }
 
@@ -339,7 +302,7 @@ namespace Patterkit.Patterplay
             throw new Exception($"unsupported {what} version: {shown}");
         }
 
-        /// <summary>A version 3 save's `registry` section (registry key -> name -> value), in document
+        /// <summary>A save's `registry` section (registry key -> name -> value), in document
         /// order; null when absent (a game that passed its own registry saves it separately).</summary>
         private static OrderedMap<string, OrderedMap<string, ExprValue>> ReadRegistry(JObject o)
         {
@@ -354,21 +317,11 @@ namespace Patterkit.Patterplay
             return m;
         }
 
-        /// <summary>`{ patter: { name: value } }` (the family's two-level shape), or the bare
-        /// `{ name: value }` this port wrote before 0.11.0. A flat map's values are scalars and arrays,
-        /// never objects, which is what tells the two apart.</summary>
-        private static Dictionary<string, ExprValue> ReadScope(JObject o)
-        {
-            if (o == null || o.Count == 0) return new Dictionary<string, ExprValue>();
-            bool twoLevel = o.Properties().All(p => p.Value.Type == JTokenType.Object);
-            return ReadValueMap(twoLevel ? Obj(o, "patter") : o);
-        }
-
         /// <summary>A flow as a save writes it, read onto <paramref name="snapshot"/>: a FlowSnapshot, or the
-        /// FlowState <see cref="ReadFlowState"/> reads.</summary>
+        /// FlowState <see cref="ReadFlowState"/> reads (with its own values).</summary>
         private static T ReadFlow<T>(JObject f, T snapshot) where T : FlowSnapshot
         {
-            var c = Obj(f, "cursor") ?? f;   // the family nests the cursor; this port's old shape kept it flat
+            var c = Obj(f, "cursor") ?? new JObject();
             var stack = new List<StackFrame>();
             if (Get(c, "stack") is JArray frames)
                 foreach (var e in frames)
@@ -377,19 +330,15 @@ namespace Patterkit.Patterplay
                         {
                             SceneId = StrOrNull(fr, "sceneId"), ContainerId = StrOrNull(fr, "containerId"),
                             Index = (int?)Get(fr, "index") ?? 0, NextId = StrOrNull(fr, "nextId"),
+                            ChoiceId = StrOrNull(fr, "choiceId"),
                         });
 
-            List<ChoiceOption> pendingOptions = null;
+            List<SavedChoiceOption> pendingOptions = null;
             string pendingGroupId = null;
             if (Get(c, "pendingChoice") is JObject choice)
             {
                 pendingGroupId = StrOrNull(choice, "groupId");
                 pendingOptions = ReadOptions(Get(choice, "options") as JArray);
-            }
-            else if (Get(c, "pendingOptions") is JArray legacyOptions)   // pre-0.11.0: flat beside the group id
-            {
-                pendingOptions = ReadOptions(legacyOptions);
-                pendingGroupId = StrOrNull(c, "pendingGroupId");
             }
 
             // Through ToUint32: the JS runtime wrote this SIGNED until it was fixed.
@@ -399,27 +348,33 @@ namespace Patterkit.Patterplay
             snapshot.CurrentSceneId = StrOrNull(c, "currentSceneId");
             snapshot.Stack = stack;
             snapshot.ActiveSnippetId = StrOrNull(c, "activeSnippetId");
-            snapshot.BeatIndex = (int?)Get(c, "beatIndex") ?? 0;
+            snapshot.BeatId = StrOrNull(c, "beatId");
+            var beatIndex = Get(c, "beatIndex");   // version 3 only
+            snapshot.BeatIndex = beatIndex != null && beatIndex.Type == JTokenType.Integer ? (int)beatIndex : (int?)null;
             snapshot.PendingOptions = pendingOptions;
             snapshot.PendingGroupId = pendingGroupId;
             snapshot.PendingPromptOwnerId = StrOrNull(c, "pendingPromptOwnerId");
             snapshot.PendingPrompt = Obj(c, "pendingPrompt") is JObject pp ? ReadPrompt(pp) : null;
             snapshot.Selectors = ReadSelectorMap(Obj(c, "selectors"));
-            // A flow's own values: a version 2 save's per-flow sections, or a flow state's.
-            snapshot.Scopes = ReadScope(Obj(f, "scopes"));
-            snapshot.SceneBags = ReadBagMap(Obj(f, "sceneBags"));
+            // A flow state's own values: `scopes.patter` and `sceneBags`.
+            if (snapshot is FlowState state)
+            {
+                state.Scopes = ReadValueMap(Obj(Obj(f, "scopes"), "patter"));
+                state.SceneBags = ReadBagMap(Obj(f, "sceneBags"));
+            }
             return snapshot;
         }
 
-        private static List<ChoiceOption> ReadOptions(JArray arr)
+        // A pending choice's options. A version 3 save's option also has its prompt text, which is discarded:
+        // the prompt is built again, in the language in use, when the choice is delivered.
+        private static List<SavedChoiceOption> ReadOptions(JArray arr)
         {
-            var list = new List<ChoiceOption>();
+            var list = new List<SavedChoiceOption>();
             if (arr == null) return list;
             foreach (var e in arr)
             {
                 if (!(e is JObject o)) continue;
-                var opt = new ChoiceOption { Id = StrOrNull(o, "id"), Eligible = (bool?)Get(o, "eligible") ?? false };
-                if (Obj(o, "prompt") is JObject p) opt.Prompt = ReadPrompt(p);
+                var opt = new SavedChoiceOption { Id = StrOrNull(o, "id"), Eligible = (bool?)Get(o, "eligible") ?? false };
                 if (Obj(o, "gameData") is JObject gd)
                 {
                     opt.GameData = new GameData();

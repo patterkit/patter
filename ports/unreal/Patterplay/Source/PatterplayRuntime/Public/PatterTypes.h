@@ -52,7 +52,7 @@ enum class EPatterValueKind : uint8
 	Flags
 };
 
-/** What failed in a content error the engine played through (FPatterPlayError). */
+/** What a problem the engine reported and carried on past was (FPatterPlayError). */
 UENUM(BlueprintType)
 enum class EPatterPlayErrorKind : uint8
 {
@@ -61,7 +61,13 @@ enum class EPatterPlayErrorKind : uint8
 	/** An effect whose value failed to evaluate, or whose write was refused. It was skipped. */
 	Effect,
 	/** A part of a Best-match condition that failed while being scored. It scored as false. */
-	BestMatch
+	BestMatch,
+	/** How the engine was set up: a locale the bundle doesn't have, or a host scope it doesn't declare.
+	 *  Flow is empty and Node is the locale or the scope's token. */
+	Setup,
+	/** A load whose saved place has gone from this build: the flow resumed at the nearest safe point. Node
+	 *  is the saved snippet, or the pending choice's group. */
+	Save
 };
 
 /** A Patter value crossing the Blueprint boundary: what a UPatterWorld holds and reports. Shaped
@@ -83,7 +89,8 @@ struct FPatterEngineOptions
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay", meta = (EditCondition = "bUseSeed"))
 	int64 Seed = 0;
 
-	/** The language to play in, such as "fr". Empty: the bundle's default locale. */
+	/** The language to play in, such as "fr". Empty: the bundle's default locale. A locale the bundle doesn't
+	 *  have resolves by the one locale rule (see UPatterEngine::SetLocale) and is reported (Setup). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
 	FString Locale;
 
@@ -100,6 +107,19 @@ struct FPatterEngineOptions
 	 *  for a debugging aid it never reads. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
 	bool bLog = false;
+};
+
+/** The bundle's locales (UPatterEngine::Locales): its default, and every locale it includes. */
+USTRUCT(BlueprintType)
+struct FPatterLocales
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Default;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FString> Included;
 };
 
 /** Made in Blueprint for SetProperty: set Kind and the one field it names (bBool, Number, String, or Flags).
@@ -271,31 +291,14 @@ struct FPatterOption
 	 *  UPatterGameData::GetEffectiveExtensionValues fills in the defaults. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterExtensionValues> Extensions;
-
-	/** Prompt.Text, from before the prompt was its own value. */
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.Text, as every Patterplay runtime's option has it."))
-	FString Text;
-
-	/** Prompt.Kind, or None without a prompt, from before the prompt was its own value. */
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.Kind and bHasPrompt, as every Patterplay runtime's option has it."))
-	EPatterPromptKind PromptKind = EPatterPromptKind::None;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.Character, as every Patterplay runtime's option has it."))
-	FString Character;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.CharacterName, as every Patterplay runtime's option has it."))
-	FString CharacterName;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.Direction, as every Patterplay runtime's option has it."))
-	FString Direction;
 };
 
 // One shared @patter property for the Runtime State inspector: its ref, type, current value and
 // declared default (as display strings), enum options, and whether it currently sits at its
 // default (so a reset button can disable). Mirrors patter::PropertyRow and the Unity / Godot row.
 /** One retained decision, for a debug UI: what the engine CHOSE, not what it produced. A step
- *  says which line played; this says why THAT line and not its siblings. `Considered` carries
- *  every child or option looked at with its verdict, which is the whole point: naming only the
+ *  says which line played; this says why THAT line and not its siblings. `Children` and `Options`
+ *  carry every child or option looked at with its verdict, which is the whole point: naming only the
  *  winner answers what happened and not why. */
 USTRUCT(BlueprintType)
 struct FPatterLogConsidered
@@ -382,7 +385,7 @@ struct FPatterLogEntry
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bHasPrev = false;
 
-	/** A diagnostic's kind: condition | effect | best-match. */
+	/** A diagnostic's kind: condition | effect | best-match | setup | save. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Kind;
 
@@ -395,31 +398,21 @@ struct FPatterLogEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Message;
-
-	/** Group, To, Target, or Node, whichever the type names: the field before entries took the JS names. */
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Group, To, Target, or Node, the fields every Patterplay runtime's entry has."))
-	FString Subject;
-
-	/** Children or Options: the field before entries took the JS names. */
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Children or Options, the fields every Patterplay runtime's entry has."))
-	TArray<FPatterLogConsidered> Considered;
-
-	/** Mode or Message: the field before entries took the JS names. */
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Mode or Message, the fields every Patterplay runtime's entry has."))
-	FString Detail;
 };
 
-/** A content error the engine played through, as UPatterEngine::OnError reports it. Content can fail at
- *  run time in ways the compiler cannot see: a division by zero, a host value of the wrong type, a story
+/** A problem the engine reported and carried on past, as UPatterEngine::OnError reports it. Content can fail
+ *  at run time in ways the compiler cannot see: a division by zero, a host value of the wrong type, a story
  *  write to a read-only @world value. The story never stops for one: a condition that fails counts as
  *  false, an effect that fails is skipped and the rest of its list still runs, and a part of a Best-match
- *  condition that fails scores as false. The same rule holds on every Patterplay runtime. */
+ *  condition that fails scores as false. The engine also reports how it was set up (Setup: a locale the
+ *  bundle doesn't have, a host scope it doesn't declare) and a load whose place has gone from the build
+ *  (Save). The same rule holds on every Patterplay runtime. */
 USTRUCT(BlueprintType)
 struct FPatterPlayError
 {
 	GENERATED_BODY()
 
-	/** The flow it happened in. */
+	/** The flow it happened in; empty for a Setup report, which belongs to no flow. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Flow;
 
@@ -427,7 +420,8 @@ struct FPatterPlayError
 	EPatterPlayErrorKind Kind = EPatterPlayErrorKind::Condition;
 
 	/** The snippet, group, or option whose condition failed, or that owns the effect (a scene, for its
-	 *  on-entry effects). */
+	 *  on-entry effects). For Setup, the locale or host-scope token at fault; for Save, the saved snippet
+	 *  (or the pending choice's group) that has gone. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Node;
 

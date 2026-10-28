@@ -96,6 +96,10 @@ static func default_for(d: Dictionary) -> Variant:
 ## ("values" or "stages" absent) constrains nothing past the type, and a type this
 ## build does not know constrains nothing. An enum may hold "" (none chosen) only
 ## when asked.
+## Whether a declaration chose none: an enum whose own default is "".
+static func chooses_none(d: Dictionary) -> bool:
+	return str(d.get("type", "")) == "enum" and d.get("default") is String and d["default"] == ""
+
 static func value_fits(d: Dictionary, value, none_chosen: bool = false) -> bool:
 	match str(d.get("type", "")):
 		"boolean":
@@ -283,7 +287,8 @@ func load(saved: Dictionary, opts: Dictionary = {}) -> Array:
 	if not bool(opts.get("refit", false)):
 		return misfits
 	for name in _decls:
-		if not landed.has(name) or value_fits(_decls[name], values[name]):
+		# An enum whose own default is "" (none chosen) takes "" back, as a host write does.
+		if not landed.has(name) or value_fits(_decls[name], values[name], chooses_none(_decls[name])):
 			continue
 		misfits.append({"name": name, "value": values[name]})
 		values[name] = _copy_value(Values.to_value(default_for(_decls[name])))

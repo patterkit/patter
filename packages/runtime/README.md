@@ -51,18 +51,22 @@ one means the next line cuts in. Line, text, and game event steps can carry `gam
 [step shapes](https://patterkit.dev/play/engine/#step-shapes) give the full list and the timing rules a game
 should follow.
 
-`new Engine(bundle, options)` takes `{ rng?, seed?, locale?, hostScopes?, registry?, replayPromptOnChoose?, closedCaptions? }`:
+`new Engine(bundle, options)` takes `{ rng?, seed?, locale?, hostScopes?, registry?, replayPromptOnChoose?, closedCaptions?, onError?, onRefit?, onDryChoice?, log? }`
+(any other key is reported to `onError` as a `setup` problem):
 - `hostScopes` binds the scopes your game owns, by token, each `{ get(name), set?(name, value) }`: for World
   Properties, `hostScopes: { world: { get, set } }`. Leave `world` unbound and the runtime self-backs `@world`
-  from the declared defaults, as a property it saves.
+  from the declared defaults, as a property it saves. A token the bundle doesn't declare is reported.
 - `registry` is the game's one `ScopeRegistry` (from `@wildwinter/scoperegistry`), holding every
   engine's properties. Omit it and the engine makes its own. See *One registry per game* below.
-- `locale` plays a non-default language (embedded localisation; an IDs-only bundle ignores it).
+- `locale` plays a non-default language (embedded localisation; an IDs-only bundle ignores it). It resolves by
+  one rule: the locale (case and `_` / `-` aside), then its language (`fr` for `fr-FR`), then the default,
+  each fallback reported.
 - A string the active locale is missing falls back to the default-locale source,
   flagged `<Untranslated: {id}> {source}` so a partial translation is impossible to miss.
 
-Switch language mid-game with **`engine.setLocale("fr")`** (read it back via `engine.locale`):
-subsequent beats / character names / `{@ref}` render in the new locale while the flow's position,
+Switch language mid-game with **`engine.setLocale("fr")`** (`engine.locale` is the locale in use, and
+`engine.locales` the bundle's `{ default, included }`): subsequent beats, a pending choice's options,
+character names, and `{@ref}` render in the new locale while the flow's position,
 state, visit counts, and PRNG are untouched - so a game's "language" setting can change live without
 rebuilding the engine or losing the player's place.
 
@@ -106,8 +110,9 @@ The release zip's `demos/` folder holds two working references (in the repo:
 
 `engine.saveGame()` returns a JSON-serialisable snapshot of the whole game (visit counts,
 selector cursors, every live flow, and, for an engine built without a registry, every property
-value); `engine.loadGame(blob)` restores it. Saves from before property values moved into the
-registry (version 2) still load. [@patterkit/play-helpers](../play-helpers) wraps these as
+value); `engine.loadGame(blob)` restores it. Saves are version 4; version 3 saves still load, and
+version 2 saves no longer do. A save whose place has gone from an edited build resumes at the nearest
+safe point and says so to `onError`. [@patterkit/play-helpers](../play-helpers) wraps these as
 `serializeState` / `deserializeState` with a tagged envelope.
 
 To set one flow aside instead, `engine.captureFlow(id)` returns its part of a save as plain data (its

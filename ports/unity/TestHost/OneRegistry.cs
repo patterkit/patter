@@ -458,9 +458,9 @@ namespace Patterkit.Patterplay.TestHost
             Console.WriteLine($"  [one-registry] the game's registry, from the game's side: {_registryChecks} checks");
         }
 
-        /// <summary>The save-envelope cases the corpus cannot write: a version 3 save and a version 2 save,
-        /// each written out BY HAND (so a change that alters the writer and the reader together cannot
-        /// satisfy them), and a version 2 save moved into a registry the game supplied.</summary>
+        /// <summary>The save-envelope cases the corpus cannot write: a version 4 save and a version 3 save, each
+        /// written out BY HAND (so a change that alters the writer and the reader together cannot satisfy them),
+        /// and a version 2 save, which 1.0 no longer reads.</summary>
         private static void RunOldShapeChecks()
         {
             var b = new Bundle { Schema = "patter/bundle@0" };
@@ -477,71 +477,49 @@ namespace Patterkit.Patterplay.TestHost
             } });
             b.Scenes["s"] = scene;
 
-            const string cursor = "\"cursor\":{\"flowEnded\":true,\"currentSceneId\":\"s\",\"stack\":[],\"activeSnippetId\":null,"
+            const string cursorV4 = "\"cursor\":{\"flowEnded\":true,\"currentSceneId\":\"s\",\"stack\":[],\"activeSnippetId\":null,"
+                + "\"pendingChoice\":null,\"pendingPromptOwnerId\":null,\"selectors\":{}}";
+            // Version 3 also wrote the next beat's index, which version 4 replaced with its id.
+            const string cursorV3 = "\"cursor\":{\"flowEnded\":true,\"currentSceneId\":\"s\",\"stack\":[],\"activeSnippetId\":null,"
                 + "\"beatIndex\":0,\"pendingChoice\":null,\"pendingPromptOwnerId\":null,\"selectors\":{}}";
-            const string expectedRegistry = "patter{gold=7} patter/flow/f/patter{} patter/flow/f/scene/s{count=1} patter/scene/s{tally=2}";
+            string OnDisk(int version, string cursor) => "{\"schema\":\"patter/save@0\",\"save\":{\"version\":" + version
+                + ",\"registry\":{\"patter\":{\"gold\":7},"
+                + "\"patter/flow/f/patter\":{},\"patter/flow/f/scene/s\":{\"count\":1},\"patter/scene/s\":{\"tally\":2}},"
+                + "\"sharedVisits\":{\"s\":1,\"b\":1,\"sn\":1},\"sharedSelectors\":{},"
+                + "\"flows\":{\"f\":{\"rngState\":0,\"visits\":{\"s\":1,\"b\":1,\"sn\":1}," + cursor + "}}}}";
 
-            Case("Today's format (version 3), written by hand", () =>
-            {
-                string onDisk = "{\"schema\":\"patter/save@0\",\"save\":{\"version\":3,\"registry\":{\"patter\":{\"gold\":7},"
-                    + "\"patter/flow/f/patter\":{},\"patter/flow/f/scene/s\":{\"count\":1},\"patter/scene/s\":{\"tally\":2}},"
-                    + "\"sharedVisits\":{\"s\":1,\"b\":1,\"sn\":1},\"sharedSelectors\":{},"
-                    + "\"flows\":{\"f\":{\"rngState\":0,\"visits\":{\"s\":1,\"b\":1,\"sn\":1}," + cursor + "}}}}";
-                var engine = new Engine(b, new EngineOptions { Seed = 0 });
-                PatterSave.DeserializeState(engine, onDisk);
-                // Before anything reads a property: the scene the cursor stands in is registered by the load
-                // itself, so a state inspector sees it straight away.
-                var shown = PatterStateLogger.SnapshotState(engine);
-                RegistryCheck("v3 by hand: the standing scene's bags are claimed at load",
-                    shown.TryGetValue("f/@scene:s.count", out var c) && Num(c) == 1
-                    && shown.TryGetValue("@scene:s.tally", out var t) && Num(t) == 2, string.Join(", ", shown.Keys));
-                RegistryCheck("v3 by hand: values", Num(engine.GetProperty("@gold")) == 7
-                    && Num(engine.GetFlow("f").GetProperty("@scene.count")) == 1
-                    && Num(engine.GetFlow("f").GetProperty("@scene.tally")) == 2);
-                RegistryCheck("v3 by hand: written back the same", JsonEqual(onDisk, Stored(engine)), Stored(engine));
-            });
-
-            // Version 2, written by hand: the shape every runtime wrote before the registry held the
-            // properties. Players have these on disk; they must keep loading, their values moving into the
-            // registry.
-            string v2 = "{\"schema\":\"patter/save@0\",\"save\":{\"version\":2,\"shared\":{\"patter\":{\"gold\":7}},"
-                + "\"sharedVisits\":{\"s\":1,\"b\":1,\"sn\":1},\"sharedSelectors\":{},\"stageBags\":{\"s\":{\"tally\":2}},"
-                + "\"flows\":{\"f\":{\"scopes\":{\"patter\":{}},\"sceneBags\":{\"s\":{\"count\":1}},\"rngState\":0,"
-                + "\"visits\":{\"s\":1,\"b\":1,\"sn\":1}," + cursor + "}}}}";
-            Case("A version 2 save, written by hand", () =>
-            {
-                var engine = new Engine(b, new EngineOptions { Seed = 0 });
-                var msg = Throws(() => PatterSave.DeserializeState(engine, v2));
-                RegistryCheck("v2 by hand: loads", msg == null, msg);
-                if (msg == null)
+            foreach (var (label, version, cursor) in new[] { ("v4", 4, cursorV4), ("v3", 3, cursorV3) })
+                Case($"A version {version} save, written by hand", () =>
                 {
-                    RegistryCheck("v2 by hand: values", Num(engine.GetProperty("@gold")) == 7
-                        && Num(engine.GetFlow("f").GetProperty("@scene.count")) == 1);
-                    var back = engine.SaveGame();
-                    RegistryCheck("v2 by hand: saved back as version 3, values in the registry",
-                        back.Version == 3 && Dump(back.Registry) == expectedRegistry, Dump(back.Registry));
-                }
-            });
+                    var engine = new Engine(b, new EngineOptions { Seed = 0 });
+                    PatterSave.DeserializeState(engine, OnDisk(version, cursor));
+                    // Before anything reads a property: the scene the cursor stands in is registered by the load
+                    // itself, so a state inspector sees it straight away.
+                    var shown = PatterStateLogger.SnapshotState(engine);
+                    RegistryCheck($"{label} by hand: the standing scene's bags are claimed at load",
+                        shown.TryGetValue("f/@scene:s.count", out var c) && Num(c) == 1
+                        && shown.TryGetValue("@scene:s.tally", out var t) && Num(t) == 2, string.Join(", ", shown.Keys));
+                    RegistryCheck($"{label} by hand: values", Num(engine.GetProperty("@gold")) == 7
+                        && Num(engine.GetFlow("f").GetProperty("@scene.count")) == 1
+                        && Num(engine.GetFlow("f").GetProperty("@scene.tally")) == 2);
+                    // Written back in today's version, whichever it read.
+                    RegistryCheck($"{label} by hand: written back as version 4", JsonEqual(OnDisk(4, cursorV4), Stored(engine)), Stored(engine));
+                });
 
-            Case("A version 2 save moved into a registry the game supplied, beside values the game already loaded", () =>
+            Case("Anything but versions 3 and 4 is refused, by number, before anything changes", () =>
             {
-                var registry = new ScopeRegistry();
-                var waiting = new OrderedMap<string, OrderedMap<string, ExprValue>>();
-                var deck = new OrderedMap<string, ExprValue>(); deck.Set("drawn", ExprValue.Num(3));
-                waiting.Set("another-engine/deck/inn", deck);
-                registry.Load(waiting); // the game's own load, waiting for its engine
-                var engine = new Engine(b, new EngineOptions { Seed = 0, Registry = registry });
-                PatterSave.DeserializeState(engine, v2);
-                RegistryCheck("v2 into the game's registry: values", Num(engine.GetFlow("f").GetProperty("@scene.count")) == 1);
-                RegistryCheck("v2 into the game's registry: beside the game's own waiting values",
-                    Dump(registry.Save()) == "another-engine/deck/inn{drawn=3} " + expectedRegistry, Dump(registry.Save()));
-            });
-
-            Case("Anything but versions 2 and 3 is refused, by number", () =>
-            {
+                // Version 2, the shape every runtime wrote before the registry held the properties: 1.0 reads it no more.
+                string v2 = "{\"schema\":\"patter/save@0\",\"save\":{\"version\":2,\"shared\":{\"patter\":{\"gold\":7}},"
+                    + "\"sharedVisits\":{\"s\":1,\"b\":1,\"sn\":1},\"sharedSelectors\":{},\"stageBags\":{\"s\":{\"tally\":2}},"
+                    + "\"flows\":{\"f\":{\"scopes\":{\"patter\":{}},\"sceneBags\":{\"s\":{\"count\":1}},\"rngState\":0,"
+                    + "\"visits\":{\"s\":1,\"b\":1,\"sn\":1}," + cursorV3 + "}}}}";
                 var engine = new Engine(b, new EngineOptions { Seed = 0 });
-                var msg = Throws(() => engine.LoadGame(new SaveGame { Version = 4, Flows = new Dictionary<string, FlowSnapshot>() }));
-                RegistryCheck("unsupported version", msg == "unsupported save version: 4", msg ?? "no error");
+                engine.OpenFlow("main", "s");
+                var msg = Throws(() => PatterSave.DeserializeState(engine, v2));
+                RegistryCheck("version 2 refused", msg == "unsupported save version: 2", msg ?? "no error");
+                RegistryCheck("version 2 refused: nothing changed", engine.GetFlow("main") != null && engine.GetFlow("f") == null);
+                msg = Throws(() => engine.LoadGame(new SaveGame { Version = 5, Flows = new Dictionary<string, FlowSnapshot>() }));
+                RegistryCheck("unsupported version", msg == "unsupported save version: 5", msg ?? "no error");
             });
         }
 

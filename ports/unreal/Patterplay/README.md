@@ -36,8 +36,8 @@ asset in your content browser. Reference that asset wherever you build an engine
 ## Play a flow
 
 ```cpp
-UPatterEngine* Engine = UPatterEngine::Create(Bundle);          // Bundle: a UPatterBundle*
-UPatterFlow*   Flow   = Engine->OpenFlow(TEXT("main"), TEXT("intro"));
+UPatterEngine* Engine = UPatterEngine::Create(Bundle, {});      // Bundle: a UPatterBundle*; {}: no host scopes bound
+UPatterFlow*   Flow   = Engine->OpenFlow(TEXT("main"), TEXT("intro"));   // an empty scene: the project's start
 
 FPatterStep Step = Flow->Advance();   // Step.Type, Step.Text, Step.Character, Step.Options
 // Render Step by its kind (line / text / game event / choice / end). On a choice,
@@ -90,10 +90,28 @@ The **PatterplayDemo** sample project holds two working references (see its READ
 ## Beyond the basics
 
 - **Properties**: `GetProperty*` / `SetProperty*` read and write `@patter` (and wired
-  external) values from C++ or Blueprint - the game pushing state into the dialogue. Bind your
-  own `@world` container with `UPatterEngine::Create(Bundle, World)`.
+  external) values from C++ or Blueprint - the game pushing state into the dialogue. A value that
+  doesn't fit the property's declaration, or a name the content doesn't declare, is refused: each
+  `SetProperty*` returns `""` when the write landed, and otherwise why it didn't, logged to
+  `LogPatterplay` (`"@patter.gold" takes a number; "lots" doesn't fit`). Bind your own containers for
+  the host scopes your game owns with `UPatterEngine::Create(Bundle, HostScopes)`, a map of token to
+  `UPatterWorld` (`"world"` for World Properties).
+- **Refusals and reports**: Blueprint can't catch what the engine throws, so a flow keeps the reason its
+  last `Advance`, `AdvanceToStop`, `Choose`, `Goto`, or `Reset` was refused in `GetLastError` (cleared by
+  the next one that succeeds). `OnError` hears every problem the engine carried on past: a content error,
+  a `Setup` problem (a locale the bundle doesn't have, a host scope it doesn't declare), and a `Save`
+  report (a load whose place has gone from this build). A `Setup` problem found while the engine is made
+  is logged and recorded at once and reaches `OnError` on the first `OpenFlow`, since the event can only
+  be bound once `Create` has returned.
+- **Locales**: `Locale()` is the locale in use and `Locales()` the bundle's default and included locales.
+  `SetLocale` (and the `Locale` option) resolves by one rule on every runtime: case and `_` / `-` don't
+  matter, then the language alone (`fr` for `fr-FR`), then the default, each fallback reported. A pending
+  choice's options follow the language too.
 - **Save and load**: `UPatterSave::SerializeState` / `DeserializeState` write and read the
-  whole run as one JSON string (save version 3; a version 2 save inside the same envelope still loads).
+  whole run as one JSON string (save version 4; a version 3 save from before 1.0 still loads, and a
+  version 2 save no longer does). A save keeps which options a pending choice offered, not their text,
+  so they're shown in the loading engine's language, and names the next line by its id, so a save loaded
+  into an edited build resumes at the nearest safe point, reported as `Save`.
 - **Taking one flow out**: `Engine->CaptureFlow(TEXT("bob"))` returns one flow as a JSON string (its
   place, a pending choice included, and its own property values, without its name), for your game to keep
   however it likes; `Engine->RestoreFlow(TEXT("bob-again"), State)` opens a flow from it later, under the
@@ -118,11 +136,12 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   register a running engine with `Engine->RegisterForDebug(...)` to watch and edit its
   `@patter` properties in Play mode.
 - **Live Link**: `FPatterDebugLink` connects a running game to Patterpad, streaming the story
-  cursor to the editor; `ApplyLiveBundle` hot-reloads an edited bundle into the running
-  engine. See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
+  cursor to the editor (`FPatterDebugLink::TypeName(Step.Type)` spells a step's type for `Observe`);
+  `ApplyLiveBundle` hot-reloads an edited bundle into the running engine. See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
 - **Structure**: `GetOutline` / `GetBeatSequence` expose the authored tree (per-beat text,
   character, speaker qualifier, speaker label, resolved `PadAfter` and any `OwnPadAfter`, gameData, tags, plus each scene's and block's own gameData) for tooling like
-  Sequencer binding. In C++, `Engine->Raw()->gameDataForScene` / `gameDataForBlock` read a scene's or
+  Sequencer binding. Every Game Data the engine hands out (on a step, an option, the outline) is the
+  game's own copy; extension values are the bundle's, and read-only. In C++, `Engine->Raw()->gameDataForScene` / `gameDataForBlock` read a scene's or
   a block's own gameData by address, raw (not merged with the declared defaults).
 - **Patter extension values**: a tool's own fields on Patter's nodes reach the game where gameData does:
   `Extensions` on a line, text or game event step (a replayed prompt and `StepFor` included), on each

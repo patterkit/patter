@@ -2,6 +2,7 @@
 #include "PatterBundle.h"
 #include "PatterDebug.h"
 #include "PatterWorld.h"
+#include "PatterLog.h"
 #include "Patter/Engine.h"
 #include "Patter/Save.h"
 #include "PatterConvert.h"
@@ -123,14 +124,24 @@ namespace
 			P.bHasSpeakerLabel = O.prompt->hasSpeakerLabel;
 			if (O.prompt->hasSpeakerLabel) P.SpeakerLabel = Ue(O.prompt->speakerLabel);
 			P.PadAfter = O.prompt->padAfter;   // line padding: the prompt's resolved pause
-			// The deprecated flat fields, filled as they were, for Blueprints that still read them.
-			Opt.PromptKind = P.Kind;
-			Opt.Text = P.Text;
-			Opt.Character = P.Character;
-			Opt.CharacterName = P.CharacterName;
-			Opt.Direction = P.Direction;
 		}
 		return Opt;
+	}
+
+	// A core PlayError as Blueprint sees it.
+	FPatterPlayError ConvertError(const patter::PlayError& Err)
+	{
+		FPatterPlayError Out;
+		Out.Flow = Ue(Err.flow);
+		Out.Kind = Err.kind == "effect" ? EPatterPlayErrorKind::Effect
+			: Err.kind == "best-match" ? EPatterPlayErrorKind::BestMatch
+			: Err.kind == "setup" ? EPatterPlayErrorKind::Setup
+			: Err.kind == "save" ? EPatterPlayErrorKind::Save
+			: EPatterPlayErrorKind::Condition;
+		Out.Node = Ue(Err.node);
+		Out.Source = Ue(Err.source);
+		Out.Message = Ue(Err.message);
+		return Out;
 	}
 
 	FPatterStep Convert(const patter::StepResult& S)
@@ -182,21 +193,33 @@ void UPatterFlow::Close()
 	if (Owner) Owner->CloseFlow(FlowId); // the engine finishes and drops it, then re-binds this wrapper
 }
 
+bool UPatterFlow::Guard(const TFunctionRef<void()>& Call)
+{
+	LastError.Reset();
+	try { Call(); return true; }
+	catch (const std::exception& Ex)
+	{
+		LastError = UTF8_TO_TCHAR(Ex.what());
+		UE_LOG(LogPatterplay, Error, TEXT("Patterplay: flow '%s': %s"), *FlowId, *LastError);
+		return false;
+	}
+}
+
 FPatterStep UPatterFlow::Advance()
 {
 	if (!Flow) return FPatterStep();
-	// A content error no longer reaches here: the core plays through it and reports it (OnError), so the
-	// flow carries on instead of ending. What can still arrive is a refusal of a different kind, such as a
-	// jump cycle with nothing to deliver, which ends the step as it always did.
-	try { return Convert(Flow->advance()); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return FPatterStep(); }
+	// A content error doesn't reach here: the core plays through it and reports it (OnError), so the flow
+	// carries on. What can still arrive is a refusal of a different kind, such as a jump cycle with nothing
+	// to deliver: the step is an empty End, and GetLastError says why (Blueprint can't catch a throw).
+	FPatterStep Step;
+	Guard([&] { Step = Convert(Flow->advance()); });
+	return Step;
 }
 
 void UPatterFlow::Choose(const FString& OptionId)
 {
 	if (!Flow) return;
-	try { Flow->choose(Std(OptionId)); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	Guard([&] { Flow->choose(Std(OptionId)); });
 }
 
 bool UPatterFlow::IsEnded() const { return Flow ? Flow->isEnded() : true; }
@@ -208,28 +231,27 @@ TArray<FPatterStep> UPatterFlow::AdvanceToStop(FPatterStep& OutStop)
 	TArray<FPatterStep> Played;
 	OutStop = FPatterStep();
 	if (!Flow) return Played;
-	try
+	Guard([&]
 	{
 		patter::AdvanceToStopResult Res = Flow->advanceToStop();
 		for (const patter::StepResult& S : Res.played) Played.Add(Convert(S));
 		OutStop = Convert(Res.stop);
-	}
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	});
 	return Played;
 }
 
 bool UPatterFlow::Goto(const FString& Scene, const FString& Block)
 {
 	if (!Flow) return false;
-	try { return Flow->gotoAddress(Std(Scene), Std(Block)); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+	bool bMoved = false;
+	Guard([&] { bMoved = Flow->gotoAddress(Std(Scene), Std(Block)); });
+	return bMoved;
 }
 
 void UPatterFlow::Reset(const FString& Scene, const FString& Block)
 {
 	if (!Flow) return;
-	try { Flow->reset(Std(Scene), Std(Block)); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	Guard([&] { Flow->reset(Std(Scene), Std(Block)); });
 }
 
 bool UPatterFlow::IsClosed() const { return Flow ? Flow->isClosed() : true; }
@@ -253,14 +275,14 @@ bool UPatterFlow::GetProperty(const FString& Ref, FPatterValue& OutValue) const
 		OutValue = ToUeValue(*V);
 		return true;
 	}
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
 int32 UPatterFlow::StageIndex(const FString& Ref, const FString& Stage) const
 {
 	if (!Flow) return -1;
 	try { return Flow->stageIndex(Std(Ref), patter::PatterValue::Str(Std(Stage))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return -1; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return -1; }
 }
 
 bool UPatterFlow::CompareStages(const FString& Ref, const FString& A, const FString& B, int32& OutOrder) const
@@ -268,7 +290,7 @@ bool UPatterFlow::CompareStages(const FString& Ref, const FString& A, const FStr
 	OutOrder = 0;
 	if (!Flow) return false;
 	try { OutOrder = Flow->compareStages(Std(Ref), patter::PatterValue::Str(Std(A)), patter::PatterValue::Str(Std(B))); return true; }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
 bool UPatterFlow::NextStage(const FString& Ref, const FString& Stage, FString& OutStage) const
@@ -276,14 +298,20 @@ bool UPatterFlow::NextStage(const FString& Ref, const FString& Stage, FString& O
 	OutStage = FString();
 	if (!Flow) return false;
 	try { OutStage = Ue(Flow->nextStage(Std(Ref), patter::PatterValue::Str(Std(Stage)))); return true; }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
-void UPatterFlow::SetProperty(const FString& Ref, const FPatterValue& Value)
+FString UPatterFlow::SetProperty(const FString& Ref, const FPatterValue& Value)
 {
-	if (!Flow) return;
-	try { Flow->setProperty(Std(Ref), FromUeValue(Value)); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	if (!Flow) return FString::Printf(TEXT("flow '%s' is closed"), *FlowId);
+	// Blueprint can't catch what the core throws, so the refusal is the return value (and a log line).
+	try { Flow->setProperty(Std(Ref), FromUeValue(Value)); return FString(); }
+	catch (const std::exception& Ex)
+	{
+		const FString Refusal = UTF8_TO_TCHAR(Ex.what());
+		UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), *Refusal);
+		return Refusal;
+	}
 }
 
 TArray<FPatterLogEntry> UPatterFlow::Log() const
@@ -300,7 +328,7 @@ FString UPatterFlow::Interpolate(const FString& Text)
 {
 	if (!Flow) return Text;
 	try { return Ue(Flow->interpolate(Std(Text))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return Text; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return Text; }
 }
 
 FString UPatterFlow::StripCaptions(const FString& Text)
@@ -326,44 +354,46 @@ bool UPatterFlow::StepFor(const FString& BeatId, FPatterStep& OutStep)
 		OutStep = Convert(*S);
 		return true;
 	}
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
 // ----- UPatterEngine ----------------------------------------------------------
 
-UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle, UPatterWorld* World)
+UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle, const TMap<FString, UPatterWorld*>& HostScopes)
 {
-	return Build(Bundle, World, nullptr, FPatterEngineOptions());
+	return Build(Bundle, HostScopes, nullptr, FPatterEngineOptions());
 }
 
-UPatterEngine* UPatterEngine::CreateWithOptions(UPatterBundle* Bundle, const FPatterEngineOptions& Options, UPatterWorld* World)
+UPatterEngine* UPatterEngine::CreateWithOptions(UPatterBundle* Bundle, const FPatterEngineOptions& Options, const TMap<FString, UPatterWorld*>& HostScopes)
 {
-	return Build(Bundle, World, nullptr, Options);
+	return Build(Bundle, HostScopes, nullptr, Options);
 }
 
 UPatterEngine* UPatterEngine::CreateWithRegistry(UPatterBundle* Bundle, const std::shared_ptr<patter::ScopeRegistry>& Registry,
-	UPatterWorld* World, const FPatterEngineOptions& Options)
+	const TMap<FString, UPatterWorld*>& HostScopes, const FPatterEngineOptions& Options)
 {
 	if (!Registry)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Patterplay: CreateWithRegistry called with a null registry"));
+		UE_LOG(LogPatterplay, Error, TEXT("Patterplay: CreateWithRegistry called with a null registry"));
 		return nullptr;
 	}
-	return Build(Bundle, World, Registry, Options);
+	return Build(Bundle, HostScopes, Registry, Options);
 }
 
-UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, const std::shared_ptr<patter::ScopeRegistry>& Registry,
-	const FPatterEngineOptions& Options)
+UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, const TMap<FString, UPatterWorld*>& HostScopes,
+	const std::shared_ptr<patter::ScopeRegistry>& Registry, const FPatterEngineOptions& Options)
 {
 	if (!Bundle || !Bundle->Raw())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Patterplay: Create called with a null/unparsed bundle"));
+		UE_LOG(LogPatterplay, Error, TEXT("Patterplay: Create called with a null/unparsed bundle"));
 		return nullptr;
 	}
-	// A bound world is an external scope in the registry, read and written through the container; the
-	// core keeps the binding for its whole life, hot swaps included.
+	// Each bound container is an external scope in the registry under its token, read and written through
+	// the container; the core keeps the bindings for its whole life, hot swaps included. A null container
+	// binds nothing (the scope is self-backed, as if it weren't in the map).
 	patter::EngineOptions Opts;
-	if (World) Opts.hostScopes["world"] = World->MakeHostScope();
+	for (const TPair<FString, UPatterWorld*>& Scope : HostScopes)
+		if (Scope.Value) Opts.hostScopes[Std(Scope.Key)] = Scope.Value->MakeHostScope();
 	Opts.registry = Registry;
 	Opts.hasSeed = Options.bUseSeed;
 	Opts.seed = static_cast<double>(Options.Seed);
@@ -373,7 +403,7 @@ UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, 
 	Opts.log = Options.bLog;
 	UPatterEngine* E = NewObject<UPatterEngine>(GetTransientPackage());
 	E->BundleRef = Bundle;
-	E->WorldRef = World;
+	for (const TPair<FString, UPatterWorld*>& Scope : HostScopes) if (Scope.Value) E->HostScopeRefs.Add(Scope.Key, Scope.Value);
 	// The core's callback raises the Blueprint event. It holds the engine weakly: the callback lives in the
 	// core's creation options, which a hot swap hands on to the replacement core.
 	TWeakObjectPtr<UPatterEngine> Weak(E);
@@ -381,23 +411,30 @@ UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, 
 	{
 		if (UPatterEngine* Self = Weak.Get()) Self->OnDryChoice.Broadcast(Ue(GroupId));
 	};
-	// A content error the core played through: always a Warning in the log, so a content bug is never
-	// silent, and the Blueprint event for a game or tool that wants to act on it.
+	// A problem the core reported and carried on past: always a Warning in the log, so none is ever silent,
+	// and the Blueprint event for a game or tool that wants to act on it. One found while the core is being
+	// built (a Setup report) comes before a game can bind OnError: it is held, and delivered on the first
+	// OpenFlow (ruled 2026-10-28). The core has already put it in the decision log.
 	Opts.onError = [Weak](const patter::PlayError& Err)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Patterplay: %s on %s in flow '%s' failed, played through: %s"),
-			UTF8_TO_TCHAR(Err.kind.c_str()), UTF8_TO_TCHAR(Err.node.c_str()), UTF8_TO_TCHAR(Err.flow.c_str()), UTF8_TO_TCHAR(Err.message.c_str()));
+		// Braced: UE_LOG is a block of its own, so it can't stand before an `else`.
+		if (Err.kind == "setup")
+		{
+			UE_LOG(LogPatterplay, Warning, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Err.message.c_str()));
+		}
+		else if (Err.kind == "save")
+		{
+			UE_LOG(LogPatterplay, Warning, TEXT("Patterplay: flow '%s': %s"), UTF8_TO_TCHAR(Err.flow.c_str()), UTF8_TO_TCHAR(Err.message.c_str()));
+		}
+		else
+		{
+			UE_LOG(LogPatterplay, Warning, TEXT("Patterplay: %s on %s in flow '%s' failed, played through: %s"),
+				UTF8_TO_TCHAR(Err.kind.c_str()), UTF8_TO_TCHAR(Err.node.c_str()), UTF8_TO_TCHAR(Err.flow.c_str()), UTF8_TO_TCHAR(Err.message.c_str()));
+		}
 		UPatterEngine* Self = Weak.Get();
 		if (!Self) return;
-		FPatterPlayError Out;
-		Out.Flow = Ue(Err.flow);
-		Out.Kind = Err.kind == "effect" ? EPatterPlayErrorKind::Effect
-			: Err.kind == "best-match" ? EPatterPlayErrorKind::BestMatch
-			: EPatterPlayErrorKind::Condition;
-		Out.Node = Ue(Err.node);
-		Out.Source = Ue(Err.source);
-		Out.Message = Ue(Err.message);
-		Self->OnError.Broadcast(Out);
+		if (Self->bBuilding) { Self->HeldErrors.Add(ConvertError(Err)); return; }
+		Self->OnError.Broadcast(ConvertError(Err));
 	};
 	// A saved value a load put back to its default: a Warning in the log, so a drifted save is never silent,
 	// and the Blueprint event.
@@ -405,15 +442,49 @@ UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, 
 	{
 		for (const patter::LoadMisfit& M : Misfits)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Patterplay: the save's %s.%s was %s, which no longer fits its declaration; it is back at its default"),
+			UE_LOG(LogPatterplay, Warning, TEXT("Patterplay: the save's %s.%s was %s, which no longer fits its declaration; it is back at its default"),
 				UTF8_TO_TCHAR(M.scope.c_str()), UTF8_TO_TCHAR(M.name.c_str()), UTF8_TO_TCHAR(M.value.toJsonString().c_str()));
 			if (UPatterEngine* Self = Weak.Get()) Self->OnRefit.Broadcast(Ue(M.scope), Ue(M.name), ToUeValue(M.value));
 		}
 	};
+	E->bBuilding = true;
 	try { E->Engine = std::make_shared<patter::Engine>(*Bundle->Raw(), Opts); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
+	E->bBuilding = false;
 	E->TapTrace();
 	return E;
+}
+
+void UPatterEngine::DeliverHeldErrors()
+{
+	if (HeldErrors.Num() == 0) return;
+	// Taken out first, so a handler that opens a flow doesn't hear them twice.
+	const TArray<FPatterPlayError> Held = MoveTemp(HeldErrors);
+	HeldErrors.Reset();
+	for (const FPatterPlayError& Err : Held) OnError.Broadcast(Err);
+}
+
+FString UPatterEngine::Write(const TFunctionRef<void()>& Call)
+{
+	if (!Engine) return TEXT("the engine has no core");
+	// Blueprint can't catch what the core throws, so the refusal is the return value (and a log line).
+	try { Call(); return FString(); }
+	catch (const std::exception& Ex)
+	{
+		const FString Refusal = UTF8_TO_TCHAR(Ex.what());
+		UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), *Refusal);
+		return Refusal;
+	}
+}
+
+FPatterLocales UPatterEngine::Locales() const
+{
+	FPatterLocales Out;
+	if (!Engine) return Out;
+	const patter::Locales L = Engine->locales();
+	Out.Default = Ue(L.defaultLocale);
+	for (const std::string& Locale : L.included) Out.Included.Add(Ue(Locale));
+	return Out;
 }
 
 void UPatterEngine::TapTrace()
@@ -427,11 +498,18 @@ void UPatterEngine::TapTrace()
 	});
 }
 
-UPatterWorld* UPatterEngine::GetBoundWorld() const { return WorldRef; }
+UPatterWorld* UPatterEngine::GetHostScope(const FString& Token) const
+{
+	// Matched case-sensitively, as the engine matches a token: an FString map's own Find ignores case.
+	for (const TPair<FString, TObjectPtr<UPatterWorld>>& Scope : HostScopeRefs)
+		if (Scope.Key.Equals(Token, ESearchCase::CaseSensitive)) return Scope.Value.Get();
+	return nullptr;
+}
 
 UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene, const FString& Block, bool bUseSeed, int64 Seed)
 {
 	if (!Engine) return nullptr;
+	DeliverHeldErrors();   // what the engine reported while it was built, now OnError can have been bound
 	try
 	{
 		const int64_t SeedValue = static_cast<int64_t>(Seed);
@@ -444,7 +522,7 @@ UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene, co
 		WrappedFlows.Add(Flow); // so a live hot swap can re-bind the wrapper by id
 		return Flow;
 	}
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
 }
 
 TArray<UPatterFlow*> UPatterEngine::Flows()
@@ -467,14 +545,14 @@ bool UPatterEngine::GetProperty(const FString& Ref, FPatterValue& OutValue) cons
 		OutValue = ToUeValue(*V);
 		return true;
 	}
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
 int32 UPatterEngine::StageIndex(const FString& Ref, const FString& Stage) const
 {
 	if (!Engine) return -1;
 	try { return Engine->stageIndex(Std(Ref), patter::PatterValue::Str(Std(Stage))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return -1; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return -1; }
 }
 
 bool UPatterEngine::CompareStages(const FString& Ref, const FString& A, const FString& B, int32& OutOrder) const
@@ -482,7 +560,7 @@ bool UPatterEngine::CompareStages(const FString& Ref, const FString& A, const FS
 	OutOrder = 0;
 	if (!Engine) return false;
 	try { OutOrder = Engine->compareStages(Std(Ref), patter::PatterValue::Str(Std(A)), patter::PatterValue::Str(Std(B))); return true; }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
 bool UPatterEngine::NextStage(const FString& Ref, const FString& Stage, FString& OutStage) const
@@ -490,14 +568,12 @@ bool UPatterEngine::NextStage(const FString& Ref, const FString& Stage, FString&
 	OutStage = FString();
 	if (!Engine) return false;
 	try { OutStage = Ue(Engine->nextStage(Std(Ref), patter::PatterValue::Str(Std(Stage)))); return true; }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
-void UPatterEngine::SetProperty(const FString& Ref, const FPatterValue& Value)
+FString UPatterEngine::SetProperty(const FString& Ref, const FPatterValue& Value)
 {
-	if (!Engine) return;
-	try { Engine->setProperty(Std(Ref), FromUeValue(Value)); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	return Write([&] { Engine->setProperty(Std(Ref), FromUeValue(Value)); });
 }
 
 TMap<FString, int32> UPatterEngine::GetVisitCounts() const
@@ -522,7 +598,7 @@ TArray<FString> UPatterEngine::TagsForScene(const FString& SceneRef) const
 	TArray<FString> Out;
 	if (!Engine) return Out;
 	try { for (const std::string& T : Engine->tagsForScene(Std(SceneRef))) Out.Add(Ue(T)); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 	return Out;
 }
 
@@ -531,7 +607,7 @@ TArray<FString> UPatterEngine::TagsForBlock(const FString& SceneRef, const FStri
 	TArray<FString> Out;
 	if (!Engine) return Out;
 	try { for (const std::string& T : Engine->tagsForBlock(Std(SceneRef), Std(BlockRef))) Out.Add(Ue(T)); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 	return Out;
 }
 
@@ -539,35 +615,35 @@ TArray<FPatterGameDataEntry> UPatterEngine::GameDataForScene(const FString& Scen
 {
 	if (!Engine) return {};
 	try { return ConvertGameData(Engine->gameDataForScene(Std(SceneRef))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
 }
 
 TArray<FPatterGameDataEntry> UPatterEngine::GameDataForBlock(const FString& SceneRef, const FString& BlockRef) const
 {
 	if (!Engine) return {};
 	try { return ConvertGameData(Engine->gameDataForBlock(Std(SceneRef), Std(BlockRef))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
 }
 
 TArray<FPatterExtensionValues> UPatterEngine::ExtensionsForScene(const FString& SceneRef) const
 {
 	if (!Engine) return {};
 	try { return ToUeExtensions(Engine->extensionsForScene(Std(SceneRef))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
 }
 
 TArray<FPatterExtensionValues> UPatterEngine::ExtensionsForBlock(const FString& SceneRef, const FString& BlockRef) const
 {
 	if (!Engine) return {};
 	try { return ToUeExtensions(Engine->extensionsForBlock(Std(SceneRef), Std(BlockRef))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
 }
 
 TArray<FPatterExtensionValues> UPatterEngine::ExtensionsForSnippet(const FString& SnippetId) const
 {
 	if (!Engine) return {};
 	try { return ToUeExtensions(Engine->extensionsForSnippet(Std(SnippetId))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
 }
 
 TArray<FPatterStep> UPatterEngine::RunFlow(const FString& FlowName, const FString& Scene, const FString& Block)
@@ -578,7 +654,7 @@ TArray<FPatterStep> UPatterEngine::RunFlow(const FString& FlowName, const FStrin
 	{
 		for (const patter::StepResult& S : Engine->runFlow(Std(FlowName), Std(Scene), Std(Block))) Played.Add(Convert(S));
 	}
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 	return Played;
 }
 
@@ -618,7 +694,7 @@ void UPatterEngine::SetLocale(const FString& Locale)
 {
 	if (!Engine) return;
 	try { Engine->setLocale(Std(Locale)); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
 void UPatterEngine::SetClosedCaptions(bool bOn)
@@ -647,27 +723,21 @@ bool UPatterEngine::GetPropertyBool(const FString& Ref) const
 	return (V && V->isBool()) ? V->b : false;
 }
 
-// A refused write (a scope the game lent with no setter, an @scene ref) is logged like every other
-// guarded call here, never thrown through Blueprint.
-void UPatterEngine::SetPropertyNumber(const FString& Ref, double Value)
+// A refused write (a value that doesn't fit, an undeclared name, a scope the game lent with no setter, an
+// @scene ref) is returned and logged, never thrown through Blueprint.
+FString UPatterEngine::SetPropertyNumber(const FString& Ref, double Value)
 {
-	if (!Engine) return;
-	try { Engine->setProperty(Std(Ref), patter::PatterValue::Num(Value)); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	return Write([&] { Engine->setProperty(Std(Ref), patter::PatterValue::Num(Value)); });
 }
 
-void UPatterEngine::SetPropertyBool(const FString& Ref, bool bValue)
+FString UPatterEngine::SetPropertyBool(const FString& Ref, bool bValue)
 {
-	if (!Engine) return;
-	try { Engine->setProperty(Std(Ref), patter::PatterValue::Bool(bValue)); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	return Write([&] { Engine->setProperty(Std(Ref), patter::PatterValue::Bool(bValue)); });
 }
 
-void UPatterEngine::SetPropertyString(const FString& Ref, const FString& Value)
+FString UPatterEngine::SetPropertyString(const FString& Ref, const FString& Value)
 {
-	if (!Engine) return;
-	try { Engine->setProperty(Std(Ref), patter::PatterValue::Str(Std(Value))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	return Write([&] { Engine->setProperty(Std(Ref), patter::PatterValue::Str(Std(Value))); });
 }
 
 FString UPatterEngine::BuildId() const
@@ -716,7 +786,7 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 		// replacement could be built at all. The old core has already released its flows: re-bind, and
 		// every wrapper reads as closed rather than dangling. (A swap refused because a checkpoint is open
 		// lands here too, before anything changed: the re-bind then finds every flow where it was.)
-		UE_LOG(LogTemp, Error, TEXT("Patterplay: hot swap failed - %s"), UTF8_TO_TCHAR(Ex.what()));
+		UE_LOG(LogPatterplay, Error, TEXT("Patterplay: hot swap failed - %s"), UTF8_TO_TCHAR(Ex.what()));
 		RebindFlows();
 		return false;
 	}
@@ -743,7 +813,7 @@ void UPatterEngine::CloseFlow(const FString& FlowName)
 {
 	if (!Engine) return;
 	try { Engine->closeFlow(Std(FlowName)); } // refused while a checkpoint is open
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return; }
 	RebindFlows(); // the flow is gone; its wrapper must stop pointing at a map entry that is not there
 }
 
@@ -751,14 +821,14 @@ FString UPatterEngine::CaptureFlow(const FString& FlowName)
 {
 	if (!Engine) return FString();
 	try { return Ue(patter::serializeFlowState(Engine->captureFlow(Std(FlowName)))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return FString(); }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return FString(); }
 }
 
 UPatterFlow* UPatterEngine::RestoreFlow(const FString& FlowName, const FString& State)
 {
 	if (!Engine) return nullptr;
 	try { Engine->restoreFlow(Std(FlowName), patter::deserializeFlowState(Std(State))); } // refused while a checkpoint is open
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
 	return GetFlow(FlowName); // a fresh wrapper, held for re-binding as OpenFlow's is
 }
 
@@ -766,7 +836,7 @@ void UPatterEngine::Reset()
 {
 	if (!Engine) return;
 	try { Engine->reset(); } // refused while a checkpoint is open
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return; }
 	RebindFlows(); // every flow went with it
 }
 
@@ -774,7 +844,7 @@ void UPatterEngine::Checkpoint()
 {
 	if (!Engine) return;
 	try { OpenCheckpoint = std::make_shared<patter::Checkpoint>(Engine->checkpoint()); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
 void UPatterEngine::Rollback()
@@ -786,7 +856,7 @@ void UPatterEngine::Rollback()
 		Engine->rollback(OpenCheckpoint ? *OpenCheckpoint : patter::Checkpoint());
 		OpenCheckpoint.reset();
 	}
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return; }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return; }
 	RebindFlows(); // a flow opened inside the checkpoint is closed and gone: its wrapper reads as closed
 }
 
@@ -798,7 +868,7 @@ void UPatterEngine::Commit()
 		Engine->commit(OpenCheckpoint ? *OpenCheckpoint : patter::Checkpoint());
 		OpenCheckpoint.reset();
 	}
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
 bool UPatterEngine::InCheckpoint() const { return Engine && Engine->inCheckpoint(); }
@@ -829,14 +899,12 @@ TArray<FString> UPatterEngine::GetPropertyFlags(const FString& Ref) const
 	return Out;
 }
 
-void UPatterEngine::SetPropertyFlags(const FString& Ref, const TArray<FString>& Values)
+FString UPatterEngine::SetPropertyFlags(const FString& Ref, const TArray<FString>& Values)
 {
-	if (!Engine) return;
 	std::vector<std::string> Flags;
 	Flags.reserve(Values.Num());
 	for (const FString& V : Values) Flags.push_back(Std(V));
-	try { Engine->setProperty(Std(Ref), patter::PatterValue::Flags(std::move(Flags))); }
-	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	return Write([&] { Engine->setProperty(Std(Ref), patter::PatterValue::Flags(std::move(Flags))); });
 }
 
 static FPatterLogEntry ConvertLogEntry(const patter::LogEntry& E)
@@ -876,10 +944,6 @@ static FPatterLogEntry ConvertLogEntry(const patter::LogEntry& E)
 	Row.Node = Ue(E.node);
 	Row.Source = Ue(E.source);
 	Row.Message = Ue(E.message);
-	// The deprecated fields, filled as they were, for Blueprints that still read them.
-	Row.Subject = !Row.Group.IsEmpty() ? Row.Group : !Row.To.IsEmpty() ? Row.To : !Row.Target.IsEmpty() ? Row.Target : Row.Node;
-	Row.Considered = Row.Children.Num() ? Row.Children : Row.Options;
-	Row.Detail = !Row.Mode.IsEmpty() ? Row.Mode : Row.Message;
 	return Row;
 }
 

@@ -58,6 +58,10 @@ var block_by_id: Dictionary = {}
 ## Every beat by its id: a snippet's beats and an option's prompt, for PatterFlow.step_for. Built once
 ## (PatterEngine._index_nodes), like the other structural indexes. JS caches one per bundle (beatIndexFor).
 var beat_by_id: Dictionary = {}
+## Each option of a choice, by its id, to the id of the choice it belongs to: a save stamps the frame an
+## option's content runs in with its choice (`choiceId`). Built once with the other indexes. JS caches one
+## per bundle (optionChoiceFor).
+var option_choice: Dictionary = {}
 ## Host-facing addresses (spec §6), shared with the engine: scene gameId -> internal id, and
 ## per-scene block gameId -> internal id. A flow needs them to resolve goto() by address.
 var scene_game_id_to_id: Dictionary = {}
@@ -120,16 +124,49 @@ var caption_character: String = "SFX"
 ## dry, no takeable option and no eligible fallback, so the silent fall-through is observable. The
 ## game's Callable as given, or null. Live feedback, distinct from the log's `dry` entry.
 var on_dry_choice = null
-## Content errors the engine played through (a condition that failed and counted as false, an effect
-## that failed and was skipped, a Best-match part that failed and scored as false): the game's
-## Callable as given, taking {flow, kind, node, source?, message}, or null. Unset, each is
-## push_warning'd, so a content bug is never silent. JS folds that default into onError itself.
+## Problems the engine reported and carried on past (a condition that failed and counted as false, an
+## effect that failed and was skipped, a Best-match part that failed and scored as false, how the engine
+## was set up, a load whose place has gone): the game's Callable as given, taking {flow, kind, node,
+## source?, message}, or null. Unset, each is push_warning'd, so none is ever silent. JS folds that
+## default into onError itself; here report() does.
 var on_error = null
 ## Saved values a load put back to their defaults because they no longer fit their declarations (a stage,
 ## an enum value or a flag deleted since the save, or a value of another type): the game's Callable as
 ## given, taking an Array of {scope, name, value}, or null. Unset, each is push_warning'd, so a drifted
 ## save is never silent. JS's onRefit.
 var on_refit = null
+
+
+## Report a problem the engine carried on past (a PlayError: {flow, kind, node, source?, message}) to the
+## game's on_error, or push_warning when it set none, so none is ever silent. The log's diagnostic entry
+## is the caller's: a flow emits its own, and the engine emits a set-up report through emit_engine.
+func report(err: Dictionary) -> void:
+	if on_error is Callable and (on_error as Callable).is_valid():
+		(on_error as Callable).call(err)
+		return
+	var kind := str(err.get("kind", ""))
+	if kind == "setup":
+		push_warning("Patterplay: %s" % err["message"])
+	elif kind == "save":
+		push_warning("Patterplay: flow '%s': %s" % [err["flow"], err["message"]])
+	else:
+		push_warning("Patterplay: %s on %s in flow '%s' failed, played through: %s" % [kind, err["node"], err["flow"], err["message"]])
+
+
+## An entry in the engine's log that belongs to no flow's (a set-up report, whose flow is ""): to
+## the engine log when it is on, and to every on_trace handler. JS's emitEngine for a flowless event;
+## a flow's own entries go through PatterFlow._emit, which writes here too.
+func emit_engine(flow_id: String, event: Dictionary) -> void:
+	if not tracing:
+		return
+	var wide := event.duplicate()
+	wide["flow"] = flow_id
+	if log_enabled:
+		wide["seq"] = engine_log_seq
+		engine_log_seq += 1
+		engine_log.append(wide)
+	for h in trace_handlers.duplicate():
+		h[1].call(flow_id, wide)
 
 
 ## Say what the registry's refitting loads have put back since it last said (EngineOptions.onRefit):

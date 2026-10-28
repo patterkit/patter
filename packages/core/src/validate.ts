@@ -58,7 +58,9 @@ export interface ValidationIssue {
     | "invalid-tag"
     | "invalid-gamedata-field"
     | "invalid-gamedata-value"
-    | "jump-cycle";
+    | "jump-cycle"
+    | "no-start"
+    | "dangling-start";
   message: string;
   /** Id of the offending node/beat, where applicable. */
   id?: string;
@@ -456,6 +458,25 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
       if (usedPairs.has(`${c.name}\u0000${q}`)) continue;
       issues.push({ code: "unused-speaker-label", severity: "warning",
         message: `'${c.name}' has its own label with the qualifier '${q}', but no line has that speaker with that qualifier` });
+    }
+  }
+
+  // The start scene reaches the bundle, and a game that opens a flow without naming a scene starts there (the
+  // hands-on review, 2026-10). With none set, or one that has gone, the game starts at the first scene instead,
+  // which may not be the one the writer means: say so, without stopping the build.
+  const wellFormed = scenes.filter((sc) => typeof sc?.id === "string" && Array.isArray(sc.blocks));
+  if (wellFormed.length > 0) {
+    const start = project.start;
+    const scene = start ? wellFormed.find((sc) => sc.id === start.scene) : undefined;
+    if (!start) {
+      issues.push({ code: "no-start", severity: "warning",
+        message: "no start scene is set, so a game that doesn't name a scene starts at the first one" });
+    } else if (!scene) {
+      issues.push({ code: "dangling-start", severity: "warning", id: start.scene,
+        message: `the start scene '${start.scene}' isn't in the project, so a game that doesn't name a scene starts at the first one` });
+    } else if (start.block !== undefined && !scene.blocks.some((b) => b?.id === start.block)) {
+      issues.push({ code: "dangling-start", severity: "warning", id: start.block,
+        message: `the start block '${start.block}' isn't in scene '${scene.id}', so the game starts at that scene's first block` });
     }
   }
 

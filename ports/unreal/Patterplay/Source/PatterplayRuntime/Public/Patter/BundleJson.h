@@ -80,6 +80,16 @@ namespace patter
             out.locales.defaultLocale = reqString(loc, "default");
             if (const J* p = field(loc, "included")) out.locales.included = strList(*p);
 
+            // The project's start: a flow opened or reset with no scene starts here. Absent (or with no scene)
+            // means the first scene in authored order.
+            if (const J* st = field(root, "start"))
+                if (const J* sc = field(*st, "scene"))
+                {
+                    out.start.present = true;
+                    out.start.scene = text(*sc);
+                    if (const J* bl = field(*st, "block")) out.start.block = text(*bl);
+                }
+
             if (const J* p = field(root, "cast"))
                 eachElement(*p, [&](const J& c)
                 {
@@ -491,8 +501,4 @@ namespace patter
     {
         return BundleReader<J>::read(root);
     }
-
-    template <typename J>
-    [[deprecated("Use parseBundle, named in the core's camelCase like the rest of it.")]]
-    inline Bundle ParseBundle(const J& root) { return parseBundle(root); }
 }

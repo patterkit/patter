@@ -22,7 +22,7 @@ import type {
   Group, Snippet, Bundle, CompiledGroup, CompiledSnippet, CompiledEffect, Expression,
   CoverageDriver, ScalarValue,
 } from "@patterkit/model";
-import { deserialiseAst, makePrng, stagesEitherSide } from "@wildwinter/expr";
+import { deserialiseAst, makePrng, stagesEitherSide, valueFits } from "@wildwinter/expr";
 import type { ExprNode } from "@wildwinter/expr";
 import type { LoadedProject } from "./load.js";
 import { sourceStrings, resolveStart } from "./loaded-helpers.js";
@@ -481,9 +481,9 @@ export function proposeCoverageDrivers(loaded: LoadedProject): CoverageDriver[] 
   const { written, proposals } = analyzeHostScopes(bundle, hostTokens);
 
   // Fill in declared enum / bool ranges where the conditions gave no literals (e.g. a bare `if @world.flag`).
-  const declByRef = new Map<string, { type: string; values?: string[]; stages?: string[] }>();
+  const declByRef = new Map<string, { type: string; values?: string[]; stages?: string[]; default?: unknown }>();
   for (const s of hostScopes) {
-    for (const d of s.declarations ?? []) declByRef.set(`@${s.token}.${d.name}`, { type: d.type, values: d.values, stages: d.stages });
+    for (const d of s.declarations ?? []) declByRef.set(`@${s.token}.${d.name}`, { type: d.type, values: d.values, stages: d.stages, default: d.default });
   }
 
   const drivers: CoverageDriver[] = [];
@@ -496,6 +496,9 @@ export function proposeCoverageDrivers(loaded: LoadedProject): CoverageDriver[] 
       else if (decl.type === "enum" && decl.values) values = [...decl.values];
       else if (decl.type === "quality" && decl.stages) values = [...decl.stages]; // stage names ARE the values
     }
+    // A literal the declaration doesn't allow (a number compared with a boolean, say) is a value the engine
+    // would refuse the game, so it's no driver.
+    if (decl) values = values.filter((v) => valueFits(decl, v, { noneChosen: decl.type === "enum" && decl.default === "" }));
     if (values.length === 0) continue;
     if (decl?.type === "quality" && decl.stages) {
       // A gate like `@q >= "x"` is covered by the stages either side of it, and a stage's place is its
@@ -589,6 +592,12 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
   const recurringDrivers = drivers.filter((d) => d.kind === "recurring");
   const drivenRefs = new Set(drivers.map((d) => d.ref));
   const pick = <T>(vals: T[]): T => vals[Math.floor(rng() * vals.length)]!;
+  // A saved driver can hold a value its declaration no longer allows, which the engine refuses: that draw
+  // moves nothing, and the run carries on.
+  const drive = (engine: Engine, d: CoverageDriver): void => {
+    const value = pick(d.values);
+    try { engine.setProperty(d.ref, value); } catch { /* refused: doesn't fit the declaration */ }
+  };
   const sites = [...new Set([...analysis.writerSites.values()].flat())];
   const entered = entryGates(bundle, analysis.routes, start);
 
@@ -617,7 +626,7 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
     });
     // Initial drivers feed the host scope BEFORE the flow enters its start scene, so first-scene entry
     // gates see them. (No-op when there are none.)
-    for (const d of initialDrivers) engine.setProperty(d.ref, pick(d.values));
+    for (const d of initialDrivers) drive(engine, d);
     const flow = engine.openFlow("cov", { scene: start.scene, block: start.block });
     const seenThisRun = new Set<string>();
     let term: keyof typeof termination = "capped";
@@ -630,7 +639,7 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
           // Recurring drivers re-roll at the choice point (per-cadence), so gated branches downstream of
           // a changing world value get exercised within a single run.
           for (const d of recurringDrivers) {
-            if (rng() < CADENCE_PROB[d.cadence ?? "sometimes"]) engine.setProperty(d.ref, pick(d.values));
+            if (rng() < CADENCE_PROB[d.cadence ?? "sometimes"]) drive(engine, d);
           }
           const eligible = r.options.filter((o) => o.eligible);
           if (eligible.length === 0) { term = "stalled"; break; } // a choice the player is stuck on

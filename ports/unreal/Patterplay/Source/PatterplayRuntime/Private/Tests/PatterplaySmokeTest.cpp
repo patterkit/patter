@@ -129,7 +129,7 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 
 	// The UObject wrappers, end to end: engine, flow, a played beat, and the self-backed host scope
 	// reaching the story (the fault that started this: @world read as false on every port).
-	UPatterEngine* Engine = UPatterEngine::Create(Bundle);
+	UPatterEngine* Engine = UPatterEngine::Create(Bundle, {});
 	if (!TestNotNull(TEXT("the engine is created"), Engine)) return false;
 	UPatterFlow* Flow = Engine->OpenFlow(TEXT("f"), TEXT("s1"));
 	if (!TestNotNull(TEXT("a flow opens"), Flow)) return false;
@@ -156,7 +156,10 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 			// option's prompt is its first beat, here a text beat).
 			TestEqual(TEXT("the choice step names its group"), After.GroupId, FString(TEXT("g1")));
 			if (TestEqual(TEXT("the choice has its one option"), After.Options.Num(), 1))
-				TestEqual(TEXT("and the option's prompt is text"), static_cast<uint8>(After.Options[0].PromptKind), static_cast<uint8>(EPatterPromptKind::Text));
+			{
+				TestTrue(TEXT("the option has a prompt"), After.Options[0].bHasPrompt);
+				TestEqual(TEXT("and the option's prompt is text"), static_cast<uint8>(After.Options[0].Prompt.Kind), static_cast<uint8>(EPatterPromptKind::Text));
+			}
 		}
 	}
 
@@ -180,7 +183,7 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 	// A flow the save did not carry comes back CLOSED rather than dangling: getFlow answers null for
 	// its id, every UPatterFlow method guards on the pointer, and IsClosed reports the truth.
 	{
-		UPatterEngine* Fresh = UPatterEngine::Create(Bundle);
+		UPatterEngine* Fresh = UPatterEngine::Create(Bundle, {});
 		UPatterFlow* Ghost = Fresh->OpenFlow(TEXT("ghost"), TEXT("s1"));
 		const FString EmptySave = UPatterSave::SerializeState(Engine); // a save with flow "f", not "ghost"
 		if (TestTrue(TEXT("the other engine's save loads"), UPatterSave::DeserializeState(Fresh, EmptySave)))

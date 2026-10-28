@@ -38,7 +38,7 @@ The [play loop](/play/concepts/) in Unreal terms: build an engine, open a flow, 
 it, present each `FPatterStep`:
 
 ```cpp
-UPatterEngine* Engine = UPatterEngine::Create(Bundle);          // Bundle: a UPatterBundle*
+UPatterEngine* Engine = UPatterEngine::Create(Bundle, {});      // Bundle: a UPatterBundle*; {}: no host scopes bound
 UPatterFlow*   Flow   = Engine->OpenFlow(TEXT("main"), TEXT("intro"));
 
 FPatterStep Step = Flow->Advance();   // Step.Type, Step.Text, Step.Character, Step.Options
@@ -65,6 +65,16 @@ set on a `Line` or `Text` step and 0 on any other, so it has no `bHas` flag. The
 stages the scene: stage it, or let it pass, but don't show it as on-screen text. It's false on any
 other step and on a replayed prompt.
 
+`OpenFlow` with an empty scene, or a flow's `Reset`, starts at the project's start scene (and block), the
+one the writer set; a project that sets none starts at its first scene.
+
+Blueprint can't catch what the engine throws, so a refused call says so in the open. A flow keeps the reason
+its last `Advance`, `AdvanceToStop`, `Choose`, `Goto`, or `Reset` was refused in **`GetLastError`** (empty when
+it wasn't, and cleared by the next one that succeeds). Each `SetProperty*` returns `""` when the write
+landed and otherwise why it didn't: a value that doesn't fit the property's declaration
+(`"@patter.gold" takes a number; "lots" doesn't fit`), or a name the content doesn't declare. Every refusal
+is also logged to the plugin's **`LogPatterplay`** category.
+
 To choose how the engine plays, create it with **`UPatterEngine::CreateWithOptions`** and an
 `FPatterEngineOptions`: a seed for a repeatable run, the locale to play in, a decision log (read it
 with `Log`), whether a chosen option's prompt is spoken back, and whether closed captions start on.
@@ -74,8 +84,20 @@ The engine's **`OnDryChoice`** event fires whenever a choice has nothing left to
 FPatterEngineOptions Options;
 Options.Locale = TEXT("fr");
 Options.bLog = true;
-UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options);
+UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options, {});
 ```
+
+`Locale()` is the locale in use and `Locales()` the bundle's default and included locales. The `Locale`
+option and `SetLocale` resolve a locale by one rule, the same on every runtime: case and `_` / `-` don't
+matter, so the locale itself wins, then its language (`fr` for `fr-FR`), then the default, whose text is
+marked `<Untranslated: id>`. Each fallback is reported. A choice already on screen follows `SetLocale`
+too.
+
+The engine's **`OnError`** event hears every problem it carried on past (an `FPatterPlayError`): a content
+error, a `Setup` problem (a locale the bundle doesn't have, a host scope it doesn't declare), or a `Save`
+report (a load whose place has gone from this build). `OnError` can only be bound once `Create` has
+returned, so a `Setup` problem found while the engine is made is logged and put in the decision log at
+once, and reaches `OnError` on the first `OpenFlow`.
 
 The **PatterplayDemo** sample project (the second folder in the release zip) holds two working
 references. Press **Play** in it and **`ATourDemoActor`** runs the complete interactive Patter
@@ -88,16 +110,17 @@ it empty to play silently.
 
 ## Your game's state
 
-Give the engine your `@world` values in a **`UPatterWorld`** when you create it. The story reads
-them through it before every condition, effects write back into it, and anything else you bind to
-the same object, your own systems or the Storylet Engine's `UStoryletWorld`, sees the same values:
+Give the engine your `@world` values in a **`UPatterWorld`** when you create it, in the host-scopes map
+under the scope's token. The story reads them through it before every condition, effects write back into
+it, and anything else you bind to the same object, your own systems or the Storylet Engine's
+`UStoryletWorld`, sees the same values:
 
 ```cpp
 UPatterWorld* World = NewObject<UPatterWorld>(this);
 World->SetString(TEXT("time_of_day"), TEXT("night"));
 World->SetBool(TEXT("knows_road"), false);
 World->SetReadOnly(TEXT("time_of_day"), true);   // yours alone: a story write is refused
-UPatterEngine* Engine = UPatterEngine::Create(Bundle, World);
+UPatterEngine* Engine = UPatterEngine::Create(Bundle, { { TEXT("world"), World } });
 
 World->OnChanged.AddDynamic(this, &AMyActor::OnWorldChanged);   // (Name, Value, bFromStory)
 ```
@@ -105,20 +128,22 @@ World->OnChanged.AddDynamic(this, &AMyActor::OnWorldChanged);   // (Name, Value,
 Everything on `UPatterWorld` is Blueprint-callable, with typed `Set*` / `Get*`, `Has`, `Names`,
 `SetReadOnly`, and an `OnChanged` delegate that tells your own writes from the story's. Names match
 case-insensitively, as the story's references do. The engine registers a bound world as an
-**external** scope: the values stay in your container, and no Patter save holds them. Leave `World`
-out of `Create` and the engine **self-backs** `@world` from the declared defaults, as a property it
+**external** scope: the values stay in your container, and no Patter save holds them. Leave `world`
+out of the map and the engine **self-backs** `@world` from the declared defaults, as a property it
 stores and saves with the rest of the run, which is right for a run that never leaves the engine;
-`GetBoundWorld()` says which you have.
+`GetHostScope(TEXT("world"))` says which you have. The map binds any host scope the project declares,
+by its token, in the same way. Tokens are case-sensitive: one the bundle doesn't declare (`World` for
+`world`) is reported through `OnError` as a `Setup` problem, naming the declared spelling, and never folded.
 
 Two read-only rules meet here and stay distinct. A property declared **`writable: false`** in the
 project is the *story's* promise, refused by the engine whether or not a world is bound. Only
 the story's write is refused; your own `SetProperty` writes it, because the value is the game's.
 **`SetReadOnly`** is the *game's* policy, a name the story may read but this game will not let it
-write. Either refusal fails the step and logs why, never crashes, and neither binds your own `Set*`
-calls. A bound container is never in a Patter save, so your game saves it once, however it already
+write. Either refusal is played through and reported through `OnError`, never a crash, and neither binds
+your own `Set*` calls. A bound container is never in a Patter save, so your game saves it once, however it already
 saves things, and a load never writes through it. The binding survives `HotSwap` and `ApplyLiveBundle`.
-It is the same shape as the Storylet Engine's `UStoryletEngine::Create(Bundle, …, World)`, so a
-project running both reads one API. [World Properties](/play/world-properties/) has the full picture.
+It's the same option every Patterplay runtime takes (JS `hostScopes`, Unity `EngineOptions.HostScopes`,
+Godot `host_scopes`). [World Properties](/play/world-properties/) has the full picture.
 
 ## One registry per game
 
@@ -156,8 +181,8 @@ UPatterSave::DeserializeState(Engine, PatterJson);
 Given a registry, the engine registers `@patter` under `patter` and each flow's and scene's bag under
 a key starting `patter/`, which no expression can name. Its save then leaves the values out, because
 your game saves the registry. `@world` is yours to register: owned, as above, when the registry should
-store and save it, or bound through a `UPatterWorld` passed as the third argument, when your game
-keeps the values. The engine self-backs nothing on a registry you pass. Every expression can read
+store and save it, or bound through a `UPatterWorld` in the host-scopes map passed as the third argument,
+when your game keeps the values. The engine self-backs nothing on a registry you pass. Every expression can read
 every registered scope.
 
 **Other engines' scopes need no setting.** A Patter line can name the Storylet Engine's `@story.act`
@@ -221,7 +246,7 @@ running engine and it lists that engine's `@patter` properties live, with type-a
 into the playing game:
 
 ```cpp
-UPatterEngine* Engine = UPatterEngine::Create(Bundle);
+UPatterEngine* Engine = UPatterEngine::Create(Bundle, {});
 Engine->RegisterForDebug(TEXT("Main story"));   // Play mode; the panel now watches this engine
 // It unregisters itself when destroyed. FPatterDebug::Register(Engine, Label) is the C++ equivalent.
 ```
@@ -242,8 +267,8 @@ dropped there), so it is safe to leave wired in:
 ```cpp
 Link = FPatterDebugLink::Create(Engine->BuildId(), TEXT("My Game"));   // Link: TSharedPtr<FPatterDebugLink>
 Link->FlowOpened(TEXT("main"));
-// ...after each Advance()/Choose() (map EPatterStepType -> "line"/"text"/"gameEvent"/"choice"/"end"):
-Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, StepTypeName(Step.Type));
+// ...after each Advance()/Choose(); TypeName spells the step's type as the wire does ("line", "gameEvent", ...):
+Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, FPatterDebugLink::TypeName(Step.Type));
 ```
 
 The protocol and the editor side are on [Live refresh & debug](/play/live-debug/).
@@ -255,8 +280,10 @@ seeded random generator. An engine you built with `Create` also carries every pr
 `@patter`, `@scene`, and a self-backed `@world` alike, so one call is still the whole game; an engine
 you built on your own registry leaves them to [the registry's save](#one-registry-per-game). It is the
 same `patter/save@0` format every Patterplay runtime uses, so a save written on the web or in Unity
-loads here. A save written before property values moved into the registry (version 2) still loads,
-and its values move into the registry as it does.
+loads here. Saves are version 4: a pending choice keeps which options it offered, not their text, so
+they're shown in the loading engine's language, and the save names the next line by its id. A save loaded
+into an edited build resumes at the nearest safe point and is reported through `OnError` as `Save`. A
+version 3 save, from before 1.0, still loads; a version 2 save no longer does.
 
 Use **`UPatterSave`**, which is Blueprint-callable and gives you the JSON to write where you like:
 `SerializeState(Engine)` returns it, `DeserializeState(Engine, Json)` restores it and returns

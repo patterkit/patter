@@ -86,8 +86,10 @@ In `demo/` (delete the folder freely):
 
 - **Save / load**: `PatterSave.serialize_state(engine)` / `deserialize_state(engine, json)` (or
   `engine.save_game()` / `engine.load_game(blob)` for the bare dictionary) snapshot and restore the
-  whole run. Saves are the shared `patter/save@0` format, version 3; a version 2 save in its envelope
-  still loads.
+  whole run. Saves are the shared `patter/save@0` format, version 4; a version 3 save still loads. A
+  pending choice saves which options were offered, not their text, so a load shows it in the language in
+  use. A load whose place has gone from an edited build resumes at the nearest safe point and reports it
+  through `on_error` (kind `"save"`).
 - **One flow as data**: `engine.capture_flow(id)` returns a flow's state as a plain Dictionary (its
   cursor, PRNG, visits, and selectors, as a save writes them, plus its own `@patter` and `@scene`
   values), without its id, for your game to keep and save like anything else. `engine.restore_flow(id,
@@ -121,8 +123,21 @@ In `demo/` (delete the folder freely):
 - **Live Link**: `PatterDebugLink` connects a running game to Patterpad, streaming the story
   cursor to the editor and hot-reloading edited bundles back in.
   See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
-- **Localisation**: play any locale of an Embedded bundle (`engine.set_locale`), or ship an
-  IDs-only bundle and localise in your own system.
+- **Localisation**: play any locale of an Embedded bundle (the `locale` option or `engine.set_locale`), or
+  ship an IDs-only bundle and localise in your own system. A locale resolves by one rule: case and `_` /
+  `-` don't matter, then the language alone (`fr` for `fr-FR`), then the default, and anything but an
+  exact match is reported. `engine.locale()` is the locale in use; `engine.locales()` gives the bundle's
+  `{"default", "included"}`.
+- **Problems and refusals**: the engine reports what it carried on past to your `on_error` Callable (or
+  `push_warning`): a content error, how it was set up (`"setup"`: an option key it doesn't take, a locale
+  the bundle doesn't have, a host scope it doesn't declare, reported as the engine is built), and a load
+  whose place has gone (`"save"`). A call it refuses can't throw in GDScript: `set_property` returns the
+  refusal (`""` when written; a value that doesn't fit its declaration, or a name the content doesn't
+  declare, is refused), and `advance()` and `choose()` keep theirs for `flow.last_error()`, cleared by the
+  next success. Each is also `push_error`'d.
+- **Copies and read-only values**: the Game Data and tags a step, an option, an outline, or a lookup hands
+  you are your own copies, so editing them changes nothing the engine says next. Extension values are the
+  bundle's own: read them, never edit them.
 - **Exporting**: nothing to configure. From 0.4.5 the plugin puts your bundle into the export
   itself, so a build has its story on every platform. (If you use Audio Folders, `patteraudio.json`
   is still yours to add to the export filters.) Details:

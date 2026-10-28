@@ -27,13 +27,21 @@ class PATTERPLAYRUNTIME_API UPatterFlow : public UObject
 public:
 	// Run until the next line / text / gameEvent / choice / end. A content error on the way (a condition or
 	// an effect that fails to evaluate) does not stop the flow: the engine plays through it and reports it
-	// through UPatterEngine::OnError.
+	// through UPatterEngine::OnError. A refusal (the flow can't be advanced: a jump cycle with nothing to
+	// deliver, say) gives an empty End step, logged, and its message in GetLastError.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	FPatterStep Advance();
 
-	// Pick an eligible option by id; the next Advance() runs it.
+	// Pick an eligible option by id; the next Advance() runs it. A refusal (no choice pending, an unknown or
+	// ineligible option) changes nothing, is logged, and its message is in GetLastError.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	void Choose(const FString& OptionId);
+
+	// Why this flow's last Advance, AdvanceToStop, Choose, Goto, or Reset was refused; empty when it wasn't.
+	// Set on a refusal and cleared by the next of them that succeeds. Blueprint can't catch what the core
+	// throws, so the message is kept here (and logged to LogPatterplay) for a game to show or act on.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	FString GetLastError() const { return LastError; }
 
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	bool IsEnded() const;
@@ -72,9 +80,13 @@ public:
 	bool NextStage(const FString& Ref, const FString& Stage, FString& OutStage) const;
 
 	// Write a property by ref from this flow, @scene included. The GAME's write, so a host declaration's
-	// read-only flag (the story's promise) does not refuse it.
-	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	void SetProperty(const FString& Ref, const FPatterValue& Value);
+	// read-only flag (the story's promise) does not refuse it. Returns "" when the write landed, else why it
+	// was refused, with nothing changed (and logged): a value that doesn't fit the property's declaration,
+	// in the same words on every runtime (`"@patter.gold" takes a number; "lots" doesn't fit`), or a name
+	// the content doesn't declare in @patter, this scene's @scene, or a host scope the bundle declares. An
+	// opaque host scope takes anything.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (ReturnDisplayName = "Refusal"))
+	FString SetProperty(const FString& Ref, const FPatterValue& Value);
 
 	// This flow's decisions, in order. Empty unless the engine was created with bLog on.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
@@ -136,9 +148,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	FString Id() const { return FlowId; }
 
-	UE_DEPRECATED(5.7, "Use Id(), the name every Patterplay runtime uses.")
-	const FString& GetFlowId() const { return FlowId; }
-
 	void Init(UPatterEngine* InOwner, const FString& InId, const std::shared_ptr<patter::Flow>& InFlow);
 	// Live bundle refresh, a save load, a close: point this wrapper at the flow of the SAME id inside
 	// the engine as it is NOW (empty when the flow did not survive - the wrapper then no-ops).
@@ -153,6 +162,9 @@ private:
 	TObjectPtr<UPatterEngine> Owner = nullptr;
 
 	FString FlowId; // the flow's id, for re-binding after a load / hot swap
+	FString LastError; // see GetLastError
+	// Run a refusing call: clear LastError, and on a throw keep and log its message. False when refused.
+	bool Guard(const TFunctionRef<void()>& Call);
 	// OWNING, not borrowed. The engine rebuilds or drops its flows on loadGame / closeFlow / reset,
 	// and this wrapper outlives those by design; holding a share means a missed re-bind reads as a
 	// finished flow rather than as freed memory.
@@ -162,7 +174,7 @@ private:
 /** A choice ran dry: none of its options could be offered. Carries the choice group's id. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterDryChoiceEvent, const FString&, GroupId);
 
-/** A content error the engine played through: what failed, where, and why. */
+/** A problem the engine reported and carried on past: what it was, where, and why. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterErrorEvent, const FPatterPlayError&, Error);
 // A saved value a load put back to its default: its scope (the registry key), its name, and what the save held.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPatterRefitEvent, const FString&, Scope, const FString&, Name, const FPatterValue&, Saved);
@@ -182,29 +194,37 @@ public:
 	// (@patter, each flow's and each scene's) is in that registry, and UPatterSave's SerializeState
 	// carries all of it in one save.
 	//
-	// `World` is the GAME's @world container (UPatterWorld): bind one and the story reads and writes your
-	// values through it, and anything else bound to the same object - the Storylet Engine, your own
-	// systems - sees the same state. It is EXTERNAL to the engine: never in a Patter save, never written
-	// by a load; the game saves its container itself. Leave it null and the engine self-backs @world from
-	// the declared defaults, as a property it stores and SAVES with everything else. The binding survives
-	// HotSwap / ApplyLiveBundle. Same shape as UStoryletEngine::Create(Bundle, ..., World).
-	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	static UPatterEngine* Create(UPatterBundle* Bundle, UPatterWorld* World = nullptr);
+	// `HostScopes` binds the scopes the GAME owns, by token, each to a container (UPatterWorld): for World
+	// Properties, a map of "world" to your container. The story reads and writes your values through it,
+	// and anything else bound to the same object - the Storylet Engine, your own systems - sees the same
+	// state. A bound scope is EXTERNAL to the engine: never in a Patter save, never written by a load; the
+	// game saves its container itself. A declared scope left unbound is self-backed from its declared
+	// defaults, as a property the engine stores and SAVES with everything else. Tokens are case-sensitive: a
+	// token the bundle doesn't declare is reported through OnError (Setup), naming the declared spelling
+	// when only the case differs. The bindings survive HotSwap / ApplyLiveBundle. The same option on every
+	// Patterplay runtime (JS `hostScopes`, Unity `EngineOptions.HostScopes`, Godot `host_scopes`). Leave
+	// the map empty to bind none.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (AutoCreateRefTerm = "HostScopes"))
+	static UPatterEngine* Create(UPatterBundle* Bundle, const TMap<FString, UPatterWorld*>& HostScopes);
 
 	// Create, choosing how the engine plays: a seed for a repeatable run, the locale, the decision log
-	// (Log), prompt replay on choose, and closed captions. See FPatterEngineOptions.
-	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	static UPatterEngine* CreateWithOptions(UPatterBundle* Bundle, const FPatterEngineOptions& Options, UPatterWorld* World = nullptr);
+	// (Log), prompt replay on choose, and closed captions (see FPatterEngineOptions), with the host scopes
+	// Create takes.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (AutoCreateRefTerm = "HostScopes"))
+	static UPatterEngine* CreateWithOptions(UPatterBundle* Bundle, const FPatterEngineOptions& Options, const TMap<FString, UPatterWorld*>& HostScopes);
 
 	// Fired with the choice group's id whenever a choice runs dry (no option could be offered), whether
 	// or not the log is on: live feedback for a writer testing the content.
 	UPROPERTY(BlueprintAssignable, Category = "Patterplay")
 	FPatterDryChoiceEvent OnDryChoice;
 
-	// Fired with each content error the engine played through (see FPatterPlayError): a condition that
-	// failed and counted as false, an effect that failed and was skipped, a Best-match part that failed
-	// and scored as false. The story carries on either way. Each is also logged as a Warning, so a
-	// content bug is never silent, and, with the decision log on, recorded as a `diagnostic` entry.
+	// Fired with each problem the engine reported and carried on past (see FPatterPlayError): a condition
+	// that failed and counted as false, an effect that failed and was skipped, a Best-match part that failed
+	// and scored as false, a set-up problem (Setup), a load whose place has gone (Save). The story carries
+	// on either way. Each is also logged to LogPatterplay as a Warning, so none is ever silent, and, with
+	// the decision log on, recorded as a `diagnostic` entry. A Setup report found while the engine is made
+	// (a locale the bundle doesn't have, a host scope it doesn't declare) comes before this event can be
+	// bound: it is logged and recorded at once, and delivered here on the first OpenFlow.
 	UPROPERTY(BlueprintAssignable, Category = "Patterplay")
 	FPatterErrorEvent OnError;
 
@@ -223,9 +243,9 @@ public:
 
 	// C++ only: construct on the GAME's registry, the one registry a game holds for every engine and
 	// system that keeps properties in it, saved once by the game. The engine registers its scopes in it
-	// (@patter under `patter`, its per-flow and per-scene bags under keys starting `patter/`, and a bound
-	// World as an external @world), reads every other scope from it, and self-backs nothing: a declared
-	// @world with no World bound is the game's to register. SerializeState then leaves the property
+	// (@patter under `patter`, its per-flow and per-scene bags under keys starting `patter/`, and each
+	// bound host scope as an external scope), reads every other scope from it, and self-backs nothing: a
+	// declared host scope left unbound is the game's to register. SerializeState then leaves the property
 	// values out; save `Registry->save()` beside it, and load it before or after DeserializeState.
 	// Returns nullptr (and logs) on error, including a token the registry already holds.
 	//
@@ -234,13 +254,15 @@ public:
 	// registry to both. Not a Blueprint node, as a std C++ type has no Blueprint handle. The module that
 	// makes the registry includes "Patter/Kernel.h" and sets bEnableExceptions in its Build.cs.
 	static UPatterEngine* CreateWithRegistry(UPatterBundle* Bundle, const std::shared_ptr<patter::ScopeRegistry>& Registry,
-		UPatterWorld* World = nullptr, const FPatterEngineOptions& Options = FPatterEngineOptions());
+		const TMap<FString, UPatterWorld*>& HostScopes = {}, const FPatterEngineOptions& Options = FPatterEngineOptions());
 
-	// The @world container bound at Create, or null for a self-backed engine.
+	// The container bound at Create under this host scope's token ("world"), or null when none is (the
+	// scope is self-backed, the game's registry holds it, or the bundle has no such scope).
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
-	UPatterWorld* GetBoundWorld() const;
+	UPatterWorld* GetHostScope(const FString& Token) const;
 
-	// Open (and start) a named flow at a scene (its id or gameId; empty = the first scene).
+	// Open (and start) a named flow at a scene (its id or gameId; empty = the bundle's start, else the first
+	// scene). The first OpenFlow delivers to OnError any Setup report made while the engine was built.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (AdvancedDisplay = "Block,bUseSeed,Seed"))
 	UPatterFlow* OpenFlow(const FString& Id, const FString& Scene, const FString& Block = TEXT(""), bool bUseSeed = false, int64 Seed = 0);
 
@@ -268,13 +290,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay|Qualities")
 	bool NextStage(const FString& Ref, const FString& Stage, FString& OutStage) const;
 
-	// Write a shared property by ref. The typed setters below are shortcuts for one kind.
-	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	void SetProperty(const FString& Ref, const FPatterValue& Value);
+	// Write a shared property by ref (@patter, a host scope, another engine's scope). The typed setters below
+	// are shortcuts for one kind. Returns "" when the write landed, else why it was refused, with nothing
+	// changed (and logged): a value that doesn't fit the property's declaration, in the same words on every
+	// runtime (`"@patter.gold" takes a number; "lots" doesn't fit`), a name the content doesn't declare in
+	// @patter or a host scope the bundle declares, an @scene ref (write those on a flow), or a scope nobody
+	// can write. An opaque host scope takes anything; another engine's scope is that engine's to check.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (ReturnDisplayName = "Refusal"))
+	FString SetProperty(const FString& Ref, const FPatterValue& Value);
 
-	// The language playing now.
+	// The locale in use: the one asked for, or the one the locale rule fell back to (see SetLocale).
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	FString Locale() const;
+
+	// The bundle's locales: its default, and every locale it includes.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	FPatterLocales Locales() const;
 
 	// True for a build that embeds the source language only so it can be played: not shippable.
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
@@ -342,22 +373,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	bool GetPropertyBool(const FString& Ref) const;
 
-	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	void SetPropertyNumber(const FString& Ref, double Value);
+	// SetProperty for a number: "" when it landed, else why it was refused.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (ReturnDisplayName = "Refusal"))
+	FString SetPropertyNumber(const FString& Ref, double Value);
 
-	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	void SetPropertyBool(const FString& Ref, bool bValue);
+	// SetProperty for true or false: "" when it landed, else why it was refused.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (ReturnDisplayName = "Refusal"))
+	FString SetPropertyBool(const FString& Ref, bool bValue);
 
-	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	void SetPropertyString(const FString& Ref, const FString& Value);
+	// SetProperty for text, an enum's value, or a quality's stage: "" when it landed, else why it was refused.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (ReturnDisplayName = "Refusal"))
+	FString SetPropertyString(const FString& Ref, const FString& Value);
 
 	// The compiled bundle's build hash (content.hash). Pass it to FPatterDebugLink so Patterpad's live
 	// link can tell whether the running game matches the currently open project (in-sync vs stale).
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	FString BuildId() const;
-
-	UFUNCTION(BlueprintPure, Category = "Patterplay", meta = (DeprecatedFunction, DeprecationMessage = "Use BuildId, the name every Patterplay runtime uses."))
-	FString GetBuildId() const { return BuildId(); }
 
 	// Live bundle refresh (editor pushes over the live link, or any bundle you loaded yourself).
 	// Applies IN PLACE - this engine object and every UPatterFlow handle stay valid:
@@ -382,8 +413,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	TArray<FString> GetPropertyFlags(const FString& Ref) const;
 
-	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	void SetPropertyFlags(const FString& Ref, const TArray<FString>& Values);
+	// SetProperty for a list of flags: "" when it landed, else why it was refused.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (ReturnDisplayName = "Refusal"))
+	FString SetPropertyFlags(const FString& Ref, const TArray<FString>& Values);
 
 	// The shared @patter properties, each with type / value / default / enum values, for a live state
 	// inspector (the editor's Runtime State window, or your own debug UI). Per-flow @local properties
@@ -396,9 +428,6 @@ public:
 	// "why that line and not its siblings", which no step result can.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
 	TArray<FPatterLogEntry> Log() const;
-
-	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug", meta = (DeprecatedFunction, DeprecationMessage = "Use Log, the name every Patterplay runtime uses."))
-	TArray<FPatterLogEntry> GetLog() const { return Log(); }
 
 	// How many times each node has been entered across every flow, by node id: the shared count.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
@@ -415,7 +444,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	TArray<FString> TagsForBeat(const FString& BeatId) const;
 
-	// Switch language live, mid-game: subsequent beats render in the new locale. No state changes.
+	// Switch language live, mid-game: subsequent beats, a pending choice's options, and names render in the
+	// new locale. No state changes. The locale resolves by one rule, the same for FPatterEngineOptions::Locale
+	// and on every runtime: case and `_` / `-` don't matter, so an exact match wins, then the language alone
+	// ("fr" for "fr-FR"), then the bundle's default, whose text keeps the `<Untranslated: id>` marker. Anything
+	// but an exact match is reported through OnError (Setup). "fr" never looks for "fr-FR".
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	void SetLocale(const FString& Locale);
 
@@ -462,10 +495,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UPatterBundle> BundleRef = nullptr;
 
-	// The game's @world container, when one was bound: held so GC keeps it and so a hot swap can re-bind
-	// the fresh core to the same object (the core copies its host scopes at construction).
+	// The game's host-scope containers, by token, as bound at Create: held so GC keeps them. The core keeps
+	// each binding for its whole life, a hot swap's replacement included.
 	UPROPERTY()
-	TObjectPtr<UPatterWorld> WorldRef = nullptr;
+	TMap<FString, TObjectPtr<UPatterWorld>> HostScopeRefs;
 
 	// Tier-1 refresh: the core points its string tables INTO this bundle, so it must outlive the
 	// swap (the structural bundle above still owns the nodes).
@@ -547,12 +580,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	bool InCheckpoint() const;
 
-	UFUNCTION(BlueprintPure, Category = "Patterplay", meta = (DeprecatedFunction, DeprecationMessage = "Use InCheckpoint, the name every Patterplay runtime uses."))
-	bool IsInCheckpoint() const { return InCheckpoint(); }
-
 private:
-	static UPatterEngine* Build(UPatterBundle* Bundle, UPatterWorld* World, const std::shared_ptr<patter::ScopeRegistry>& Registry,
-		const FPatterEngineOptions& Options);
+	static UPatterEngine* Build(UPatterBundle* Bundle, const TMap<FString, UPatterWorld*>& HostScopes,
+		const std::shared_ptr<patter::ScopeRegistry>& Registry, const FPatterEngineOptions& Options);
+
+	// A refused write, as SetProperty* return it: "" when Call landed, else its message, logged.
+	FString Write(const TFunctionRef<void()>& Call);
+
+	// Hand OnError the Setup reports held since the engine was built (see OnError).
+	void DeliverHeldErrors();
+
+	// True while Build constructs the core: OnError can't be bound yet, so a report is held instead.
+	bool bBuilding = false;
+	TArray<FPatterPlayError> HeldErrors;
 
 	// SHARED rather than a pimpl: HotSwap takes the replacement core the engine hands back.
 	std::shared_ptr<patter::Engine> Engine;

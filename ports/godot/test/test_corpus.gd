@@ -8,6 +8,9 @@ extends SceneTree
 var _fails := 0
 ## What every engine of the running case reported through on_refit, for expectRefits.
 var _refits: Array = []
+## What every engine of the running case reported through on_error, for expectErrors: from the first
+## engine's construction on.
+var _errors: Array = []
 var _dialect: Dictionary = PatterDialect.dialect()
 
 ## The shared registry corpus runner (vendored beside this file from ../expr, no
@@ -445,11 +448,25 @@ func _run_specificity(arr: Array) -> int:
 # -- runtime -------------------------------------------------------------------
 
 # A case's engineOptions: the construction options it plays under, for its engine and every engine a
-# saveLoad / hotSwap makes (they share `options`). An absent key keeps the engine's default.
+# saveLoad / hotSwap makes (they share `options`). An absent key keeps the engine's default. Its locale
+# and host scopes too (corpus 8): each host scope a resolver over a store kept for the whole case.
 func _apply_engine_options(c: Dictionary, options: Dictionary) -> void:
 	# A fresh case: its engines (and every one a saveLoad or hotSwap makes) record into one list.
 	_refits.clear()
+	_errors.clear()
 	options["on_refit"] = func(misfits: Array) -> void: _refits.append_array(misfits)
+	options["on_error"] = func(err: Dictionary) -> void: _errors.append(err)
+	if c.has("locale"):
+		options["locale"] = str(c["locale"])
+	if c.has("hostScopes"):
+		var scopes := {}
+		for token in c["hostScopes"]:
+			var store := {}
+			scopes[str(token)] = {
+				"get": func(n): return store.get(n),
+				"set": func(n, v): store[n] = v,
+			}
+		options["host_scopes"] = scopes
 	var eo: Dictionary = c.get("engineOptions", {})
 	if eo.has("replayPromptOnChoose"):
 		options["replay_prompt_on_choose"] = bool(eo["replayPromptOnChoose"])
@@ -465,8 +482,6 @@ func _run_runtime(arr: Array) -> int:
 		if c.has("seed"):
 			var rng := PatterMulberry32.new(int(c["seed"]))
 			options["rng"] = func(): return rng.next()
-		if c.has("locale"):
-			options["locale"] = c["locale"]
 		_apply_engine_options(c, options)
 		var engine := PatterEngine.new(c["bundle"], options)
 		var start: Dictionary = c.get("start", {})
@@ -693,6 +708,7 @@ func _run_scripted(arr: Array) -> int:
 func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: Dictionary, options: Dictionary, name: String) -> bool:
 	var current := ""
 	var cp = null   # the open checkpoint, between a "checkpoint" op and its "rollback" / "commit"
+	var handed = null   # what the last advance or stepFor handed the host, for `scribble`
 	var captured := {}   # captureFlow states, by name, for restoreFlow
 	var ok := true
 	for op in ops:
@@ -722,13 +738,25 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 			"useFlow":
 				current = op["flow"]
 			"advance":
-				chunk.append(_transcript_step(holder["engine"].get_flow(current).advance(), _ids_only(bundle)))
+				var step: Dictionary = holder["engine"].get_flow(current).advance()
+				chunk.append(_transcript_step(_clone(step), _ids_only(bundle)))
+				handed = step
 			"stepFor":
 				# The step a flow would deliver for a beat now, recorded as a delivered one is; none for an
 				# unknown id. The flow named, else the current one.
 				var sf = holder["engine"].get_flow(op.get("flow", current)).step_for(op["beat"])
 				if sf != null:
-					chunk.append(_transcript_step(sf, _ids_only(bundle)))
+					chunk.append(_transcript_step(_clone(sf), _ids_only(bundle)))
+				handed = sf
+			"scribble":
+				# A careless host defaces what it was handed. It is its own copy, so nothing the engine says
+				# next changes.
+				if handed is Dictionary:
+					if handed.get("type", "") == "choice":
+						for o in handed.get("options", []):
+							_scribble(o.get("gameData"))
+					elif handed.get("type", "") != "end":
+						_scribble(handed.get("gameData"))
 			"choose":
 				holder["engine"].get_flow(current).choose(op["id"])
 			"resetFlow":
@@ -795,9 +823,9 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 					if not _refused(holder, name, "hotSwap", func(e): return is_same(e.hot_swap(swap_to), e)):
 						return false
 				else:
-					var swap_blob: Dictionary = holder["engine"].save_game()
-					holder["engine"] = PatterEngine.new(bundle_b, options)
-					holder["engine"].load_game(swap_blob)
+					# The engine's own hot_swap, as the reference runner uses: it carries the locale asked
+					# for and the captions toggle across, and the replacement reports as it is built.
+					holder["engine"] = holder["engine"].hot_swap(bundle_b if not bundle_b.is_empty() else bundle)
 			"setLocale":
 				holder["engine"].set_locale(op["locale"])
 			"setClosedCaptions":
@@ -925,8 +953,36 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 				holder["engine"].commit(cp)
 				cp = null
 			"setProperty":
-				# The game's write, with host authority (a game moving @world).
-				holder["engine"].set_property(op["ref"], PatterValues.to_value(op["value"]))
+				# The game's write, with host authority (a game moving @world). A refusal is the returned
+				# message, which this addon also push_errors; nothing changes, which the ops after it show.
+				var refusal: String = holder["engine"].set_property(op["ref"], PatterValues.to_value(op["value"]))
+				if op.get("expectRefused", false) != (refusal != ""):
+					_fail("scripted", name, "setProperty %s: expected %s, got %s" % [op["ref"],
+						"a refusal" if op.get("expectRefused", false) else "the write", ("refused: " + refusal) if refusal != "" else "written"])
+					return false
+			"expectErrors":
+				# Kind, node, and (when the expectation names one) flow: never the message, which is each
+				# runtime's own. Taking them empties the record.
+				var want_errors: Array = op["expectResult"]
+				var got_errors: Array = []
+				var seen_errors: Array = []
+				for i in range(_errors.size()):
+					var e: Dictionary = _errors[i]
+					var g := {"kind": e.get("kind"), "node": e.get("node")}
+					if i < want_errors.size() and (want_errors[i] as Dictionary).has("flow"):
+						g["flow"] = e.get("flow")
+					got_errors.append(g)
+					seen_errors.append({"kind": e.get("kind"), "node": e.get("node"), "flow": e.get("flow")})
+				if not _deep_equal(got_errors, want_errors):
+					_fail("scripted", name, "expectErrors: expected %s, got %s" % [JSON.stringify(want_errors), JSON.stringify(seen_errors)])
+					return false
+				_errors.clear()
+			"expectLocale":
+				var got_locale: Dictionary = {"locale": holder["engine"].locale()}
+				got_locale.merge(holder["engine"].locales())
+				if not _deep_equal(got_locale, op["expectResult"]):
+					_fail("scripted", name, "expectLocale: expected %s, got %s" % [JSON.stringify(op["expectResult"]), JSON.stringify(got_locale)])
+					return false
 			"expectRefits":
 				# What the case's loads put back, in order, as { scope, name, value }.
 				if not _deep_equal(_refits, op["expectResult"]):
@@ -1016,6 +1072,25 @@ func _key_paths(v, path: String, out: Array) -> Array:
 		out.sort()
 	return out
 
+
+
+## The `scribble` op on one gameData: every flags list gains "scribbled", then every value becomes
+## "scribbled" and the map gains the key too.
+static func _scribble(game_data) -> void:
+	if not (game_data is Dictionary):
+		return
+	var gd: Dictionary = game_data
+	for k in gd.keys():
+		if gd[k] is Array:
+			(gd[k] as Array).append("scribbled")
+	for k in gd.keys():
+		gd[k] = "scribbled"
+	gd["scribbled"] = "scribbled"
+
+
+## A transcript's own copy of what a step carried, so a later `scribble` on the step can't reach it.
+static func _clone(v: Dictionary) -> Dictionary:
+	return v.duplicate(true)
 
 
 # -- gameData ------------------------------------------------------------------

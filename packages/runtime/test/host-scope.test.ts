@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import { Engine } from "@patterkit/runtime";
-import type { StepResult } from "@patterkit/runtime";
+import type { EngineOptions, PlayError, StepResult } from "@patterkit/runtime";
 import { exportBundle } from "@patterkit/compiler";
 import type { ProjectFile, Scene, LocaleFile } from "@patterkit/model";
 
@@ -92,13 +92,15 @@ describe("first-class host scopes", () => {
     expect(bag.get("gold")).toBe(105);
   });
 
-  it("still takes the deprecated `world` option as the world scope", () => {
+  it("reports the retired `world` option, which binds nothing: the scope self-backs", () => {
     const bag = new Map<string, number>([["gold", 100]]);
-    const engine = new Engine(bundle, {
-      world: { get: (n) => (n === "phase" ? "a2" : bag.get(n)), set: (n, v) => { bag.set(n, v as number); } },
-    });
-    expect(firstLine(engine.openFlow("f", { scene: "s" }))).toBe("gold 105 phase a2");
-    // Bound, so released with the engine like any scope hostScopes binds.
-    engine.hotSwap(bundle);
+    const errors: PlayError[] = [];
+    const options = {
+      world: { get: (n: string) => (n === "phase" ? "a2" : bag.get(n)), set: (n: string, v: unknown) => { bag.set(n, v as number); } },
+      onError: (e: PlayError) => errors.push(e),
+    } as EngineOptions; // a plain-JS caller's options, which no type check stops
+    const engine = new Engine(bundle, options);
+    expect(errors).toEqual([{ flow: "", kind: "setup", node: "world", message: expect.stringContaining("hostScopes: { world }") }]);
+    expect(firstLine(engine.openFlow("f", { scene: "s" }))).not.toContain("a2");
   });
 });

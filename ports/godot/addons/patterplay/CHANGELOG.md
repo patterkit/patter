@@ -6,6 +6,76 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+The runtime foundations before 1.0, from the hands-on review of October 2026, as the JS reference has them.
+Changes marked **Breaking (1.0)** change what an existing game sees. Pinned by the conformance corpus
+(version 8).
+
+### Added
+
+- **The project's start scene.** `open_flow(id)` with no scene, and `flow.reset()` with none, start at the
+  bundle's `start`, at its block when it names one. A bundle without one starts at the first scene, as before.
+- **Set-up problems and moved saves are reported** to `on_error` and the decision log (a `diagnostic` entry),
+  as a content error is. The kind `"setup"` (with `flow` `""`) covers an option key the engine doesn't take
+  (the options are an untyped Dictionary, so a mistyped key used to be ignored in silence; the retired
+  `"world"` says how to bind the scope now), a locale the bundle doesn't have, and a `host_scopes` token the
+  bundle doesn't declare, naming the declared spelling when only the case differs. Those found while the
+  engine is built are reported as the constructor ends, in that order. The kind `"save"` covers a load
+  whose place has gone from the build. With no `on_error`, each is `push_warning`'d.
+- **`engine.locales()`**: the bundle's `{"default", "included"}`, a fresh copy each call.
+- **One rule for a locale**, used by the `locale` option, `set_locale`, `replace_strings`, and `hot_swap`:
+  case and `_` / `-` don't matter, so the locale itself wins, then its language (`fr` for `fr-FR`), then the
+  default, whose text keeps the `<Untranslated: id>` marker. Anything but an exact match is reported. `fr`
+  never looks for `fr-FR`. An IDs-only bundle takes the locale as given, unreported.
+- **`flow.last_error()`**: why the last `advance()` or `choose()` was refused (also `push_error`'d), or `""`.
+  Set on a refusal (a flow that hasn't started, no choice pending, an unknown or greyed option, a jump to
+  nowhere, a jump cycle that never settles) and cleared by the next of those calls that succeeds. A refused
+  `advance()` returns `{"type": "end"}`, as before.
+- **A save loaded into an edited build resumes at the nearest safe point**, reported as `"save"` only when
+  its place has really gone: a gone snippet is skipped; a gone next beat ends its snippet there (its onExit
+  and jump run), so nothing plays twice; a gone option offers its choice again; a pending choice none of
+  whose options survive is offered again with what its group has now, or play carries on after it.
+
+### Changed
+
+- **Breaking (1.0): `set_property` refuses a value that doesn't fit its declaration**, on the engine and on a
+  flow, and a name the content doesn't declare (in `@patter`, `@scene`, or a host scope the bundle
+  declares), changing nothing. It now **returns** the refusal, or `""` when the value was written, and
+  `push_error`s it, as the Storylet Engine's does: `"@patter.gold" takes a number; "lots" doesn't fit`. An
+  enum whose own default is `""` takes `""` back; a scope that declares no names takes anything.
+- **Breaking (1.0): a pending choice follows the language and the values.** Its options' prompts are built
+  each time the choice is delivered (`advance()`, `get_choices()`), so `set_locale` reaches a choice already
+  on screen and a save loads in the loading engine's language. The replayed prompt
+  (`replay_prompt_on_choose`) is the documented exception: it's spoken exactly as the choice showed it.
+- **Breaking (1.0): `engine.locale()` is the locale in use**, the one the rule resolved to, rather than the
+  string asked for.
+- **Breaking (1.0): what the engine hands out is the game's own copy.** Tag lists (on steps, from
+  `tags_for_beat`, `tags_for_scene`, `tags_for_block`, and in the outline) and the outline's beat gameData are
+  copies now, as step, option, scene, and block gameData already were. Extension values are not copied:
+  they're the bundle's own, read-only by contract.
+- **Breaking (1.0): saves are version 4.** A pending choice keeps its options' ids, eligibility, and gameData,
+  not their prompts; the cursor names the next beat by `beatId` instead of `beatIndex`; and a frame inside a
+  choice's option carries the choice's `choiceId`. Version 3 saves still load (their prompt text is
+  discarded). `capture_flow` writes version 4, and `restore_flow` reads 3 and 4.
+- The Tour demo's bundle is compiled again, so it carries the project's start scene.
+
+### Removed
+
+- **Breaking (1.0): version 2 saves, and the snake_case shape this addon wrote before 0.11.0, no longer
+  load.** Load one with a 0.x release and save it again to bring it forward.
+- **Breaking (1.0): the deprecated API.** `flow.start()` (use `flow.reset()`), `PatterDebugLink.status()` (use
+  `state()`, `build()`, and `url()`), `PatterBundle.game_data_fields_for` (use `game_data_fields`), and the
+  `PatterAudio` class (use `PatterAudioResolver`).
+
+### Fixed
+
+- **A saved "" loads as saved on an enum whose default is "".** A host scope's enum declared with default ""
+  (none chosen) had a saved "" reported as drifted when it loaded. It now loads as saved; any other enum still
+  puts a saved "" back to its default. (The shared expression kernel, fixed in every runtime.)
+- **A refused hot swap reports set-up once, and a start block the bundle doesn't have is passed over.** When
+  `hot_swap`'s load is refused, the engine it falls back on no longer repeats the replacement's set-up reports. A
+  hand-edited bundle whose `start` names a block its scene doesn't have now starts at that scene's first block,
+  rather than refusing the flow.
+
 ## [0.34.0] - 2026-10-21
 
 ### Removed

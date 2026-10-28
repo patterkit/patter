@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { Engine } from "@patterkit/runtime";
 import { exportBundle } from "@patterkit/compiler";
+import type { PlayError } from "@patterkit/runtime";
 import type { ProjectFile, Scene, LocaleFile } from "@patterkit/model";
 
 // One snippet, two text beats (T1 then T2) so a single flow yields them in order.
@@ -47,11 +48,36 @@ describe("Engine.setLocale - live language switch", () => {
     expect(engine.locale).toBe("fr");
   });
 
-  it("a locale with no table falls back to the source text, flagged <Untranslated>", () => {
-    const engine = new Engine(bundle);
+  it("a locale the bundle doesn't have falls back to the default, flagged <Untranslated>, and says so", () => {
+    const errors: PlayError[] = [];
+    const engine = new Engine(bundle, { onError: (e) => errors.push(e) });
     const flow = engine.openFlow("main", { scene: "s" });
     flow.advance(); // T1 in en
-    engine.setLocale("de"); // declared nowhere here -> empty table
+    engine.setLocale("de"); // declared nowhere here
+    expect(engine.locale).toBe("en"); // the locale in use
+    expect(errors).toEqual([{ flow: "", kind: "setup", node: "de", message: expect.stringContaining('"de"') }]);
     expect(flow.advance()).toMatchObject({ id: "T2", text: "<Untranslated: T2> Goodbye" });
+  });
+
+  it("matches case and separators, then the language, never the other way", () => {
+    const errors: string[] = [];
+    const engine = new Engine(bundle, { locale: "FR", onError: (e) => errors.push(e.node) });
+    expect(engine.locale).toBe("fr");
+    engine.setLocale("fr_BE");
+    expect(engine.locale).toBe("fr");
+    engine.setLocale("fr");
+    expect(errors).toEqual(["FR", "fr_BE"]); // the exact match says nothing
+    expect(engine.locales).toEqual({ default: "en", included: ["en", "fr"] });
+  });
+
+  it("replaceStrings resolves again, reporting only a fallback that changed", () => {
+    const errors: string[] = [];
+    const engine = new Engine(bundle, { locale: "fr-CA", onError: (e) => errors.push(e.node) });
+    engine.replaceStrings(bundle);                           // the same fallback: nothing new to say
+    expect(errors).toEqual(["fr-CA"]);
+    const enOnly = exportBundle({ project: { ...project, locales: { default: "en", all: ["en"] } }, scenes: [scene], locales: [locales[0]!] });
+    engine.replaceStrings(enOnly);                           // fr has gone: now the default
+    expect(errors).toEqual(["fr-CA", "fr-CA"]);
+    expect(engine.locale).toBe("en");
   });
 });

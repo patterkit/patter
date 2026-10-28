@@ -44,6 +44,9 @@ namespace Patterkit.Patterplay
             var loc = (JObject)b["locales"];
             bundle.Locales.Default = (string)loc["default"];
             if (loc["included"] is JArray inc) foreach (var x in inc) bundle.Locales.Included.Add((string)x);
+            // Where a flow opened without a scene starts; absent when the project sets none.
+            if (b["start"] is JObject st && st["scene"] is JValue startScene && startScene.Type == JTokenType.String)
+                bundle.Start = new BundleStart { Scene = (string)startScene, Block = st["block"]?.Type == JTokenType.String ? (string)st["block"] : null };
 
             // Declared host scopes (@world). A runtime that skips this plays a silently different story:
             // the reference reads as a graceful false and the gated branch is never taken.

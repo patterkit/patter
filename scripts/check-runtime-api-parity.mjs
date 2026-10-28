@@ -170,6 +170,7 @@ const API = [
 
   // --- live refresh + presentation -----------------------------------------
   { on: "Engine", js: "locale", unity: "Locale", godot: "locale", unreal: "locale", bp: "Locale" },
+  { on: "Engine", js: "locales", unity: "Locales", godot: "locales", unreal: "locales", bp: "Locales" },
   { on: "Engine", js: "setLocale", unity: "SetLocale", godot: "set_locale", unreal: "setLocale", bp: "SetLocale" },
   { on: "Engine", js: "isSourceDebug", unity: "IsSourceDebug", godot: "is_source_debug", unreal: "isSourceDebug", bp: "IsSourceDebug" },
   { on: "Engine", js: "closedCaptions", unity: "ClosedCaptions", godot: "closed_captions", unreal: "closedCaptions", bp: "ClosedCaptions" },

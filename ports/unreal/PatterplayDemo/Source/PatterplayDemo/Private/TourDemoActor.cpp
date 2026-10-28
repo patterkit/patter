@@ -171,7 +171,7 @@ void ATourDemoActor::StartTour()
 	Transcript->ClearChildren();
 	ClearChoices();
 
-	Engine = UPatterEngine::Create(Bundle ? Bundle : LoadedBundle);
+	Engine = UPatterEngine::Create(Bundle ? Bundle : LoadedBundle, {});
 	if (!Engine) { AddLine(TEXT(""), TEXT("TourDemo: the bundle did not parse."), NoticeColour); return; }
 	FPatterDebug::Register(Engine, TEXT("Tour demo")); // visible in Window > Patterplay Runtime State
 	Flow = Engine->OpenFlow(TEXT("main"), TEXT(""));   // the project's start scene

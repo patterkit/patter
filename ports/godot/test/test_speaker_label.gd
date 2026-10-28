@@ -75,22 +75,20 @@ func _check_lines(locale: String, guard: String, player: String) -> void:
 	_expect(prompt.get("speakerLabel") == player, "%s: a line prompt carries the label: %s" % [locale, prompt])
 
 
-# 3: a save taken at the choice, with the label taken out of the pending prompt as an older save has it,
-# loaded into an engine in French: the label comes back, resolved in French, and the rest is as saved.
+# 3: a save taken at the choice keeps which options, not their text (version 4), and loaded into an engine
+# in French, the prompt is built again there, its label resolved in French.
 func _check_older_save() -> void:
 	var engine := PatterEngine.new(_bundle(), {})
 	var flow := engine.open_flow("main", "s")
 	for i in 4:
 		flow.advance()
 	var save: Dictionary = JSON.parse_string(JSON.stringify(engine.save_game()))
-	var prompt: Dictionary = save["flows"]["main"]["cursor"]["pendingChoice"]["options"][0]["prompt"]
-	_expect(prompt.get("speakerLabel") == "Your thoughts", "a save carries the prompt's label: %s" % prompt)
-	prompt.erase("speakerLabel")
+	var option: Dictionary = save["flows"]["main"]["cursor"]["pendingChoice"]["options"][0]
+	_expect(not option.has("prompt"), "a save keeps a pending option's id, not its prompt: %s" % option)
 	var later := PatterEngine.new(_bundle(), {"locale": "fr"})
 	later.load_game(save)
 	var loaded: Dictionary = later.get_flow("main").get_choices()[0]["prompt"]
-	_expect(loaded.get("speakerLabel") == "Tes pensées", "an older save's prompt gets its label again, in the current locale: %s" % loaded)
-	_expect(loaded.get("characterName") == "You", "the rest of the saved prompt is as the choice showed it: %s" % loaded)
+	_expect(loaded.get("speakerLabel") == "Tes pensées", "the loaded choice's prompt is built in the current locale: %s" % loaded)
 
 
 # 3: a save taken between choose and advance, with replay_prompt_on_choose, carries the prompt still to be

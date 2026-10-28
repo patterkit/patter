@@ -25,7 +25,6 @@ const PLAYER_JS = String.raw`
 (function () {
   var Engine = window.Patterplay.Engine;
   var BUNDLE = window.PATTER_BUNDLE;
-  var startScene = (BUNDLE.start && BUNDLE.start.scene) || Object.keys(BUNDLE.scenes)[0];
   var SAVE_KEY = "patter.play." + ((BUNDLE.content && BUNDLE.content.hash) || "x");
 
   var stage = document.getElementById("stage");
@@ -80,7 +79,7 @@ const PLAYER_JS = String.raw`
     };
   }
 
-  function build() { engine = new Engine(BUNDLE); flow = engine.openFlow("main", { scene: startScene }); }
+  function build() { engine = new Engine(BUNDLE); flow = engine.openFlow("main"); } // the project's start, or the first scene
 
   function newGame() { stage.innerHTML = ""; controls.innerHTML = ""; build(); run(); }
 

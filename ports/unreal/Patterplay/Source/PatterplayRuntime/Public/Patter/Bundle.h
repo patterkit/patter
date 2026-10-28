@@ -207,6 +207,9 @@ namespace patter
     // when off). `present` distinguishes a baked config from the default [ / ] + SFX.
     struct CaptionDelimiters { std::string open = "["; std::string close = "]"; std::string character; bool present = false; };
 
+    // The bundle's `start` (the project's start scene, and block when it names one).
+    struct BundleStart { bool present = false; std::string scene; std::string block; };
+
     struct Bundle
     {
         std::string schema;           // the bundle schema tag ("patter/bundle@0"); empty if absent
@@ -217,6 +220,10 @@ namespace patter
         std::string contentProject;   // content.project - optional project name
         std::string contentVersion;   // content.version - the authored bundle version, if stamped
         Locales locales;
+        // Where a flow opened (or reset) with no scene starts: the project's authored start, its scene and,
+        // when it names one, its block. `present` false when the project sets none, or names one that has
+        // gone: every runtime then starts at the first scene in authored order.
+        BundleStart start;
         std::vector<Cast> cast;
         std::vector<Qualifier> qualifiers;   // the speaker qualifiers the content uses; empty = none
         // The project's speaker pattern, the unlocalised fallback for the `speaker:pattern` string; absent when
@@ -314,8 +321,6 @@ namespace patter
         return it != bundle.gameDataFields.end() ? it->second : std::vector<GameDataField>{};
     }
 
-    [[deprecated("Use gameDataFields, the name every Patterplay runtime uses.")]]
-    inline std::vector<GameDataField> gameDataFieldsFor(const Bundle& bundle, const std::string& kind) { return gameDataFields(bundle, kind); }
 
     // One node's effective value for a field: its sparse OVERRIDE if present, else the field's declared
     // default (null if neither is set). `fields` is the schema for the node's type; `node` may be null.

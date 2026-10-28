@@ -158,8 +158,8 @@ export type ScriptOp =
   // replaced, and the current flow stays as it was. A runtime that throws refuses by throwing; one that
   // reports and returns null (Godot) refuses that way. The runner checks the name still means the same
   // flow; the script's following `advance` shows that flow carrying on.
-  // No `scene` = the runtime's default start scene: the FIRST AUTHORED scene (the bundle's key order), never
-  // the first by id.
+  // No `scene` = the bundle's start (`bundle.start`, its block when it names one), else the FIRST AUTHORED
+  // scene (the bundle's key order), never the first by id.
   | { op: "openFlow"; flow: string; scene?: string; block?: string; seed?: number; expect?: TranscriptStep[]; expectResult?: boolean }
   | { op: "useFlow"; flow: string }
   | { op: "advance"; expect: TranscriptStep[] }
@@ -222,8 +222,9 @@ export type ScriptOp =
   // extension the bundle doesn't have. Compared deeply, as `expectExtensions`.
   | { op: "expectNodeExtensions"; kind: string; address?: string; expectResult: Record<string, unknown>; effective?: { extension: string } }
   | { op: "reset"; expectRefused?: boolean }
-  // Reset the CURRENT flow (Flow.reset, an alias of start): forget its per-flow state and anything waiting to be
-  // delivered, and begin again at the scene (empty: the first authored scene) and block given. No transcript.
+  // Reset the CURRENT flow (Flow.reset): forget its per-flow state and anything waiting to be delivered, and
+  // begin again at the scene (empty: the bundle's start, else the first authored scene) and block given. No
+  // transcript.
   | { op: "resetFlow"; scene?: string; block?: string }
   // Checkpoints: `checkpoint` opens one (the engine's `checkpoint()`); `rollback` puts the whole game back
   // as it was then (every property, visit count, shuffle and sequence position, every flow's cursor and
@@ -245,8 +246,27 @@ export type ScriptOp =
   // quality, @scene on the engine). JS, C# and C++ throw; Godot returns an EvalError. No transcript.
   | { op: "stage"; call: "index" | "compare" | "next"; ref: string; args: ScalarValue[]; onFlow?: boolean; expectResult?: number | string; expectRefused?: boolean }
   // The GAME's write to a shared or host-scope property (engine.setProperty), with host authority: a game
-  // moving its own `@world` value, or the value another engine's scope holds. No transcript.
+  // moving its own `@world` value, or the value another engine's scope holds. No transcript. `expectRefused`:
+  // the runtime refuses it and changes nothing, as it must a value that doesn't fit the property's declaration
+  // (the kernel's `valueFits`; an enum whose own default is "" takes "" back) or a name the content doesn't
+  // declare in a scope the bundle declares. JS and C# throw; Godot and Unreal return the message.
   | { op: "setProperty"; ref: string; value: ScalarValue; expectRefused?: boolean }
+  // What the engines reported to `onError` since the case began (the first engine's construction included) or
+  // the last expectErrors, in order: each as `{ kind, node }`, with `flow` compared when the expectation gives
+  // it. Never the message, whose wording is each runtime's own. A runner records every engine's onError
+  // (OnError, on_error) for it; taking them empties the record. Unreal, whose OnError is bound after the
+  // engine is made, records what it reports at once to its decision log and delivers on the first OpenFlow.
+  | { op: "expectErrors"; expectResult: { kind: string; node: string; flow?: string }[] }
+  // The engine's locales: `locale` is `engine.locale`, the locale in use (what the one locale rule resolved
+  // the asked-for one to), and `default` and `included` are `engine.locales`. No transcript.
+  | { op: "expectLocale"; expectResult: { locale: string; default: string; included: string[] } }
+  // A careless host (corpus 8): deface what the last `advance` or `stepFor` handed it, in place. In the step's
+  // gameData, or each option's on a choice, every flags list gains the item "scribbled", then every value
+  // becomes "scribbled" and the map gains the key "scribbled" too. Extension values are left alone: they are
+  // the bundle's own and read-only by contract. Nothing is asserted: the steps that follow, from this engine
+  // or another on the same bundle, must carry the bundle's values unchanged, since what a host is handed is
+  // its own copy.
+  | { op: "scribble" }
   // What the engines' loads put back to their defaults since the case began or the last expectRefits, in
   // order: each saved value that no longer fit its declaration (a stage, an enum value or a flag the edit
   // deleted), as `{ scope, name, value }` with `scope` the registry key and `value` what the save held. A
@@ -261,6 +281,13 @@ export interface ScriptedCase {
   bundleB?: Bundle;
   /** Seeds each flow's built-in serialisable PRNG (survives saveLoad). */
   seed?: number;
+  /** The locale every engine in the case is made with (corpus 8), resolved by the one locale rule; omit for
+   *  the bundle's default. Not save state: a `saveLoad` engine starts in it again, whatever `setLocale` did. */
+  locale?: string;
+  /** Host scopes the runner binds (corpus 8), by token, each to a resolver over a store the runner keeps for
+   *  the case (empty to start, read and written by name, shared by every engine the case makes). Omit to bind
+   *  none, as the cases before them did. */
+  hostScopes?: string[];
   /** Engine construction options, for this engine and every engine `saveLoad` / `hotSwap` makes. */
   engineOptions?: CaseEngineOptions;
   script: ScriptOp[];
@@ -299,9 +326,12 @@ export interface SaveCase {
   /** Engine construction options, for the engine that loads the envelope (the reference wrote it under the
    *  same) and every engine the script's `saveLoad` makes. */
   engineOptions?: CaseEngineOptions;
-  /** `{ schema: "patter/save@0", save }` exactly as `@patterkit/play-helpers` serializeState writes it. */
+  /** `{ schema: "patter/save@0", save }` exactly as `@patterkit/play-helpers` serializeState writes it (or as an
+   *  older runtime wrote it: a version 3 save among them). */
   envelope: SaveEnvelope;
-  /** Every key path in `envelope`, sorted (`save/flows/main/cursor/stack[0]/sceneId`); containers included. */
+  /** Every key path in the envelope a runtime writes back having loaded `envelope`, sorted
+   *  (`save/flows/main/cursor/stack[0]/sceneId`); containers included. The envelope's own, unless it is an
+   *  older save, which is written back in today's version. */
   keyPaths: string[];
   /** Continues from the loaded state; starts with `useFlow`, since nothing opened a flow in this engine. */
   script: ScriptOp[];
@@ -438,6 +468,10 @@ export interface ScriptedFixture {
   localesB?: LocaleFile[];
   projectB?: ProjectFile;
   seed?: number;
+  /** The locale the case's engines are made with (see `ScriptedCase.locale`). */
+  locale?: string;
+  /** Host scopes the runner binds (see `ScriptedCase.hostScopes`). */
+  hostScopes?: string[];
   engineOptions?: CaseEngineOptions;
   /** Build the bundle IDs-only, as a runtime case can (no strings; steps carry beat ids and no names). */
   idsOnly?: boolean;
@@ -459,9 +493,9 @@ export interface SaveFixture {
   /** Played by the reference engine at corpus-build time; the envelope is what it saves afterwards. */
   setup: ScriptOp[];
   /** Edits the reference's save before it becomes the envelope: to stand for a save an older runtime
-   *  wrote (a field it did not have yet). The case's `keyPaths` are the edited envelope's, so a runtime
-   *  must write back exactly what it loaded. */
-  editSave?: (save: SaveGame) => void;
+   *  wrote (a field it did not have yet, or a version 3 save). The case's `keyPaths` are what the reference
+   *  writes back having loaded it, so a runtime must write back exactly that. */
+  editSave?: (save: SaveGame, bundle: Bundle) => void;
   /** What every runtime must reproduce having loaded that envelope. */
   script: ScriptOp[];
 }

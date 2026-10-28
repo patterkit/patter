@@ -92,7 +92,7 @@ bool FPatterExtensionsTest::RunTest(const FString& Parameters)
 {
 	UPatterBundle* Bundle = UPatterBundle::LoadFromString(ExtensionsBundleJson);
 	if (!TestNotNull(TEXT("the bundle loads"), Bundle)) return false;
-	UPatterEngine* Engine = UPatterEngine::Create(Bundle);
+	UPatterEngine* Engine = UPatterEngine::Create(Bundle, {});
 	if (!TestNotNull(TEXT("engine created"), Engine)) return false;
 	UPatterFlow* Flow = Engine->OpenFlow(TEXT("main"), TEXT("harbour"));
 	if (!TestNotNull(TEXT("flow opened"), Flow)) return false;
@@ -148,7 +148,7 @@ bool FPatterExtensionsTest::RunTest(const FString& Parameters)
 	{
 		const FString Saved = UPatterSave::SerializeState(Engine);
 		TestFalse(TEXT("a save carries no extension values"), Saved.Contains(TEXT("\"extensions\"")));
-		UPatterEngine* Loaded = UPatterEngine::Create(Bundle);
+		UPatterEngine* Loaded = UPatterEngine::Create(Bundle, {});
 		if (TestTrue(TEXT("the save loads"), UPatterSave::DeserializeState(Loaded, Saved)))
 		{
 			UPatterFlow* Back = Loaded->GetFlow(TEXT("main"));

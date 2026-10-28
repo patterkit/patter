@@ -47,7 +47,7 @@ describe("captureFlow / restoreFlow", () => {
     const engine = new Engine(bundle);
     inT(engine, "npc/bob");
     const state = engine.captureFlow("npc/bob");
-    expect(state.version).toBe(3);
+    expect(state.version).toBe(4);
     expect(state.scopes).toEqual({ patter: { gold: 3 } });
     expect(state.sceneBags["s"]).toEqual({ mine: 7 });
     expect(JSON.stringify(state)).not.toContain("npc");

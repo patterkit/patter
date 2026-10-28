@@ -12,6 +12,7 @@ function project(): ProjectFile {
     project: { id: "proj_1", name: "Test" },
     locales: { default: "en", all: ["en"] },
     cast: [{ name: "BARKEEP" }, { name: "PLAYER" }],
+    start: { scene: "scn_1" },
   };
 }
 
@@ -95,6 +96,14 @@ describe("canonical (de)serialisation", () => {
 describe("validateProject", () => {
   it("accepts a valid project", () => {
     expect(validateProject({ project: project(), scenes: [scene()] })).toEqual([]);
+  });
+
+  it("warns when no start scene is set, or the start names one that has gone (the hands-on review, 2026-10)", () => {
+    const { start: _, ...noStart } = project();
+    expect(validateProject({ project: noStart, scenes: [scene()] }).map((i) => [i.code, i.severity])).toEqual([["no-start", "warning"]]);
+    expect(validateProject({ project: { ...project(), start: { scene: "scn_gone" } }, scenes: [scene()] }).map((i) => i.code)).toEqual(["dangling-start"]);
+    expect(validateProject({ project: { ...project(), start: { scene: "scn_1", block: "blk_gone" } }, scenes: [scene()] }).map((i) => i.code)).toEqual(["dangling-start"]);
+    expect(validateProject({ project: noStart, scenes: [] })).toEqual([]); // nothing to start
   });
 
   it("flags a duplicate id", () => {

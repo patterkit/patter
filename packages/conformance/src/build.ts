@@ -33,8 +33,18 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  7: claims and settings are gone from the extensions spec (2026-10-20), so version 4's go: the bundle carries
  *  no `extensions[id].settings`, and the op `expectExtensionSettings` and its cases are removed. A runner
  *  ignores an older bundle's settings. No other expectation changed.
+ *  8: the runtime foundations before 1.0 (the hands-on review, 2026-10). The bundle's `start`, where a flow opened
+ *  with no scene begins. Saves are version 4: a pending choice keeps its options' ids and not their text (its
+ *  prompts are built in the language in use on every delivery), the cursor names the next beat by `beatId`, and
+ *  a frame inside an option carries its `choiceId`; a load whose place has gone resumes at the nearest safe point
+ *  and reports it; version 3 saves still load, and version 2 no longer does. The ops `expectErrors` (what the
+ *  engines reported to onError: the kinds `setup` and `save` are new), `expectLocale` (the locale in use, by the
+ *  one locale rule, and the bundle's locales), and `scribble` (what a host is handed is its own copy of its
+ *  gameData); a scripted case's `locale` and `hostScopes`; `setProperty` refuses a value that doesn't fit its
+ *  declaration, or an undeclared name; a save case's `keyPaths` are what a runtime writes back having loaded its
+ *  envelope. `scriptedHotSwapDeleteActive` and `scriptedHotSwapEmptiedBlock` now also expect a `save` report.
  */
-export const CORPUS_VERSION = 7;
+export const CORPUS_VERSION = 8;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at
@@ -101,6 +111,8 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     // edited scenes/strings.
     ...(f.scenesB ? { bundleB: exportBundle({ project: f.projectB ?? f.project, scenes: f.scenesB, locales: f.localesB ?? f.locales }) } : {}),
     ...(f.seed !== undefined ? { seed: f.seed } : {}),
+    ...(f.locale !== undefined ? { locale: f.locale } : {}),
+    ...(f.hostScopes !== undefined ? { hostScopes: f.hostScopes } : {}),
     ...(f.engineOptions !== undefined ? { engineOptions: f.engineOptions } : {}),
     script: f.script,
   }));
@@ -122,14 +134,17 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     const options = { ...(f.seed !== undefined ? { seed: f.seed } : {}), ...f.engineOptions };
     const { engine } = runScript(new Engine(bundle, options), f.setup, { bundle, options });
     const envelope: SaveEnvelope = { schema: SAVE_SCHEMA, save: JSON.parse(JSON.stringify(engine.saveGame())) };
-    f.editSave?.(envelope.save); // a save as an older runtime wrote it
+    f.editSave?.(envelope.save, bundle); // a save as an older runtime wrote it
+    // The shape a runtime writes back having loaded it: the envelope's own, or today's for an older save.
+    const reader = new Engine(bundle, { ...options, onError: () => {} });
+    reader.loadGame(JSON.parse(JSON.stringify(envelope.save)));
     return {
       name: f.name,
       bundle,
       ...(f.seed !== undefined ? { seed: f.seed } : {}),
       ...(f.engineOptions !== undefined ? { engineOptions: f.engineOptions } : {}),
       envelope,
-      keyPaths: envelopeKeyPaths(envelope),
+      keyPaths: envelopeKeyPaths({ schema: SAVE_SCHEMA, save: JSON.parse(JSON.stringify(reader.saveGame())) }),
       script: f.script,
     };
   });

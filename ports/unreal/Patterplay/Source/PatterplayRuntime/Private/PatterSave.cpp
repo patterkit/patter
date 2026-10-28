@@ -1,6 +1,7 @@
 #include "PatterSave.h"
 
 #include "PatterEngine.h"
+#include "PatterLog.h"
 #include "Patter/Save.h"
 
 FString UPatterSave::SerializeState(UPatterEngine* Engine)
@@ -27,7 +28,7 @@ bool UPatterSave::DeserializeState(UPatterEngine* Engine, const FString& Json)
 		// A bare false told a Blueprint author nothing about WHY their file was refused. Note for
 		// anyone writing an automation test that asserts a refusal: UE counts a logged Error as a
 		// test failure, so such a test needs an AddExpectedError for this line.
-		UE_LOG(LogTemp, Error, TEXT("Patterplay: refused a save file - %s"), UTF8_TO_TCHAR(Ex.what()));
+		UE_LOG(LogPatterplay, Error, TEXT("Patterplay: refused a save file - %s"), UTF8_TO_TCHAR(Ex.what()));
 		return false;
 	}
 }

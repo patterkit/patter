@@ -1,8 +1,9 @@
-// The GAME's @world container, bound to an engine at UPatterEngine::Create.
+// A host scope's container, such as the GAME's @world: bound to an engine under its token at
+// UPatterEngine::Create (the HostScopes map, "world" to this object).
 //
 // A bound container is an EXTERNAL scope in the engine's property registry: the registry reads and
-// writes @world through it and never stores or saves it, so the values are the game's, saved by the
-// game (play/world-properties). Without one the engine self-backs @world from the declared defaults,
+// writes the scope through it and never stores or saves it, so the values are the game's, saved by the
+// game (play/world-properties). Without one the engine self-backs the scope from the declared defaults,
 // as a property it stores and saves with the rest of a Patter save, which is fine for a run that
 // never leaves the engine; bind one when the game, the story and anything else (the Storylet
 // Engine's UStoryletWorld, say) share values.
@@ -88,7 +89,7 @@ public:
 
 	// --- C++ seam (Blueprint never sees these) ------------------------------------
 
-	/** The host scope handed to the core, which registers it as the external @world scope; weak on
+	/** The host scope handed to the core, which registers it as an external scope under its token; weak on
 	 *  this object, so a world the game dropped reads as unset rather than dangling. The core's `get`
 	 *  pointer stays valid until the next call, which a slot inside this object guarantees. */
 	patter::HostScope MakeHostScope();

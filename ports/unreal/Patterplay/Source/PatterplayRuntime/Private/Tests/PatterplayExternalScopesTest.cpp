@@ -97,7 +97,8 @@ bool FPatterplayExternalScopesTest::RunTest(const FString& Parameters)
 
 		// The engine that took the scope away mid-game: a write names it, never landing in @patter.
 		GameRegistry->remove("story");
-		Game->SetPropertyNumber(TEXT("@story.act"), 1.f);   // refused and logged, never thrown through
+		const FString Refused = Game->SetPropertyNumber(TEXT("@story.act"), 1.f);   // refused, returned, and logged, never thrown through
+		TestTrue(TEXT("the refusal is returned, naming the scope"), Refused.Contains(TEXT("@story")));
 		TestFalse(TEXT("the refused write did not land in @patter"), GameRegistry->get("patter", "story.act").has_value());
 	}
 	return true;

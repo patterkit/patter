@@ -100,9 +100,11 @@ bool FPatterplayWorldTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("knows_road is not"), World->IsReadOnly(TEXT("knows_road")));
 	TestTrue(TEXT("names match case-insensitively"), World->Has(TEXT("Knows_Road")));
 
-	UPatterEngine* Engine = UPatterEngine::Create(Bundle, World);
+	// Bound under the token the bundle declares, as every runtime binds a host scope.
+	UPatterEngine* Engine = UPatterEngine::Create(Bundle, { { TEXT("world"), World } });
 	if (!TestNotNull(TEXT("engine with world"), Engine)) return false;
-	TestEqual(TEXT("GetBoundWorld"), Engine->GetBoundWorld(), World);
+	TestEqual(TEXT("GetHostScope"), Engine->GetHostScope(TEXT("world")), World);
+	TestNull(TEXT("no other scope bound"), Engine->GetHostScope(TEXT("weather")));
 
 	// --- reads go through the container -------------------------------------------
 	TestEqual(TEXT("time_of_day read from the host"), Engine->GetPropertyString(TEXT("@world.time_of_day")), FString(TEXT("dusk")));
@@ -138,25 +140,25 @@ bool FPatterplayWorldTest::RunTest(const FString& Parameters)
 	World->SetBool(TEXT("knows_road"), false);
 	TestTrue(TEXT("load"), UPatterSave::DeserializeState(Engine, Saved));
 	TestFalse(TEXT("load left the container to the host"), World->GetBool(TEXT("knows_road")));
-	TestEqual(TEXT("still bound after load"), Engine->GetBoundWorld(), World);
+	TestEqual(TEXT("still bound after load"), Engine->GetHostScope(TEXT("world")), World);
 
 	// --- the binding survives a hot swap ---------------------------------------------
 	TestTrue(TEXT("hot swap"), Engine->HotSwap(Bundle));
-	TestEqual(TEXT("still bound after swap"), Engine->GetBoundWorld(), World);
+	TestEqual(TEXT("still bound after swap"), Engine->GetHostScope(TEXT("world")), World);
 	TestEqual(TEXT("road gated again through the same container"), PlayScene(Engine, TEXT("r3"), TEXT("road")), FString());
 	World->SetBool(TEXT("knows_road"), true);
 	TestEqual(TEXT("and opens again when the host says so"), PlayScene(Engine, TEXT("r4"), TEXT("road")), FString(TEXT("The road north.")));
 
 	// --- the self-backed path: a property the engine stores, and SAVES ------------------
-	UPatterEngine* Plain = UPatterEngine::Create(Bundle);
+	UPatterEngine* Plain = UPatterEngine::Create(Bundle, {});
 	if (!TestNotNull(TEXT("self-backed engine"), Plain)) return false;
-	TestNull(TEXT("no world bound"), Plain->GetBoundWorld());
+	TestNull(TEXT("no world bound"), Plain->GetHostScope(TEXT("world")));
 	TestEqual(TEXT("self-backed reads the default"), Plain->GetPropertyString(TEXT("@world.time_of_day")), FString(TEXT("day")));
 	TestEqual(TEXT("learn plays self-backed"), PlayScene(Plain, TEXT("l"), TEXT("learn")), FString(TEXT("You learn the road.")));
 	{
 		const FString PlainSave = UPatterSave::SerializeState(Plain);
 		TestTrue(TEXT("a self-backed @world is saved"), PlainSave.Contains(TEXT("knows_road")));
-		UPatterEngine* Reloaded = UPatterEngine::Create(Bundle);
+		UPatterEngine* Reloaded = UPatterEngine::Create(Bundle, {});
 		TestTrue(TEXT("self-backed save loads"), UPatterSave::DeserializeState(Reloaded, PlainSave));
 		TestTrue(TEXT("and brings @world back"), Reloaded->GetPropertyBool(TEXT("@world.knows_road")));
 	}
@@ -165,7 +167,7 @@ bool FPatterplayWorldTest::RunTest(const FString& Parameters)
 	{
 		auto Registry = std::make_shared<patter::ScopeRegistry>();
 		UPatterWorld* GameWorld = NewObject<UPatterWorld>();
-		UPatterEngine* Shared = UPatterEngine::CreateWithRegistry(Bundle, Registry, GameWorld);
+		UPatterEngine* Shared = UPatterEngine::CreateWithRegistry(Bundle, Registry, { { TEXT("world"), GameWorld } });
 		if (!TestNotNull(TEXT("engine on the game's registry"), Shared)) return false;
 		TestTrue(TEXT("@patter is registered in the game's registry"), Registry->has("patter"));
 		TestTrue(TEXT("the bound world is registered as @world"), Registry->has("world"));

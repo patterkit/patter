@@ -26,6 +26,7 @@ namespace patter { namespace bundlereadercase
   "localisation": { "mode": "ids", "sourceDebug": true },
   "closedCaptions": { "open": "<", "close": ">", "character": "FX" },
   "locales": { "default": "en", "included": ["en", "fr"] },
+  "start": { "scene": "scn_aa", "block": null },
   "cast": [{ "name": "ANNA", "displayName": "Anna", "qualifierLabels": { "radio": "Anna on the radio", "os": null } }, { "name": "FX" }],
   "qualifiers": [{ "gameId": "os", "name": "O.S." }, { "gameId": "radio", "name": "RADIO" }, { "gameId": "vo" }],
   "speakerPattern": "{name}, {qualifier}",
@@ -93,6 +94,7 @@ namespace patter { namespace bundlereadercase
         expect(b.cast.size() == 2 && b.cast[0].qualifierLabels == std::map<std::string, std::string>{{"radio", "Anna on the radio"}} && b.cast[1].qualifierLabels.empty(),
                "a character's own labels with a qualifier, keyed by its gameId (a null labels nothing)");
         expect(b.hasSpeakerPattern && b.speakerPattern == "{name}, {qualifier}", "speakerPattern");
+        expect(b.start.present && b.start.scene == "scn_aa" && b.start.block.empty(), "start: a scene, its null block read as absent");
 
         expect(b.properties.size() == 4, "properties");
         if (b.properties.size() == 4)

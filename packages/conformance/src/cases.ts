@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import type { DescribeFixture, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
-import type { ProjectFile, LocaleFile, Scene } from "@patterkit/model";
+import type { Bundle, CompiledGroup, CompiledSnippet, ProjectFile, LocaleFile, SaveGame, Scene } from "@patterkit/model";
 import { castStringKey, qualifierStringKey, speakerLabelKey, SPEAKER_PATTERN_KEY } from "@patterkit/model";
 import type { ExtensionShard } from "@patterkit/model";
 import { readFileSync } from "node:fs";
@@ -1085,6 +1085,34 @@ const scriptedDefaultStartScene = {
   ],
 } satisfies ScriptedFixture;
 
+// The project's start reaches the bundle (`bundle.start`), and a flow opened or reset without a scene starts
+// there, at its block when it names one (the hands-on review, 2026-10: the start never reached the runtimes,
+// so a game always opened on the first scene whatever the writer had chosen).
+const scriptedProjectStart = {
+  name: "openFlow and resetFlow with no scene start at the project's start scene and block",
+  project: project({ start: { scene: "scn_aa", block: "b_g2" } }),
+  scenes: [
+    { id: "scn_zz", type: "scene", name: "Tavern", blocks: [{ id: "b_t", type: "block", name: "B", children: [
+      { id: "sn_t", type: "snippet", beats: [{ id: "T_t", kind: "text" }], jump: { to: "END" } },
+    ] }] },
+    { id: "scn_aa", type: "scene", name: "Gate", blocks: [
+      { id: "b_g", type: "block", name: "B", children: [
+        { id: "sn_g", type: "snippet", beats: [{ id: "T_g", kind: "text" }], jump: { to: "END" } },
+      ] },
+      { id: "b_g2", type: "block", name: "Second", children: [
+        { id: "sn_g2", type: "snippet", beats: [{ id: "T_g2", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ],
+  locales: [loc("scn_zz", { T_t: "tavern" }), loc("scn_aa", { T_g: "gate", T_g2: "gate, second block" })],
+  script: [
+    { op: "openFlow", flow: "f" },
+    { op: "advance", expect: [{ type: "text", id: "T_g2", text: "gate, second block" }] },
+    { op: "resetFlow" },
+    { op: "advance", expect: [{ type: "text", id: "T_g2", text: "gate, second block" }] },
+  ],
+} satisfies ScriptedFixture;
+
 // Host navigation by address. Pins every part of the contract in one script: a scene-address hop that
 // runs the target's onEntry, a scene-SCOPED block address, an unknown address that must NOT move the
 // cursor, abandonment of both the rest of a snippet and a pending call-return, and revival of an ended
@@ -1431,7 +1459,8 @@ const scriptedSaveLoadChoice = {
 
 // Live language switch (Engine.setLocale): the active string table re-points WITHOUT a rebuild, so the
 // flow keeps its cursor and only subsequent beats re-render. Also proves the locale-aware character name
-// follows the swap, and that a locale with no table degrades to the source via the <Untranslated> flag.
+// follows the swap, and that a locale the bundle doesn't have falls back to the default, reported and marked
+// <Untranslated> (the one locale rule: scriptedLocaleRule).
 const scriptedSetLocale = {
   name: "live setLocale swaps the language mid-flow; the cursor + state are untouched",
   project: project({ locales: { default: "en", all: ["en", "fr"] }, cast: [{ name: "GUIDE" }] }),
@@ -1454,7 +1483,9 @@ const scriptedSetLocale = {
     { op: "advance", expect: [{ type: "line", id: "L", text: "Welcome.", character: "GUIDE", characterName: "Guide" }] },
     { op: "setLocale", locale: "fr" },
     { op: "advance", expect: [{ type: "text", id: "T1", text: "Premier." }] },  // SAME flow continued, now in fr
-    { op: "setLocale", locale: "de" },                                          // no table -> source fallback, flagged
+    { op: "setLocale", locale: "de" },                                          // not in the bundle -> the default, flagged
+    { op: "expectErrors", expectResult: [{ kind: "setup", node: "de", flow: "" }] },
+    { op: "expectLocale", expectResult: { locale: "en", default: "en", included: ["en", "fr"] } },
     { op: "advance", expect: [{ type: "text", id: "T2", text: "<Untranslated: T2> Second." }] },
     { op: "advance", expect: [{ type: "end" }] },
   ],
@@ -2380,7 +2411,7 @@ const scriptedHotSwapInsert = {
 } satisfies ScriptedFixture;
 
 const scriptedHotSwapDeleteActive = {
-  name: "hotSwap: a deleted ACTIVE snippet is skipped; play continues at the next survivor",
+  name: "hotSwap: a deleted ACTIVE snippet is skipped, reported; play continues at the next survivor",
   project: project(),
   scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
     { id: "sn1", type: "snippet", beats: [{ id: "T1a", kind: "text" }, { id: "T1b", kind: "text" }] },
@@ -2394,6 +2425,7 @@ const scriptedHotSwapDeleteActive = {
     { op: "openFlow", flow: "main", scene: "s" },
     { op: "advance", expect: [{ type: "text", id: "T1a", text: "cut a" }] }, // sn1 is mid-delivery
     { op: "hotSwap" }, // its remaining beat (T1b) vanishes with it - never delivered
+    { op: "expectErrors", expectResult: [{ kind: "save", node: "sn1", flow: "main" }] }, // and the load says so
     { op: "advance", expect: [{ type: "text", id: "T2", text: "survivor" }] },
     { op: "advance", expect: [{ type: "end" }] },
   ],
@@ -2422,7 +2454,7 @@ const scriptedHotSwapDropOption = {
     ] }] },
     { op: "hotSwap" },
     { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
-      { id: "left", prompt: { kind: "text", text: "Left" }, eligible: true }, // `right` drifted out: dropped, never re-derived
+      { id: "left", prompt: { kind: "text", text: "Left" }, eligible: true }, // `right` drifted out: dropped; the set is never re-derived, only its prompts built
     ] }] },
     { op: "choose", id: "left" },
     { op: "advance", expect: [{ type: "text", id: "TL", text: "went left" }] },
@@ -2431,7 +2463,7 @@ const scriptedHotSwapDropOption = {
 } satisfies ScriptedFixture;
 
 const scriptedHotSwapEmptiedBlock = {
-  name: "hotSwap: the cursor's whole container emptied - the frame drops and the flow ends cleanly",
+  name: "hotSwap: the cursor's whole container emptied - the frame drops, reported, and the flow ends cleanly",
   project: project(),
   scenes: [{ id: "s", type: "scene", name: "S", blocks: [
     { id: "b1", type: "block", name: "B1", children: [
@@ -2453,6 +2485,7 @@ const scriptedHotSwapEmptiedBlock = {
     { op: "advance", expect: [{ type: "text", id: "T1", text: "intro" }] },
     { op: "advance", expect: [{ type: "text", id: "T2a", text: "deep a" }] }, // now inside b2
     { op: "hotSwap" }, // active snippet + every sibling gone: nothing left to run
+    { op: "expectErrors", expectResult: [{ kind: "save", node: "sn2", flow: "main" }] },
     { op: "advance", expect: [{ type: "end" }] },
   ],
 } satisfies ScriptedFixture;
@@ -3813,6 +3846,370 @@ const audioManifest = {
   ],
 };
 
+// --- the runtime foundations before 1.0 (corpus 8) ---------------------------------------------------
+// The hands-on review of October 2026 found five ways the runtimes went quiet where they should have spoken, or
+// spoke in a language the player had left. Each case below pins one of the fixes on every runtime.
+
+// One rule for a locale (ruling Q2): case and `_` / `-` don't matter, so an exact match wins, then the language
+// alone, then the default. Anything but an exact match is reported, `engine.locale` says the locale in use, and
+// a hot swap, which builds a new engine, resolves and reports again.
+const localeScenes: Scene[] = [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+  { id: "n", type: "snippet", beats: [
+    { id: "T1", kind: "text" }, { id: "T2", kind: "text" }, { id: "T3", kind: "text" }, { id: "T4", kind: "text" }, { id: "T5", kind: "text" },
+  ], jump: { to: "END" } },
+] }] }];
+const scriptedLocaleRule = {
+  name: "a locale resolves by one rule (case, then language, then the default), each fallback reported",
+  project: project({ locales: { default: "en", all: ["en", "fr"] } }),
+  scenes: localeScenes,
+  scenesB: localeScenes,
+  locales: [
+    loc("s", { T1: "one", T2: "two", T3: "three", T4: "four", T5: "five" }, "en"),
+    loc("s", { T1: "un", T2: "deux", T3: "trois", T4: "quatre", T5: "cinq" }, "fr"),
+  ],
+  locale: "FR",
+  script: [
+    { op: "expectErrors", expectResult: [{ kind: "setup", node: "FR", flow: "" }] },  // reported as the engine was made
+    { op: "expectLocale", expectResult: { locale: "fr", default: "en", included: ["en", "fr"] } },
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "un" }] },
+    { op: "setLocale", locale: "fr-CA" },                                               // its language
+    { op: "expectErrors", expectResult: [{ kind: "setup", node: "fr-CA" }] },
+    { op: "expectLocale", expectResult: { locale: "fr", default: "en", included: ["en", "fr"] } },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "deux" }] },
+    { op: "setLocale", locale: "de" },                                                  // the default, marked
+    { op: "expectErrors", expectResult: [{ kind: "setup", node: "de" }] },
+    { op: "expectLocale", expectResult: { locale: "en", default: "en", included: ["en", "fr"] } },
+    { op: "advance", expect: [{ type: "text", id: "T3", text: "<Untranslated: T3> three" }] },
+    { op: "setLocale", locale: "en" },                                                  // exact: nothing to say
+    { op: "expectErrors", expectResult: [] },
+    { op: "advance", expect: [{ type: "text", id: "T4", text: "four" }] },
+    { op: "setLocale", locale: "fr_FR" },
+    { op: "expectErrors", expectResult: [{ kind: "setup", node: "fr_FR" }] },
+    { op: "hotSwap" },                                                                  // a new engine: reported again
+    { op: "expectErrors", expectResult: [{ kind: "setup", node: "fr_FR" }] },
+    { op: "expectLocale", expectResult: { locale: "fr", default: "en", included: ["en", "fr"] } },
+    { op: "advance", expect: [{ type: "text", id: "T5", text: "cinq" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// A language never looks for its regions: "fr" is not "fr-FR", so it falls back to the default, marked.
+const scriptedLocaleNoRegion = {
+  name: "a locale never looks for its regions: fr falls back to the default when the bundle has only fr-FR",
+  project: project({ locales: { default: "en", all: ["en", "fr-FR"] } }),
+  scenes: localeScenes,
+  locales: [
+    loc("s", { T1: "one", T2: "two", T3: "three", T4: "four", T5: "five" }, "en"),
+    loc("s", { T1: "un", T2: "deux", T3: "trois", T4: "quatre", T5: "cinq" }, "fr-FR"),
+  ],
+  locale: "fr",
+  script: [
+    { op: "expectErrors", expectResult: [{ kind: "setup", node: "fr", flow: "" }] },
+    { op: "expectLocale", expectResult: { locale: "en", default: "en", included: ["en", "fr-FR"] } },
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "<Untranslated: T1> one" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// An IDs-only bundle takes the locale as given and says nothing: the game localises it.
+const scriptedLocaleIds = {
+  name: "an IDs-only bundle takes any locale as given, unreported",
+  project: project({ locales: { default: "en", all: ["en"] } }),
+  scenes: localeScenes,
+  locales: [loc("s", { T1: "one", T2: "two", T3: "three", T4: "four", T5: "five" })],
+  idsOnly: true,
+  locale: "xx-YY",
+  script: [
+    { op: "expectErrors", expectResult: [] },
+    { op: "expectLocale", expectResult: { locale: "xx-YY", default: "en", included: ["en"] } },
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "T1" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// A host scope bound under a token the bundle doesn't declare is reported, never folded (ruling F): `World` is
+// not `world`, which the engine then self-backs from its defaults as it would with nothing bound.
+const scriptedHostScopeWrongCase = {
+  name: "a host scope bound under a token the bundle doesn't declare (only the case differs) is reported, never folded",
+  project: project({ scopeRegistry: { version: 1, scopes: [{ token: "world", declarations: [{ name: "alarms", type: "number", default: 2 }] }] } }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "n", type: "snippet", beats: [{ id: "T", kind: "text" }], jump: { to: "END" } },
+  ] }] }],
+  locales: [loc("s", { T: "alarms: {@world.alarms}" })],
+  hostScopes: ["World"],
+  script: [
+    { op: "expectErrors", expectResult: [{ kind: "setup", node: "World", flow: "" }] },
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T", text: "alarms: 2" }] },  // the self-backed default
+  ],
+} satisfies ScriptedFixture;
+
+// A host write that doesn't fit its declaration is refused, changing nothing (ruling B), as the Storylet Engine
+// refuses one: the kernel's `valueFits`, an enum whose own default is "" taking "" back. A name the content
+// doesn't declare is refused too, in @patter and in a host scope the bundle declares.
+const scriptedHostWrites = {
+  name: "a host write that doesn't fit its declaration, or names nothing declared, is refused and changes nothing",
+  project: project({
+    properties: [
+      { name: "gold", type: "number", shared: true, default: 1 },
+      { name: "mood", type: "enum", values: ["calm", "tense"], shared: true, default: "" },
+      { name: "keys", type: "flags", values: ["iron", "brass"], shared: true },
+      { name: "act", type: "quality", stages: ["one", "two"], shared: true, default: "one" },
+      { name: "note", type: "string", shared: true, default: "" },
+    ],
+    // `fx` is opaque: it declares no names, so any name and value in it is the game's, never refused.
+    scopeRegistry: { version: 1, scopes: [{ token: "world", declarations: [{ name: "alarm", type: "boolean", default: false }] }, { token: "fx" }] },
+  }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "n", type: "snippet", beats: [{ id: "T", kind: "text" }], jump: { to: "END" } },
+  ] }] }],
+  locales: [loc("s", { T: "{@gold} [{@mood}] {@act} {@note} {@world.alarm} {@keys} {@fx.glow}" })],
+  script: [
+    { op: "setProperty", ref: "@gold", value: "lots", expectRefused: true },
+    { op: "setProperty", ref: "@gold", value: 5 },
+    { op: "setProperty", ref: "@mood", value: "angry", expectRefused: true },
+    { op: "setProperty", ref: "@mood", value: "tense" },
+    { op: "setProperty", ref: "@mood", value: "" },                         // its own default: none chosen
+    { op: "setProperty", ref: "@keys", value: ["iron", "gold"], expectRefused: true },
+    { op: "setProperty", ref: "@keys", value: ["brass"] },
+    { op: "setProperty", ref: "@act", value: "three", expectRefused: true },
+    { op: "setProperty", ref: "@act", value: "two" },
+    { op: "setProperty", ref: "@note", value: 3, expectRefused: true },
+    { op: "setProperty", ref: "@world.alarm", value: 1, expectRefused: true },
+    { op: "setProperty", ref: "@world.alarm", value: true },
+    { op: "setProperty", ref: "@world.bells", value: 1, expectRefused: true }, // not declared in a declared scope
+    { op: "setProperty", ref: "@silver", value: 1, expectRefused: true },      // not declared at all
+    { op: "setProperty", ref: "@fx.glow", value: 3 },                           // an opaque scope takes anything
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T", text: "5 [] two  true brass 3" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// What a host is handed is its own copy of the gameData (ruling Q4): a game that edits a step's, or an option's,
+// a flags list among them, changes nothing this engine, or another on the same bundle, hands out next.
+const scriptedGameDataCopied = {
+  name: "a step's and an option's gameData are the host's own copy: defacing them changes nothing handed out next",
+  project: project(),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "n", type: "snippet", beats: [{ id: "L", kind: "line", character: "NPC", gameData: { cam: "wide", marks: ["x", "y"] } }] },
+    { id: "g", type: "group", selector: "choice", children: [
+      { id: "o", type: "group", gameData: { icon: "ear", tags: ["calm"] }, prompt: { id: "P", kind: "text" }, children: [
+        { id: "o_c", type: "snippet", jump: { to: "END" } },
+      ] },
+    ] },
+  ] }] }],
+  locales: [loc("s", { L: "Hello.", P: "Listen" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "line", id: "L", text: "Hello.", character: "NPC", gameData: { cam: "wide", marks: ["x", "y"] } }] },
+    { op: "scribble" },
+    { op: "stepFor", beat: "L", expect: [{ type: "line", id: "L", text: "Hello.", character: "NPC", gameData: { cam: "wide", marks: ["x", "y"] } }] },
+    { op: "scribble" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o", prompt: { kind: "text", text: "Listen" }, eligible: true, gameData: { icon: "ear", tags: ["calm"] } },
+    ] }] },
+    { op: "scribble" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o", prompt: { kind: "text", text: "Listen" }, eligible: true, gameData: { icon: "ear", tags: ["calm"] } },
+    ] }] },
+    { op: "scribble" },
+    { op: "saveLoad" },                                                       // a second engine on the same bundle
+    { op: "resetFlow", scene: "s" },
+    { op: "advance", expect: [{ type: "line", id: "L", text: "Hello.", character: "NPC", gameData: { cam: "wide", marks: ["x", "y"] } }] },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o", prompt: { kind: "text", text: "Listen" }, eligible: true, gameData: { icon: "ear", tags: ["calm"] } },
+    ] }] },
+  ],
+} satisfies ScriptedFixture;
+
+// A pending choice's options follow the language and the values (ruling Q1): their prompts are built whenever the
+// choice is delivered, never kept as text, so `setLocale` reaches them and a save loads in the language of the
+// engine that loads it. (The replayed prompt is the documented exception: scriptedReplayShown.)
+const scriptedChoiceFollowsLocale = {
+  name: "a pending choice's prompts follow setLocale and the current values, and a save loads in the loading engine's language",
+  project: project({ locales: { default: "en", all: ["en", "fr"] }, properties: [{ name: "coins", type: "number", shared: true, default: 3 }] }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g", type: "group", selector: "choice", children: [
+      { id: "o_pay", type: "group", prompt: { id: "P_pay", kind: "text" }, children: [{ id: "pay_c", type: "snippet", beats: [{ id: "T_pay", kind: "text" }], jump: { to: "END" } }] },
+      { id: "o_go", type: "group", prompt: { id: "P_go", kind: "text" }, children: [{ id: "go_c", type: "snippet", jump: { to: "END" } }] },
+    ] },
+  ] }] }],
+  locales: [
+    loc("s", { P_pay: "Pay {@coins}", P_go: "Leave", T_pay: "Paid." }, "en"),
+    loc("s", { P_pay: "Payer {@coins}", P_go: "Partir", T_pay: "Payé." }, "fr"),
+  ],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o_pay", prompt: { kind: "text", text: "Pay 3" }, eligible: true },
+      { id: "o_go", prompt: { kind: "text", text: "Leave" }, eligible: true },
+    ] }] },
+    { op: "setLocale", locale: "fr" },
+    { op: "setProperty", ref: "@coins", value: 5 },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [ // the same choice, in French, at 5
+      { id: "o_pay", prompt: { kind: "text", text: "Payer 5" }, eligible: true },
+      { id: "o_go", prompt: { kind: "text", text: "Partir" }, eligible: true },
+    ] }] },
+    { op: "saveLoad" },                                                    // the loading engine is in English
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o_pay", prompt: { kind: "text", text: "Pay 5" }, eligible: true },
+      { id: "o_go", prompt: { kind: "text", text: "Leave" }, eligible: true },
+    ] }] },
+    { op: "choose", id: "o_pay" },
+    { op: "advance", expect: [{ type: "text", id: "T_pay", text: "Paid." }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// A save names the next beat by id (ruling D), so an edit to the snippet under the cursor can't move it: a beat
+// inserted before it is not replayed, and nothing is reported, since nothing moved.
+const scriptedSaveBeatInserted = {
+  name: "a beat inserted before the cursor in the active snippet neither replays nor is reported",
+  project: project(),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "n", type: "snippet", beats: [{ id: "T1", kind: "text" }, { id: "T2", kind: "text" }], jump: { to: "END" } },
+  ] }] }],
+  scenesB: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "n", type: "snippet", beats: [{ id: "T0", kind: "text" }, { id: "T1", kind: "text" }, { id: "T2", kind: "text" }], jump: { to: "END" } },
+  ] }] }],
+  locales: [loc("s", { T0: "inserted", T1: "one", T2: "two" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "one" }] },
+    { op: "hotSwap" },                                                     // the raw index (1) would replay T1
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "two" }] },
+    { op: "expectErrors", expectResult: [] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// The next beat itself has gone: the snippet ends there (its onExit runs and its jump is followed), so nothing
+// plays twice, and the load reports it (`save`, naming the snippet).
+const scriptedSaveBeatDeleted = {
+  name: "the next beat deleted from the active snippet: the snippet ends there, its onExit and jump run, reported",
+  project: project({ properties: [{ name: "left", type: "boolean", shared: true, default: false }] }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [
+    { id: "b", type: "block", name: "B", children: [
+      { id: "n", type: "snippet", beats: [{ id: "T1", kind: "text" }, { id: "T2", kind: "text" }, { id: "T3", kind: "text" }],
+        onExit: [{ kind: "set", target: "@left", value: "true" }], jump: { to: "b2" } },
+    ] },
+    { id: "b2", type: "block", name: "B2", children: [
+      { id: "n2", type: "snippet", beats: [{ id: "T4", kind: "text" }], jump: { to: "END" } },
+    ] },
+  ] }],
+  scenesB: [{ id: "s", type: "scene", name: "S", blocks: [
+    { id: "b", type: "block", name: "B", children: [
+      { id: "n", type: "snippet", beats: [{ id: "T1", kind: "text" }, { id: "T3", kind: "text" }],
+        onExit: [{ kind: "set", target: "@left", value: "true" }], jump: { to: "b2" } },
+    ] },
+    { id: "b2", type: "block", name: "B2", children: [
+      { id: "n2", type: "snippet", beats: [{ id: "T4", kind: "text" }], jump: { to: "END" } },
+    ] },
+  ] }],
+  locales: [loc("s", { T1: "one", T2: "two", T3: "three", T4: "after, left={@left}" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "one" }] },
+    { op: "hotSwap" },
+    { op: "expectErrors", expectResult: [{ kind: "save", node: "n", flow: "main" }] },
+    { op: "advance", expect: [{ type: "text", id: "T4", text: "after, left=true" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// The option the cursor stood in has gone, its choice still there: the choice is offered again, without it
+// (visit counts already hold the first time), and the load reports it.
+const scriptedSaveOptionDeleted = {
+  name: "the option the cursor stood in deleted: its choice is offered again, reported",
+  project: project(),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g", type: "group", selector: "choice", children: [
+      { id: "o_a", type: "group", prompt: { id: "P_a", kind: "text" }, children: [
+        { id: "a_c", type: "snippet", beats: [{ id: "A1", kind: "text" }, { id: "A2", kind: "text" }], jump: { to: "END" } },
+      ] },
+      { id: "o_b", type: "group", prompt: { id: "P_b", kind: "text" }, children: [
+        { id: "b_c", type: "snippet", beats: [{ id: "B1", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ] }] }],
+  scenesB: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g", type: "group", selector: "choice", children: [
+      { id: "o_b", type: "group", prompt: { id: "P_b", kind: "text" }, children: [
+        { id: "b_c", type: "snippet", beats: [{ id: "B1", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ] }] }],
+  locales: [loc("s", { P_a: "Ask", P_b: "Go", A1: "asked", A2: "asked again", B1: "gone" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o_a", prompt: { kind: "text", text: "Ask" }, eligible: true },
+      { id: "o_b", prompt: { kind: "text", text: "Go" }, eligible: true },
+    ] }] },
+    { op: "choose", id: "o_a" },
+    { op: "advance", expect: [{ type: "text", id: "A1", text: "asked" }] },
+    { op: "hotSwap" },
+    { op: "expectErrors", expectResult: [{ kind: "save", node: "a_c", flow: "main" }] },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o_b", prompt: { kind: "text", text: "Go" }, eligible: true },
+    ] }] },
+    { op: "choose", id: "o_b" },
+    { op: "advance", expect: [{ type: "text", id: "B1", text: "gone" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// Every option of a pending choice has gone, the choice still there: it is offered again with what it has now.
+const scriptedSaveChoiceRewritten = {
+  name: "every option of the pending choice replaced: the choice is offered again with its new options, reported",
+  project: project(),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g", type: "group", selector: "choice", children: [
+      { id: "o_a", type: "group", prompt: { id: "P_a", kind: "text" }, children: [{ id: "a_c", type: "snippet", jump: { to: "END" } }] },
+    ] },
+  ] }] }],
+  scenesB: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g", type: "group", selector: "choice", children: [
+      { id: "o_c", type: "group", prompt: { id: "P_c", kind: "text" }, children: [{ id: "c_c", type: "snippet", beats: [{ id: "C1", kind: "text" }], jump: { to: "END" } }] },
+    ] },
+  ] }] }],
+  locales: [loc("s", { P_a: "Old", P_c: "New", C1: "the new way" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [{ id: "o_a", prompt: { kind: "text", text: "Old" }, eligible: true }] }] },
+    { op: "hotSwap" },
+    { op: "expectErrors", expectResult: [{ kind: "save", node: "g", flow: "main" }] },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [{ id: "o_c", prompt: { kind: "text", text: "New" }, eligible: true }] }] },
+    { op: "choose", id: "o_c" },
+    { op: "advance", expect: [{ type: "text", id: "C1", text: "the new way" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+/** A version 4 save as a version 3 runtime wrote it: the next beat by its index, no `choiceId` on its frames, and each
+ *  pending option's prompt as text (here stale, to show a load discards it). For the save cases that stand for a
+ *  save on a player's disk from before 1.0. */
+const asVersion3 = (save: SaveGame, bundle: Bundle): void => {
+  const beatsOf = new Map<string, string[]>();
+  const walk = (nodes: ReadonlyArray<CompiledGroup | CompiledSnippet>): void => {
+    for (const n of nodes) {
+      if (n.type === "snippet") beatsOf.set(n.id, (n.beats ?? []).map((b) => b.id));
+      else walk(n.children);
+    }
+  };
+  for (const scene of Object.values(bundle.scenes)) for (const block of scene.blocks) walk(block.children);
+  (save as { version: number }).version = 3;
+  for (const f of Object.values(save.flows)) {
+    const c = f.cursor;
+    for (const frame of c.stack) delete frame.choiceId;
+    const beats = c.activeSnippetId !== null ? beatsOf.get(c.activeSnippetId) ?? [] : [];
+    c.beatIndex = c.beatId !== undefined ? beats.indexOf(c.beatId) : beats.length;
+    delete c.beatId;
+    for (const o of c.pendingChoice?.options ?? []) Object.assign(o, { prompt: { kind: "text", text: "(stale text from the save)" } });
+  }
+};
+
 export const cases: Fixtures = {
   expressions: [
     { name: "number comparison", src: "@hp > 5", scopes: { patter: { hp: 10 } }, expected: true },
@@ -3865,7 +4262,7 @@ export const cases: Fixtures = {
     linePadding, linePaddingPrompt, actionText, actionTextLocalised,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ruleErrorsPlayThrough, ruleBestMatchFailingPart, ruleNumberText, rulePromptTags, ruleAllGreyedRunsDry],
-  scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedEscapedEmojiSaveLoad, scriptedSetLocale,
+  scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedProjectStart, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedEscapedEmojiSaveLoad, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
@@ -3874,7 +4271,9 @@ export const cases: Fixtures = {
     scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties, scriptedStages,
     scriptedWorldQuality, scriptedStoryQuality, scriptedQualityDeletedStage, scriptedEnumDeletedValue,
     scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited,
-    scriptedExtensions, scriptedExtensionsCompile, scriptedNoExtensions],
+    scriptedExtensions, scriptedExtensionsCompile, scriptedNoExtensions,
+    scriptedLocaleRule, scriptedLocaleNoRegion, scriptedLocaleIds, scriptedHostScopeWrongCase, scriptedHostWrites, scriptedGameDataCopied,
+    scriptedChoiceFollowsLocale, scriptedSaveBeatInserted, scriptedSaveBeatDeleted, scriptedSaveOptionDeleted, scriptedSaveChoiceRewritten],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults, gameDataQuality, gameDataQualityDefaults, gameDataOption, gameDataOptionDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),
@@ -3885,7 +4284,7 @@ export const cases: Fixtures = {
     // to fr, and after the onEnter), and writes the save back without a `pendingPrompt` it never had.
     {
       ...asSaveFixture(scriptedReplaySaveLoad, "a save written before saves carried the shown prompt resolves the prompt when it is delivered"),
-      editSave: (save) => { for (const f of Object.values(save.flows)) delete f.cursor.pendingPrompt; },
+      editSave: (save, bundle) => { asVersion3(save, bundle); for (const f of Object.values(save.flows)) delete f.cursor.pendingPrompt; },
       script: [
         { op: "useFlow", flow: "main" },
         { op: "setLocale", locale: "fr" },
@@ -3897,6 +4296,38 @@ export const cases: Fixtures = {
     asSaveFixture(scriptedEmptySpeakerSaveLoad, "a save written by the JS reference keeps a pending choice's empty speaker fields"),
     asSaveFixture(scriptedEscapedEmojiSaveLoad, "a save written by the JS reference with an emoji property value, escaped as a surrogate pair, loads as the one character"),
     asSaveFixture(scriptedQualifierSaveLoad, "a save written by the JS reference keeps a qualified prompt's qualifier, pending and spoken back"),
+    // Version 3 saves, as a runtime before 1.0 wrote them, still load, and are written back as version 4.
+    { ...asSaveFixture(scriptedSaveLoad, "a version 3 save loads mid-flow, cursor and selector memory intact"), editSave: asVersion3 },
+    {
+      name: "a version 3 save loads mid-snippet, at the beat its index names",
+      project: project(),
+      scenes: scriptedSaveBeatInserted.scenes,
+      locales: scriptedSaveBeatInserted.locales,
+      setup: [{ op: "openFlow", flow: "main", scene: "s" }, { op: "advance", expect: [{ type: "text", id: "T1", text: "one" }] }],
+      editSave: asVersion3,
+      script: [
+        { op: "useFlow", flow: "main" },
+        { op: "advance", expect: [{ type: "text", id: "T2", text: "two" }] },
+        { op: "advance", expect: [{ type: "end" }] },
+      ],
+    },
+    // A version 3 pending choice's prompt text is discarded: the choice is shown in the loading engine's language.
+    {
+      ...asSaveFixture(scriptedChoiceFollowsLocale, "a version 3 save at a pending choice discards its prompt text and shows the choice in the language in use"),
+      editSave: asVersion3,
+      script: [
+        { op: "useFlow", flow: "main" },
+        { op: "setLocale", locale: "fr" },
+        { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+          { id: "o_pay", prompt: { kind: "text", text: "Payer 5" }, eligible: true },
+          { id: "o_go", prompt: { kind: "text", text: "Partir" }, eligible: true },
+        ] }] },
+        { op: "choose", id: "o_go" },
+        { op: "advance", expect: [{ type: "end" }] },
+      ],
+    },
+    // Version 4 at a pending choice in French: the save keeps no text, so English is what an English engine shows.
+    asSaveFixture(scriptedChoiceFollowsLocale, "a save written by the JS reference at a pending choice keeps its options' ids, not their text"),
   ],
   logs: [decisionLog],
   describes: [describeEverything],

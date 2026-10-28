@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "expressions": [
     {
       "name": "number comparison",
@@ -10296,6 +10296,145 @@
       ]
     },
     {
+      "name": "openFlow and resetFlow with no scene start at the project's start scene and block",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1j40nbi",
+          "structureHash": "0fkcr7b"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "start": {
+          "scene": "scn_aa",
+          "block": "b_g2"
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "scn_zz": {
+            "id": "scn_zz",
+            "type": "scene",
+            "name": "Tavern",
+            "blocks": [
+              {
+                "id": "b_t",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_t",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_t",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "scn_aa": {
+            "id": "scn_aa",
+            "type": "scene",
+            "name": "Gate",
+            "blocks": [
+              {
+                "id": "b_g",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_g",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_g",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_g2",
+                "type": "block",
+                "name": "Second",
+                "children": [
+                  {
+                    "id": "sn_g2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_g2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_t": "tavern",
+            "T_g": "gate",
+            "T_g2": "gate, second block"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_g2",
+              "text": "gate, second block"
+            }
+          ]
+        },
+        {
+          "op": "resetFlow"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_g2",
+              "text": "gate, second block"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "goto: address navigation, immediate landing, and move-without-reset",
       "bundle": {
         "schema": "patter/bundle@0",
@@ -11377,6 +11516,27 @@
         {
           "op": "setLocale",
           "locale": "de"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "setup",
+              "node": "de",
+              "flow": ""
+            }
+          ]
+        },
+        {
+          "op": "expectLocale",
+          "expectResult": {
+            "locale": "en",
+            "default": "en",
+            "included": [
+              "en",
+              "fr"
+            ]
+          }
         },
         {
           "op": "advance",
@@ -12583,7 +12743,7 @@
       ]
     },
     {
-      "name": "hotSwap: a deleted ACTIVE snippet is skipped; play continues at the next survivor",
+      "name": "hotSwap: a deleted ACTIVE snippet is skipped, reported; play continues at the next survivor",
       "bundle": {
         "schema": "patter/bundle@0",
         "content": {
@@ -12722,6 +12882,16 @@
         },
         {
           "op": "hotSwap"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "save",
+              "node": "sn1",
+              "flow": "main"
+            }
+          ]
         },
         {
           "op": "advance",
@@ -12996,7 +13166,7 @@
       ]
     },
     {
-      "name": "hotSwap: the cursor's whole container emptied - the frame drops and the flow ends cleanly",
+      "name": "hotSwap: the cursor's whole container emptied - the frame drops, reported, and the flow ends cleanly",
       "bundle": {
         "schema": "patter/bundle@0",
         "content": {
@@ -13164,6 +13334,16 @@
         },
         {
           "op": "hotSwap"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "save",
+              "node": "sn2",
+              "flow": "main"
+            }
+          ]
         },
         {
           "op": "advance",
@@ -23660,6 +23840,2317 @@
           "expectResult": {}
         }
       ]
+    },
+    {
+      "name": "a locale resolves by one rule (case, then language, then the default), each fallback reported",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tl7it8",
+          "structureHash": "16s6lym"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T4",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T5",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T3": "three",
+            "T4": "four",
+            "T5": "five"
+          },
+          "fr": {
+            "T1": "un",
+            "T2": "deux",
+            "T3": "trois",
+            "T4": "quatre",
+            "T5": "cinq"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tl7it8",
+          "structureHash": "16s6lym"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T4",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T5",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T3": "three",
+            "T4": "four",
+            "T5": "five"
+          },
+          "fr": {
+            "T1": "un",
+            "T2": "deux",
+            "T3": "trois",
+            "T4": "quatre",
+            "T5": "cinq"
+          }
+        }
+      },
+      "locale": "FR",
+      "script": [
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "setup",
+              "node": "FR",
+              "flow": ""
+            }
+          ]
+        },
+        {
+          "op": "expectLocale",
+          "expectResult": {
+            "locale": "fr",
+            "default": "en",
+            "included": [
+              "en",
+              "fr"
+            ]
+          }
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "un"
+            }
+          ]
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr-CA"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "setup",
+              "node": "fr-CA"
+            }
+          ]
+        },
+        {
+          "op": "expectLocale",
+          "expectResult": {
+            "locale": "fr",
+            "default": "en",
+            "included": [
+              "en",
+              "fr"
+            ]
+          }
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "deux"
+            }
+          ]
+        },
+        {
+          "op": "setLocale",
+          "locale": "de"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "setup",
+              "node": "de"
+            }
+          ]
+        },
+        {
+          "op": "expectLocale",
+          "expectResult": {
+            "locale": "en",
+            "default": "en",
+            "included": [
+              "en",
+              "fr"
+            ]
+          }
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T3",
+              "text": "<Untranslated: T3> three"
+            }
+          ]
+        },
+        {
+          "op": "setLocale",
+          "locale": "en"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": []
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T4",
+              "text": "four"
+            }
+          ]
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr_FR"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "setup",
+              "node": "fr_FR"
+            }
+          ]
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "setup",
+              "node": "fr_FR"
+            }
+          ]
+        },
+        {
+          "op": "expectLocale",
+          "expectResult": {
+            "locale": "fr",
+            "default": "en",
+            "included": [
+              "en",
+              "fr"
+            ]
+          }
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T5",
+              "text": "cinq"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a locale never looks for its regions: fr falls back to the default when the bundle has only fr-FR",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0zep1xl",
+          "structureHash": "16s6lym"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr-FR"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T4",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T5",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T3": "three",
+            "T4": "four",
+            "T5": "five"
+          },
+          "fr-FR": {
+            "T1": "un",
+            "T2": "deux",
+            "T3": "trois",
+            "T4": "quatre",
+            "T5": "cinq"
+          }
+        }
+      },
+      "locale": "fr",
+      "script": [
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "setup",
+              "node": "fr",
+              "flow": ""
+            }
+          ]
+        },
+        {
+          "op": "expectLocale",
+          "expectResult": {
+            "locale": "en",
+            "default": "en",
+            "included": [
+              "en",
+              "fr-FR"
+            ]
+          }
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "<Untranslated: T1> one"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an IDs-only bundle takes any locale as given, unreported",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1skq2tk",
+          "structureHash": "16s6lym"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T4",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T5",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {},
+        "localisation": {
+          "mode": "ids"
+        }
+      },
+      "locale": "xx-YY",
+      "script": [
+        {
+          "op": "expectErrors",
+          "expectResult": []
+        },
+        {
+          "op": "expectLocale",
+          "expectResult": {
+            "locale": "xx-YY",
+            "default": "en",
+            "included": [
+              "en"
+            ]
+          }
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "T1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a host scope bound under a token the bundle doesn't declare (only the case differs) is reported, never folded",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0pt6i6u",
+          "structureHash": "0b742mh"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scopeRegistry": {
+          "version": 1,
+          "scopes": [
+            {
+              "token": "world",
+              "declarations": [
+                {
+                  "name": "alarms",
+                  "type": "number",
+                  "default": 2
+                }
+              ]
+            }
+          ]
+        },
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T": "alarms: {@world.alarms}"
+          }
+        }
+      },
+      "hostScopes": [
+        "World"
+      ],
+      "script": [
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "setup",
+              "node": "World",
+              "flow": ""
+            }
+          ]
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T",
+              "text": "alarms: 2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a host write that doesn't fit its declaration, or names nothing declared, is refused and changes nothing",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0y72ajw",
+          "structureHash": "1afejdm"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "gold",
+            "type": "number",
+            "shared": true,
+            "default": 1
+          },
+          {
+            "name": "mood",
+            "type": "enum",
+            "values": [
+              "calm",
+              "tense"
+            ],
+            "shared": true,
+            "default": ""
+          },
+          {
+            "name": "keys",
+            "type": "flags",
+            "values": [
+              "iron",
+              "brass"
+            ],
+            "shared": true,
+            "default": []
+          },
+          {
+            "name": "act",
+            "type": "quality",
+            "stages": [
+              "one",
+              "two"
+            ],
+            "shared": true,
+            "default": "one"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "shared": true,
+            "default": ""
+          }
+        ],
+        "scopeRegistry": {
+          "version": 1,
+          "scopes": [
+            {
+              "token": "world",
+              "declarations": [
+                {
+                  "name": "alarm",
+                  "type": "boolean",
+                  "default": false
+                }
+              ]
+            },
+            {
+              "token": "fx"
+            }
+          ]
+        },
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T": "{@gold} [{@mood}] {@act} {@note} {@world.alarm} {@keys} {@fx.glow}"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "setProperty",
+          "ref": "@gold",
+          "value": "lots",
+          "expectRefused": true
+        },
+        {
+          "op": "setProperty",
+          "ref": "@gold",
+          "value": 5
+        },
+        {
+          "op": "setProperty",
+          "ref": "@mood",
+          "value": "angry",
+          "expectRefused": true
+        },
+        {
+          "op": "setProperty",
+          "ref": "@mood",
+          "value": "tense"
+        },
+        {
+          "op": "setProperty",
+          "ref": "@mood",
+          "value": ""
+        },
+        {
+          "op": "setProperty",
+          "ref": "@keys",
+          "value": [
+            "iron",
+            "gold"
+          ],
+          "expectRefused": true
+        },
+        {
+          "op": "setProperty",
+          "ref": "@keys",
+          "value": [
+            "brass"
+          ]
+        },
+        {
+          "op": "setProperty",
+          "ref": "@act",
+          "value": "three",
+          "expectRefused": true
+        },
+        {
+          "op": "setProperty",
+          "ref": "@act",
+          "value": "two"
+        },
+        {
+          "op": "setProperty",
+          "ref": "@note",
+          "value": 3,
+          "expectRefused": true
+        },
+        {
+          "op": "setProperty",
+          "ref": "@world.alarm",
+          "value": 1,
+          "expectRefused": true
+        },
+        {
+          "op": "setProperty",
+          "ref": "@world.alarm",
+          "value": true
+        },
+        {
+          "op": "setProperty",
+          "ref": "@world.bells",
+          "value": 1,
+          "expectRefused": true
+        },
+        {
+          "op": "setProperty",
+          "ref": "@silver",
+          "value": 1,
+          "expectRefused": true
+        },
+        {
+          "op": "setProperty",
+          "ref": "@fx.glow",
+          "value": 3
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T",
+              "text": "5 [] two  true brass 3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a step's and an option's gameData are the host's own copy: defacing them changes nothing handed out next",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1xsqgnx",
+          "structureHash": "0omyjrp"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L",
+                        "kind": "line",
+                        "character": "NPC",
+                        "gameData": {
+                          "cam": "wide",
+                          "marks": [
+                            "x",
+                            "y"
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "o_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "gameData": {
+                          "icon": "ear",
+                          "tags": [
+                            "calm"
+                          ]
+                        },
+                        "prompt": {
+                          "id": "P",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L": "Hello.",
+            "P": "Listen"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L",
+              "text": "Hello.",
+              "character": "NPC",
+              "gameData": {
+                "cam": "wide",
+                "marks": [
+                  "x",
+                  "y"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "op": "scribble"
+        },
+        {
+          "op": "stepFor",
+          "beat": "L",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L",
+              "text": "Hello.",
+              "character": "NPC",
+              "gameData": {
+                "cam": "wide",
+                "marks": [
+                  "x",
+                  "y"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "op": "scribble"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Listen"
+                  },
+                  "eligible": true,
+                  "gameData": {
+                    "icon": "ear",
+                    "tags": [
+                      "calm"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "scribble"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Listen"
+                  },
+                  "eligible": true,
+                  "gameData": {
+                    "icon": "ear",
+                    "tags": [
+                      "calm"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "scribble"
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "resetFlow",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L",
+              "text": "Hello.",
+              "character": "NPC",
+              "gameData": {
+                "cam": "wide",
+                "marks": [
+                  "x",
+                  "y"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Listen"
+                  },
+                  "eligible": true,
+                  "gameData": {
+                    "icon": "ear",
+                    "tags": [
+                      "calm"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a pending choice's prompts follow setLocale and the current values, and a save loads in the loading engine's language",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1ccq0vf",
+          "structureHash": "1r1hai3"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_pay",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "pay_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_pay",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_pay",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_pay": "Pay {@coins}",
+            "P_go": "Leave",
+            "T_pay": "Paid."
+          },
+          "fr": {
+            "P_pay": "Payer {@coins}",
+            "P_go": "Partir",
+            "T_pay": "Payé."
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_pay",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Pay 3"
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_go",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Leave"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr"
+        },
+        {
+          "op": "setProperty",
+          "ref": "@coins",
+          "value": 5
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_pay",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Payer 5"
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_go",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Partir"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_pay",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Pay 5"
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_go",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Leave"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_pay"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_pay",
+              "text": "Paid."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a beat inserted before the cursor in the active snippet neither replays nor is reported",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1clbdfg",
+          "structureHash": "0u12eak"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T0": "inserted",
+            "T1": "one",
+            "T2": "two"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1t9plf0",
+          "structureHash": "1xcykks"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T0",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T0": "inserted",
+            "T1": "one",
+            "T2": "two"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "one"
+            }
+          ]
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two"
+            }
+          ]
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": []
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the next beat deleted from the active snippet: the snippet ends there, its onExit and jump run, reported",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0rr4zqa",
+          "structureHash": "02j0q4c"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "left",
+            "type": "boolean",
+            "shared": true,
+            "default": false
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      }
+                    ],
+                    "onExit": [
+                      {
+                        "kind": "set",
+                        "target": "@left",
+                        "value": {
+                          "src": "true",
+                          "ast": [
+                            "b",
+                            true
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "b2"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b2",
+                "type": "block",
+                "name": "B2",
+                "children": [
+                  {
+                    "id": "n2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T4",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T3": "three",
+            "T4": "after, left={@left}"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "16b5axs",
+          "structureHash": "0a8d6mm"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "left",
+            "type": "boolean",
+            "shared": true,
+            "default": false
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      }
+                    ],
+                    "onExit": [
+                      {
+                        "kind": "set",
+                        "target": "@left",
+                        "value": {
+                          "src": "true",
+                          "ast": [
+                            "b",
+                            true
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "b2"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b2",
+                "type": "block",
+                "name": "B2",
+                "children": [
+                  {
+                    "id": "n2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T4",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T3": "three",
+            "T4": "after, left={@left}"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "one"
+            }
+          ]
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "save",
+              "node": "n",
+              "flow": "main"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T4",
+              "text": "after, left=true"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the option the cursor stood in deleted: its choice is offered again, reported",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0cs8531",
+          "structureHash": "02tdex9"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_a",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "a_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "A1",
+                                "kind": "text"
+                              },
+                              {
+                                "id": "A2",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_a",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "o_b",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "b_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "B1",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_b",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_a": "Ask",
+            "P_b": "Go",
+            "A1": "asked",
+            "A2": "asked again",
+            "B1": "gone"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0ql0l1m",
+          "structureHash": "0jydcge"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_b",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "b_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "B1",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_b",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_a": "Ask",
+            "P_b": "Go",
+            "A1": "asked",
+            "A2": "asked again",
+            "B1": "gone"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_a",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Ask"
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_b",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Go"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_a"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "A1",
+              "text": "asked"
+            }
+          ]
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "save",
+              "node": "a_c",
+              "flow": "main"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_b",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Go"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_b"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "B1",
+              "text": "gone"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "every option of the pending choice replaced: the choice is offered again with its new options, reported",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1ymu401",
+          "structureHash": "0ehxcg1"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_a",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "a_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_a",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_a": "Old",
+            "P_c": "New",
+            "C1": "the new way"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0qs528c",
+          "structureHash": "134z5tg"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_c",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "c_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "C1",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_c",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_a": "Old",
+            "P_c": "New",
+            "C1": "the new way"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_a",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Old"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "save",
+              "node": "g",
+              "flow": "main"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_c",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "New"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_c"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "C1",
+              "text": "the new way"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
     }
   ],
   "gameData": [
@@ -24164,7 +26655,7 @@
       "envelope": {
         "schema": "patter/save@0",
         "save": {
-          "version": 3,
+          "version": 4,
           "registry": {
             "patter": {},
             "patter/flow/main/patter": {},
@@ -24201,7 +26692,6 @@
                   }
                 ],
                 "activeSnippetId": "one",
-                "beatIndex": 1,
                 "pendingChoice": null,
                 "pendingPromptOwnerId": null,
                 "selectors": {
@@ -24220,7 +26710,6 @@
         "save/flows/main",
         "save/flows/main/cursor",
         "save/flows/main/cursor/activeSnippetId",
-        "save/flows/main/cursor/beatIndex",
         "save/flows/main/cursor/currentSceneId",
         "save/flows/main/cursor/flowEnded",
         "save/flows/main/cursor/pendingChoice",
@@ -24385,7 +26874,7 @@
       "envelope": {
         "schema": "patter/save@0",
         "save": {
-          "version": 3,
+          "version": 4,
           "registry": {
             "patter": {},
             "patter/flow/main/patter": {},
@@ -24417,26 +26906,15 @@
                   }
                 ],
                 "activeSnippetId": null,
-                "beatIndex": 0,
                 "pendingChoice": {
                   "groupId": "g",
                   "options": [
                     {
                       "id": "left",
-                      "prompt": {
-                        "kind": "text",
-                        "text": "Left",
-                        "padAfter": 0.6
-                      },
                       "eligible": true
                     },
                     {
                       "id": "right",
-                      "prompt": {
-                        "kind": "text",
-                        "text": "Right",
-                        "padAfter": 0.6
-                      },
                       "eligible": true
                     }
                   ]
@@ -24454,7 +26932,6 @@
         "save/flows/main",
         "save/flows/main/cursor",
         "save/flows/main/cursor/activeSnippetId",
-        "save/flows/main/cursor/beatIndex",
         "save/flows/main/cursor/currentSceneId",
         "save/flows/main/cursor/flowEnded",
         "save/flows/main/cursor/pendingChoice",
@@ -24463,17 +26940,9 @@
         "save/flows/main/cursor/pendingChoice/options[0]",
         "save/flows/main/cursor/pendingChoice/options[0]/eligible",
         "save/flows/main/cursor/pendingChoice/options[0]/id",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/kind",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/padAfter",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
         "save/flows/main/cursor/pendingChoice/options[1]",
         "save/flows/main/cursor/pendingChoice/options[1]/eligible",
         "save/flows/main/cursor/pendingChoice/options[1]/id",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt/kind",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt/padAfter",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt/text",
         "save/flows/main/cursor/pendingPromptOwnerId",
         "save/flows/main/cursor/selectors",
         "save/flows/main/cursor/stack",
@@ -24685,7 +27154,7 @@
       "envelope": {
         "schema": "patter/save@0",
         "save": {
-          "version": 3,
+          "version": 4,
           "registry": {
             "patter": {
               "coins": 0
@@ -24723,7 +27192,7 @@
                   }
                 ],
                 "activeSnippetId": "ask_c",
-                "beatIndex": 0,
+                "beatId": "T_ask",
                 "pendingChoice": null,
                 "pendingPromptOwnerId": "o_ask",
                 "pendingPrompt": {
@@ -24751,7 +27220,7 @@
         "save/flows/main",
         "save/flows/main/cursor",
         "save/flows/main/cursor/activeSnippetId",
-        "save/flows/main/cursor/beatIndex",
+        "save/flows/main/cursor/beatId",
         "save/flows/main/cursor/currentSceneId",
         "save/flows/main/cursor/flowEnded",
         "save/flows/main/cursor/pendingChoice",
@@ -25005,14 +27474,14 @@
                   }
                 ],
                 "activeSnippetId": "ask_c",
-                "beatIndex": 0,
                 "pendingChoice": null,
                 "pendingPromptOwnerId": "o_ask",
                 "selectors": {
                   "o_ask": {
                     "seq": 1
                   }
-                }
+                },
+                "beatIndex": 0
               }
             }
           }
@@ -25024,7 +27493,7 @@
         "save/flows/main",
         "save/flows/main/cursor",
         "save/flows/main/cursor/activeSnippetId",
-        "save/flows/main/cursor/beatIndex",
+        "save/flows/main/cursor/beatId",
         "save/flows/main/cursor/currentSceneId",
         "save/flows/main/cursor/flowEnded",
         "save/flows/main/cursor/pendingChoice",
@@ -25225,7 +27694,7 @@
       "envelope": {
         "schema": "patter/save@0",
         "save": {
-          "version": 3,
+          "version": 4,
           "registry": {
             "patter": {},
             "patter/flow/main/patter": {},
@@ -25257,43 +27726,19 @@
                   }
                 ],
                 "activeSnippetId": null,
-                "beatIndex": 0,
                 "pendingChoice": {
                   "groupId": "g",
                   "options": [
                     {
                       "id": "o_a",
-                      "prompt": {
-                        "kind": "line",
-                        "text": "Pa",
-                        "character": "ANNA",
-                        "characterName": "Anna",
-                        "direction": "",
-                        "speakerLabel": "Anna",
-                        "padAfter": 0.6
-                      },
                       "eligible": true
                     },
                     {
                       "id": "o_b",
-                      "prompt": {
-                        "kind": "line",
-                        "text": "Pb",
-                        "character": "BO",
-                        "characterName": "",
-                        "speakerLabel": "",
-                        "padAfter": 0.6
-                      },
                       "eligible": true
                     },
                     {
                       "id": "o_n",
-                      "prompt": {
-                        "kind": "line",
-                        "text": "Pn",
-                        "character": "",
-                        "padAfter": 0.6
-                      },
                       "eligible": true
                     }
                   ]
@@ -25311,7 +27756,6 @@
         "save/flows/main",
         "save/flows/main/cursor",
         "save/flows/main/cursor/activeSnippetId",
-        "save/flows/main/cursor/beatIndex",
         "save/flows/main/cursor/currentSceneId",
         "save/flows/main/cursor/flowEnded",
         "save/flows/main/cursor/pendingChoice",
@@ -25320,32 +27764,12 @@
         "save/flows/main/cursor/pendingChoice/options[0]",
         "save/flows/main/cursor/pendingChoice/options[0]/eligible",
         "save/flows/main/cursor/pendingChoice/options[0]/id",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/character",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/characterName",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/direction",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/kind",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/padAfter",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/speakerLabel",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
         "save/flows/main/cursor/pendingChoice/options[1]",
         "save/flows/main/cursor/pendingChoice/options[1]/eligible",
         "save/flows/main/cursor/pendingChoice/options[1]/id",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt/character",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt/characterName",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt/kind",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt/padAfter",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt/speakerLabel",
-        "save/flows/main/cursor/pendingChoice/options[1]/prompt/text",
         "save/flows/main/cursor/pendingChoice/options[2]",
         "save/flows/main/cursor/pendingChoice/options[2]/eligible",
         "save/flows/main/cursor/pendingChoice/options[2]/id",
-        "save/flows/main/cursor/pendingChoice/options[2]/prompt",
-        "save/flows/main/cursor/pendingChoice/options[2]/prompt/character",
-        "save/flows/main/cursor/pendingChoice/options[2]/prompt/kind",
-        "save/flows/main/cursor/pendingChoice/options[2]/prompt/padAfter",
-        "save/flows/main/cursor/pendingChoice/options[2]/prompt/text",
         "save/flows/main/cursor/pendingPromptOwnerId",
         "save/flows/main/cursor/selectors",
         "save/flows/main/cursor/stack",
@@ -25532,7 +27956,7 @@
       "envelope": {
         "schema": "patter/save@0",
         "save": {
-          "version": 3,
+          "version": 4,
           "registry": {
             "patter": {
               "mood": "\ud83d\ude42"
@@ -25567,7 +27991,6 @@
                   }
                 ],
                 "activeSnippetId": "one",
-                "beatIndex": 1,
                 "pendingChoice": null,
                 "pendingPromptOwnerId": null,
                 "selectors": {}
@@ -25582,7 +28005,6 @@
         "save/flows/main",
         "save/flows/main/cursor",
         "save/flows/main/cursor/activeSnippetId",
-        "save/flows/main/cursor/beatIndex",
         "save/flows/main/cursor/currentSceneId",
         "save/flows/main/cursor/flowEnded",
         "save/flows/main/cursor/pendingChoice",
@@ -25767,7 +28189,7 @@
       "envelope": {
         "schema": "patter/save@0",
         "save": {
-          "version": 3,
+          "version": 4,
           "registry": {
             "patter": {},
             "patter/flow/main/patter": {},
@@ -25801,22 +28223,11 @@
                   }
                 ],
                 "activeSnippetId": null,
-                "beatIndex": 0,
                 "pendingChoice": {
                   "groupId": "g_radio",
                   "options": [
                     {
                       "id": "o_call",
-                      "prompt": {
-                        "kind": "line",
-                        "text": "Base, come in.",
-                        "character": "TAM",
-                        "characterName": "Tam",
-                        "qualifier": "radio",
-                        "qualifierName": "RADIO",
-                        "speakerLabel": "Tam (RADIO)",
-                        "padAfter": 0.6
-                      },
                       "eligible": true
                     }
                   ]
@@ -25834,7 +28245,6 @@
         "save/flows/main",
         "save/flows/main/cursor",
         "save/flows/main/cursor/activeSnippetId",
-        "save/flows/main/cursor/beatIndex",
         "save/flows/main/cursor/currentSceneId",
         "save/flows/main/cursor/flowEnded",
         "save/flows/main/cursor/pendingChoice",
@@ -25843,15 +28253,6 @@
         "save/flows/main/cursor/pendingChoice/options[0]",
         "save/flows/main/cursor/pendingChoice/options[0]/eligible",
         "save/flows/main/cursor/pendingChoice/options[0]/id",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/character",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/characterName",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/kind",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/padAfter",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/qualifier",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/qualifierName",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/speakerLabel",
-        "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
         "save/flows/main/cursor/pendingPromptOwnerId",
         "save/flows/main/cursor/selectors",
         "save/flows/main/cursor/stack",
@@ -25941,6 +28342,967 @@
               "qualifier": "radio",
               "qualifierName": "RADIO",
               "speakerLabel": "BASE (RADIO)"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a version 3 save loads mid-flow, cursor and selector memory intact",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0vpxcpn",
+          "structureHash": "03ibej8"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "sceneProps": [
+              {
+                "name": "laps",
+                "type": "number",
+                "default": 0
+              }
+            ],
+            "blocks": [
+              {
+                "id": "loop",
+                "type": "block",
+                "name": "Loop",
+                "children": [
+                  {
+                    "id": "seq",
+                    "type": "group",
+                    "selector": "sequence",
+                    "children": [
+                      {
+                        "id": "one",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T1",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "two",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T2",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gate",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "visits('loop') < 2",
+                      "ast": [
+                        "bin",
+                        "<",
+                        [
+                          "call",
+                          "visits",
+                          [
+                            "s",
+                            "loop"
+                          ]
+                        ],
+                        [
+                          "n",
+                          2
+                        ]
+                      ]
+                    },
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@scene.laps",
+                        "value": {
+                          "src": "@scene.laps + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "laps"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "loop"
+                    }
+                  },
+                  {
+                    "id": "done",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "TD",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "first",
+            "T2": "second",
+            "TD": "laps={@scene.laps}"
+          }
+        }
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 3,
+          "registry": {
+            "patter": {},
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {
+              "laps": 0
+            },
+            "patter/scene/s": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "loop": 1,
+            "seq": 1,
+            "one": 1
+          },
+          "sharedSelectors": {},
+          "flows": {
+            "main": {
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "loop": 1,
+                "seq": 1,
+                "one": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "loop",
+                    "index": 1,
+                    "nextId": "gate"
+                  }
+                ],
+                "activeSnippetId": "one",
+                "pendingChoice": null,
+                "pendingPromptOwnerId": null,
+                "selectors": {
+                  "seq": {
+                    "seq": 1
+                  }
+                },
+                "beatIndex": 1
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/selectors/seq",
+        "save/flows/main/cursor/selectors/seq/seq",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/nextId",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/visits",
+        "save/flows/main/visits/loop",
+        "save/flows/main/visits/one",
+        "save/flows/main/visits/s",
+        "save/flows/main/visits/seq",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/flow/main/scene/s/laps",
+        "save/registry/patter/scene/s",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/loop",
+        "save/sharedVisits/one",
+        "save/sharedVisits/s",
+        "save/sharedVisits/seq",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "second"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "TD",
+              "text": "laps=1"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a version 3 save loads mid-snippet, at the beat its index names",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1clbdfg",
+          "structureHash": "0u12eak"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T0": "inserted",
+            "T1": "one",
+            "T2": "two"
+          }
+        }
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 3,
+          "registry": {
+            "patter": {},
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {},
+            "patter/scene/s": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "b": 1,
+            "n": 1
+          },
+          "sharedSelectors": {},
+          "flows": {
+            "main": {
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "b": 1,
+                "n": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "b",
+                    "index": 1
+                  }
+                ],
+                "activeSnippetId": "n",
+                "pendingChoice": null,
+                "pendingPromptOwnerId": null,
+                "selectors": {},
+                "beatIndex": 1
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/beatId",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/visits",
+        "save/flows/main/visits/b",
+        "save/flows/main/visits/n",
+        "save/flows/main/visits/s",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/scene/s",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/b",
+        "save/sharedVisits/n",
+        "save/sharedVisits/s",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a version 3 save at a pending choice discards its prompt text and shows the choice in the language in use",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1ccq0vf",
+          "structureHash": "1r1hai3"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_pay",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "pay_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_pay",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_pay",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_pay": "Pay {@coins}",
+            "P_go": "Leave",
+            "T_pay": "Paid."
+          },
+          "fr": {
+            "P_pay": "Payer {@coins}",
+            "P_go": "Partir",
+            "T_pay": "Payé."
+          }
+        }
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 3,
+          "registry": {
+            "patter": {
+              "coins": 5
+            },
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {},
+            "patter/scene/s": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "b": 1,
+            "g": 1
+          },
+          "sharedSelectors": {},
+          "flows": {
+            "main": {
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "b": 1,
+                "g": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "b",
+                    "index": 1
+                  }
+                ],
+                "activeSnippetId": null,
+                "pendingChoice": {
+                  "groupId": "g",
+                  "options": [
+                    {
+                      "id": "o_pay",
+                      "eligible": true,
+                      "prompt": {
+                        "kind": "text",
+                        "text": "(stale text from the save)"
+                      }
+                    },
+                    {
+                      "id": "o_go",
+                      "eligible": true,
+                      "prompt": {
+                        "kind": "text",
+                        "text": "(stale text from the save)"
+                      }
+                    }
+                  ]
+                },
+                "pendingPromptOwnerId": null,
+                "selectors": {},
+                "beatIndex": 0
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingChoice/groupId",
+        "save/flows/main/cursor/pendingChoice/options",
+        "save/flows/main/cursor/pendingChoice/options[0]",
+        "save/flows/main/cursor/pendingChoice/options[0]/eligible",
+        "save/flows/main/cursor/pendingChoice/options[0]/id",
+        "save/flows/main/cursor/pendingChoice/options[1]",
+        "save/flows/main/cursor/pendingChoice/options[1]/eligible",
+        "save/flows/main/cursor/pendingChoice/options[1]/id",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/visits",
+        "save/flows/main/visits/b",
+        "save/flows/main/visits/g",
+        "save/flows/main/visits/s",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/coins",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/scene/s",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/b",
+        "save/sharedVisits/g",
+        "save/sharedVisits/s",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_pay",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Payer 5"
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_go",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Partir"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_go"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a save written by the JS reference at a pending choice keeps its options' ids, not their text",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1ccq0vf",
+          "structureHash": "1r1hai3"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_pay",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "pay_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_pay",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_pay",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_pay": "Pay {@coins}",
+            "P_go": "Leave",
+            "T_pay": "Paid."
+          },
+          "fr": {
+            "P_pay": "Payer {@coins}",
+            "P_go": "Partir",
+            "T_pay": "Payé."
+          }
+        }
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 4,
+          "registry": {
+            "patter": {
+              "coins": 5
+            },
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {},
+            "patter/scene/s": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "b": 1,
+            "g": 1
+          },
+          "sharedSelectors": {},
+          "flows": {
+            "main": {
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "b": 1,
+                "g": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "b",
+                    "index": 1
+                  }
+                ],
+                "activeSnippetId": null,
+                "pendingChoice": {
+                  "groupId": "g",
+                  "options": [
+                    {
+                      "id": "o_pay",
+                      "eligible": true
+                    },
+                    {
+                      "id": "o_go",
+                      "eligible": true
+                    }
+                  ]
+                },
+                "pendingPromptOwnerId": null,
+                "selectors": {}
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingChoice/groupId",
+        "save/flows/main/cursor/pendingChoice/options",
+        "save/flows/main/cursor/pendingChoice/options[0]",
+        "save/flows/main/cursor/pendingChoice/options[0]/eligible",
+        "save/flows/main/cursor/pendingChoice/options[0]/id",
+        "save/flows/main/cursor/pendingChoice/options[1]",
+        "save/flows/main/cursor/pendingChoice/options[1]/eligible",
+        "save/flows/main/cursor/pendingChoice/options[1]/id",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/visits",
+        "save/flows/main/visits/b",
+        "save/flows/main/visits/g",
+        "save/flows/main/visits/s",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/coins",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/scene/s",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/b",
+        "save/sharedVisits/g",
+        "save/sharedVisits/s",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_pay",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Pay 5"
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_go",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Leave"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_pay"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_pay",
+              "text": "Paid."
             }
           ]
         },

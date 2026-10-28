@@ -50,9 +50,6 @@ namespace Patterkit.Patterplay
             catch { return false; }
         }
 
-        [System.Obsolete("Use ApplyLiveBundle, the name every Patterplay runtime uses.")]
-        public static PatterLiveBundleResult Apply(Engine engine, Bundle current, string data) => ApplyLiveBundle(engine, current, data);
-
         /// <summary>Apply a pushed bundle. <paramref name="current"/> is the bundle the engine is
         /// running (needed for the structure-hash comparison); <paramref name="data"/> is the pushed
         /// .patterc JSON. A missing StructureHash on either side (an older compiler) falls through to

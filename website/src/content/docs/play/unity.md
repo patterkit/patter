@@ -90,6 +90,19 @@ none. The [timing rules](/play/engine/#step-shapes) say how to play it. A `Text`
 it, or let it pass, but don't show it as on-screen text. `Action` is false on shown text and on a
 replayed prompt.
 
+`engine.OpenFlow("main")` with no scene starts at the project's start scene (`Bundle.Start`), or at the
+first scene when the project sets none. A step's `GameData` and `Tags`, and an option's `GameData`, are your
+own copies: edit them freely. A step's `Extensions` are the bundle's own, so treat them as read-only. A
+choice's prompts are built each time it's delivered, so `SetLocale` reaches a choice already on screen.
+
+The engine never stops the story for a problem: it carries on and reports it to
+`EngineOptions.OnError` as a `PlayError` (or, with no handler, as a `[Patterplay]` warning). Its `Kind`
+says what it was: a `condition`, `effect`, or `best-match` that failed at run time; `setup`, how the engine
+was built (a locale the bundle doesn't have, a host scope it doesn't declare), reported as the constructor
+ends; or `save`, a load whose place has gone from the build. A locale resolves by one rule: the locale
+itself, then its language (`fr` for `fr-FR`), then the bundle's default. `engine.Locale` is the one in use,
+and `engine.Locales` the bundle's `Default` and `Included`.
+
 Two ready-made samples ship with the package. Import them from **Package Manager ▸ Patterplay ▸
 Samples**. Each carries a **ready-made scene**, so there is nothing to set up: import, open the
 scene, press Play. The **Tour demo** (`Tour.unity`) plays the full interactive Patter tour as an
@@ -124,8 +137,11 @@ save holds them, so your game saves them. Leave `HostScopes` null and a standalo
 **self-backs** `@world` from the declared defaults, as a property it stores and saves with the rest of
 the run. A property declared `writable: false` in the project is the *story's* promise, so the engine
 refuses the story's write with `'@world.x' is read-only`, bound or self-backed. Your own `SetProperty`
-isn't refused, because the value is the game's. A per-name policy of your own is yours to refuse from
-`Set`. [World Properties](/play/world-properties/) has the full picture.
+isn't refused for that, because the value is the game's. It does throw, changing nothing, on a value that
+doesn't fit the declaration (`"@world.alarm" takes true or false; "yes" doesn't fit`) or a name the project
+doesn't declare; a scope that declares no names takes anything. A host-scope token is case-sensitive: one
+the bundle doesn't declare is reported (`setup`), never folded. A per-name policy of your own is yours to
+refuse from `Set`. [World Properties](/play/world-properties/) has the full picture.
 
 ## One registry per game
 
@@ -239,10 +255,11 @@ you built on its own also carries every property value, `@patter`, `@scene`, and
 `@world` alike, so one call is still the whole game; an engine you gave a registry leaves them to
 [the registry's save](#one-registry-per-game). It is the **same `patter/save@0` format every
 Patterplay runtime uses**, so a save written by a web build or by Patterpad loads here, and a save
-written here loads in Godot or Unreal. A save written before property values moved into the registry
-(version 2) still loads, and its values move into the registry as it does. Saves written by this
-package before 0.11.0 (its old PascalCase shape) still load too, and are written back in the shared
-shape on the next save. Persist the string wherever you keep saves, and see
+written here loads in Godot or Unreal. Saves are version 4: a pending choice is saved by its options'
+ids, not their text, so it loads in the language of the engine that loads it. A version 3 save still
+loads, and is written back as version 4 on the next save; older saves don't load in 1.0. A save loaded
+into an edited build finds its place by id and, where that place has gone, resumes at the nearest safe
+point and reports it (`save`). Persist the string wherever you keep saves, and see
 [Save/load & Game Data](/play/integration/) for the format.
 
 To set one flow aside instead, `engine.CaptureFlow(id)` returns its part of a save as a `FlowState`, and

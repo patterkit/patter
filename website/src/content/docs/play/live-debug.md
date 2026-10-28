@@ -184,7 +184,7 @@ WebSockets dependency is dropped there), so it is safe to leave in:
 Link = FPatterDebugLink::Create(Engine->BuildId(), TEXT("My Game"));
 Link->FlowOpened(TEXT("main"));
 // ...after each step (map EPatterStepType -> "line" / "text" / "gameEvent" / "choice" / "end"):
-Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, StepTypeName(Step.Type));
+Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, FPatterDebugLink::TypeName(Step.Type));
 ```
 
 **Godot.** A `PatterDebugLink` node. It only opens the link in a debug build

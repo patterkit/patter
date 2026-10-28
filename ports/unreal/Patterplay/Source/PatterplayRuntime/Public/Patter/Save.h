@@ -4,22 +4,23 @@
 // writes (@patterkit/model documents it; design/patter-schema.md 9), written and read identically by
 // every Patterplay runtime so a save crosses engines. camelCase literal keys, the execution position
 // under `cursor`, a pending choice as `{groupId, options}`, selector cursors with every key optional.
-// Until 0.11.0 this port wrote its own flat shape, which a JS save loaded into only partly: the flow
-// came back and its pending choice did not (from-storylets/save-shape-across-engines, 2026-09-03).
-// Reading still accepts that shape.
 //
 // Version 3 (the one-registry model): property values are the registry's, not the engine's. A save
 // holds only what is NOT a property (cursors, PRNGs, visits, selectors), plus, when the engine made
 // its own registry (a standalone game), that registry's values under `registry`, keyed by registry
 // key (`patter`, `patter/scene/<scene>`, `patter/flow/<flow>/patter`, `patter/flow/<flow>/scene/<scene>`,
-// and a self-backed host scope's token). Version 2 saves still load: their property sections
-// (`shared`, `stageBags`, and each flow's `scopes` and `sceneBags`) move into the registry.
+// and a self-backed host scope's token).
+//
+// Version 4 (Patterplay 1.0): a pending choice keeps its options' ids, eligibility, and gameData, not
+// their prompts, which are built again in the language in use whenever the choice is delivered; the
+// cursor names the next beat by id (`beatId`, absent when none is left) rather than by its index; and a
+// frame inside a choice's option carries the choice's id (`choiceId`). Versions 3 and 4 are read, and 4
+// is written; a version 3 save's prompt text is discarded as it loads. Version 2 no longer loads.
 //
 // std-only, and deliberately self-contained: the core is JSON-library-agnostic (Bundle.h), so this
 // header carries its own compact JSON writer + reader for the SaveGame shape - which also makes the
 // envelope testable in the clang TestHost, where Unreal's FJson does not exist. Reading refuses a
-// bare snapshot with no envelope, as every Patterplay runtime does; a version 2 snapshot inside the
-// envelope still loads.
+// bare snapshot with no envelope, as every Patterplay runtime does.
 #pragma once
 
 #include <cstdio>
@@ -115,10 +116,10 @@ namespace patter
             return out + "}";
         }
 
-        inline std::string optionJson(const ChoiceOption& o)
+        // A pending choice's option: which, whether it could be taken, and its gameData. Never its prompt.
+        inline std::string optionJson(const PendingOption& o)
         {
             std::string out = "{\"id\":" + jsonQuote(o.id) + ",\"eligible\":" + (o.eligible ? "true" : "false");
-            if (o.prompt) out += ",\"prompt\":" + promptJson(*o.prompt);
             if (o.gameData) out += ",\"gameData\":" + valueMapJson(*o.gameData);
             return out + "}";
         }
@@ -142,12 +143,13 @@ namespace patter
                 out += "{\"sceneId\":" + jsonQuote(fr.sceneId) + ",\"containerId\":" + jsonQuote(fr.containerId)
                      + ",\"index\":" + std::to_string(fr.index);
                 if (!fr.nextId.empty()) out += ",\"nextId\":" + jsonQuote(fr.nextId);   // absent at a container's end
+                if (!fr.choiceId.empty()) out += ",\"choiceId\":" + jsonQuote(fr.choiceId);   // only inside an option
                 out += "}";
             }
             out += "]";
             out += ",\"activeSnippetId\":" + nullableJson(f.activeSnippetId);
-            out += ",\"beatIndex\":" + std::to_string(f.beatIndex);
-            if (f.pendingOptions.empty()) out += ",\"pendingChoice\":null";
+            if (!f.beatId.empty()) out += ",\"beatId\":" + jsonQuote(f.beatId);   // absent once every beat is delivered
+            if (!f.hasPendingChoice) out += ",\"pendingChoice\":null";
             else
             {
                 out += ",\"pendingChoice\":{\"groupId\":" + jsonQuote(f.pendingGroupId) + ",\"options\":[";
@@ -167,9 +169,9 @@ namespace patter
             return "{" + flowFieldsJson(f) + "}";
         }
 
-        // A version 2 save's per-flow property sections, which a FlowState carries: `scopes` in the
-        // family's two-level shape, and `sceneBags` (scene id -> name -> value).
-        inline std::string flowValuesJson(const FlowSnapshot& f)
+        // A FlowState's own property values: `scopes` in the family's two-level shape, and `sceneBags`
+        // (scene id -> name -> value).
+        inline std::string flowValuesJson(const FlowState& f)
         {
             std::string out = "\"scopes\":{\"patter\":" + valueMapJson(f.scopes) + "},\"sceneBags\":{";
             bool first = true;
@@ -335,17 +337,10 @@ namespace patter
             return m;
         }
 
-        // `{"patter": {name: value}}` (the family's two-level shape) or a bare map (this port before
-        // 0.11.0). A bare map's values are scalars and arrays, never objects, which tells the two apart.
+        // A FlowState's `scopes`: `{"patter": {name: value}}`, the family's two-level shape.
         inline std::map<std::string, PatterValue> toScope(const JV* o)
         {
-            if (o && o->t == JV::T::Obj && !o->obj.empty())
-            {
-                bool twoLevel = true;
-                for (const auto& kv : o->obj) if (kv.second.t != JV::T::Obj) { twoLevel = false; break; }
-                if (twoLevel) return toValueMap(o->get("patter"));
-            }
-            return toValueMap(o);
+            return o && o->t == JV::T::Obj ? toValueMap(o->get("patter")) : std::map<std::string, PatterValue>{};
         }
 
         inline std::map<std::string, int> toIntMap(const JV* o)
@@ -359,12 +354,12 @@ namespace patter
         {
             SelectorState s;
             s.seq = static_cast<int>(v.num("seq"));
-            // Presence IS the flag in the family's shape; the explicit booleans are this port's pre-0.11.0 keys.
+            // Presence IS the flag in the family's shape.
             const JV* bag = v.get("bag");
-            s.bagInit = (bag != nullptr) || v.boolean("bagInit");
+            s.bagInit = bag != nullptr;
             if (bag) for (const auto& e : bag->arr) s.bag.push_back(e.s);
             const JV* last = v.get("last");
-            s.hasLast = (last != nullptr && last->t == JV::T::Str) || v.boolean("hasLast");
+            s.hasLast = last != nullptr && last->t == JV::T::Str;
             s.last = v.str("last");
             return s;
         }
@@ -399,11 +394,12 @@ namespace patter
             return prompt;
         }
 
-        inline ChoiceOption toOption(const JV& e)
+        // A pending choice's option. A version 3 save's `prompt` is discarded: the prompt is built again, in
+        // the language in use, when the choice is delivered.
+        inline PendingOption toOption(const JV& e)
         {
-            ChoiceOption o;
+            PendingOption o;
             o.id = e.str("id"); o.eligible = e.boolean("eligible");
-            if (const JV* p = e.get("prompt")) o.prompt = toPrompt(*p);
             if (const JV* gd = e.get("gameData")) o.gameData = std::make_shared<GameData>(toValueMap(gd));
             return o;
         }
@@ -425,19 +421,16 @@ namespace patter
         inline FlowSnapshot toFlow(const JV& v)
         {
             FlowSnapshot f;
-            // Version 2 only: the flow's own property values (absent from a version 3 save).
-            f.scopes = toScope(v.get("scopes"));
-            f.sceneBags = toBagMap(v.get("sceneBags"));
             // The JS runtime accumulated this state with `| 0` until 0.x, so saves in
             // the wild carry it SIGNED. Casting a negative double straight to
             // uint32_t is undefined behaviour (it gave 0 at -O0 and garbage at -O2),
             // so it goes through the same ToUint32 the seed does.
             f.rngState = Mulberry32::ToUint32(v.num("rngState"));
             f.visits = toIntMap(v.get("visits"));
-            // The family nests the execution position under `cursor`; this port's pre-0.11.0 shape
-            // kept those fields flat on the flow. Same reads either way.
+            // The family nests the execution position under `cursor`.
             const JV* cursor = v.get("cursor");
-            const JV& c = cursor ? *cursor : v;
+            if (!cursor || cursor->t != JV::T::Obj) throw std::runtime_error("malformed save: a flow has no cursor");
+            const JV& c = *cursor;
             f.flowEnded = c.boolean("flowEnded");
             f.currentSceneId = c.str("currentSceneId");   // null -> "" (this core's "none")
             if (const JV* stack = c.get("stack"))
@@ -445,24 +438,19 @@ namespace patter
                 {
                     StackFrame fr;
                     fr.sceneId = e.str("sceneId"); fr.containerId = e.str("containerId");
-                    fr.index = static_cast<int>(e.num("index")); fr.nextId = e.str("nextId");
+                    fr.index = static_cast<int>(e.num("index")); fr.nextId = e.str("nextId"); fr.choiceId = e.str("choiceId");
                     f.stack.push_back(std::move(fr));
                 }
             f.activeSnippetId = c.str("activeSnippetId");
-            f.beatIndex = static_cast<int>(c.num("beatIndex"));
+            f.beatId = c.str("beatId");                                                    // version 4
+            if (const JV* bi = c.get("beatIndex")) if (bi->t == JV::T::Num) f.beatIndex = static_cast<int>(bi->n);   // version 3
             if (const JV* pc = c.get("pendingChoice"))
-            {
                 if (pc->t == JV::T::Obj)
                 {
+                    f.hasPendingChoice = true;
                     f.pendingGroupId = pc->str("groupId");
                     if (const JV* opts = pc->get("options")) for (const auto& e : opts->arr) f.pendingOptions.push_back(toOption(e));
                 }
-            }
-            else   // pre-0.11.0: the group id and options flat on the flow
-            {
-                f.pendingGroupId = c.str("pendingGroupId");
-                if (const JV* opts = c.get("pendingOptions")) for (const auto& e : opts->arr) f.pendingOptions.push_back(toOption(e));
-            }
             f.pendingPromptOwnerId = c.str("pendingPromptOwnerId");
             if (const JV* pp = c.get("pendingPrompt")) if (pp->t == JV::T::Obj) f.pendingPrompt = toPrompt(*pp);
             f.selectors = toSelectorMap(c.get("selectors"));
@@ -472,11 +460,11 @@ namespace patter
 
     namespace savedetail
     {
-        // Refuse a version this runtime does not read (exactly 2 or SAVE_VERSION: 3.9 is refused, not
+        // Refuse a version this runtime does not read (exactly 3 or SAVE_VERSION: 3.9 is refused, not
         // read as 3), shown as JS's String() writes it: the same message on every runtime.
         inline void checkVersion(const JV* version, const std::string& refusal)
         {
-            if (version && version->t == JV::T::Num && (version->n == 2 || version->n == SAVE_VERSION)) return;
+            if (version && version->t == JV::T::Num && (version->n == 3 || version->n == SAVE_VERSION)) return;
             std::string shown = "undefined";
             if (version)
                 switch (version->t)
@@ -492,10 +480,10 @@ namespace patter
         }
     }
 
-    /// Parse + restore a serializeState string: version 3, or a version 2 save whose values move into the
-    /// registry, each inside the `patter/save@0` envelope. Throws on malformed JSON, anything that is not
-    /// that envelope (a bare snapshot with no envelope included), a save version this runtime does not
-    /// read (exactly 2 or 3: 3.9 is refused, not read as 3), or a save with no `flows` object. Every one of
+    /// Parse + restore a serializeState string: version 4, or a version 3 save written before 1.0, inside
+    /// the `patter/save@0` envelope. Throws on malformed JSON, anything that is not that envelope (a bare
+    /// snapshot with no envelope included), a save version this runtime does not read (exactly 3 or 4: 3.9
+    /// is refused, not read as 3), a save with no `flows` object, or a flow with no `cursor`. Every one of
     /// those is checked before anything changes, so a refused save leaves the engine as it was.
     inline void deserializeState(Engine& engine, const std::string& json)
     {
@@ -514,9 +502,6 @@ namespace patter
         if (const JV* reg = saveObj->get("registry")) if (reg->t == JV::T::Obj) s.registry = toRegistry(reg);
         s.sharedVisits = toIntMap(saveObj->get("sharedVisits"));
         s.sharedSelectors = toSelectorMap(saveObj->get("sharedSelectors"));
-        // Version 2 only: the shared property sections (absent from a version 3 save).
-        s.shared = toScope(saveObj->get("shared"));
-        s.stageBags = toBagMap(saveObj->get("stageBags"));
         for (const auto& kv : flows->obj) s.flows[kv.first] = toFlow(kv.second);
         engine.loadGame(s);
     }
@@ -531,7 +516,7 @@ namespace patter
 
     /// Parse a serializeFlowState string (or one another runtime wrote) for Engine::restoreFlow. Throws on
     /// malformed JSON, anything that is not an object, a version a save reader would refuse, or a state with
-    /// no `cursor` object (a flow state never had the flat shape a save from before 0.11.0 may have).
+    /// no `cursor` object.
     inline FlowState deserializeFlowState(const std::string& json)
     {
         using namespace savedetail;
@@ -544,6 +529,8 @@ namespace patter
         FlowState state;
         static_cast<FlowSnapshot&>(state) = toFlow(root);
         state.version = static_cast<int>(version->n);
+        state.scopes = toScope(root.get("scopes"));
+        state.sceneBags = toBagMap(root.get("sceneBags"));
         return state;
     }
 

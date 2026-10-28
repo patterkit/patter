@@ -30,16 +30,26 @@ namespace patter
         bool hasPadAfter = false; double padAfter = DEFAULT_PAD_AFTER;
     };
 
+    // A node's gameData as the game's own copy (null when it has none): the bundle's object is shared by
+    // every engine on the bundle, so what a game is handed must be a copy. Flags lists are values, so they
+    // copy with it. Extension values are not copied (see StepResult::extensions).
+    inline std::shared_ptr<GameData> copyGameData(const std::shared_ptr<GameData>& gameData)
+    {
+        return gameData ? std::make_shared<GameData>(*gameData) : nullptr;
+    }
+
     struct ChoiceOption
     {
         std::string id;
         std::shared_ptr<ChoicePrompt> prompt;   // null when no prompt at all
         bool eligible = false;
+        // The option's own author gameData, raw: the game's own copy (null when it sets none), so editing it
+        // changes nothing the engine, or another engine on the same bundle, hands out next.
         std::shared_ptr<GameData> gameData;
         // The option's Patter extension values, by extension id, exactly as the bundle carries them: raw and
-        // sparse, any JSON, never read by the engine. Empty when it has none. Fill in defaults with
-        // effectiveGameData(extensionDecls(bundle, id, "option"), option.extensions.get(id)). A save doesn't
-        // carry them: a loaded pending choice reads them off the option's node again.
+        // sparse, any JSON, never read by the engine, and the bundle's own, so read-only by contract. Empty
+        // when it has none. Fill in defaults with effectiveGameData(extensionDecls(bundle, id, "option"),
+        // option.extensions.get(id)). A save doesn't carry them: they're read off the option's node.
         NodeExtensions extensions;
     };
 
@@ -63,9 +73,12 @@ namespace patter
         // dialogue scene's text, unless the project localises it). Its text is the source in every locale. False
         // on any other step, and on a replayed option prompt, which never is.
         bool action = false;
+        // The beat's own author gameData, raw: the game's own copy (null when it sets none), so editing it
+        // changes nothing the engine, or another engine on the same bundle, hands out next.
         std::shared_ptr<GameData> gameData;
         // A line, text or game-event step's Patter extension values (the beat's, a replayed prompt's
-        // included), by extension id, raw as the bundle carries them; empty when the beat has none.
+        // included), by extension id, raw as the bundle carries them; empty when the beat has none. Not
+        // copied: they're the bundle's own, and read-only by contract.
         NodeExtensions extensions;
         bool hasTags = false; std::vector<std::string> tags;   // author tags (#215)
         std::vector<ChoiceOption> options;       // choice only

@@ -108,6 +108,7 @@ namespace Patterkit.Patterplay.TestHost
             RunSpeakerLabelChecks();
             RunPlayErrorChecks();
             RunOldSaveRuleChecks();
+            RunFoundationsChecks();
 
             RunDescribeSmoke();
             RunAudioJoinCheck();
@@ -279,25 +280,15 @@ namespace Patterkit.Patterplay.TestHost
             var pad = new System.Text.RegularExpressions.Regex(",\"padAfter\":-?[0-9.eE+-]+");
             Engine Fresh() { var o = new EngineOptions(); ApplyEngineOptions(fixture, o); return new Engine(bundle, o); }
 
-            // A pending choice: both options' prompts lose their pause in the aged save.
-            var engine = Fresh();
-            var flow = engine.OpenFlow("main", "s");
-            var stop = flow.AdvanceToStop().Stop;
-            if (stop == null || stop.Type != StepType.Choice) { Fail("legacy-prompt-pad", "choice", "the fixture did not stop at its choice"); return; }
-            string json = PatterSave.SerializeState(engine);
-            string aged = pad.Replace(json, "");
-            if (aged == json) { Fail("legacy-prompt-pad", "envelope", "no prompt padAfter in the save to strip; the check would prove nothing"); return; }
-            var loaded = Fresh();
-            PatterSave.DeserializeState(loaded, aged);
-            var got = loaded.GetFlow("main").GetChoices().Select(o => $"{o.Id}={o.Prompt?.PadAfter?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "<missing>"}");
-            string gotStr = string.Join(" ", got);
-            if (gotStr != "o_cut=-0.4 o_wait=3") { Fail("legacy-prompt-pad", "pending choice", $"re-resolved prompts were {gotStr}"); return; }
-            if (PatterSave.SerializeState(loaded) != json) { Fail("legacy-prompt-pad", "re-save", "the re-saved choice does not match the original save"); return; }
-
+            Engine engine;
+            Flow flow;
+            string json, aged;
+            Engine loaded;
             // The choose->advance window: the pending replay prompt's shown copy loses its pause.
             engine = Fresh();
             flow = engine.OpenFlow("main", "s");
-            flow.AdvanceToStop();
+            var stop = flow.AdvanceToStop().Stop;
+            if (stop == null || stop.Type != StepType.Choice) { Fail("legacy-prompt-pad", "choice", "the fixture did not stop at its choice"); return; }
             flow.Choose("o_cut");
             json = PatterSave.SerializeState(engine);
             aged = pad.Replace(json, "");
@@ -307,7 +298,7 @@ namespace Patterkit.Patterplay.TestHost
             if (PatterSave.SerializeState(loaded) != json) { Fail("legacy-prompt-pad", "pending prompt", "the re-saved pending prompt does not carry its pause again"); return; }
             var step = loaded.GetFlow("main").Advance();
             if (step.Id != "P_cut" || step.PadAfter != -0.4) { Fail("legacy-prompt-pad", "replay", $"the replayed prompt was {step.Id} with padAfter {step.PadAfter}"); return; }
-            Console.WriteLine("  [legacy-prompt-pad] a save whose prompts carry no pause loads with each prompt's pause re-resolved");
+            Console.WriteLine("  [legacy-prompt-pad] a save whose prompt still to be spoken back carries no pause loads with it re-resolved");
         }
 
         /// <summary>The save envelope's SHAPE, checked rather than round-tripped.
@@ -422,11 +413,11 @@ namespace Patterkit.Patterplay.TestHost
             string json = PatterSave.SerializeState(engine);
             using var sdoc = JsonDocument.Parse(json);
             var save = sdoc.RootElement.GetProperty("save");
-            // The family's shape: camelCase literals, the cursor under `cursor`, and (version 3) every
+            // The family's shape: camelCase literals, the cursor under `cursor`, and (version 3 on) every
             // property value under `registry`, keyed by registry key, each section a flat name -> value map.
             // This port wrote PascalCase off reflection until 0.11.0, and nothing here noticed because the
             // check read the same PascalCase back.
-            Check("version 3", save.GetProperty("version").GetInt32() == 3, json);
+            Check("version 4", save.GetProperty("version").GetInt32() == 4, json);
             var registry = save.GetProperty("registry");
             var stage = registry.GetProperty("patter/scene/s");
             Check("stage bag is flat, under its registry key", stage.TryGetProperty("alarm", out _) && !stage.TryGetProperty("values", out _), json);
@@ -866,12 +857,37 @@ namespace Patterkit.Patterplay.TestHost
         /// engine a saveLoad / hotSwap makes (they share `opts`). An absent key keeps the engine's default.</summary>
         /// <summary>What every engine of the running case reported through OnRefit, for expectRefits.</summary>
         private static readonly List<LoadMisfit> _refits = new List<LoadMisfit>();
+        /// <summary>What every engine of the running case reported through OnError, from the first engine's
+        /// construction on, for expectErrors.</summary>
+        private static readonly List<PlayError> _errors = new List<PlayError>();
+        /// <summary>The locale the running case last asked for (its `locale`, then each setLocale): what the
+        /// PatterSave JSON pass builds a hotSwap's replacement in, as Engine.HotSwap does.</summary>
+        private static string _askedLocale;
+
+        /// <summary>A host scope over a store the runner keeps for the whole case (corpus 8): empty to start,
+        /// read and written by name, shared by every engine the case makes.</summary>
+        private sealed class MapScope : IHostScope
+        {
+            private readonly Dictionary<string, ExprValue> _store = new Dictionary<string, ExprValue>();
+            public ExprValue Get(string name) => _store.TryGetValue(name, out var v) ? v : null;
+            public void Set(string name, ExprValue value) => _store[name] = value;
+        }
 
         private static void ApplyEngineOptions(JsonElement c, EngineOptions opts)
         {
             // A fresh case: its engines (and every one a saveLoad or hotSwap makes) record into one list.
             _refits.Clear();
             opts.OnRefit = _refits.AddRange;
+            _errors.Clear();
+            opts.OnError = _errors.Add;
+            // The case's locale and host scopes (corpus 8), for every engine it makes.
+            if (c.TryGetProperty("locale", out var lc) && lc.ValueKind == JsonValueKind.String) opts.Locale = lc.GetString();
+            _askedLocale = opts.Locale;
+            if (c.TryGetProperty("hostScopes", out var hs) && hs.ValueKind == JsonValueKind.Array)
+            {
+                opts.HostScopes = new Dictionary<string, IHostScope>();
+                foreach (var t in hs.EnumerateArray()) opts.HostScopes[t.GetString()] = new MapScope();
+            }
             if (!c.TryGetProperty("engineOptions", out var eo)) return;
             if (eo.TryGetProperty("replayPromptOnChoose", out var rp)) opts.ReplayPromptOnChoose = rp.GetBoolean();
             if (eo.TryGetProperty("closedCaptions", out var cc)) opts.ClosedCaptions = cc.GetBoolean();
@@ -908,6 +924,7 @@ namespace Patterkit.Patterplay.TestHost
         {
             bool ok = true;
             Checkpoint checkpoint = null;
+            StepResult handed = null; // what the last advance or stepFor handed the host, for `scribble`
             var captured = new Dictionary<string, FlowState>(); // captureFlow states, by name, for restoreFlow
                     foreach (var op in script.EnumerateArray())
                     {
@@ -947,7 +964,14 @@ namespace Patterkit.Patterplay.TestHost
                                 current = op.GetProperty("flow").GetString();
                                 break;
                             case "advance":
-                                chunk.Add(Normalize(engine.GetFlow(current).Advance(), IsIdsOnly(bundle)));
+                                handed = engine.GetFlow(current).Advance();
+                                chunk.Add(Normalize(handed, IsIdsOnly(bundle)));
+                                break;
+                            case "scribble":
+                                // A careless host defaces what it was handed. It is its own copy, so nothing the
+                                // engine says next changes.
+                                if (handed?.Type == StepType.Choice) foreach (var o in handed.Options) Scribble(o.GameData);
+                                else if (handed != null && handed.Type != StepType.End) Scribble(handed.GameData);
                                 break;
                             case "stepFor":
                             {
@@ -956,6 +980,7 @@ namespace Patterkit.Patterplay.TestHost
                                 string on = op.TryGetProperty("flow", out var sf) ? sf.GetString() : current;
                                 var r = engine.GetFlow(on).StepFor(op.GetProperty("beat").GetString());
                                 if (r != null) chunk.Add(Normalize(r, IsIdsOnly(bundle)));
+                                handed = r;
                                 break;
                             }
                             case "choose":
@@ -1032,9 +1057,13 @@ namespace Patterkit.Patterplay.TestHost
                                 // the EDITED bundle, restore - drift resolves identically on every port.
                                 if (_jsonSaveLoad)
                                 {
+                                    // Built in the locale last asked for, as Engine.HotSwap builds its replacement.
                                     string json = PatterSave.SerializeState(engine);
-                                    engine = new Engine(bundleB, opts);
+                                    var swapOpts = WithLocale(opts, _askedLocale);
+                                    bool captions = engine.ClosedCaptions;
+                                    engine = new Engine(bundleB, swapOpts);
                                     PatterSave.DeserializeState(engine, json);
+                                    engine.SetClosedCaptions(captions);
                                 }
                                 else
                                 {
@@ -1045,8 +1074,39 @@ namespace Patterkit.Patterplay.TestHost
                                 break;
                             }
                             case "setLocale":
-                                engine.SetLocale(op.GetProperty("locale").GetString());
+                                _askedLocale = op.GetProperty("locale").GetString();
+                                engine.SetLocale(_askedLocale);
                                 break;
+                            case "expectErrors":
+                            {
+                                // Kind, node, and (when the expectation names one) flow: never the message, which
+                                // is each runtime's own. Taking them empties the record.
+                                var want = op.GetProperty("expectResult").EnumerateArray().ToList();
+                                bool same = want.Count == _errors.Count;
+                                for (int i = 0; same && i < want.Count; i++)
+                                {
+                                    var w = want[i]; var e = _errors[i];
+                                    same = e.Kind == w.GetProperty("kind").GetString() && e.Node == w.GetProperty("node").GetString()
+                                        && (!w.TryGetProperty("flow", out var wf) || e.Flow == wf.GetString());
+                                }
+                                if (!same)
+                                    throw new Exception($"expectErrors: expected {op.GetProperty("expectResult").GetRawText()}, got [{string.Join(", ", _errors.Select(e => $"{{kind:{e.Kind}, node:{e.Node}, flow:{e.Flow}}}"))}]");
+                                _errors.Clear();
+                                break;
+                            }
+                            case "expectLocale":
+                            {
+                                // The locale in use, and the bundle's locales.
+                                var locales = engine.Locales;
+                                var got = new Dictionary<string, object>
+                                {
+                                    ["locale"] = engine.Locale, ["default"] = locales.Default,
+                                    ["included"] = locales.Included.Cast<object>().ToList(),
+                                };
+                                if (!Match(got, op.GetProperty("expectResult")))
+                                    throw new Exception($"expectLocale: expected {op.GetProperty("expectResult").GetRawText()}, got {Dump(got)}");
+                                break;
+                            }
                             case "setClosedCaptions":
                                 engine.SetClosedCaptions(op.GetProperty("on").GetBoolean());
                                 break;
@@ -1205,6 +1265,24 @@ namespace Patterkit.Patterplay.TestHost
                     }
             return (ok, engine);
         }
+
+        /// <summary>The `scribble` op on one gameData: every flags list gains "scribbled" (through the list
+        /// underneath, as careless code might), then every value becomes "scribbled" and the map gains the key too.</summary>
+        private static void Scribble(GameData gameData)
+        {
+            if (gameData == null) return;
+            foreach (var v in gameData.Values) if (v != null && v.IsFlags && v.AsFlags is List<string> list) list.Add("scribbled");
+            foreach (var key in gameData.Keys.ToList()) gameData[key] = ExprValue.Str("scribbled");
+            gameData["scribbled"] = ExprValue.Str("scribbled");
+        }
+
+        /// <summary>A copy of a case's options in another locale, for the JSON pass's hotSwap.</summary>
+        private static EngineOptions WithLocale(EngineOptions o, string locale) => new EngineOptions
+        {
+            Rng = o.Rng, Seed = o.Seed, Locale = locale, ReplayPromptOnChoose = o.ReplayPromptOnChoose,
+            ClosedCaptions = o.ClosedCaptions, Log = o.Log, OnDryChoice = o.OnDryChoice, OnError = o.OnError,
+            OnRefit = o.OnRefit, HostScopes = o.HostScopes, Registry = o.Registry,
+        };
 
         /// <summary>Whether a script op carries `expectRefused: true`.</summary>
         private static bool Refused(JsonElement op)
@@ -1478,7 +1556,7 @@ namespace Patterkit.Patterplay.TestHost
                 case ExprKind.Bool: return v.AsBool;
                 case ExprKind.Number: return v.AsNumber;
                 case ExprKind.Str: return v.AsString;
-                case ExprKind.Flags: return v.AsFlags.ToList();
+                case ExprKind.Flags: return v.AsFlags.Cast<object>().ToList();
                 default: return null;
             }
         }
@@ -1626,6 +1704,8 @@ namespace Patterkit.Patterplay.TestHost
             var loc = b.GetProperty("locales");
             bundle.Locales.Default = loc.GetProperty("default").GetString();
             if (loc.TryGetProperty("included", out var inc)) bundle.Locales.Included = inc.EnumerateArray().Select(x => x.GetString()).ToList();
+            if (b.TryGetProperty("start", out var st) && st.TryGetProperty("scene", out var stScene))
+                bundle.Start = new BundleStart { Scene = stScene.GetString(), Block = st.TryGetProperty("block", out var stBlock) ? stBlock.GetString() : null };
             if (b.TryGetProperty("localisation", out var lz))
                 bundle.Localisation = new Localisation {
                     Mode = lz.TryGetProperty("mode", out var lm) ? lm.GetString() : "embedded",

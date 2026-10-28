@@ -34,8 +34,15 @@ Now a condition on `@world.alarm` reads your live `game.world.alarm`, and an eff
 change. Everything under `@world` goes through this one resolver. `hostScopes` is keyed by scope
 because every runtime takes the same option, but a Patter project declares the one scope, `world`.
 
-Earlier releases took the resolver as a `world` option of its own. That still works, and goes in a
-later release.
+A scope's token is case-sensitive: binding `World` doesn't bind `world`, so the engine reports it to
+`onError` as a `setup` problem, naming the spelling the bundle declares, and self-backs `world` as if you
+had bound nothing. Earlier releases also took the resolver as a `world` option of its own; it went in
+1.0, and passing it is reported the same way.
+
+A value your game writes with `setProperty` must fit the property's declaration: a boolean for a
+boolean, one of an enum's values, one of a quality's stages, and so on. One that doesn't, or a name the
+project doesn't declare under `@world`, throws and changes nothing, with a message saying what the
+property takes.
 
 ## Read-only properties
 
@@ -87,7 +94,7 @@ Every runtime takes the same host scopes, in its own idiom, and self-backs `@wor
 none:
 
 - **Unity** takes `EngineOptions.HostScopes`, an `IHostScope` per token, and the [Unity](/play/unity/#your-games-state) page has the detail.
-- **Unreal** binds a `UPatterWorld` at `UPatterEngine::Create(Bundle, World)`, covered on the [Unreal](/play/unreal/#your-games-state) page.
+- **Unreal** takes a host-scopes map at `UPatterEngine::Create(Bundle, HostScopes)`, a `UPatterWorld` per token, covered on the [Unreal](/play/unreal/#your-games-state) page.
 - **Godot** uses the `host_scopes` option, a `get` / `set` pair per token, covered on the [Godot](/play/godot/#your-games-state) page.
 
 The rules are the same everywhere: a bound `@world` is never in a save, a self-backed one is; a `writable: false`

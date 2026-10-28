@@ -225,9 +225,6 @@ namespace patter
         std::vector<OutlineBlock> blocks;
     };
     struct FlatBeat { std::string sceneId, blockId, snippetId; BeatInfo beat; };
-    // The names these types had before they took the JS names; they go in a later release.
-    using OutlineBeat [[deprecated("Use BeatInfo, the name every Patterplay runtime uses.")]] = BeatInfo;
-    using OutlineFlatBeat [[deprecated("Use FlatBeat, the name every Patterplay runtime uses.")]] = FlatBeat;
 
     inline void walkNodes(const std::vector<NodePtr>& nodes, const std::function<void(const Node*)>& visit)
     {
@@ -273,7 +270,10 @@ namespace patter
     // save was taken. Restore re-finds the child by this id, so a save survives siblings inserted /
     // removed / reordered before the cursor (live bundle refresh / patched-game saves, spec 9.8);
     // empty falls back to the raw index. Mirrors the JS runtime's StackFrame.nextId.
-    struct StackFrame { std::string sceneId, containerId; int index = 0; std::string nextId; };
+    // `choiceId` is SNAPSHOT-ONLY too: on a frame whose container is an option of a choice, that choice
+    // group's id, so a load whose option has gone offers the choice again. Empty on every other frame, and
+    // in a version 3 save.
+    struct StackFrame { std::string sceneId, containerId; int index = 0; std::string nextId; std::string choiceId; };
 
     struct SelectorState
     {
@@ -336,46 +336,59 @@ namespace patter
         return values;
     }
 
+    // One option of a pending choice, as a save keeps it: which option, whether it could be taken, and its
+    // gameData, saved VERBATIM, since re-deriving on load would re-evaluate conditions. Its prompt is not
+    // kept: it is built again, in the language in use and against the current values, each time the choice
+    // is delivered. (A version 3 save's option also has a prompt, which a load discards.)
+    struct PendingOption
+    {
+        std::string id;
+        bool eligible = false;
+        std::shared_ptr<GameData> gameData;   // null = none
+    };
+
     // The serialised cursor + PRNG + visits of a single flow. Its properties are the registry's.
     struct FlowSnapshot
     {
-        // VERSION 2 ONLY in a save, read and never written: the flow's NOT-shared @patter globals and
-        // its per-scene NOT-shared @scene bags, which a version 2 save carried itself. loadGame moves
-        // them into the registry under the flow's keys. A FlowState carries them too, without the id.
-        std::map<std::string, PatterValue> scopes;
-        std::map<std::string, std::map<std::string, PatterValue>> sceneBags;
         uint32_t rngState = 0;
         std::map<std::string, int> visits;
         bool flowEnded = false;
         std::string currentSceneId;                                                 // "" = none
         std::vector<StackFrame> stack;
         std::string activeSnippetId;                                                // "" = none
-        int beatIndex = 0;
+        // The id of the next beat the active snippet delivers, so a load against an edited bundle finds
+        // its place by id. Empty when no snippet is active or the active one has delivered every beat.
+        std::string beatId;
+        // Version 3 only, read and never written: the index of the next beat in the active snippet. -1 = absent.
+        int beatIndex = -1;
+        bool hasPendingChoice = false;                                              // the flow is stopped at a choice
         std::string pendingGroupId;
-        std::vector<ChoiceOption> pendingOptions;                                   // empty = no pending choice
+        std::vector<PendingOption> pendingOptions;
         std::string pendingPromptOwnerId;                                           // chosen option owning a prompt still to replay (save in the choose->advance window)
-        std::shared_ptr<ChoicePrompt> pendingPrompt;                                // that prompt as the choice showed it; null when none, or in a save written before it was carried
+        std::shared_ptr<ChoicePrompt> pendingPrompt;                                // that prompt as the choice SHOWED it (the one prompt a save keeps as text); null when none, or in a save written before it was carried
         std::map<std::string, SelectorState> selectors;
     };
 
-    /** The save version saveGame() writes. Bumped only when a reader would MISREAD an older save. */
-    inline constexpr int SAVE_VERSION = 3;
+    /** The save version saveGame() writes. Bumped only when a reader would MISREAD an older save. Version 4
+     *  (Patterplay 1.0): a pending choice keeps its options' ids, not their text; the cursor names the next
+     *  beat by id; a frame inside an option carries its choice's id. Versions 3 and 4 are read. */
+    inline constexpr int SAVE_VERSION = 4;
 
     // One flow taken out of an engine (Engine::captureFlow) to be put back later (Engine::restoreFlow),
     // under the same id or another: its snapshot as a save writes it, plus its own property values
-    // without its id (`scopes` and `sceneBags`, the sections a version 2 save carried per flow). Plain
-    // data in the save's spelling (Save.h writes and reads it), so a game saves it as it saves anything
-    // else. Shared state (shared properties, shared visit counts, shared selectors) is never in it, so
-    // restoring one rewinds nothing else.
+    // without its id (`scopes`, its NOT-shared @patter globals, and `sceneBags`, its per-scene NOT-shared
+    // @scene props). Plain data in the save's spelling (Save.h writes and reads it), so a game saves it as
+    // it saves anything else. Shared state (shared properties, shared visit counts, shared selectors) is
+    // never in it, so restoring one rewinds nothing else.
     struct FlowState : FlowSnapshot
     {
-        int version = SAVE_VERSION;
+        int version = SAVE_VERSION;   // SAVE_VERSION when written; a version 3 state still restores
+        std::map<std::string, PatterValue> scopes;
+        std::map<std::string, std::map<std::string, PatterValue>> sceneBags;
     };
 
-    // A full resumable save-game (version 3): everything that is not a property, plus the registry's
-    // values when the engine made its own registry. loadGame also reads version 2, from before the
-    // registry held the properties; its property sections (the fields marked VERSION 2 ONLY) move
-    // into the registry as it loads.
+    // A full resumable save-game (version 4): everything that is not a property, plus the registry's
+    // values when the engine made its own registry. loadGame reads versions 3 and 4.
     struct SaveGame
     {
         int version = SAVE_VERSION;
@@ -386,10 +399,6 @@ namespace patter
         std::map<std::string, int> sharedVisits;
         std::map<std::string, SelectorState> sharedSelectors;
         std::map<std::string, FlowSnapshot> flows;
-        // VERSION 2 ONLY, read and never written: the shared @patter globals and the shared,
-        // scene-namespaced @scene bags.
-        std::map<std::string, PatterValue> shared;
-        std::map<std::string, std::map<std::string, PatterValue>> stageBags;
     };
 
     // ----- checkpoints -------------------------------------------------------------
@@ -426,20 +435,25 @@ namespace patter
 
     // ----- the shared host context the Engine hands to every flow --------------
 
-    /// A content error the engine played through. Content can fail at run time in ways the compiler
-    /// cannot see: a division by zero, a host value of the wrong type, a story write to a read-only
-    /// `@world` value. The story never stops for one. A condition that fails counts as false; an effect
-    /// that fails is skipped and the rest of its list still runs; a part of a Best-match condition that
-    /// fails scores as false. Each is reported through EngineOptions::onError and, when the log is on,
-    /// as a `diagnostic` LogEntry. Parity with the JS runtime's PlayError.
+    /// A problem the engine reported and carried on past. Content can fail at run time in ways the
+    /// compiler cannot see: a division by zero, a host value of the wrong type, a story write to a
+    /// read-only `@world` value. The story never stops for one. A condition that fails counts as false; an
+    /// effect that fails is skipped and the rest of its list still runs; a part of a Best-match condition
+    /// that fails scores as false. The engine also reports how it was set up (`setup`: a locale the bundle
+    /// doesn't have, a host scope it doesn't declare) and a load whose place has gone from the build
+    /// (`save`). Each is reported through EngineOptions::onError and, when the log or a trace handler is
+    /// on, as a `diagnostic` LogEntry; a report made while the engine is being built reaches them as the
+    /// constructor ends. Parity with the JS runtime's PlayError.
     struct PlayError
     {
-        /// The flow it happened in.
+        /// The flow it happened in; "" for a `setup` report, which belongs to no flow.
         std::string flow;
-        /// What failed: "condition", "effect", or "best-match" (a part of a condition being scored).
+        /// What it was: "condition", "effect", or "best-match" (a part of a condition being scored) that
+        /// failed; "setup" (how the engine was set up); or "save" (a load whose saved place has gone).
         std::string kind;
         /// The snippet, group, or option whose condition failed, or that owns the effect (a scene, for
-        /// its onEntry).
+        /// its onEntry). For `setup`, the locale or host-scope token at fault. For `save`, the saved
+        /// snippet (or, at a pending choice, its group) that has gone.
         std::string node;
         /// The expression's source text, when the bundle carries it; empty when it does not.
         std::string source;
@@ -456,7 +470,7 @@ namespace patter
     ///   dry:        group
     ///   jump:       to, mode
     ///   write:      target, value, prev (hasPrev false when there was none)
-    ///   diagnostic: a content error played through (see PlayError): kind, node, source, message
+    ///   diagnostic: a problem reported and played through (see PlayError): kind, node, source, message
     struct LogEntry
     {
         std::string type;
@@ -480,7 +494,7 @@ namespace patter
         PatterValue value;
         bool hasPrev = false;
         PatterValue prev;
-        /// A diagnostic's PlayError kind: condition | effect | best-match.
+        /// A diagnostic's PlayError kind: condition | effect | best-match | setup | save.
         std::string kind;
         std::string node;
         /// A diagnostic's expression source text, when the bundle carries it.
@@ -516,8 +530,8 @@ namespace patter
         /// eligible fallback - so the silent fall-through is observable, as on every runtime
         /// (onDryChoice in JS). Live feedback, distinct from the log's `dry` entry.
         std::function<void(const std::string&)> onDryChoice;
-        /// Where a content error the engine played through is reported (see PlayError). Unset: nowhere
-        /// but the log, as a std-only core has no console of its own to warn on.
+        /// Where a problem the engine carried on past is reported (see PlayError). Unset: nowhere but the
+        /// log, as a std-only core has no console of its own to warn on.
         std::function<void(const PlayError&)> onError;
         /// Where the saved values a load put back to their defaults are reported (EngineOptions::onRefit).
         std::function<void(const std::vector<LoadMisfit>&)> onRefit;
@@ -588,6 +602,9 @@ namespace patter
         // Every beat by its id (a snippet's beats and an option's prompt), for Flow::stepFor; built once per
         // bundle with the indexes above.
         std::map<std::string, const Beat*> beatIndex;
+        // Each option of a choice, by its id, to the id of the choice it belongs to: a save stamps the frame an
+        // option's content runs in with its choice (StackFrame::choiceId).
+        std::map<std::string, std::string> optionChoice;
         /** The game's one registry: @patter (the SHARED globals), host scopes, every instance bag. */
         std::shared_ptr<ScopeRegistry> registry;
         /** True when the engine made the registry (a standalone game): saveGame() then carries its values. */
@@ -679,6 +696,9 @@ namespace patter
     {
         std::function<double()> rng;                  // shared custom PRNG (runtime corpus cases)
         bool hasSeed = false; double seed = 0;        // per-flow built-in PRNG (scripted corpus cases)
+        // The locale to play (embedded localisation); empty = the bundle's default. A locale the bundle
+        // doesn't have resolves by the one locale rule (see Engine::setLocale) and is reported (`setup`).
+        // An IDs-only bundle takes it as given.
         std::string locale;
         bool replayPromptOnChoose = false;
         bool closedCaptions = true;                   // #214: show caption cues in dialogue lines (default)
@@ -688,11 +708,12 @@ namespace patter
         /// Fired with the choice's group id whenever a choice runs dry. Unaffected by `log`
         /// and useful with it off: live feedback, not an audit read afterwards.
         std::function<void(const std::string&)> onDryChoice;
-        /// Called with each content error the engine played through (see PlayError): a condition that
-        /// failed and counted as false, an effect that failed and was skipped, a Best-match part that
-        /// failed and scored as false. The story carries on either way. Unaffected by `log`, which also
-        /// records each as a `diagnostic` entry. Unset, the core reports nothing: the UE wrapper sets it
-        /// (a Warning in the log and UPatterEngine::OnError), and so should any other host.
+        /// Called with each problem the engine reported and carried on past (see PlayError): a condition
+        /// that failed and counted as false, an effect that failed and was skipped, a Best-match part that
+        /// failed and scored as false, a set-up problem (reported as the constructor ends), a load whose
+        /// place has gone. The story carries on either way. Unaffected by `log`, which also records each as
+        /// a `diagnostic` entry. Unset, the core reports nothing: the UE wrapper sets it (a Warning in the
+        /// log and UPatterEngine::OnError), and so should any other host.
         std::function<void(const PlayError&)> onError;
         /// Called with the saved values a load put back to their defaults because they no longer fit their
         /// declarations: a stage, an enum value or a flag deleted since the save was taken, or a value of
@@ -708,6 +729,8 @@ namespace patter
         // stored or saved there). Declared tokens you do not bind are self-backed by a standalone
         // engine, as properties the registry stores and saves; given the game's registry, the engine
         // self-backs nothing, since those tokens are the game's to register (or another engine's).
+        // Tokens are case-sensitive: a token the bundle doesn't declare is reported (`setup`), naming the
+        // declared spelling when only the case differs, and never folded onto it.
         std::map<std::string, HostScope> hostScopes;
         // The game's registry: ONE per game, holding every engine's properties except those the game
         // keeps itself, saved once. Given one, the engine registers its own scopes in it (@patter under
@@ -768,6 +791,70 @@ namespace patter
         return split;
     }
 
+    // What a declared property takes, in words, for a refused host write: the same words on every runtime.
+    inline std::string takesWords(const std::string& type, const std::vector<std::string>& values, const std::vector<std::string>& stages)
+    {
+        const auto quoted = [](const std::vector<std::string>& xs)
+        {
+            std::string out;
+            for (size_t i = 0; i < xs.size(); ++i) { if (i) out += ", "; out += PatterValue::JsonQuote(xs[i]); }
+            return out;
+        };
+        if (type == "number") return "a number";
+        if (type == "boolean") return "true or false";
+        if (type == "enum") return "one of " + quoted(values);
+        if (type == "flags") return !values.empty() ? "a list of flags from " + quoted(values) : "a list of flags";
+        if (type == "quality") return "one of its stages " + quoted(stages);
+        return "text";
+    }
+
+    // Refuse a host write that doesn't fit what the content declared (the hands-on review, 2026-10): a string
+    // for a number, a value an enum or a quality doesn't list, a flag a flags property doesn't, or a name the
+    // content doesn't declare. The rule is the kernel's ValueFits, the one a load walks saved values with, so
+    // a value the game may set is exactly one a save may carry; an enum whose own default is "" (none chosen)
+    // takes "" back. A scope the bundle doesn't declare (another engine's, or one the game keeps) is its
+    // owner's to check, and an opaque one (no declarations) takes anything. Throws EvalError, changing nothing.
+    // `name` is lowercased, as splitRef gives it; `sceneId` is the scene an @scene write lands in.
+    inline void checkHostWrite(const FlowHost& host, const std::string& scope, const std::string& name,
+                               const PatterValue& value, const std::string& sceneId)
+    {
+        bool found = false, noneChosen = false;
+        std::string type;
+        const std::vector<std::string>* values = nullptr;
+        const std::vector<std::string>* stages = nullptr;
+        const auto take = [&](const auto& d)
+        {
+            found = true; type = d.type; values = &d.values; stages = &d.stages;
+            noneChosen = d.type == "enum" && d.hasDefault && d.def.isString() && d.def.asString().empty();
+        };
+        if (scope == "patter" || scope == "scene")
+        {
+            const std::vector<PropertyDecl>* decls = nullptr;
+            if (scope == "patter") decls = &host.bundle->properties;
+            else
+            {
+                auto it = host.bundle->scenes.find(sceneId);
+                if (it != host.bundle->scenes.end()) decls = &it->second.sceneProps;
+            }
+            if (decls) for (const auto& d : *decls) if (toLower(d.name) == name) { take(d); break; }
+        }
+        else
+        {
+            const HostScopeSpec* spec = nullptr;
+            for (const auto& sp : host.bundle->scopeRegistry.scopes) if (sp.token == scope) { spec = &sp; break; }
+            if (!spec || !spec->hasDeclarations) return;   // not this bundle's to check, or opaque: the game's
+            for (const auto& d : spec->declarations) if (toLower(d.name) == name) { take(d); break; }
+        }
+        const std::string path = "@" + scope + "." + name;
+        if (!found) throw EvalError("no property at \"" + path + "\": the content declares no " + path);
+        const auto listed = [](const std::vector<std::string>* xs)
+        {
+            return xs && !xs->empty() ? std::optional<std::vector<std::string>>(*xs) : std::nullopt;
+        };
+        if (!wildwinter::expr::ValueFits(type, listed(values), listed(stages), value, noneChosen))
+            throw EvalError("\"" + path + "\" takes " + takesWords(type, *values, *stages) + "; " + value.toJsonString() + " doesn't fit");
+    }
+
     // The stage ladder of each declared quality in one set of declarations, by lowercased name (the first
     // declaration of a name wins). Built once per set and kept on the host: a comparison asks for a ladder
     // every time it runs, and scanning the declarations each time cost a pass and a lowercasing per
@@ -802,7 +889,7 @@ namespace patter
         Flow(std::string id, FlowHost* host, double seed) : id_(std::move(id)), host_(host)
         {
             rngState_ = Mulberry32::ToUint32(seed);
-            local_ = newLocal(); // registered by start() / restore()
+            local_ = newLocal(); // registered by begin() / restore()
             // FnScope wraps a lambda as the shared IScopeSource. `get` returns an
             // optional rather than a pointer, because the Storylet Engine's scopes
             // compose values on the fly and cannot hand back a stable address.
@@ -877,8 +964,9 @@ namespace patter
         }
 
         // The options of the choice currently waiting for the player, empty when none is pending. The same
-        // list the `choice` step carries - re-readable, e.g. after restoring a save.
-        std::vector<ChoiceOption> getChoices() const { return hasPendingChoice_ ? pendingOptions_ : std::vector<ChoiceOption>{}; }
+        // list the `choice` step carries, its prompts built now in the language in use and against the
+        // current values - re-readable, e.g. after restoring a save or switching language.
+        std::vector<ChoiceOption> getChoices() { return hasPendingChoice_ ? offer() : std::vector<ChoiceOption>{}; }
 
         // Advance repeatedly, collecting every played beat, until a choice or the end - the "play to the
         // next stop" a host's play UI / tooling wants. The terminal choice / end is returned as `stop`;
@@ -959,19 +1047,26 @@ namespace patter
             begin(sceneId, blockId);
         }
 
-        /** Use reset(), the one public name for beginning a flow again on every runtime. start() was the same
-         *  call under a second name, and goes in a later release. */
-        [[deprecated("Use reset(), the same call under the name every Patterplay runtime uses.")]]
-        void start(const std::string& sceneId, const std::string& blockId) { reset(sceneId, blockId); }
-
     private:
         friend class Engine;
 
-        /** Begin this flow at a scene (empty: the first authored scene), and optionally a block within it. The
-         *  engine's own entry point: openFlow and a goto on an unstarted flow begin a flow here. A game calls
-         *  reset(). */
-        void begin(const std::string& sceneId, const std::string& blockId)
+        /** Begin this flow at a scene (empty: the bundle's start, else the first authored scene), and
+         *  optionally a block within it. The engine's own entry point: openFlow and a goto on an unstarted flow
+         *  begin a flow here. A game calls reset(). */
+        void begin(std::string sceneId, std::string blockId)
         {
+            // No scene named: the project's start, when the bundle carries one; else the first scene, below.
+            const BundleStart& start = host_->bundle->start;
+            // A start naming a scene, or block, the bundle doesn't have (only a hand-edited bundle can) is passed over.
+            if (sceneId.empty() && blockId.empty() && start.present && host_->bundle->scenes.count(start.scene))
+            {
+                sceneId = start.scene;
+                if (!start.block.empty())
+                {
+                    auto owner = host_->blockToScene.find(start.block);
+                    if (owner != host_->blockToScene.end() && owner->second == start.scene) blockId = start.block;
+                }
+            }
             // Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
             // inside the checkpoint may start in one.
             if (host_->journal && !host_->journal->opened.count(this))
@@ -995,7 +1090,7 @@ namespace patter
                 auto it = host_->blockToScene.find(blockId);
                 if (it == host_->blockToScene.end()) throw std::runtime_error("unknown block: " + blockId);
                 enterSceneSetup(it->second);
-                stack_.push_back({ it->second, blockId, 0, "" });
+                stack_.push_back({ it->second, blockId, 0, "", "" });
                 enter(blockId);
             }
             else
@@ -1008,7 +1103,7 @@ namespace patter
                 if (!it->second.blocks.empty())
                 {
                     const Block& first = it->second.blocks.front();
-                    stack_.push_back({ id, first.id, 0, "" });
+                    stack_.push_back({ id, first.id, 0, "", "" });
                     enter(first.id);
                 }
             }
@@ -1052,7 +1147,7 @@ namespace patter
             if (flowEnded_) return StepResult::End();
             if (hasPendingChoice_)
             {
-                StepResult r; r.type = StepType::Choice; r.groupId = pendingGroupId_; r.options = pendingOptions_; return r;
+                StepResult r; r.type = StepType::Choice; r.groupId = pendingGroupId_; r.options = offer(); return r;
             }
             if (!activeSnippet_) { flowEnded_ = true; return StepResult::End(); }
             return beatResult(activeSnippet_->beats[beatIndex_++]);
@@ -1075,6 +1170,13 @@ namespace patter
             {
                 auto sp = splitHostRef(*host_, ref);
                 const std::string& name = sp.second;
+                // The game's value must fit what the content declared; the story's own writes were checked as
+                // they compiled.
+                if (host)
+                {
+                    if (sp.first == "scene" && currentSceneId_.empty()) throw std::runtime_error("'" + ref + "': the flow has not entered a scene yet");
+                    checkHostWrite(*host_, sp.first, name, value, currentSceneId_);
+                }
                 Journal* journal = host_->journal.get();
                 if (sp.first == "patter")
                 {
@@ -1154,23 +1256,30 @@ namespace patter
         void choose(const std::string& id)
         {
             if (!hasPendingChoice_) throw std::runtime_error("no choice is pending");
-            const ChoiceOption* option = nullptr;
+            const PendingOption* option = nullptr;
             for (auto& o : pendingOptions_) if (o.id == id) { option = &o; break; }
             if (!option) throw std::runtime_error("unknown choice option: " + id);
             if (!option->eligible) throw std::runtime_error("choice option is not eligible: " + id);
             touch();
-            const Node* node = pendingById_[id];
+            const Node* picked = pendingById_[id];
             if (host_->tracing) { LogEntry e; e.type = "chose"; e.group = pendingGroupId_; e.option = id; emit(std::move(e)); }
-            const Node* picked = node;
-            std::shared_ptr<ChoicePrompt> shownPrompt = option->prompt ? std::make_shared<ChoicePrompt>(*option->prompt) : nullptr;
-            clearPendingChoice();
             // Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and
-            // exactly as the choice showed it. A prompt borrowed from the option's own first content line is
-            // not replayed, since that line is about to play as content anyway. (clearPendingChoice() dropped the
-            // options, so the shown prompt is copied out first.)
-            pendingPromptBeat_ = nullptr; pendingPromptShown_.reset();
-            if (host_->replayPromptOnChoose && shownPrompt)
-                if (const Beat* authored = authoredPromptOf(picked)) { pendingPromptBeat_ = authored; pendingPromptShown_ = shownPrompt; }
+            // exactly as the choice showed it (the one prompt that doesn't follow the language: a documented
+            // exception). A prompt borrowed from the option's own first content line is not replayed, since
+            // that line is about to play as content anyway. A choice never delivered since a load shows its
+            // prompt as it would be now, before the option's onEnter runs. (Worked out before
+            // clearPendingChoice() drops what was shown.)
+            const Beat* authored = host_->replayPromptOnChoose ? authoredPromptOf(picked) : nullptr;
+            std::shared_ptr<ChoicePrompt> shownPrompt;
+            if (authored)
+            {
+                auto was = pendingShown_.find(id);
+                std::shared_ptr<ChoicePrompt> shown = was != pendingShown_.end() ? was->second : promptFor(picked);
+                if (shown) shownPrompt = std::make_shared<ChoicePrompt>(*shown);
+            }
+            clearPendingChoice();
+            pendingPromptBeat_ = shownPrompt ? authored : nullptr;
+            pendingPromptShown_ = shownPrompt;
             pendingPromptOwnerId_ = pendingPromptBeat_ ? picked->id : "";
             enterChild(picked);
         }
@@ -1189,7 +1298,9 @@ namespace patter
         }
 
         // Write a property by ref. The GAME's surface, so a host declaration's `writable: false` binds
-        // the story, not the game that owns the value. Effects use writeProperty(.., false).
+        // the story, not the game that owns the value. Effects use writeProperty(.., false). THROWS
+        // EvalError, changing nothing, on a value that doesn't fit the declaration, or a name the content
+        // doesn't declare (an @scene name in the scene this flow is in), as Engine::setProperty does.
         void setProperty(const std::string& ref, const PatterValue& value) { writeProperty(ref, value, true); }
 
         // A quality's ladder, for game code holding one of its values: the position of `value` on the ladder of
@@ -1244,17 +1355,30 @@ namespace patter
             s.flowEnded = flowEnded_;
             s.currentSceneId = currentSceneId_;
             // Stamp each frame with the id of the child it would run next, so a restore against an
-            // EDITED bundle re-finds the position by id instead of trusting the raw index (spec 9.8).
+            // EDITED bundle re-finds the position by id instead of trusting the raw index (spec 9.8). A frame
+            // an option's content runs in carries its choice (choiceId), to be offered again if the option
+            // has gone.
             s.stack = stack_;
             for (auto& frame : s.stack)
             {
                 const std::vector<NodePtr>* children = childrenOf(frame.containerId);
                 if (children && frame.index >= 0 && frame.index < static_cast<int>(children->size()))
                     frame.nextId = (*children)[frame.index]->id;
+                auto choice = host_->optionChoice.find(frame.containerId);
+                if (choice != host_->optionChoice.end()) frame.choiceId = choice->second;
             }
             s.activeSnippetId = activeSnippet_ ? activeSnippet_->id : "";
-            s.beatIndex = beatIndex_;
-            if (hasPendingChoice_) { s.pendingGroupId = pendingGroupId_; s.pendingOptions = pendingOptions_; }
+            // The next beat by id, so an edit to the snippet can't move it; none once every beat is delivered.
+            if (activeSnippet_ && beatIndex_ >= 0 && beatIndex_ < static_cast<int>(activeSnippet_->beats.size()))
+                s.beatId = activeSnippet_->beats[beatIndex_].id;
+            if (hasPendingChoice_)
+            {
+                // Which options, never their text: a prompt is built again in the language in use whenever the
+                // choice is delivered. The gameData is the save's own copy.
+                s.hasPendingChoice = true;
+                s.pendingGroupId = pendingGroupId_;
+                for (const PendingOption& o : pendingOptions_) s.pendingOptions.push_back({ o.id, o.eligible, copyGameData(o.gameData) });
+            }
             s.pendingPromptOwnerId = pendingPromptOwnerId_;
             if (pendingPromptShown_) s.pendingPrompt = std::make_shared<ChoicePrompt>(*pendingPromptShown_);
             s.selectors = selectors_;
@@ -1263,11 +1387,11 @@ namespace patter
 
         /** @internal Restore this flow from a snapshot: its cursor, PRNG, visits, and selector cursors.
          *  Its property values are the registry's and stay as they are (a load puts the saved ones there
-         *  first). */
+         *  first). A place that has gone from the build resumes at the nearest safe point, reported (`save`). */
         void restore(const FlowSnapshot& snap)
         {
             if (host_->journal) throw std::runtime_error("a flow can't be restored while a checkpoint is open");
-            restoreCursor(snap);
+            const Drift drift = restoreCursor(snap);
             // Register this flow's bags: each claims the values the registry holds for it (loaded by the
             // game, by loadGame from the save, or handed back by the engine this one replaces), laid over
             // fresh defaults. Released KEEPING their values, so a live flow restored in place keeps its
@@ -1285,70 +1409,132 @@ namespace patter
                 for (const auto& frame : stack_) note(frame.sceneId);
                 for (const auto& s : scenes) if (host_->bundle->scenes.count(s)) ensureSceneBags(s);
             }
+            // Only now, with the values back, can a choice be offered again: its conditions read them.
+            if (drift.gone)
+            {
+                PlayError err;
+                err.flow = id_; err.kind = "save"; err.node = drift.node;
+                err.message = "the save's place has gone from this build: " + drift.instead;
+                report(err);
+                if (drift.reoffer) setupChoice(drift.reoffer);
+            }
         }
 
     private:
-        /** The cursor half of restore(), without touching the bags. */
-        void restoreCursor(const FlowSnapshot& snap)
+        /** Where a load found its saved place gone from the build (spec 9.8), to resume from once the flow's
+         *  bags are back. */
+        struct Drift
+        {
+            bool gone = false;
+            /** The report's node: the saved snippet, or at a pending choice its group. */
+            std::string node;
+            /** What has gone and what the flow does instead, for the report's message. */
+            std::string instead;
+            /** The choice to offer again: the one the gone option belonged to, or a pending choice none of whose
+             *  options survive. */
+            const Node* reoffer = nullptr;
+        };
+
+        /** The cursor half of restore(), without touching the bags. Says where the saved place had gone, if it had. */
+        Drift restoreCursor(const FlowSnapshot& snap)
         {
             rngState_ = snap.rngState;
             visitCounts_ = snap.visits;
             started_ = true;
             flowEnded_ = snap.flowEnded;
-            beatIndex_ = snap.beatIndex;
             currentSceneId_ = snap.currentSceneId;
+            Drift drift;
             // Re-bind each frame to the CURRENT bundle: prefer the saved next-child id (survives
             // siblings inserted / removed / reordered before the cursor); fall back to the raw index
-            // when absent or its node drifted out of the bundle (spec 9.8 best-effort).
-            stack_ = snap.stack;
-            for (auto& frame : stack_)
+            // when absent (at the container's end) or its node drifted out of the bundle (spec 9.8
+            // best-effort). A frame whose OPTION has gone, with its choice still there, ends the stack:
+            // the choice is offered again.
+            stack_.clear();
+            for (const StackFrame& saved : snap.stack)
             {
-                if (!frame.nextId.empty())
+                const std::vector<NodePtr>* children = childrenOf(saved.containerId);
+                if (!children && !saved.choiceId.empty())
                 {
-                    const std::vector<NodePtr>* children = childrenOf(frame.containerId);
-                    if (children)
-                        for (size_t i = 0; i < children->size(); i++)
-                            if ((*children)[i]->id == frame.nextId) { frame.index = static_cast<int>(i); break; }
+                    auto choice = host_->nodeIndex.find(saved.choiceId);
+                    if (choice != host_->nodeIndex.end() && choice->second->isGroup() && choice->second->selector == "choice")
+                    {
+                        drift.gone = true;
+                        drift.node = !snap.activeSnippetId.empty() ? snap.activeSnippetId
+                            : snap.hasPendingChoice ? snap.pendingGroupId : saved.containerId;
+                        drift.instead = "option " + saved.containerId + " has gone, so choice " + saved.choiceId + " is offered again";
+                        drift.reoffer = choice->second;
+                        break;
+                    }
                 }
-                frame.nextId.clear(); // live frames never carry it
+                StackFrame frame{ saved.sceneId, saved.containerId, saved.index, "", "" };   // live frames carry no stamps
+                if (!saved.nextId.empty() && children)
+                    for (size_t i = 0; i < children->size(); i++)
+                        if ((*children)[i]->id == saved.nextId) { frame.index = static_cast<int>(i); break; }
+                stack_.push_back(std::move(frame));
             }
 
+            // Content-drift policy (spec 9.8): if a saved position points at content deleted since the save,
+            // resume at the nearest safe point rather than throwing. A gone snippet is skipped: play carries on
+            // from the surviving stack. A gone NEXT beat in a surviving snippet finishes the snippet (its onExit
+            // and jump run), so nothing plays twice. A version 3 save names the beat by its raw index, trusted
+            // as it always was.
             activeSnippet_ = nullptr;
-            if (!snap.activeSnippetId.empty())
+            beatIndex_ = 0;
+            if (!drift.reoffer && !snap.activeSnippetId.empty())
             {
                 auto it = host_->nodeIndex.find(snap.activeSnippetId);
-                if (it != host_->nodeIndex.end() && it->second->isSnippet()) activeSnippet_ = it->second;
+                if (it != host_->nodeIndex.end() && it->second->isSnippet())
+                {
+                    const std::vector<Beat>& beats = it->second->beats;
+                    activeSnippet_ = it->second;
+                    if (!snap.beatId.empty())
+                    {
+                        int at = -1;
+                        for (size_t i = 0; i < beats.size(); i++) if (beats[i].id == snap.beatId) { at = static_cast<int>(i); break; }
+                        beatIndex_ = at >= 0 ? at : static_cast<int>(beats.size());
+                        if (at < 0)
+                        {
+                            drift.gone = true; drift.node = snap.activeSnippetId;
+                            drift.instead = "beat " + snap.beatId + " has gone from snippet " + snap.activeSnippetId + ", so the snippet ends there";
+                        }
+                    }
+                    // Version 4 writes no beat once every one is delivered; version 3 writes its index.
+                    else beatIndex_ = snap.beatIndex >= 0 ? snap.beatIndex : static_cast<int>(beats.size());
+                }
+                else
+                {
+                    drift.gone = true; drift.node = snap.activeSnippetId;
+                    drift.instead = "snippet " + snap.activeSnippetId + " has gone, so play carries on after it";
+                }
             }
             selectors_ = snap.selectors;
 
+            // Replay the saved option set VERBATIM (schema 9.3) - re-deriving would re-evaluate conditions
+            // (double-consuming PRNG draws) and could change the choice under the player. Prompts are not in
+            // the save (a version 3 save's are discarded): they are built when the choice is delivered.
+            // Options whose nodes drifted out of the bundle are dropped. A choice with no surviving option is
+            // offered again, when its group is still there, or dissolves (9.8).
             clearPendingChoice();
-            if (!snap.pendingOptions.empty())
+            if (!drift.reoffer && snap.hasPendingChoice)
             {
-                std::vector<ChoiceOption> options;
+                std::vector<PendingOption> options;
                 std::map<std::string, const Node*> byId;
                 for (const auto& o : snap.pendingOptions)
                 {
                     auto it = host_->nodeIndex.find(o.id);
                     if (it == host_->nodeIndex.end()) continue;
                     byId[o.id] = it->second;
-                    options.push_back(o);
-                    // An option's extension values are the bundle's, not the save's: read off its node again.
-                    options.back().extensions = it->second->extensions;
-                    // A save from before prompts carried their pause, or a speaker's label, has none: work them out
-                    // again (the pause from the prompt's beat, the label from the speaker the choice showed, in the
-                    // current locale).
-                    ChoiceOption& added = options.back();
-                    std::string label;
-                    const bool relabel = added.prompt && added.prompt->kind == "line" && !added.prompt->hasSpeakerLabel
-                        && speakerLabelOf(*host_, added.prompt->hasCharacter, added.prompt->character, added.prompt->hasQualifier, added.prompt->qualifier, label);
-                    if (added.prompt && (!added.prompt->hasPadAfter || relabel))
-                    {
-                        added.prompt = std::make_shared<ChoicePrompt>(*added.prompt);
-                        if (!added.prompt->hasPadAfter) { added.prompt->hasPadAfter = true; added.prompt->padAfter = promptPadOf(it->second); }
-                        if (relabel) { added.prompt->hasSpeakerLabel = true; added.prompt->speakerLabel = label; }
-                    }
+                    options.push_back({ o.id, o.eligible, copyGameData(o.gameData) });
                 }
-                if (!options.empty()) { hasPendingChoice_ = true; pendingGroupId_ = snap.pendingGroupId; pendingOptions_ = options; pendingById_ = byId; }
+                if (!options.empty()) { hasPendingChoice_ = true; pendingGroupId_ = snap.pendingGroupId; pendingOptions_ = std::move(options); pendingById_ = std::move(byId); }
+                else
+                {
+                    auto group = host_->nodeIndex.find(snap.pendingGroupId);
+                    const bool isChoice = group != host_->nodeIndex.end() && group->second->isGroup() && group->second->selector == "choice";
+                    drift.gone = true; drift.node = snap.pendingGroupId; drift.reoffer = isChoice ? group->second : nullptr;
+                    drift.instead = isChoice ? "none of choice " + snap.pendingGroupId + "'s options is left, so it's offered again"
+                                             : "choice " + snap.pendingGroupId + " has gone, so play carries on after it";
+                }
             }
 
             // A save taken between choose() and the next advance() left a prompt still to be replayed: the
@@ -1358,7 +1544,7 @@ namespace patter
             // bundle or has no authored prompt (spec 9.8): the live choose() would replay nothing.
             pendingPromptBeat_ = nullptr;
             pendingPromptShown_.reset();
-            pendingPromptOwnerId_ = snap.pendingPromptOwnerId;
+            pendingPromptOwnerId_ = drift.reoffer ? std::string() : snap.pendingPromptOwnerId;
             if (!pendingPromptOwnerId_.empty())
             {
                 auto it = host_->nodeIndex.find(pendingPromptOwnerId_);
@@ -1369,13 +1555,14 @@ namespace patter
             {
                 pendingPromptShown_ = std::make_shared<ChoicePrompt>(*snap.pendingPrompt);
                 if (!pendingPromptShown_->hasPadAfter) { pendingPromptShown_->hasPadAfter = true; pendingPromptShown_->padAfter = padOf(pendingPromptBeat_->id); }
-                // As for the pending choice's options: a save from before prompts carried a speaker's label works it out again.
+                // A save from before prompts carried a speaker's label works it out again.
                 std::string label;
                 if (pendingPromptShown_->kind == "line" && !pendingPromptShown_->hasSpeakerLabel
                     && speakerLabelOf(*host_, pendingPromptShown_->hasCharacter, pendingPromptShown_->character,
                                       pendingPromptShown_->hasQualifier, pendingPromptShown_->qualifier, label))
                 { pendingPromptShown_->hasSpeakerLabel = true; pendingPromptShown_->speakerLabel = label; }
             }
+            return drift;
         }
 
         /** Inside a checkpoint, the first change to this flow records its cursor and PRNG, so a rollback
@@ -1391,13 +1578,13 @@ namespace patter
             {
                 uint32_t rngState; bool started, flowEnded; std::string currentSceneId;
                 const Node* activeSnippet; int beatIndex;
-                bool hasPendingChoice; std::string pendingGroupId; std::vector<ChoiceOption> pendingOptions;
-                std::map<std::string, const Node*> pendingById;
+                bool hasPendingChoice; std::string pendingGroupId; std::vector<PendingOption> pendingOptions;
+                std::map<std::string, const Node*> pendingById; std::map<std::string, std::shared_ptr<ChoicePrompt>> pendingShown;
                 const Beat* pendingPromptBeat; std::shared_ptr<ChoicePrompt> pendingPromptShown; std::string pendingPromptOwnerId;
                 std::vector<StackFrame> stack;   // a copy of the frames: they advance in place (index++)
             };
             Cursor c{ rngState_, started_, flowEnded_, currentSceneId_, activeSnippet_, beatIndex_,
-                      hasPendingChoice_, pendingGroupId_, pendingOptions_, pendingById_,
+                      hasPendingChoice_, pendingGroupId_, pendingOptions_, pendingById_, pendingShown_,
                       pendingPromptBeat_, pendingPromptShown_, pendingPromptOwnerId_, stack_ };
             std::shared_ptr<Flow> self = shared_from_this();
             journal->undo.push_back([self, c = std::move(c)]
@@ -1406,7 +1593,7 @@ namespace patter
                 f.rngState_ = c.rngState; f.started_ = c.started; f.flowEnded_ = c.flowEnded;
                 f.currentSceneId_ = c.currentSceneId; f.activeSnippet_ = c.activeSnippet; f.beatIndex_ = c.beatIndex;
                 f.hasPendingChoice_ = c.hasPendingChoice; f.pendingGroupId_ = c.pendingGroupId;
-                f.pendingOptions_ = c.pendingOptions; f.pendingById_ = c.pendingById;
+                f.pendingOptions_ = c.pendingOptions; f.pendingById_ = c.pendingById; f.pendingShown_ = c.pendingShown;
                 f.pendingPromptBeat_ = c.pendingPromptBeat; f.pendingPromptShown_ = c.pendingPromptShown; f.pendingPromptOwnerId_ = c.pendingPromptOwnerId;
                 f.stack_ = c.stack;
             });
@@ -1452,8 +1639,12 @@ namespace patter
         int beatIndex_ = 0;
         bool hasPendingChoice_ = false;
         std::string pendingGroupId_;
-        std::vector<ChoiceOption> pendingOptions_;
+        // The options offered, without their prompts: those are built again, in the language in use, each time
+        // the choice is delivered (offer()).
+        std::vector<PendingOption> pendingOptions_;
         std::map<std::string, const Node*> pendingById_;
+        // Each option's prompt as it was last delivered (null: none), for a replay to speak exactly what the player saw.
+        std::map<std::string, std::shared_ptr<ChoicePrompt>> pendingShown_;
         const Beat* pendingPromptBeat_ = nullptr;                                   // replayPromptOnChoose: the chosen option's authored prompt beat
         std::shared_ptr<ChoicePrompt> pendingPromptShown_;                          // ...as the choice showed it; null only after loading a save that did not carry it
         std::string pendingPromptOwnerId_;                                          // owner of pendingPromptBeat_, found again across a save in the choose->advance window
@@ -1463,7 +1654,29 @@ namespace patter
         // The dialect's host hooks, held by the flow so evalCtx_.host stays valid.
         PatterHost evalHost_;
 
-        void clearPendingChoice() { hasPendingChoice_ = false; pendingGroupId_.clear(); pendingOptions_.clear(); pendingById_.clear(); }
+        void clearPendingChoice() { hasPendingChoice_ = false; pendingGroupId_.clear(); pendingOptions_.clear(); pendingById_.clear(); pendingShown_.clear(); }
+
+        /** The pending choice's options as the game is handed them: each prompt built now, in the language in
+         *  use and against the current values (and remembered, for a replay to speak as shown), and the game's
+         *  own copy of each option's gameData. */
+        std::vector<ChoiceOption> offer()
+        {
+            std::vector<ChoiceOption> out;
+            out.reserve(pendingOptions_.size());
+            for (const PendingOption& o : pendingOptions_)
+            {
+                const Node* node = pendingById_[o.id];
+                ChoiceOption opt;
+                opt.id = o.id;
+                opt.prompt = promptFor(node);
+                pendingShown_[o.id] = opt.prompt;
+                opt.eligible = o.eligible;
+                opt.gameData = copyGameData(o.gameData);
+                opt.extensions = node->extensions;   // the bundle's, read-only by contract
+                out.push_back(std::move(opt));
+            }
+            return out;
+        }
 
         /** Drop everything waiting to be delivered: an open choice, and a chosen option's prompt still to be
          *  replayed. Every move that abandons the flow's place (start and reset, goto, close) does this, so none
@@ -1701,7 +1914,7 @@ namespace patter
             enter(node->id);
             if (node->isSnippet()) { beginSnippet(node); return; }
             std::string selector = node->selector.empty() ? "run" : node->selector;
-            if (selector == "run") { stack_.push_back({ currentSceneId_, node->id, 0, "" }); return; }
+            if (selector == "run") { stack_.push_back({ currentSceneId_, node->id, 0, "", "" }); return; }
             if (selector == "choice") { setupChoice(node); return; }
             const Node* pick = selectChild(node);
             if (pick) enterChild(pick);
@@ -1725,7 +1938,7 @@ namespace patter
 
         void setupChoice(const Node* group)
         {
-            std::vector<ChoiceOption> options;
+            std::vector<PendingOption> options;
             std::map<std::string, const Node*> byId;
             std::vector<const Node*> fallbacks;
             for (const auto& childPtr : group->children)
@@ -1739,13 +1952,7 @@ namespace patter
                 }
                 bool elig = eligible(child);
                 if (!elig && child->secretUntilEligible) continue;
-                ChoiceOption opt;
-                opt.id = child->id;
-                opt.prompt = promptFor(child);
-                opt.eligible = elig;
-                opt.gameData = child->gameData;
-                opt.extensions = child->extensions;
-                options.push_back(opt);
+                options.push_back({ child->id, elig, child->gameData });   // prompts are built as it's delivered
                 byId[child->id] = child;
             }
             // A choice is offered only when the player can take something. One whose every remaining option
@@ -1764,6 +1971,7 @@ namespace patter
                     emit(std::move(e));
                 }
                 hasPendingChoice_ = true; pendingGroupId_ = group->id; pendingOptions_ = options; pendingById_ = byId;
+                pendingShown_.clear();
                 return;
             }
             // No normal option can be taken. Auto-follow the fallback if it is eligible (its own condition
@@ -1803,7 +2011,7 @@ namespace patter
                 sceneId = loc->second; containerId = to;
             }
             enter(containerId);
-            StackFrame frame{ sceneId, containerId, 0, "" };
+            StackFrame frame{ sceneId, containerId, 0, "", "" };
             if (mode == "call") stack_.push_back(frame); else { stack_.clear(); stack_.push_back(frame); }
         }
 
@@ -2027,15 +2235,16 @@ namespace patter
         // Report a content error the engine is playing through: to the host's onError, and to the log.
         void reportError(const std::string& kind, const std::string& node, const Expression* expr, const std::string& message)
         {
-            const std::string source = expr ? expr->src : std::string();
-            if (host_->onError)
-            {
-                PlayError err;
-                err.flow = id_; err.kind = kind; err.node = node; err.source = source; err.message = message;
-                host_->onError(err);
-            }
+            PlayError err;
+            err.flow = id_; err.kind = kind; err.node = node; err.source = expr ? expr->src : std::string(); err.message = message;
+            report(err);
+        }
+        // Report a problem this flow carried on past: to the host's onError, and to the log.
+        void report(const PlayError& err)
+        {
+            if (host_->onError) host_->onError(err);
             if (!host_->tracing) return;
-            LogEntry e; e.type = "diagnostic"; e.kind = kind; e.node = node; e.source = source; e.message = message;
+            LogEntry e; e.type = "diagnostic"; e.kind = err.kind; e.node = err.node; e.source = err.source; e.message = err.message;
             emit(std::move(e));
         }
         // A refusal from the evaluator is the kernel's ExprError, rethrown as Patterplay's EvalError.
@@ -2088,8 +2297,8 @@ namespace patter
                 if (it != host_->tagIndex.end() && !it->second.empty()) { s.hasTags = true; s.tags = it->second; }
             };
             r.extensions = beat.extensions;   // Patter extension values, raw, on every kind of beat
-            if (beat.kind == "gameEvent") { r.type = StepType::GameEvent; r.id = beat.id; r.gameData = beat.gameData; applyTags(r); return r; }
-            if (beat.kind == "text") { r.type = StepType::Text; r.id = beat.id; r.text = interp(resolveString(beat.id)); r.padAfter = padOf(beat.id); r.action = beat.action; r.gameData = beat.gameData; applyTags(r); return r; }
+            if (beat.kind == "gameEvent") { r.type = StepType::GameEvent; r.id = beat.id; r.gameData = copyGameData(beat.gameData); applyTags(r); return r; }
+            if (beat.kind == "text") { r.type = StepType::Text; r.id = beat.id; r.text = interp(resolveString(beat.id)); r.padAfter = padOf(beat.id); r.action = beat.action; r.gameData = copyGameData(beat.gameData); applyTags(r); return r; }
             // line
             std::string raw = resolveString(beat.id);
             r.type = StepType::Line; r.id = beat.id;
@@ -2112,7 +2321,7 @@ namespace patter
                 std::string qn; if (resolveQualifierName(beat, qn)) { r.hasQualifierName = true; r.qualifierName = qn; }
                 std::string sl; if (resolveSpeakerLabel(beat, sl)) { r.hasSpeakerLabel = true; r.speakerLabel = sl; }
             }
-            r.gameData = beat.gameData;
+            r.gameData = copyGameData(beat.gameData);   // the game's own copy
             applyTags(r);
             return r;
         }
@@ -2167,7 +2376,7 @@ namespace patter
         StepResult promptResult(const Beat& beat, const ChoicePrompt& shown)
         {
             StepResult r;
-            r.id = beat.id; r.text = shown.text; r.gameData = beat.gameData; r.extensions = beat.extensions; r.padAfter = padOf(beat.id);
+            r.id = beat.id; r.text = shown.text; r.gameData = copyGameData(beat.gameData); r.extensions = beat.extensions; r.padAfter = padOf(beat.id);
             auto it = host_->tagIndex.find(beat.id);
             if (it != host_->tagIndex.end() && !it->second.empty()) { r.hasTags = true; r.tags = it->second; }
             if (shown.kind == "text") { r.type = StepType::Text; return r; }
@@ -2179,13 +2388,6 @@ namespace patter
             if (shown.hasQualifierName) { r.hasQualifierName = true; r.qualifierName = shown.qualifierName; }
             if (shown.hasSpeakerLabel) { r.hasSpeakerLabel = true; r.speakerLabel = shown.speakerLabel; }
             return r;
-        }
-        // The resolved pause of the beat an option shows as its prompt (its authored prompt, else its first
-        // content line), for a saved option that predates prompts carrying one.
-        double promptPadOf(const Node* node)
-        {
-            const Beat* beat = promptBeatOf(node);
-            return beat ? padOf(beat->id) : DEFAULT_PAD_AFTER;
         }
         const Beat* promptBeatOf(const Node* node)
         {
@@ -2267,6 +2469,53 @@ namespace patter
 
     };
 
+    // ----- locales ---------------------------------------------------------------
+
+    // How a requested locale resolved (see resolveLocale): the locale in use, the string table it reads (none:
+    // every string falls back to the default locale, marked untranslated), and what to report when it isn't an
+    // exact match (empty when it is).
+    struct LocaleChoice
+    {
+        std::string locale;
+        bool hasTable = false; std::string table;
+        std::string problem;
+    };
+
+    // The one rule for a locale, used wherever one is set (the constructor, setLocale, replaceStrings, and
+    // hotSwap through the constructor). Case and `_` / `-` don't matter: an exact match, then the language
+    // alone (`fr` for `fr-FR`), then the bundle's default. Anything but an exact match carries a problem to
+    // report. The default reads no table of its own here, so its text keeps the `<Untranslated: id>` marker
+    // and the gap shows. `fr` never looks for `fr-FR`. An IDs-only bundle takes the locale as given: the game
+    // localises it. Null `requested` = none asked for: the default, unreported. The same rule, and the same
+    // messages, on every runtime.
+    inline LocaleChoice resolveLocale(const Bundle& bundle, const std::string* requested)
+    {
+        const std::string& def = bundle.locales.defaultLocale;
+        if (!requested) return { def, true, def, "" };
+        if (bundle.localisation.mode == "ids") return { *requested, true, *requested, "" };
+        std::vector<std::string> have;
+        const auto add = [&have](const std::string& l) { if (std::find(have.begin(), have.end(), l) == have.end()) have.push_back(l); };
+        add(def);
+        for (const auto& l : bundle.locales.included) add(l);
+        for (const auto& kv : bundle.strings) add(kv.first);
+        if (std::find(have.begin(), have.end(), *requested) != have.end()) return { *requested, true, *requested, "" };
+        const auto norm = [](const std::string& l)
+        {
+            std::string out = toLower(l);
+            std::replace(out.begin(), out.end(), '_', '-');
+            return out;
+        };
+        const std::string want = norm(*requested);
+        for (const auto& l : have)
+            if (norm(l) == want)
+                return { l, true, l, "the locale \"" + *requested + "\" is spelled \"" + l + "\" in this bundle, so it's using \"" + l + "\"" };
+        const std::string language = want.substr(0, want.find('-'));
+        for (const auto& l : have)
+            if (norm(l) == language)
+                return { l, true, l, "this bundle has no locale \"" + *requested + "\", so it's using its language, \"" + l + "\"" };
+        return { def, false, "", "this bundle has no locale \"" + *requested + "\", so it's using the default, \"" + def + "\", with every string marked untranslated" };
+    }
+
     // ----- Engine --------------------------------------------------------------
 
     class Engine
@@ -2294,15 +2543,20 @@ namespace patter
         // Internal: the constructor hotSwap uses. A hotSwap replacement of a standalone engine shares
         // its predecessor's registry but is still its own game (it self-backs host scopes and saves the
         // registry's values); that is not a choice a caller makes, so it is not public API.
-        struct HotSwapTag { bool ownsRegistry; };
+        // setupReported is set only on the engine a refused hotSwap load falls back on, which stands in for a
+        // replacement that has already made its set-up reports, so it makes none.
+        struct HotSwapTag { bool ownsRegistry; bool setupReported = false; };
 
         Engine(const Bundle& bundle, const EngineOptions& options, HotSwapTag tag)
         {
             creationOptions_ = options; // reused by hotSwap (same seed source + settings)
             allStrings_ = &bundle.strings;
-            std::string locale = options.locale.empty() ? bundle.locales.defaultLocale : options.locale;
+            // Set-up problems found while building, reported as the constructor ends, when the engine can report.
+            std::vector<std::pair<std::string, std::string>> setup;
+            if (!options.locale.empty()) requestedLocale_ = options.locale;
+            currentLocale_ = resolveLocale(bundle, requestedLocale_ ? &*requestedLocale_ : nullptr);
+            if (!currentLocale_.problem.empty()) setup.emplace_back(options.locale, currentLocale_.problem);
             const auto& allStrings = bundle.strings;
-            currentLocale_ = locale;
             // Localisation mode (spec §11): "ids" + no source-debug -> emit beat IDs + omit character names.
             host_.logEnabled = options.log;
             host_.tracing = options.log;
@@ -2314,7 +2568,7 @@ namespace patter
             host_.emitIds = bundle.localisation.mode == "ids" && !bundle.localisation.sourceDebug;
             sourceDebug_ = bundle.localisation.mode == "ids" && bundle.localisation.sourceDebug;
             if (sourceDebug_) std::cerr << "[Patterplay] source-only DEBUG build: strings are the source language for debugging, not a shippable localised build.\n";
-            auto ls = allStrings.find(locale); if (ls != allStrings.end()) host_.strings = &ls->second;
+            host_.strings = tableOf(currentLocale_);
             auto ds = allStrings.find(bundle.locales.defaultLocale); if (ds != allStrings.end()) host_.defaultStrings = &ds->second;
 
             for (const auto& c : bundle.cast) if (!c.displayName.empty()) host_.castDisplay[c.name] = c.displayName;
@@ -2343,7 +2597,11 @@ namespace patter
                     walkNodes(block.children, [&](const Node* n)
                     {
                         host_.nodeIndex[n->id] = n;
-                        if (n->isGroup()) { if (n->prompt) host_.beatIndex[n->prompt->id] = n->prompt.get(); }
+                        if (n->isGroup())
+                        {
+                            if (n->prompt) host_.beatIndex[n->prompt->id] = n->prompt.get();
+                            if (n->selector == "choice") for (const auto& option : n->children) host_.optionChoice[option->id] = n->id;
+                        }
                         else for (const auto& beat : n->beats) host_.beatIndex[beat.id] = &beat;
                     });
                     indexTags(block.children, blockTags);
@@ -2383,15 +2641,58 @@ namespace patter
             // @patter (the SHARED globals) prefixed "@patter.", which is both the address a row reports
             // and the log path.
             host_.patterBag = makeSharedPatter(host_.patterSharedDecls);
-            registerScopes(bundle, options);
+            registerScopes(bundle, options, setup);
             // The `patter` bag (and any self-backed host scope) claimed values the game may have loaded first.
             host_.reportRefits();
+            // Last, so the game's handler and the decision log hear about an engine that is ready to be asked.
+            // The engine a refused hotSwap load falls back on makes none: the replacement before it already did.
+            if (!tag.setupReported) for (const auto& s : setup) reportSetup(s.first, s.second);
+        }
+
+        // Report a set-up problem (a `setup` PlayError, which belongs to no flow): to the game's onError, and to
+        // the decision log and the live tap, under no flow.
+        void reportSetup(const std::string& node, const std::string& message)
+        {
+            if (host_.onError)
+            {
+                PlayError err;
+                err.flow = ""; err.kind = "setup"; err.node = node; err.message = message;
+                host_.onError(err);
+            }
+            if (!host_.tracing) return;
+            LogEntry e; e.type = "diagnostic"; e.kind = "setup"; e.node = node; e.message = message;
+            if (!host_.traceHandlers.empty())
+            {
+                const auto handlers = host_.traceHandlers;   // a copy: a handler may unsubscribe while being called
+                for (const auto& h : handlers) h.second("", e);
+            }
+            if (host_.logEnabled) { e.seq = host_.engineLogSeq++; engineLog_.push_back(std::move(e)); }
+        }
+
+        // The string table a resolved locale reads: none when it fell back to the default (see resolveLocale).
+        const std::map<std::string, std::string>* tableOf(const LocaleChoice& choice) const
+        {
+            if (!choice.hasTable) return &FlowHost::noStrings();
+            auto it = allStrings_->find(choice.table);
+            return it != allStrings_->end() ? &it->second : &FlowHost::noStrings();
+        }
+
+        // Use a resolved locale: re-point the active strings off the live table source (the bundle's, unless
+        // replaceStrings re-pointed it at a pushed bundle's) - no whole-table copy.
+        void useLocale(LocaleChoice choice)
+        {
+            currentLocale_ = std::move(choice);
+            host_.strings = tableOf(currentLocale_);
         }
 
     public:
 
-        // The active locale (string + character-name lookups resolve in it).
-        const std::string& locale() const { return currentLocale_; }
+        // The locale in use (string + character-name lookups resolve in it): the one the game asked for, or the
+        // one it fell back to (`fr` for `fr-FR`, the default for a locale the bundle doesn't have).
+        const std::string& locale() const { return currentLocale_.locale; }
+
+        // The bundle's locales: its default, and every locale it includes. A fresh copy each call.
+        Locales locales() const { return host_.bundle->locales; }
 
         // True for a source-only DEBUG build: the embedded strings are the source language (for debugging),
         // not a shippable localised build. An IDs-only ship build is false.
@@ -2400,16 +2701,20 @@ namespace patter
         // The bundle's build identity (its content hash), the one a debug link handshakes with.
         const std::string& buildId() const { return host_.bundle->contentHash; }
 
-        // Switch the active locale LIVE - subsequent string lookups (new beats, character names, {@ref})
-        // render in it; flow position / state / visits / rng are untouched. All open flows share host_, so
-        // the swap reaches them at once. A locale with no table degrades to the source via <Untranslated>.
+        // Switch the active locale LIVE - subsequent string lookups (new beats, a pending choice's options,
+        // character names, {@ref}) render in it; flow position / state / visits / rng are untouched. All open
+        // flows share host_, so the swap reaches them at once.
+        //
+        // The locale resolves by one rule, the same for EngineOptions::locale: case and `_` / `-` don't
+        // matter, so an exact match wins, then the language alone (`fr` for `fr-FR`), then the bundle's
+        // default, whose text then keeps the `<Untranslated: id>` marker so the gap shows. Anything but an
+        // exact match is reported (`setup`). `fr` never looks for `fr-FR`. An IDs-only bundle takes the
+        // locale as given, unreported.
         void setLocale(const std::string& locale)
         {
-            currentLocale_ = locale;
-            // Re-point the active strings off the live table source (the bundle's, unless replaceStrings
-            // re-pointed it at a pushed bundle's) - no whole-table copy.
-            auto it = allStrings_->find(locale);
-            host_.strings = it != allStrings_->end() ? &it->second : &FlowHost::noStrings();
+            requestedLocale_ = locale;
+            useLocale(resolveLocale(*host_.bundle, &locale));
+            if (!currentLocale_.problem.empty()) reportSetup(locale, currentLocale_.problem);
         }
 
         // Live bundle refresh, tier 1 (strings only): swap every locale's string table in place from a
@@ -2420,16 +2725,22 @@ namespace patter
         void replaceStrings(const Bundle& bundle)
         {
             allStrings_ = &bundle.strings;
-            auto it = allStrings_->find(currentLocale_);
-            host_.strings = it != allStrings_->end() ? &it->second : &FlowHost::noStrings();
+            // The requested locale resolves again against the new tables; a fallback is reported only when it
+            // changed, so a live text edit doesn't repeat what the game has already heard.
+            const std::string was = currentLocale_.problem;
+            useLocale(resolveLocale(bundle, requestedLocale_ ? &*requestedLocale_ : nullptr));
             auto ds = allStrings_->find(host_.bundle->locales.defaultLocale);
             host_.defaultStrings = ds != allStrings_->end() ? &ds->second : &FlowHost::noStrings();
+            const std::string& now = currentLocale_.problem;
+            if (!now.empty() && now != was) reportSetup(requestedLocale_ ? *requestedLocale_ : std::string(), now);
         }
 
         // Live bundle refresh, tier 2 (full swap): rebuild on an edited bundle with the whole run carried
-        // over (saveGame -> fresh engine -> loadGame) plus the presentation state that isn't save state
-        // (active locale, captions toggle). Content drift resolves per spec 9.8: stack frames re-find
-        // their next child by id, drifted options drop, a vanished snippet is skipped.
+        // over (saveGame -> fresh engine -> loadGame) plus the presentation state that isn't save state (the
+        // locale asked for, resolved again against the new bundle and reported again if it falls back; the
+        // captions toggle). Content drift resolves per spec 9.8: stack frames re-find their next child and
+        // the next beat by id, drifted options drop, and a place that has gone resumes at the nearest safe
+        // point, reported (`save`).
         //
         // Returns the REPLACEMENT engine, on the same registry (caller owns it AND keeps `bundle` alive
         // for its lifetime). This one hands its bags over (each is removed from the registry with its
@@ -2446,6 +2757,9 @@ namespace patter
             // still its own game (so its saveGame keeps carrying the registry's values).
             EngineOptions options = creationOptions_;
             options.registry = host_.registry;
+            // Built in the locale this one was asked for, so the new bundle's locales resolve it, as the
+            // constructor reports.
+            if (requestedLocale_) options.locale = *requestedLocale_;
             const HotSwapTag tag{ host_.ownsRegistry };
             // On a game's registry, this engine's own values are parked again to be REFITTED as the
             // replacement claims them: the edit may have deleted a stage, an enum value or a flag one of them
@@ -2476,14 +2790,14 @@ namespace patter
                 // before the fallback claims them, so a stage the edit deleted is put back here too.
                 if (host_.ownsRegistry) { if (snapshot.registry) host_.registry->load(*snapshot.registry, true, true); }
                 else host_.registry->load(own, /*keepParked=*/true, /*refit=*/true);
-                next.reset(new Engine(bundle, options, tag));
+                // The fallback stands in for the replacement, which has made the set-up reports: it makes none.
+                next.reset(new Engine(bundle, options, HotSwapTag{ tag.ownsRegistry, true }));
                 for (const auto& kv : snapshot.flows)
                 {
                     try { next->openFlow(kv.first, kv.second.currentSceneId); }
                     catch (const std::exception&) { /* scene deleted: drop the flow */ }
                 }
             }
-            next->setLocale(currentLocale_);
             next->setClosedCaptions(host_.captionsOn);
             return next;
         }
@@ -2621,7 +2935,7 @@ namespace patter
         Flow* restoreFlow(const std::string& id, const FlowState& state)
         {
             refuseInCheckpoint("restoreFlow");
-            if (state.version != 2 && state.version != SAVE_VERSION)
+            if (state.version != 3 && state.version != SAVE_VERSION)
                 throw std::runtime_error("unsupported flow state version: " + std::to_string(state.version));
             if (flows_.count(id))
                 throw std::runtime_error("a flow '" + id + "' is already open; close it before restoring another under that id");
@@ -2857,10 +3171,16 @@ namespace patter
         }
         // Write a shared property by ref. The GAME's surface: a host declaration's `writable: false` is
         // the story's promise about the story's writes, never a lock on the value's owner.
+        //
+        // THROWS EvalError, changing nothing, on a value that doesn't fit the property's declaration (a string
+        // for a number, a value an enum or a quality doesn't list, a flag a flags property doesn't), and on a
+        // name the content doesn't declare in @patter or a host scope the bundle declares. An opaque host scope
+        // takes anything, and another engine's scope is that engine's to check.
         void setProperty(const std::string& ref, const PatterValue& value)
         {
             auto sp = splitHostRef(host_, ref);
             if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
+            checkHostWrite(host_, sp.first, sp.second, value, std::string());
             std::optional<PatterValue> prev = host_.journal ? host_.registry->get(sp.first, sp.second) : std::nullopt;
             kernelCall([&] { host_.registry->set(sp.first, sp.second, value, /*host=*/true); });
             if (host_.journal && prev)
@@ -2932,7 +3252,7 @@ namespace patter
         //
         // One checkpoint at a time. Inside one, the calls that replace or drop flows or their bags wholesale
         // (reset, loadGame, hotSwap, closeFlow, restoreFlow, openFlow on the name of an open flow, and a
-        // flow's own start and restore) throw. Not undone: log entries already recorded, and draws from a
+        // flow's own reset and restore) throw. Not undone: log entries already recorded, and draws from a
         // custom `rng` the game supplied.
         Checkpoint checkpoint()
         {
@@ -3029,10 +3349,6 @@ namespace patter
             return seq;
         }
 
-        [[deprecated("Use getOutline(), the name every Patterplay runtime uses.")]]
-        std::vector<OutlineScene> listOutline() const { return getOutline(); }
-        [[deprecated("Use getBeatSequence(), the name every Patterplay runtime uses.")]]
-        std::vector<FlatBeat> beatSequence() const { return getBeatSequence(); }
 
     private:
         void collectBeats(const std::vector<NodePtr>& nodes, const std::string& sceneId, const std::string& blockId,
@@ -3123,15 +3439,15 @@ namespace patter
         }
 
         // Restore a saveGame(): visit counts, shared selector cursors, and every flow. Property values
-        // come from the registry. A save that carries them (a standalone engine's, or a version 2 save
-        // from before the registry held them) has them moved into the registry here; otherwise the game
-        // loads its registry itself, before or after this call. Either order works: this engine's bags
-        // are handed back to the registry (values kept) and the restored flows claim them as they
-        // register.
+        // come from the registry. A save that carries them (a standalone engine's) has them moved into the
+        // registry here; otherwise the game loads its registry itself, before or after this call. Either
+        // order works: this engine's bags are handed back to the registry (values kept) and the restored
+        // flows claim them as they register. Reads versions 3 and 4. A flow whose saved place has gone from
+        // this build resumes at the nearest safe point, reported (`save`).
         void loadGame(const SaveGame& save)
         {
             refuseInCheckpoint("loadGame");
-            if (save.version != 2 && save.version != SAVE_VERSION)
+            if (save.version != 3 && save.version != SAVE_VERSION)
                 throw std::runtime_error("unsupported save version: " + std::to_string(save.version));
             assertExternalScopes();
             ScopeRegistry& reg = *host_.registry;
@@ -3147,7 +3463,7 @@ namespace patter
             }
             host_.stageBags.clear();
 
-            std::optional<ScopeRegistry::SaveBlob> values = save.version == 2 ? std::optional<ScopeRegistry::SaveBlob>(sectionsFromV2(save)) : save.registry;
+            const std::optional<ScopeRegistry::SaveBlob>& values = save.registry;
             if (values)
             {
                 // The engine's own registry takes the save wholesale. A game's registry may hold values
@@ -3192,20 +3508,8 @@ namespace patter
             }
         }
 
-        // A version 2 save's property values, as registry sections under this engine's keys.
-        static ScopeRegistry::SaveBlob sectionsFromV2(const SaveGame& save)
-        {
-            ScopeRegistry::SaveBlob out;
-            out.set("patter", orderedOf(save.shared));
-            for (const auto& kv : save.stageBags) out.set(registrykeys::stage(kv.first), orderedOf(kv.second));
-            for (const auto& f : save.flows)
-                for (const auto& kv : flowSections(f.first, f.second)) out.set(kv.first, kv.second);
-            return out;
-        }
-
-        // One flow's own values (a version 2 save's per-flow sections, or a FlowState's) as registry
-        // sections under flow `id`'s keys.
-        static ScopeRegistry::SaveBlob flowSections(const std::string& id, const FlowSnapshot& f)
+        // One flow's own values (a FlowState's) as registry sections under flow `id`'s keys.
+        static ScopeRegistry::SaveBlob flowSections(const std::string& id, const FlowState& f)
         {
             ScopeRegistry::SaveBlob out;
             out.set(registrykeys::flowGlobals(id), orderedOf(f.scopes));
@@ -3216,7 +3520,7 @@ namespace patter
         // The inverse of flowSections: flow `id`'s sections in a registry save, without the id, into
         // `out`'s scopes and sceneBags. Values still waiting in the registry for a scene the flow hasn't
         // re-entered are in the save, so they come too.
-        static void flowValuesFrom(const std::string& id, const ScopeRegistry::SaveBlob& saved, FlowSnapshot& out)
+        static void flowValuesFrom(const std::string& id, const ScopeRegistry::SaveBlob& saved, FlowState& out)
         {
             const std::string prefix = registrykeys::flow(id);
             const std::string scenePrefix = "scene/";
@@ -3236,7 +3540,7 @@ namespace patter
         // standalone engine only, a self-backed bag for each declared host scope nobody bound. On any
         // throw, remove (keeping values) whatever this constructor registered, so a clash leaves the
         // game's registry as it was, then rethrow.
-        void registerScopes(const Bundle& bundle, const EngineOptions& options)
+        void registerScopes(const Bundle& bundle, const EngineOptions& options, std::vector<std::pair<std::string, std::string>>& setup)
         {
             ScopeRegistry& reg = *host_.registry;
             const std::string owner = PATTER_OWNER;
@@ -3252,6 +3556,18 @@ namespace patter
                 {
                     const HostScopeSpec* spec = nullptr;
                     for (const auto& sp : bundle.scopeRegistry.scopes) if (sp.token == kv.first) { spec = &sp; break; }
+                    // Tokens are case-sensitive everywhere, so a near miss is reported, never folded: folding
+                    // would make a second spelling of the scope. Another engine's scope the content names is that
+                    // engine's to declare.
+                    const auto& external = bundle.externalScopes;
+                    if (!spec && std::find(external.begin(), external.end(), kv.first) == external.end())
+                    {
+                        const HostScopeSpec* near = nullptr;
+                        for (const auto& sp : bundle.scopeRegistry.scopes) if (toLower(sp.token) == toLower(kv.first)) { near = &sp; break; }
+                        setup.emplace_back(kv.first, near
+                            ? "hostScopes binds \"" + kv.first + "\", which this bundle doesn't declare: it declares \"" + near->token + "\", and a scope's token is case-sensitive"
+                            : "hostScopes binds \"" + kv.first + "\", which this bundle doesn't declare");
+                    }
                     std::vector<ScopeDeclaration> decls;
                     if (spec) for (const auto& d : spec->declarations) decls.push_back(toForeignDecl(d));
                     ForeignScopeOptions fo;
@@ -3330,7 +3646,10 @@ namespace patter
         // The public accessors still hand out `Flow*` (`.get()`), so existing C++ is unaffected;
         // `flowPtr` is the handle for anything that needs to OUTLIVE the map entry.
         std::map<std::string, std::shared_ptr<Flow>> flows_;
-        std::string currentLocale_;
+        // The locale in use, as the resolver found it, and the one the game asked for (the option, or the last
+        // setLocale), which hotSwap and replaceStrings resolve again against the bundle they take.
+        LocaleChoice currentLocale_;
+        std::optional<std::string> requestedLocale_;
         // The live string-table source: the constructor's bundle, unless replaceStrings re-pointed it at a
         // pushed bundle's tables (whose lifetime the caller guarantees, same as the constructor's bundle).
         const std::map<std::string, std::map<std::string, std::string>>* allStrings_ = nullptr;

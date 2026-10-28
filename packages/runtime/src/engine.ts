@@ -30,7 +30,7 @@
 // when the engine made the registry itself; otherwise the game saves the registry once.
 // ---------------------------------------------------------------------------
 
-import { evaluate, deserialiseAst, makePrng, toUint32, stageIndex, compareStages, nextStage } from "@wildwinter/expr";
+import { evaluate, deserialiseAst, makePrng, toUint32, stageIndex, compareStages, nextStage, valueFits } from "@wildwinter/expr";
 import type { ScalarValue, EvalContext, ExprNode } from "@wildwinter/expr";
 import { matchedSpecificity as scoreSpecificity, type EvalTruthy } from "@wildwinter/expr-specificity";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
@@ -42,7 +42,7 @@ import { buildTagIndex } from "./tags.js";
 import { buildPadIndex, type BeatPad } from "./pads.js";
 import { SAVE_VERSION } from "@patterkit/model";
 import type {
-  EngineSave, SelectorSnapshot, StackFrame, SavedChoice, SavedChoicePrompt, FlowSnapshot, SaveGame, SaveGameV2,
+  EngineSave, SelectorSnapshot, StackFrame, SavedChoicePrompt, FlowSnapshot, SaveGame, SaveGameV3,
   FlowState, FlowValues,
   Bundle, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet,
   CompiledEffect, Beat, LineBeat, TextBeat, GameData, NodeExtensions, Expression, PropertyDecl, PropertyType, Jump, HostScopeDecl,
@@ -72,6 +72,24 @@ function padIndexFor(bundle: Bundle): Map<string, BeatPad> {
   return index;
 }
 
+// Each option of a choice, by its id, to the id of the choice it belongs to: a save stamps the frame an option's content
+// runs in with its choice (`StackFrame.choiceId`). Structural, cached the same way.
+const optionChoiceCache = new WeakMap<Bundle, Map<string, string>>();
+function optionChoiceFor(bundle: Bundle): Map<string, string> {
+  let index = optionChoiceCache.get(bundle);
+  if (index) return index;
+  index = new Map<string, string>();
+  for (const scene of Object.values(bundle.scenes)) {
+    for (const block of scene.blocks) {
+      walkNodes<SelectableNode>(block.children, (n) => {
+        if (n.type === "group" && n.selector === "choice") for (const option of n.children) index!.set(option.id, n.id);
+      });
+    }
+  }
+  optionChoiceCache.set(bundle, index);
+  return index;
+}
+
 // Every beat by its id (a snippet's beats and an option's prompt), for `Flow.stepFor`; structural, cached the same way.
 const beatIndexCache = new WeakMap<Bundle, Map<string, Beat>>();
 function beatIndexFor(bundle: Bundle): Map<string, Beat> {
@@ -90,6 +108,17 @@ function beatIndexFor(bundle: Bundle): Map<string, Beat> {
   return index;
 }
 
+/** A node's gameData as a COPY, its flags lists too: the bundle's own object is shared by every engine on the
+ *  bundle, so a game that edits what it was handed (a step's, an option's, an outline entry's) must not change
+ *  what any of them hands out next. Extension values are NOT copied: they are the extension runtime's to read,
+ *  can be large, and are read-only by contract. */
+function copyGameData(gameData: GameData | undefined): GameData | undefined {
+  if (gameData === undefined) return undefined;
+  const out: GameData = {};
+  for (const [k, v] of Object.entries(gameData)) out[k] = Array.isArray(v) ? [...v] : v;
+  return out;
+}
+
 /** A node's tags as a COPY: the index is shared by every engine on the bundle, so a host that edits an
  *  array it was given (a step's tags, `tagsForBeat`) must not change the answer for all of them. */
 function tagsOf(host: { tagIndex: Map<string, string[]> }, id: string): string[] | undefined {
@@ -101,7 +130,7 @@ function tagsOf(host: { tagIndex: Map<string, string[]> }, id: string): string[]
 // working; this engine's saveGame() output IS that document, and every port writes the same.
 export type {
   EngineSave, SelectorSnapshot, StackFrame, SavedChoice, SavedChoiceOption, SavedChoicePrompt,
-  FlowCursor, FlowSnapshot, SaveGame, SaveEnvelope, SaveGameV2, FlowSnapshotV2, FlowState, FlowValues,
+  FlowCursor, FlowSnapshot, SaveGame, SaveEnvelope, SaveGameV3, FlowState, FlowValues,
 } from "@patterkit/model";
 
 /** The owner label on everything this engine registers: named in a clash error and carried on
@@ -116,7 +145,9 @@ const unesc = (key: string): string => key.replace(/%2F/g, "/").replace(/%25/g, 
 /** Internal: marks a hotSwap replacement of a standalone engine, which shares its predecessor's registry
  *  but is still its own game (it self-backs host scopes and saves the registry's values). */
 const OWNS_REGISTRY = Symbol("ownsRegistry");
-type InternalOptions = EngineOptions & { [OWNS_REGISTRY]?: boolean };
+/** Set on a hot swap's fallback engine: the replacement it stands in for has already made its set-up reports. */
+const SETUP_REPORTED = Symbol("setupReported");
+type InternalOptions = EngineOptions & { [OWNS_REGISTRY]?: boolean; [SETUP_REPORTED]?: boolean };
 
 const keys = {
   /** A scene's SHARED `@scene` props (one bag per scene, every flow's). */
@@ -265,10 +296,11 @@ export interface ChoiceOption {
   prompt?: ChoicePrompt;
   /** False when the option's condition fails; still returned (greyed) unless hidden. */
   eligible: boolean;
+  /** The option's own author gameData, raw: the game's own copy. */
   gameData?: GameData;
   /**
    * The option's Patter extension values, by extension id, exactly as the bundle carries them: raw and sparse,
-   * any JSON, never read by the engine. Absent when it has none. Fill in defaults with
+   * any JSON, never read by the engine, and the bundle's own, so read-only. Absent when it has none. Fill in defaults with
    * `effectiveGameData(extensionDecls(bundle, id, "option"), option.extensions?.[id])`.
    */
   extensions?: NodeExtensions;
@@ -281,9 +313,6 @@ export interface ChoiceOption {
  * are never stored or saved by this engine.
  */
 export type HostScope = ScopeResolver;
-
-/** @deprecated Use {@link HostScope}, the name every Patterplay runtime uses. */
-export type WorldResolver = HostScope;
 
 /** What the engine DECIDED, as opposed to what it produced. A step tells you the line that
  *  played; a trace event tells you why that line and not its siblings - which children were
@@ -332,28 +361,31 @@ export type TraceEvent =
   | { type: "diagnostic"; kind: PlayError["kind"]; node: string; source?: string; message: string };
 
 /**
- * A content error the engine played through. Content can fail at run time in ways the compiler cannot
+ * A problem the engine reported and carried on past. Content can fail at run time in ways the compiler cannot
  * see: a division by zero, a host value of the wrong type, a story write to a read-only `@world` value.
  * The story never stops for one. A condition that fails counts as false; an effect that fails is skipped
- * and the rest of its list still runs; a part of a Best-match condition that fails scores as false. Each
- * is reported, through `EngineOptions.onError` and as a `diagnostic` entry in the decision log. The same
- * rule holds on all four runtimes, including the two whose languages cannot throw.
+ * and the rest of its list still runs; a part of a Best-match condition that fails scores as false. The
+ * engine also reports how it was set up (`setup`: a locale the bundle doesn't have, a host scope it doesn't
+ * declare, an option it doesn't take) and a load whose place has gone from the build (`save`). Each is
+ * reported, through `EngineOptions.onError` and as a `diagnostic` entry in the decision log; a report made
+ * while the engine is being built reaches them as the constructor ends. The same rule holds on all four
+ * runtimes, including the two whose languages cannot throw.
  */
 export interface PlayError {
-  /** The flow it happened in. */
+  /** The flow it happened in; "" for a `setup` report, which belongs to no flow. */
   flow: string;
-  /** What failed: a condition, an effect, or a part of a condition being scored for Best match. */
-  kind: "condition" | "effect" | "best-match";
-  /** The snippet, group, or option whose condition failed, or that owns the effect (a scene, for its onEntry). */
+  /** What it was: a condition, an effect, or a part of a condition being scored for Best match that failed;
+   *  how the engine was set up (`setup`); or a load whose saved place has gone (`save`). */
+  kind: "condition" | "effect" | "best-match" | "setup" | "save";
+  /** The snippet, group, or option whose condition failed, or that owns the effect (a scene, for its onEntry).
+   *  For `setup`, the locale, host-scope token, or option key at fault. For `save`, the saved snippet (or, at a
+   *  pending choice, its group) that has gone. */
   node: string;
   /** The expression's source text, when the bundle carries it. */
   source?: string;
   message: string;
 }
 
-/** @deprecated Nothing takes one: a flow has no tap of its own, and `onTrace` takes an
- *  {@link EngineTraceHandler}. Goes in a later release. */
-export type TraceHandler = (event: TraceEvent) => void;
 /** The engine-level tap: every flow's events, tagged with the flow id - one stream for tools. */
 export type EngineTraceHandler = (flow: string, event: TraceEvent) => void;
 
@@ -375,18 +407,17 @@ export interface EngineOptions {
   rng?: () => number;
   /** Default seed for each flow's built-in (serialisable) PRNG; override per flow in `openFlow`. */
   seed?: number;
-  /** Active locale for string lookups (embedded localisation). Defaults to the bundle's default locale.
-   *  Ignored by an "ids" bundle, which emits beat IDs for the game to localise itself. */
+  /** Active locale for string lookups (embedded localisation). Defaults to the bundle's default locale. A locale
+   *  the bundle doesn't have resolves as `setLocale` resolves one, and is reported. Ignored by an "ids" bundle,
+   *  which emits beat IDs for the game to localise itself. */
   locale?: string;
   /** The host scopes the game binds, by token: for each, a resolver over values the game owns and the
    *  story reads, such as `{ world: { get, set } }` for **World Properties** (`@world.*`). A declared
    *  scope left unbound is self-backed from its defaults, as a property the registry stores and saves.
    *  Shared by all flows. A game running several engines registers its scopes in its registry itself
-   *  instead, and binds none here. The same option on every runtime. */
+   *  instead, and binds none here. Tokens are case-sensitive: a token the bundle doesn't declare is reported
+   *  (`setup`), naming the declared spelling when only the case differs. The same option on every runtime. */
   hostScopes?: Record<string, HostScope>;
-  /** @deprecated Use `hostScopes: { world }`, the option every Patterplay runtime takes. Goes in a later
-   *  release. */
-  world?: HostScope;
   /** The game's registry: ONE per game, holding every engine's properties except those the game keeps
    *  itself, saved once. Given one, the engine registers its own scopes in it (`@patter` under `patter`,
    *  its per-flow and per-scene bags under keys starting `patter/`, and each scope `hostScopes` binds),
@@ -411,9 +442,10 @@ export interface EngineOptions {
    *  unchanged; this only makes the fall-through observable. The coverage harness uses it to flag choices
    *  that ran dry. Leave it unset in shipped games (zero cost). */
   onDryChoice?: (groupId: string) => void;
-  /** Called with each content error the engine played through (see {@link PlayError}): a condition
-   *  that failed and counted as false, an effect that failed and was skipped. Unset, each is written
-   *  to `console.warn`, so a content bug is never silent. */
+  /** Called with each problem the engine reported and carried on past (see {@link PlayError}): a condition
+   *  that failed and counted as false, an effect that failed and was skipped, a set-up problem (reported as
+   *  the constructor ends), a load whose place has gone. Unset, each is written to `console.warn`, so none is
+   *  ever silent. */
   onError?: (error: PlayError) => void;
   /** Called with the saved values a load put back to their defaults because they no longer fit their
    *  declarations: a stage, an enum value or a flag deleted since the save was taken, or a value of another
@@ -451,8 +483,29 @@ export interface OpenFlowOptions {
 interface ChoiceState {
   /** The choice group's id (saved alongside the verbatim option set - SavedChoice). */
   groupId: string;
-  options: ChoiceOption[];
+  /** The options offered, without their prompts: those are built again, in the language in use, each time the
+   *  choice is delivered. */
+  options: PendingOption[];
   byId: Map<string, SelectableNode>;
+  /** Each option's prompt as it was last delivered, for a replay to speak exactly what the player saw. */
+  shown: Map<string, ChoicePrompt | undefined>;
+}
+
+/** One option of a pending choice: what a save keeps (`SavedChoiceOption`). */
+interface PendingOption {
+  id: string;
+  eligible: boolean;
+  gameData?: GameData;
+}
+
+/** Where a load found its saved place gone from the build (§9.8), to resume from once the flow's bags are back. */
+interface Drift {
+  /** The report's node: the saved snippet, or at a pending choice its group. */
+  node: string;
+  /** What has gone and what the flow does instead, for the report's message. */
+  instead: string;
+  /** The choice to offer again: the one the gone option belonged to, or a pending choice none of whose options survive. */
+  reoffer?: CompiledGroup;
 }
 
 interface SelectorState {
@@ -562,7 +615,7 @@ interface FlowHost {
    *  fallback - so it falls through and the flow continues past it. Zero cost when unset; the coverage
    *  harness passes it to surface silent fall-throughs. Not a gameplay signal (the behaviour is unchanged). */
   onDryChoice?: (groupId: string) => void;
-  /** Where a content error the engine played through is reported (see PlayError). */
+  /** Where a problem the engine carried on past is reported (see PlayError). */
   onError: (error: PlayError) => void;
   /** Say what the registry's refitting loads have put back since it last said (EngineOptions.onRefit). */
   reportRefits: () => void;
@@ -584,8 +637,11 @@ export class Engine {
    *  live (setLocale) without rebuilding the engine. Reassigned wholesale by `replaceStrings`
    *  (live bundle refresh, tier 1), hence not readonly. */
   private allStrings: Record<string, Record<string, string>>;
-  /** The currently active locale (string lookups + character names resolve in it). */
-  private currentLocale: string;
+  /** The locale in use (string lookups + character names resolve in it), as the resolver found it. */
+  private currentLocale: LocaleChoice;
+  /** The locale the game asked for (the option, or the last `setLocale`), which `hotSwap` and `replaceStrings`
+   *  resolve again against the bundle they take. */
+  private requestedLocale: string | undefined;
   /** True for a source-only DEBUG build (`localisation: { mode: "ids", sourceDebug: true }`) - the strings
    *  are the source language, embedded only so the build can be played; not a shippable localised build. */
   private readonly sourceDebug: boolean;
@@ -606,11 +662,21 @@ export class Engine {
 
   constructor(bundle: Bundle, options: EngineOptions = {}) {
     this.creationOptions = options;
-    const locale = options.locale ?? bundle.locales.default;
+    // Set-up problems found while building, reported as the constructor ends, when the engine can report.
+    const setup: Array<{ node: string; message: string }> = [];
+    // A plain-JS caller gets no type check on its options, so a mistyped or retired key would be ignored in silence.
+    for (const key of Object.keys(options)) {
+      if (ENGINE_OPTIONS.has(key)) continue;
+      setup.push({ node: key, message: key === "world"
+        ? `the engine option "world" has gone: bind the scope as hostScopes: { world }`
+        : `"${key}" isn't an engine option, so it's ignored` });
+    }
     const allStrings = bundle.strings;
     this.allStrings = allStrings;
-    this.currentLocale = locale;
-    const strings = allStrings[locale] ?? {};
+    this.requestedLocale = options.locale;
+    this.currentLocale = resolveLocale(bundle, options.locale);
+    if (this.currentLocale.problem) setup.push({ node: options.locale!, message: this.currentLocale.problem });
+    const strings = tableOf(allStrings, this.currentLocale);
     const defaultStrings = allStrings[bundle.locales.default] ?? {};
     // Localisation mode (spec §11). "ids" + no source-debug = the engine emits beat IDs (the game localises
     // itself). A source-debug build still resolves its embedded source strings, but is flagged for a warning.
@@ -669,8 +735,17 @@ export class Engine {
       // Each scope the game binds is EXTERNAL: the game keeps the values, the registry never saves them.
       // Its declarations (types, read-only) come from the compiled bundle.
       const hostBound = new Set<string>();
-      for (const [token, resolver] of Object.entries(boundScopes(options))) {
-        const spec = bundle.scopeRegistry?.scopes.find((s) => s.token === token);
+      const declared = bundle.scopeRegistry?.scopes ?? [];
+      for (const [token, resolver] of Object.entries(options.hostScopes ?? {})) {
+        const spec = declared.find((s) => s.token === token);
+        // Tokens are case-sensitive everywhere, so a near miss is reported, never folded: folding would make a
+        // second spelling of the scope. Another engine's scope the content names is that engine's to declare.
+        if (!spec && !(bundle.externalScopes ?? []).includes(token)) {
+          const near = declared.find((s) => s.token.toLowerCase() === token.toLowerCase());
+          setup.push({ node: token, message: near
+            ? `hostScopes binds "${token}", which this bundle doesn't declare: it declares "${near.token}", and a scope's token is case-sensitive`
+            : `hostScopes binds "${token}", which this bundle doesn't declare` });
+        }
         const decls = (spec?.declarations ?? []).map(toForeignDecl);
         registry.defineForeign(token, resolver, decls, { writable: spec?.writable ?? true, owner: OWNER });
         registered.push(token);
@@ -716,7 +791,10 @@ export class Engine {
       journal: null,
       customRng: options.rng,
       onDryChoice: options.onDryChoice,
-      onError: options.onError ?? ((e) => console.warn(`Patterplay: ${e.kind} on ${e.node} in flow '${e.flow}' failed, played through: ${e.message}`)),
+      onError: options.onError ?? ((e) => console.warn(
+        e.kind === "setup" ? `Patterplay: ${e.message}`
+          : e.kind === "save" ? `Patterplay: flow '${e.flow}': ${e.message}`
+            : `Patterplay: ${e.kind} on ${e.node} in flow '${e.flow}' failed, played through: ${e.message}`)),
       reportRefits: () => {
         // This engine's own keys only: the game's registry may hold other engines' and the game's misfits,
         // which are theirs to take.
@@ -735,10 +813,26 @@ export class Engine {
     };
     // The `patter` bag (and any self-backed host scope) claimed values the game may have loaded first.
     this.host.reportRefits();
+    // Last, so the game's handler and the decision log hear about an engine that is ready to be asked.
+    if ((options as InternalOptions)[SETUP_REPORTED] !== true) for (const s of setup) this.reportSetup(s.node, s.message);
   }
 
-  /** The active locale (string + character-name lookups resolve in it). */
-  get locale(): string { return this.currentLocale; }
+  /** Report a set-up problem (a `setup` PlayError, which belongs to no flow): to the game's onError, and to the
+   *  decision log. */
+  private reportSetup(node: string, message: string): void {
+    this.host.onError({ flow: "", kind: "setup", node, message });
+    if (this.host.tracing) this.emitEngine("", { type: "diagnostic", kind: "setup", node, message });
+  }
+
+  /** The locale in use (string + character-name lookups resolve in it): the one the game asked for, or the one
+   *  it fell back to (`fr` for `fr-FR`, the default for a locale the bundle doesn't have). */
+  get locale(): string { return this.currentLocale.locale; }
+
+  /** The bundle's locales: its default, and every locale it includes. A fresh copy each call. */
+  get locales(): { default: string; included: string[] } {
+    const { default: def, included } = this.host.bundle.locales;
+    return { default: def, included: [...included] };
+  }
 
   /** True for a source-only DEBUG build: the embedded strings are the source language (for debugging),
    *  not a shippable localised build. An IDs-only ship build is `false`. */
@@ -750,15 +844,25 @@ export class Engine {
 
   /**
    * Switch the active locale LIVE - a real game's "language" setting can change mid-session. Subsequent
-   * string lookups (new beats, re-resolved character names, `{@ref}` interpolation) render in the new
-   * locale; everything else - flow position, `@patter`/`@scene` state, visit counts, the PRNG - is
-   * untouched (already-emitted text isn't retro-translated; that's the host's call). A locale with no
-   * table resolves every string via the `<Untranslated: {id}>` source fallback. All open flows share the
-   * engine's string table, so the swap reaches every flow at once.
+   * string lookups (new beats, a pending choice's options, re-resolved character names, `{@ref}`
+   * interpolation) render in the new locale; everything else - flow position, `@patter`/`@scene` state,
+   * visit counts, the PRNG - is untouched (already-emitted text isn't retro-translated; that's the host's
+   * call). All open flows share the engine's string table, so the swap reaches every flow at once.
+   *
+   * The locale resolves by one rule, the same for the `locale` option: case and `_` / `-` don't matter, so an
+   * exact match wins, then the language alone (`fr` for `fr-FR`), then the bundle's default, whose text then
+   * keeps the `<Untranslated: {id}>` marker so the gap shows. Anything but an exact match is reported
+   * (`setup`). `fr` never looks for `fr-FR`. An IDs-only bundle takes the locale as given, unreported.
    */
   setLocale(locale: string): void {
-    this.currentLocale = locale;
-    this.host.strings = this.allStrings[locale] ?? {};
+    this.requestedLocale = locale;
+    this.useLocale(resolveLocale(this.host.bundle, locale));
+    if (this.currentLocale.problem) this.reportSetup(locale, this.currentLocale.problem);
+  }
+
+  private useLocale(choice: LocaleChoice): void {
+    this.currentLocale = choice;
+    this.host.strings = tableOf(this.allStrings, choice);
   }
 
   /**
@@ -771,17 +875,24 @@ export class Engine {
    */
   replaceStrings(bundle: Bundle): void {
     this.allStrings = bundle.strings;
-    this.host.strings = this.allStrings[this.currentLocale] ?? {};
+    // The requested locale resolves again against the new tables; a fallback is reported only when it changed,
+    // so a live text edit doesn't repeat what the game has already heard.
+    const was = this.currentLocale.problem;
+    this.useLocale(resolveLocale(bundle, this.requestedLocale));
     this.host.defaultStrings = this.allStrings[this.host.bundle.locales.default] ?? {};
+    const now = this.currentLocale.problem;
+    if (now && now !== was) this.reportSetup(this.requestedLocale!, now);
   }
 
   /**
    * Live bundle refresh, tier 2 (full swap): rebuild on an edited bundle with the whole run carried
    * over. Snapshot (`saveGame`), construct a fresh engine on `bundle` with THIS engine's original
-   * options (same world resolver, RNG, hooks), restore (`loadGame`), and carry over the presentation
-   * state that deliberately isn't save state (active locale, closed-captions toggle). The
+   * options (same host scopes, RNG, hooks), restore (`loadGame`), and carry over the presentation
+   * state that deliberately isn't save state (the locale asked for, resolved again against the new bundle
+   * and reported again if it falls back; the closed-captions toggle). The
    * content-drift policy (§9.8) resolves edits under the cursor: stack frames re-find their next
-   * child by id, drifted options drop, a vanished snippet is skipped.
+   * child and the next beat by id, drifted options drop, and a place that has gone resumes at the
+   * nearest safe point, reported (`save`).
    *
    * Returns the REPLACEMENT engine, on the same registry. This one hands its bags over (each is
    * removed from the registry with its values kept, and the replacement claims them as it
@@ -794,14 +905,17 @@ export class Engine {
     this.refuseInCheckpoint("hotSwap");
     const snapshot = this.saveGame();
     const carryOver = (next: Engine): Engine => {
-      next.setLocale(this.currentLocale);
       next.setClosedCaptions(this.host.captionsOn);
       return next;
     };
     // The replacement registers on the SAME registry, and a standalone engine's replacement is still its
-    // own game (so its saveGame keeps carrying the registry's values).
-    const make = (): Engine => new Engine(bundle, {
-      ...this.creationOptions, registry: this.host.registry, [OWNS_REGISTRY]: this.host.ownsRegistry,
+    // own game (so its saveGame keeps carrying the registry's values). It is built in the locale this one was
+    // asked for, so the new bundle's locales resolve it, as the constructor reports.
+    const locale = this.requestedLocale;
+    // The fallback (`reported`) stands in for a replacement that has made its set-up reports: it makes none.
+    const make = (reported = false): Engine => new Engine(bundle, {
+      ...this.creationOptions, ...(locale !== undefined ? { locale } : {}),
+      registry: this.host.registry, [OWNS_REGISTRY]: this.host.ownsRegistry, [SETUP_REPORTED]: reported,
     } as InternalOptions);
     // On a game's registry, this engine's own values are parked again to be REFITTED as the replacement claims
     // them: the edit may have deleted a stage, an enum value or a flag one of them holds, and the snapshot does
@@ -824,7 +938,7 @@ export class Engine {
       // fallback claims them, so a stage the edit deleted is put back here too.
       const again = this.host.ownsRegistry ? snapshot.registry : values;
       if (again) this.host.registry.load(again, { keepParked: true, refit: true });
-      const fresh = make();
+      const fresh = make(true);
       for (const [id, f] of Object.entries(snapshot.flows)) {
         const sceneId = f.cursor.currentSceneId;
         try { fresh.openFlow(id, sceneId !== null ? { scene: sceneId } : {}); } catch { /* scene deleted: drop the flow */ }
@@ -1005,19 +1119,19 @@ export class Engine {
    * A scene's own author gameData (by internal id or gameId address): the RAW sparse overrides, exactly
    * as a beat's step carries its own, not merged with the project's declared field defaults (resolve
    * those with `effectiveGameData(gameDataFields(bundle, "scene"), ...)`). Not inherited by its blocks.
-   * A fresh object each call; empty when the scene sets none or the ref is unknown.
+   * The game's own copy each call; empty when the scene sets none or the ref is unknown.
    */
   gameDataForScene(sceneRef: string): GameData {
     const id = this.resolveSceneRef(sceneRef);
     const scene = id != null ? this.host.bundle.scenes[id] : undefined;
-    return { ...scene?.gameData };
+    return copyGameData(scene?.gameData) ?? {};
   }
   /** A block's own author gameData, by scene + block ref (id or gameId). Raw overrides, like
    *  {@link gameDataForScene}; the scene's gameData is not folded in. Empty when none / unknown. */
   gameDataForBlock(sceneRef: string, blockRef: string): GameData {
     const id = this.resolveBlockRef(this.resolveSceneRef(sceneRef), blockRef);
     const block = id != null ? this.host.blockById.get(id) : undefined;
-    return { ...block?.gameData };
+    return copyGameData(block?.gameData) ?? {};
   }
 
   /**
@@ -1179,7 +1293,7 @@ export class Engine {
       const source = this.host.defaultStrings[beat.id]; // source-locale text, un-interpolated
       if (source !== undefined) info.text = source;
     }
-    if (beat.gameData && Object.keys(beat.gameData).length) info.gameData = beat.gameData;
+    if (beat.gameData && Object.keys(beat.gameData).length) info.gameData = copyGameData(beat.gameData);
     if (beat.extensions && Object.keys(beat.extensions).length) info.extensions = beat.extensions;
     if (tags && tags.length) info.tags = tags;
     return info;
@@ -1232,7 +1346,7 @@ export class Engine {
    *
    * One checkpoint at a time. Inside one, the calls that replace or drop flows or their bags wholesale
    * (`reset`, `loadGame`, `hotSwap`, `closeFlow`, `openFlow` on the name of an open flow, and a flow's own
-   * `start`, `reset`, and `restore`) throw. Not undone:
+   * `reset` and `restore`) throw. Not undone:
    * trace and log events already emitted, and draws from a custom `rng` the game supplied.
    */
   checkpoint(): Checkpoint {
@@ -1298,7 +1412,7 @@ export class Engine {
   restoreFlow(id: string, state: FlowState): Flow {
     this.refuseInCheckpoint("restoreFlow");
     const version: unknown = (state as { version?: unknown }).version;
-    if (version !== 2 && version !== SAVE_VERSION) throw new Error(`unsupported flow state version: ${String(version)}`);
+    if (version !== 3 && version !== SAVE_VERSION) throw new Error(`unsupported flow state version: ${String(version)}`);
     const cursor: unknown = (state as { cursor?: unknown }).cursor;
     if (typeof cursor !== "object" || cursor === null) throw new Error("malformed flow state: no cursor");
     if (this.flowsById.has(id)) throw new Error(`a flow '${id}' is already open; close it before restoring another under that id`);
@@ -1357,7 +1471,7 @@ export class Engine {
     for (const s of this.host.stageBags.keys()) reg.remove(keys.stage(s), { keep });
     this.host.stageBags.clear();
     for (const t of ["patter", ...this.host.hostScopes]) if (reg.has(t)) reg.remove(t, { keep });
-    for (const t of Object.keys(boundScopes(this.creationOptions))) if (reg.has(t)) reg.remove(t);
+    for (const t of Object.keys(this.creationOptions.hostScopes ?? {})) if (reg.has(t)) reg.remove(t);
   }
 
   /** Read a shared (`@patter` / foreign) property by ref. `@scene` refs are rejected (flow-level). */
@@ -1372,9 +1486,14 @@ export class Engine {
    *  `writable: false` is the story's promise not to write the value, never a lock on the game that
    *  owns it. The story's own writes come through `Flow.runEffects`, which never claims it. (Ruled
    *  across the family 2026-09-05, after a Storylets venue clock and this project's coverage driver
-   *  were each refused the one property they existed to move.) */
+   *  were each refused the one property they existed to move.)
+   *
+   *  THROWS, changing nothing, on a value that doesn't fit the property's declaration (a string for a
+   *  number, a value an enum or a quality doesn't list, a flag a flags property doesn't), and on a name the
+   *  content doesn't declare. Another engine's scope is that engine's to check. */
   setProperty(ref: string, value: ScalarValue): void {
     const { scope, name } = this.splitShared(ref);
+    checkHostWrite(this.host, scope, name, value, null);
     const prev = this.host.journal ? this.host.registry.get(scope, name) : undefined;
     this.host.registry.set(scope, name, value, { host: true });
     if (this.host.journal && prev !== undefined) this.host.journal.undo.push(() => this.host.registry.set(scope, name, prev, { host: true }));
@@ -1473,19 +1592,6 @@ export class Engine {
     return split;
   }
 
-  /** The shared `@patter` values alone, as `{ patter: {...} }`.
-   *  @deprecated The registry holds every property now: a game saves `registry.save()` once, and a
-   *  standalone engine's `saveGame()` carries its registry's values. Removed at the next breaking release. */
-  save(): EngineSave {
-    return { patter: this.host.patterBag.save() };
-  }
-
-  /** Lay a `{ patter: {...} }` section over the shared `@patter` values; anything else is ignored.
-   *  @deprecated See `save`. Removed at the next breaking release. */
-  load(blob: EngineSave): void {
-    if (blob.patter) this.host.patterBag.load(blob.patter);
-  }
-
   /** Snapshot the whole game's NON-property state: visit counts, shared selector cursors, and every
    *  live flow's cursor and PRNG. The property values are the registry's: a standalone engine (one that
    *  made its own registry) carries them here under `registry`; a game that passed a registry saves it
@@ -1504,15 +1610,16 @@ export class Engine {
 
   /**
    * Restore a `saveGame()`: visit counts, shared selector cursors, and every flow. Property values come
-   * from the registry. A save that carries them (a standalone engine's, or a version 2 save from before
-   * the registry held them) has them moved into the registry here; otherwise the game loads its
-   * registry itself, before or after this call. Either order works: this engine's bags are handed back
-   * to the registry (values kept) and the restored flows claim them as they register.
+   * from the registry. A save that carries them (a standalone engine's) has them moved into the registry
+   * here; otherwise the game loads its registry itself, before or after this call. Either order works:
+   * this engine's bags are handed back to the registry (values kept) and the restored flows claim them as
+   * they register. Reads versions 3 and 4. A flow whose saved place has gone from this build resumes at the
+   * nearest safe point, reported (`save`).
    */
-  loadGame(save: SaveGame | SaveGameV2): void {
+  loadGame(save: SaveGame | SaveGameV3): void {
     this.refuseInCheckpoint("loadGame");
     const version: unknown = (save as { version?: unknown }).version;
-    if (version !== 2 && version !== SAVE_VERSION) throw new Error(`unsupported save version: ${String(version)}`);
+    if (version !== 3 && version !== SAVE_VERSION) throw new Error(`unsupported save version: ${String(version)}`);
     // Everything a load reads is checked BEFORE anything changes: a save missing its flows used to close
     // every flow and load the registry, then fail, leaving the engine half-loaded.
     const flows: unknown = (save as { flows?: unknown }).flows;
@@ -1526,7 +1633,7 @@ export class Engine {
     for (const s of this.host.stageBags.keys()) reg.remove(keys.stage(s), { keep: true });
     this.host.stageBags.clear();
 
-    const values = save.version === 2 ? sectionsFromV2(save) : save.registry;
+    const values = save.registry;
     if (values) {
       // The engine's own registry takes the save wholesale. A game's registry may hold values the game
       // loaded for other engines, still waiting to be claimed: add to those, never replace them.
@@ -1638,7 +1745,7 @@ export class Flow {
     this.id = id;
     this.host = host;
     this.rngState = toUint32(seed);
-    this.local = this.newLocal(); // registered by start() / restore()
+    this.local = this.newLocal(); // registered by begin() / restore()
 
     this.evalCtx = {
       scopes: {},
@@ -1695,6 +1802,13 @@ export class Flow {
    *  openFlow and a goto on an unstarted flow begin a flow here. A game calls {@link reset}.
    *  @internal */
   begin(sceneId?: string, blockId?: string): void {
+    // No scene named: the project's start, when the bundle carries one; else the first scene, below.
+    // A start naming a scene, or block, the bundle doesn't have (only a hand-edited bundle can) is passed over.
+    const start = this.host.bundle.start;
+    if (sceneId === undefined && blockId === undefined && start && this.host.bundle.scenes[start.scene]) {
+      sceneId = start.scene;
+      if (start.block !== undefined && this.host.blockIndex.get(start.block)?.sceneId === start.scene) blockId = start.block;
+    }
     // Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
     // inside the checkpoint may start in one.
     if (this.host.journal && !this.host.journal.opened.has(this)) throw new Error("a flow can't be started or reset while a checkpoint is open");
@@ -1739,12 +1853,6 @@ export class Flow {
     this.begin(sceneId, blockId);
   }
 
-  /** @deprecated Use {@link reset}, the one public name for beginning a flow again on every runtime. `start`
-   *  was the same call under a second name, and goes in a later release. */
-  start(sceneId?: string, blockId?: string): void {
-    this.reset(sceneId, blockId);
-  }
-
   /**
    * Send this flow's cursor to an ADDRESS, exactly as an authored `go` jump would: the target scene's
    * `onEntry` effects run, entering counts as a visit, and the callstack is REPLACED - any pending
@@ -1779,7 +1887,7 @@ export class Flow {
       blockId = resolveBlock(this.host, sceneId, block);
       if (blockId === undefined) return false; // a block address is scene-scoped: unknown HERE is unknown
     }
-    // Never started: start() does the same landing plus the one-time per-flow setup.
+    // Never started: begin() does the same landing plus the one-time per-flow setup.
     if (!this.started) { this.begin(sceneId, blockId); return true; }
 
     this.clearPending();
@@ -1853,7 +1961,7 @@ export class Flow {
     if (this.pendingPrompt) { const p = this.pendingPrompt; this.pendingPrompt = null; this.pendingPromptOwnerId = null; return p.shown ? this.promptResult(p.beat, p.shown) : this.beatResult(p.beat); }
     this.settle();
     if (this.flowEnded) return { type: "end" };
-    if (this.pendingChoice) return { type: "choice", groupId: this.pendingChoice.groupId, options: this.pendingChoice.options };
+    if (this.pendingChoice) return { type: "choice", groupId: this.pendingChoice.groupId, options: this.offer(this.pendingChoice) };
     if (!this.activeSnippet) { this.flowEnded = true; return { type: "end" }; }
     return this.beatResult(this.activeSnippet.beats![this.beatIndex++]!);
   }
@@ -1975,9 +2083,22 @@ export class Flow {
     return beat ? this.beatResult(beat) : undefined;
   }
 
-  /** The options of a pending choice (empty when not at a choice point). */
+  /** The options of a pending choice (empty when not at a choice point), their prompts built in the language in
+   *  use, as `advance` delivers them. */
   getChoices(): ChoiceOption[] {
-    return this.pendingChoice?.options ?? [];
+    return this.pendingChoice ? this.offer(this.pendingChoice) : [];
+  }
+
+  /** A pending choice's options as the game is handed them: each prompt built now, in the language in use and
+   *  against the current values (and remembered, for a replay to speak as shown), and the game's own copy of
+   *  each option's gameData. */
+  private offer(choice: ChoiceState): ChoiceOption[] {
+    return choice.options.map((o) => {
+      const node = choice.byId.get(o.id)!;
+      const prompt = this.promptFor(node);
+      choice.shown.set(o.id, prompt);
+      return { id: o.id, prompt, eligible: o.eligible, gameData: copyGameData(o.gameData), ...extensionsField(node.extensions) };
+    });
   }
 
   /** Pick an eligible option by id; the next `advance()` runs it. */
@@ -1992,10 +2113,13 @@ export class Flow {
     if (this.host.tracing) this.emit({ type: "chose", group: choice.groupId, option: id });
     this.pendingChoice = null;
     // Optionally speak the chosen option's prompt back as its first beat (spec §5): only an AUTHORED
-    // prompt, and exactly as the choice showed it. A prompt borrowed from the option's own first content
-    // line is not replayed, since that line is about to play as content anyway.
+    // prompt, and exactly as the choice showed it (the one prompt that doesn't follow the language: a
+    // documented exception). A prompt borrowed from the option's own first content line is not replayed,
+    // since that line is about to play as content anyway. A choice never delivered since a load shows its
+    // prompt as it would be now, before the option's onEnter runs.
     const authored = this.host.replayPromptOnChoose ? this.authoredPromptOf(node) : undefined;
-    this.pendingPrompt = authored && option.prompt ? { beat: authored, shown: { ...option.prompt } } : null;
+    const shown = authored ? (choice.shown.has(id) ? choice.shown.get(id) : this.promptFor(node)) : undefined;
+    this.pendingPrompt = authored && shown ? { beat: authored, shown: { ...shown } } : null;
     this.pendingPromptOwnerId = this.pendingPrompt ? node.id : null;
     // The block frame is already advanced past the choice group (the gather point),
     // so when the chosen option finishes without a jump, the flow continues there.
@@ -2016,7 +2140,9 @@ export class Flow {
 
   /** Write a property by ref (routed by scope, then by the property's `shared` flag). The GAME's
    *  surface: it writes with host authority, so a `writable: false` host declaration does not refuse
-   *  it (see `Engine.setProperty`). The story's writes go through `writeProperty` instead. */
+   *  it (see `Engine.setProperty`). The story's writes go through `writeProperty` instead. THROWS,
+   *  changing nothing, on a value that doesn't fit the declaration, or a name the content doesn't declare
+   *  (an `@scene` name in the scene this flow is in), as `Engine.setProperty` does. */
   setProperty(ref: string, value: ScalarValue): void {
     this.writeProperty(ref, value, true);
   }
@@ -2051,6 +2177,11 @@ export class Flow {
    *  about: the story is refused, the game is not. */
   private writeProperty(ref: string, value: ScalarValue, host: boolean): void {
     const { scope, name } = this.splitRef(ref);
+    // The game's value must fit what the content declared; the story's own writes were checked as they compiled.
+    if (host) {
+      if (scope === "scene" && this.currentSceneId === null) throw new Error(`'${ref}': the flow has not entered a scene yet`);
+      checkHostWrite(this.host, scope, name, value, this.currentSceneId);
+    }
     const journal = this.host.journal;
     if (scope === "patter") {
       // Inside a checkpoint, each write records how to put the old value back, against the bag it
@@ -2084,6 +2215,8 @@ export class Flow {
 
   /** @internal Snapshot this flow's cursor + PRNG + visits. Its properties are the registry's. */
   snapshot(): FlowSnapshot {
+    const choices = optionChoiceFor(this.host.bundle);
+    const beatId = this.activeSnippet?.beats?.[this.beatIndex]?.id;
     return {
       rngState: this.rngState,
       visits: Object.fromEntries(this.visitCounts),
@@ -2092,17 +2225,23 @@ export class Flow {
         currentSceneId: this.currentSceneId,
         // Stamp each frame with the id of the child it would run next (nextId), so a restore against
         // an EDITED bundle re-finds the position by id instead of trusting the raw index (§9.8 /
-        // live bundle refresh). A frame saved at its container's end has no next child - no stamp.
+        // live bundle refresh). A frame saved at its container's end has no next child - no stamp. A
+        // frame an option's content runs in carries its choice (choiceId), to be offered again if the
+        // option has gone.
         stack: this.stack.map((f) => {
           const next = this.childrenOf(f.containerId)?.[f.index];
-          return next ? { ...f, nextId: next.id } : { ...f };
+          const choiceId = choices.get(f.containerId);
+          return { ...f, ...(next ? { nextId: next.id } : {}), ...(choiceId !== undefined ? { choiceId } : {}) };
         }),
         activeSnippetId: this.activeSnippet?.id ?? null,
-        beatIndex: this.beatIndex,
+        // The next beat by id, so an edit to the snippet can't move it; none once every beat is delivered.
+        ...(beatId !== undefined ? { beatId } : {}),
         pendingChoice: this.pendingChoice
-          // An option's extension values are the bundle's, not the save's: left out, and read off the option's
-          // node again on load.
-          ? { groupId: this.pendingChoice.groupId, options: this.pendingChoice.options.map(({ extensions: _ext, ...o }) => ({ ...o })) }
+          // Which options, never their text: a prompt is built again in the language in use whenever the
+          // choice is delivered. An option's extension values are the bundle's, read off its node again.
+          ? { groupId: this.pendingChoice.groupId, options: this.pendingChoice.options.map((o) => ({
+              id: o.id, eligible: o.eligible, ...(o.gameData !== undefined ? { gameData: copyGameData(o.gameData) } : {}),
+            })) }
           : null,
         pendingPromptOwnerId: this.pendingPromptOwnerId,
         // The prompt still to be replayed, as the choice showed it: present only in the choose -> advance window.
@@ -2113,10 +2252,11 @@ export class Flow {
   }
 
   /** @internal Restore this flow from a snapshot: its cursor, PRNG, visits, and selector cursors. Its
-   *  property values are the registry's and stay as they are (a load puts the saved ones there first). */
+   *  property values are the registry's and stay as they are (a load puts the saved ones there first). A
+   *  place that has gone from the build resumes at the nearest safe point, reported (`save`). */
   restore(snap: FlowSnapshot): void {
     if (this.host.journal) throw new Error("a flow can't be restored while a checkpoint is open");
-    this.restoreCursor(snap);
+    const drift = this.restoreCursor(snap);
     // Register this flow's bags: each claims the values the registry holds for it (loaded by the game, by
     // loadGame from the save, or handed back by the engine this one replaces), laid over fresh defaults.
     // Released KEEPING their values, so a live flow restored in place keeps its property values (a fresh
@@ -2127,62 +2267,87 @@ export class Flow {
     for (const s of new Set([this.currentSceneId, ...this.stack.map((f) => f.sceneId)])) {
       if (s !== null && this.host.bundle.scenes[s]) this.ensureSceneBags(s);
     }
+    // Only now, with the values back, can a choice be offered again: its conditions read them.
+    if (drift) {
+      this.report({ flow: this.id, kind: "save", node: drift.node, message: `the save's place has gone from this build: ${drift.instead}` });
+      if (drift.reoffer) this.setupChoice(drift.reoffer);
+    }
   }
 
-  /** The cursor half of `restore`, without touching the bags (a rollback has already put those back). */
-  private restoreCursor(snap: FlowSnapshot): void {
+  /** The cursor half of `restore`, without touching the bags. Says where the saved place had gone, if it had. */
+  private restoreCursor(snap: FlowSnapshot): Drift | null {
     this.rngState = toUint32(snap.rngState);
     this.visitCounts = new Map(Object.entries(snap.visits ?? {}));
     const c = snap.cursor;
     this.started = true;
     this.flowEnded = c.flowEnded;
-    this.beatIndex = c.beatIndex;
     this.currentSceneId = c.currentSceneId;
+    let drift: Drift | null = null;
     // Re-bind each frame to the CURRENT bundle: prefer the saved next-child id (survives siblings
     // inserted / removed / reordered before the cursor); fall back to the raw index when the id is
-    // absent (an older save) or its node drifted out of the bundle (§9.8 best-effort).
-    this.stack = c.stack.map((f) => {
-      const { nextId, ...frame } = f;
-      if (nextId !== undefined) {
-        const at = this.childrenOf(frame.containerId)?.findIndex((ch) => ch.id === nextId) ?? -1;
-        if (at >= 0) return { ...frame, index: at };
+    // absent (at the container's end) or its node drifted out of the bundle (§9.8 best-effort). A frame
+    // whose OPTION has gone, with its choice still there, ends the stack: the choice is offered again.
+    this.stack = [];
+    for (const f of c.stack) {
+      const { nextId, choiceId, ...frame } = f;
+      const children = this.childrenOf(frame.containerId);
+      const choice = !children && choiceId !== undefined ? this.host.nodeIndex.get(choiceId) : undefined;
+      if (choice?.type === "group" && choice.selector === "choice") {
+        drift = { node: c.activeSnippetId ?? c.pendingChoice?.groupId ?? frame.containerId, instead: `option ${frame.containerId} has gone, so choice ${choice.id} is offered again`, reoffer: choice };
+        break;
       }
-      return { ...frame };
-    });
+      const at = nextId !== undefined ? children?.findIndex((ch) => ch.id === nextId) ?? -1 : -1;
+      this.stack.push(at >= 0 ? { ...frame, index: at } : { ...frame });
+    }
 
-    // Content-drift policy (§9.8): if a saved position points at content deleted
-    // since the save, resume best-effort rather than throwing - the missing
-    // snippet / choice is dropped and play continues from the surviving stack.
+    // Content-drift policy (§9.8): if a saved position points at content deleted since the save, resume at
+    // the nearest safe point rather than throwing. A gone snippet is skipped: play carries on from the
+    // surviving stack. A gone NEXT beat in a surviving snippet finishes the snippet (its onExit and jump run),
+    // so nothing plays twice. A version 3 save names the beat by its raw index, trusted as it always was.
     this.activeSnippet = null;
-    if (c.activeSnippetId !== null) {
+    this.beatIndex = 0;
+    if (!drift?.reoffer && c.activeSnippetId !== null) {
       const node = this.host.nodeIndex.get(c.activeSnippetId);
-      if (node && node.type === "snippet") this.activeSnippet = node;
+      if (node && node.type === "snippet") {
+        const beats = node.beats ?? [];
+        this.activeSnippet = node;
+        if (c.beatId !== undefined) {
+          const at = beats.findIndex((b) => b.id === c.beatId);
+          this.beatIndex = at >= 0 ? at : beats.length;
+          if (at < 0) drift = { node: c.activeSnippetId, instead: `beat ${c.beatId} has gone from snippet ${c.activeSnippetId}, so the snippet ends there` };
+        } else {
+          this.beatIndex = c.beatIndex ?? beats.length; // version 4 writes no beat once every one is delivered
+        }
+      } else {
+        drift = { node: c.activeSnippetId, instead: `snippet ${c.activeSnippetId} has gone, so play carries on after it` };
+      }
     }
 
     this.selectors = deserialiseSelectors(c.selectors); // this flow's (non-shared) selector cursors
 
-    // Replay the saved option set VERBATIM (schema 9.3) - re-deriving would
-    // re-evaluate conditions (double-consuming PRNG draws) and could change the
-    // choice under the player. Options whose nodes drifted out of the bundle
-    // are dropped; a choice with no surviving options dissolves (9.8).
+    // Replay the saved option set VERBATIM (schema 9.3) - re-deriving would re-evaluate conditions
+    // (double-consuming PRNG draws) and could change the choice under the player. Prompts are not in the
+    // save (a version 3 save's are discarded): they are built when the choice is delivered. Options whose
+    // nodes drifted out of the bundle are dropped. A choice with no surviving option is offered again, when
+    // its group is still there, or dissolves (9.8).
     this.pendingChoice = null;
-    if (c.pendingChoice !== null) {
+    if (!drift?.reoffer && c.pendingChoice !== null) {
       const byId = new Map<string, SelectableNode>();
-      const options: ChoiceOption[] = [];
+      const options: PendingOption[] = [];
       for (const o of c.pendingChoice.options) {
         const node = this.host.nodeIndex.get(o.id);
         if (!node) continue;
         byId.set(o.id, node);
-        // A save from before prompts carried their pause, or a speaker's label, has none: work them out again
-        // (the pause from the prompt's beat, the label from the speaker the choice showed, in the current locale).
-        const { prompt: saved, extensions: _saved, ...rest } = o as typeof o & { extensions?: unknown };
-        const label = saved?.kind === "line" && saved.speakerLabel === undefined ? speakerLabelOf(this.host, saved.character, saved.qualifier) : undefined;
-        options.push({
-          ...rest, ...(saved ? { prompt: { ...saved, padAfter: saved.padAfter ?? this.promptPadOf(node), ...(label !== undefined ? { speakerLabel: label } : {}) } } : {}),
-          ...extensionsField(node.extensions),   // the bundle's, never the save's
-        });
+        options.push({ id: o.id, eligible: o.eligible, ...(o.gameData !== undefined ? { gameData: o.gameData } : {}) });
       }
-      if (options.length > 0) this.pendingChoice = { groupId: c.pendingChoice.groupId, options, byId };
+      if (options.length > 0) {
+        this.pendingChoice = { groupId: c.pendingChoice.groupId, options, byId, shown: new Map() };
+      } else {
+        const group = this.host.nodeIndex.get(c.pendingChoice.groupId);
+        drift = group?.type === "group" && group.selector === "choice"
+          ? { node: c.pendingChoice.groupId, instead: `none of choice ${group.id}'s options is left, so it's offered again`, reoffer: group }
+          : { node: c.pendingChoice.groupId, instead: `choice ${c.pendingChoice.groupId} has gone, so play carries on after it` };
+      }
     }
 
     // A save taken between choose() and the next advance() left a prompt still to be replayed
@@ -2191,16 +2356,17 @@ export class Flow {
     // only the owner, and its beat is resolved when delivered, as it was then. Dropped if the option
     // drifted out of the bundle or has no authored prompt (§9.8): the live choose() would replay nothing.
     this.pendingPrompt = null;
-    this.pendingPromptOwnerId = c.pendingPromptOwnerId ?? null;
+    this.pendingPromptOwnerId = drift?.reoffer ? null : c.pendingPromptOwnerId ?? null;
     if (this.pendingPromptOwnerId) {
       const owner = this.host.nodeIndex.get(this.pendingPromptOwnerId);
       const beat = owner ? this.authoredPromptOf(owner) : undefined;
       const saved = c.pendingPrompt;
-      // As for the pending choice's options: a save from before prompts carried a speaker's label works it out again.
+      // A save from before prompts carried a speaker's label works it out again.
       const label = saved?.kind === "line" && saved.speakerLabel === undefined ? speakerLabelOf(this.host, saved.character, saved.qualifier) : undefined;
       if (beat) this.pendingPrompt = { beat, ...(saved ? { shown: { ...saved, padAfter: saved.padAfter ?? this.padOf(beat.id), ...(label !== undefined ? { speakerLabel: label } : {}) } } : {}) };
       else this.pendingPromptOwnerId = null;
     }
+    return drift;
   }
 
   // -- Scene / block / node entry ------------------------------------------
@@ -2251,7 +2417,7 @@ export class Flow {
   }
 
   private setupChoice(group: CompiledGroup): void {
-    const options: ChoiceOption[] = [];
+    const options: PendingOption[] = [];
     const byId = new Map<string, SelectableNode>();
     const fallbacks: SelectableNode[] = [];
     for (const child of group.children) {
@@ -2267,7 +2433,7 @@ export class Flow {
       const eligible = this.eligible(child);
       const hidden = child.secretUntilEligible === true;
       if (!eligible && hidden) continue; // secret while ineligible; otherwise an ineligible option shows greyed
-      options.push({ id: child.id, prompt: this.promptFor(child), eligible, gameData: child.gameData, ...extensionsField(child.extensions) });
+      options.push({ id: child.id, eligible, ...(child.gameData !== undefined ? { gameData: child.gameData } : {}) });
       byId.set(child.id, child);
     }
     // A choice is offered only when the player can take something. One whose every remaining option is
@@ -2279,7 +2445,7 @@ export class Flow {
       // option alone cannot answer it. Options hidden by secretUntilEligible are absent
       // here too, exactly as the player sees them.
       if (this.host.tracing) this.emit({ type: "choice", group: group.id, options: options.map((o) => ({ id: o.id, eligible: o.eligible })) });
-      this.pendingChoice = { groupId: group.id, options, byId };
+      this.pendingChoice = { groupId: group.id, options, byId, shown: new Map() };
       return;
     }
     // No normal option can be taken. Auto-follow the fallback if it is eligible (its own condition still
@@ -2550,8 +2716,13 @@ export class Flow {
   private reportError(kind: PlayError["kind"], node: string, expr: Expression | undefined, err: unknown): void {
     const message = err instanceof Error ? err.message : String(err);
     const source = expr?.src;
-    this.host.onError({ flow: this.id, kind, node, ...(source ? { source } : {}), message });
-    if (this.host.tracing) this.emit({ type: "diagnostic", kind, node, ...(source ? { source } : {}), message });
+    this.report({ flow: this.id, kind, node, ...(source ? { source } : {}), message });
+  }
+
+  /** Report a problem this flow carried on past: to the host's onError, and to the log. */
+  private report(e: PlayError): void {
+    this.host.onError(e);
+    if (this.host.tracing) this.emit({ type: "diagnostic", kind: e.kind, node: e.node, ...(e.source ? { source: e.source } : {}), message: e.message });
   }
 
   private evalExpr(expr: Expression): ScalarValue {
@@ -2607,9 +2778,9 @@ export class Flow {
     // static). Game-event beats carry no localised content.
     switch (beat.kind) {
       case "gameEvent":
-        return { type: "gameEvent", id: beat.id, gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags };
+        return { type: "gameEvent", id: beat.id, gameData: copyGameData(beat.gameData), ...extensionsField(beat.extensions), ...withTags };
       case "text":
-        return { type: "text", id: beat.id, text: this.interpolate(this.resolveString(beat.id)), padAfter: this.padOf(beat.id), ...(beat.action ? { action: true as const } : {}), gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags };
+        return { type: "text", id: beat.id, text: this.interpolate(this.resolveString(beat.id)), padAfter: this.padOf(beat.id), ...(beat.action ? { action: true as const } : {}), gameData: copyGameData(beat.gameData), ...extensionsField(beat.extensions), ...withTags };
       case "line": {
         const raw = this.resolveString(beat.id);
         // Closed captions (#214) apply to DIALOGUE lines only: strip cues when captions are off. Two ways a
@@ -2631,7 +2802,7 @@ export class Flow {
           qualifierName: silent ? undefined : this.resolveQualifierName(beat.qualifier),
           speakerLabel: silent ? undefined : speakerLabelOf(this.host, beat.character, beat.qualifier),
           padAfter: this.padOf(beat.id), // a silent line still fires, so it still carries its pause
-          gameData: beat.gameData,
+          gameData: copyGameData(beat.gameData),
           ...extensionsField(beat.extensions),
           ...withTags,
         };
@@ -2695,12 +2866,12 @@ export class Flow {
   private promptResult(beat: LineBeat | TextBeat, shown: ChoicePrompt): StepResult {
     const tags = tagsOf(this.host, beat.id);
     const withTags = tags && tags.length ? { tags } : {};
-    if (shown.kind === "text") return { type: "text", id: beat.id, text: shown.text, padAfter: this.padOf(beat.id), gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags };
+    if (shown.kind === "text") return { type: "text", id: beat.id, text: shown.text, padAfter: this.padOf(beat.id), gameData: copyGameData(beat.gameData), ...extensionsField(beat.extensions), ...withTags };
     return {
       type: "line", id: beat.id, text: shown.text,
       character: shown.character, characterName: shown.characterName, direction: shown.direction,
       qualifier: shown.qualifier, qualifierName: shown.qualifierName, speakerLabel: shown.speakerLabel, padAfter: this.padOf(beat.id),
-      gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags,
+      gameData: copyGameData(beat.gameData), ...extensionsField(beat.extensions), ...withTags,
     };
   }
 
@@ -2741,13 +2912,6 @@ export class Flow {
     if (this.host.emitIds) return undefined; // IDs-only: omit the display name; the game maps the `character` token
     const key = castStringKey(character);
     return this.host.strings[key] ?? this.host.defaultStrings[key] ?? this.host.castDisplay.get(character);
-  }
-
-  /** The resolved pause of the beat an option shows as its prompt (its authored prompt, else its first content
-   *  line), for a saved option that predates prompts carrying one. */
-  private promptPadOf(node: SelectableNode): number {
-    const beat = this.promptBeatOf(node);
-    return beat ? this.padOf(beat.id) : DEFAULT_PAD_AFTER;
   }
 
   /** A line or text beat's resolved pause (line padding): its own `padAfter`, else the nearest default above
@@ -2900,7 +3064,7 @@ function speakerLabelOf(host: FlowHost, character: string | undefined, qualifier
 
 /** A `{ gameData }` outline fragment, present only when the node sets any (parity with a beat's). */
 function gameDataField(gameData: GameData | undefined): { gameData?: GameData } {
-  return gameData && Object.keys(gameData).length ? { gameData } : {};
+  return gameData && Object.keys(gameData).length ? { gameData: copyGameData(gameData) } : {};
 }
 
 /** An `{ extensions }` fragment, present only when the node has any Patter extension values (as gameData's). */
@@ -2966,9 +3130,82 @@ function toDecl(decl: PropertyDecl): ScopeDeclaration {
 }
 
 
-/** The scopes the game binds: `hostScopes`, and the deprecated `world` as the scope of that name. */
-function boundScopes(options: EngineOptions): Record<string, HostScope> {
-  return { ...(options.world ? { world: options.world } : {}), ...options.hostScopes };
+/** Every key `EngineOptions` takes: another is reported (`setup`), since a plain-JS caller has no type check. */
+const ENGINE_OPTIONS = new Set([
+  "rng", "seed", "locale", "hostScopes", "registry", "replayPromptOnChoose", "closedCaptions", "onDryChoice", "onError", "onRefit", "log",
+]);
+
+/** How a requested locale resolved (see `resolveLocale`): the locale in use, the string table it reads (none: every
+ *  string falls back to the default locale, marked untranslated), and what to report when it isn't an exact match. */
+interface LocaleChoice { locale: string; table?: string; problem?: string }
+
+/** The one rule for a locale, used wherever one is set (the constructor, setLocale, replaceStrings, and hotSwap
+ *  through the constructor). Case and `_` / `-` don't matter: an exact match, then the language alone (`fr` for
+ *  `fr-FR`), then the bundle's default. Anything but an exact match carries a problem to report. The default
+ *  reads no table of its own here, so its text keeps the `<Untranslated: id>` marker and the gap shows. `fr`
+ *  never looks for `fr-FR`. An IDs-only bundle takes the locale as given: the game localises it. */
+function resolveLocale(bundle: Bundle, requested: string | undefined): LocaleChoice {
+  const def = bundle.locales.default;
+  if (requested === undefined) return { locale: def, table: def };
+  if (bundle.localisation?.mode === "ids") return { locale: requested, table: requested };
+  const have = [...new Set([def, ...bundle.locales.included, ...Object.keys(bundle.strings)])];
+  if (have.includes(requested)) return { locale: requested, table: requested };
+  const norm = (l: string): string => l.toLowerCase().replace(/_/g, "-");
+  const exact = have.find((l) => norm(l) === norm(requested));
+  if (exact !== undefined) {
+    return { locale: exact, table: exact, problem: `the locale "${requested}" is spelled "${exact}" in this bundle, so it's using "${exact}"` };
+  }
+  const language = norm(requested).split("-")[0]!;
+  const near = have.find((l) => norm(l) === language);
+  if (near !== undefined) {
+    return { locale: near, table: near, problem: `this bundle has no locale "${requested}", so it's using its language, "${near}"` };
+  }
+  return { locale: def, problem: `this bundle has no locale "${requested}", so it's using the default, "${def}", with every string marked untranslated` };
+}
+
+/** The string table a resolved locale reads: empty when it fell back to the default (see `resolveLocale`). */
+function tableOf(all: Record<string, Record<string, string>>, choice: LocaleChoice): Record<string, string> {
+  return choice.table !== undefined ? all[choice.table] ?? {} : {};
+}
+
+/**
+ * Refuse a host write that doesn't fit what the content declared (the hands-on review, 2026-10): a string for
+ * a number, a value an enum or a quality doesn't list, a flag a flags property doesn't, or a name the content
+ * doesn't declare. The rule is the kernel's `valueFits`, the one a load walks saved values with, so a value the
+ * game may set is exactly one a save may carry; an enum whose own default is "" (none chosen) takes "" back. A
+ * scope the bundle doesn't declare (another engine's, or one the game keeps) is its owner's to check. The same
+ * rule and message on every runtime, and in the Storylet Engine's.
+ */
+function checkHostWrite(host: FlowHost, scope: string, name: string, value: ScalarValue, sceneId: string | null): void {
+  type Decl = { name: string; type: string; default?: ScalarValue; values?: string[]; stages?: string[] };
+  const find = (decls: ReadonlyArray<Decl> | undefined): Decl | undefined => decls?.find((d) => d.name.toLowerCase() === name);
+  let decl: Decl | undefined;
+  if (scope === "patter") decl = find(host.bundle.properties);
+  else if (scope === "scene") decl = find(sceneId !== null ? host.bundle.scenes[sceneId]?.sceneProps : undefined);
+  else {
+    const spec = host.bundle.scopeRegistry?.scopes.find((s) => s.token === scope);
+    // An opaque scope declares no names: any name and value is the game's.
+    if (!spec || spec.declarations === undefined) return;
+    decl = find(spec.declarations);
+  }
+  const path = `@${scope}.${name}`;
+  if (decl === undefined) throw new Error(`no property at "${path}": the content declares no ${path}`);
+  if (!valueFits(decl, value, { noneChosen: decl.type === "enum" && decl.default === "" })) {
+    throw new Error(`"${path}" takes ${takes(decl)}; ${JSON.stringify(value)} doesn't fit`);
+  }
+}
+
+/** What a declared property takes, in words, for a refused host write. */
+function takes(decl: { type: string; values?: string[]; stages?: string[] }): string {
+  const quoted = (xs: readonly string[] | undefined): string => (xs ?? []).map((x) => JSON.stringify(x)).join(", ");
+  switch (decl.type) {
+    case "number": return "a number";
+    case "boolean": return "true or false";
+    case "enum": return `one of ${quoted(decl.values)}`;
+    case "flags": return decl.values !== undefined && decl.values.length > 0 ? `a list of flags from ${quoted(decl.values)}` : "a list of flags";
+    case "quality": return `one of its stages ${quoted(decl.stages)}`;
+    default: return "text";
+  }
 }
 
 /** The stage ladder of each declared quality in one set of declarations, by lowercased name (names compare
@@ -3046,17 +3283,7 @@ function splitHostRef(host: FlowHost, ref: string): { scope: string; name: strin
   return hit;
 }
 
-/** A version 2 save's property values, as registry sections under this engine's keys. */
-function sectionsFromV2(save: SaveGameV2): EngineSave {
-  const out: EngineSave = {};
-  if (save.shared?.patter) out["patter"] = save.shared.patter;
-  for (const [s, v] of Object.entries(save.stageBags ?? {})) out[keys.stage(s)] = v;
-  for (const [id, f] of Object.entries(save.flows ?? {})) Object.assign(out, flowSections(id, f));
-  return out;
-}
-
-/** One flow's own values (a version 2 save's per-flow sections, or a `FlowState`'s) as registry sections under
- *  flow `id`'s keys. */
+/** One flow's own values (a `FlowState`'s) as registry sections under flow `id`'s keys. */
 function flowSections(id: string, f: Partial<FlowValues>): EngineSave {
   const out: EngineSave = {};
   if (f.scopes?.patter) out[keys.flowGlobals(id)] = f.scopes.patter;

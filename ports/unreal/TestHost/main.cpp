@@ -442,12 +442,34 @@ static int runSpecificity(const JsonValue& arr)
 // saveLoad / hotSwap makes (they share `opts`). An absent key keeps the engine's default.
 // What every engine of the running case reported through onRefit, for expectRefits.
 static std::vector<LoadMisfit> caseRefits;
+// What every engine of the running case reported through onError, from the first engine's construction on,
+// for expectErrors.
+static std::vector<PlayError> caseErrors;
 
 static void applyEngineOptions(const JsonValue& c, EngineOptions& opts)
 {
-    // A fresh case: its engines (and every one a saveLoad or hotSwap makes) record into one list.
+    // A fresh case: its engines (and every one a saveLoad or hotSwap makes) record into one list each.
     caseRefits.clear();
+    caseErrors.clear();
     opts.onRefit = [](const std::vector<LoadMisfit>& m) { caseRefits.insert(caseRefits.end(), m.begin(), m.end()); };
+    opts.onError = [](const PlayError& e) { caseErrors.push_back(e); };
+    // The case's locale (corpus 8): every engine it makes is made in it, whatever setLocale did since.
+    if (const JsonValue* loc = c.find("locale")) opts.locale = loc->str;
+    // The case's host scopes (corpus 8): each token bound to a store kept for the whole case, read and written
+    // by name, shared by every engine the case makes.
+    if (const JsonValue* hs = c.find("hostScopes"))
+        for (const auto& token : hs->arr)
+        {
+            auto store = std::make_shared<std::map<std::string, PatterValue>>();
+            HostScope scope;
+            scope.get = [store](const std::string& name) -> const PatterValue*
+            {
+                auto it = store->find(name);
+                return it != store->end() ? &it->second : nullptr;
+            };
+            scope.set = [store](const std::string& name, const PatterValue& value) { (*store)[name] = value; };
+            opts.hostScopes[token.str] = scope;
+        }
     const JsonValue* eo = c.find("engineOptions");
     if (!eo) return;
     if (const JsonValue* rp = eo->find("replayPromptOnChoose")) opts.replayPromptOnChoose = rp->b;
@@ -466,7 +488,6 @@ static int runRuntime(const JsonValue& arr)
             EngineOptions opts;
             std::shared_ptr<Mulberry32> rng;
             if (const JsonValue* seed = c.find("seed")) { rng = std::make_shared<Mulberry32>(seed->num); opts.rng = [rng]() { return rng->next(); }; }
-            if (const JsonValue* loc = c.find("locale")) opts.locale = loc->str;
             applyEngineOptions(c, opts);
 
             Engine engine(bundle, opts);
@@ -902,6 +923,8 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
     };
     const auto refusing = [](const JsonValue& op) { const JsonValue* r = op.find("expectRefused"); return r && r->isBool() && r->b; };
     std::map<std::string, patter::FlowState> captured; // captureFlow states, by name, for restoreFlow
+    // What the last advance or stepFor handed the host, for `scribble`: its own copy, which it may deface.
+    std::optional<StepResult> handed;
             for (const auto& op : script.arr)
             {
                 JsonValue chunk = JsonValue::Arr();
@@ -934,12 +957,32 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                     }
                 }
                 else if (kind == "useFlow") current = op.at("flow").str;
-                else if (kind == "advance") chunk.push(normalize(engine->getFlow(current)->advance(), isIdsOnly(bundle)));
+                else if (kind == "advance")
+                {
+                    handed = engine->getFlow(current)->advance();
+                    chunk.push(normalize(*handed, isIdsOnly(bundle)));
+                }
                 // The step a flow would deliver for a beat now, recorded as a delivered one is; none for an unknown id.
                 else if (kind == "stepFor")
                 {
                     const std::string flowId = op.has("flow") ? op.at("flow").str : current;
-                    if (auto s = engine->getFlow(flowId)->stepFor(op.at("beat").str)) chunk.push(normalize(*s, isIdsOnly(bundle)));
+                    handed = engine->getFlow(flowId)->stepFor(op.at("beat").str);
+                    if (handed) chunk.push(normalize(*handed, isIdsOnly(bundle)));
+                }
+                // A careless host (corpus 8) defaces what it was handed, in place: every flags list gains
+                // "scribbled", then every value becomes "scribbled" and the map gains the key too. It is the host's
+                // own copy, so nothing the engine hands out next changes. Extension values are left alone.
+                else if (kind == "scribble")
+                {
+                    const auto deface = [](const std::shared_ptr<GameData>& gameData)
+                    {
+                        if (!gameData) return;
+                        for (auto& kv : *gameData) if (kv.second.isFlags()) kv.second.f.push_back("scribbled");
+                        for (auto& kv : *gameData) kv.second = PatterValue::Str("scribbled");
+                        (*gameData)["scribbled"] = PatterValue::Str("scribbled");
+                    };
+                    if (handed && handed->type == StepType::Choice) for (auto& o : handed->options) deface(o.gameData);
+                    else if (handed && handed->type != StepType::End) deface(handed->gameData);
                 }
                 else if (kind == "choose") engine->getFlow(current)->choose(op.at("id").str);
                 // Host navigation by address. No transcript of its own; the next advance shows where it
@@ -1130,6 +1173,45 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                     const JsonValue* refusedV = op.find("expectRefused");
                     if (refusedV && refusedV->b) refused("setProperty " + ref, [&] { engine->setProperty(ref, value); });
                     else engine->setProperty(ref, value);
+                }
+                // What the engines reported to onError since the case began (the first engine's construction
+                // included) or the last expectErrors, in order: kind and node, and flow when the expectation gives
+                // it. Never the message, which is each runtime's own wording. Taking them empties the record.
+                else if (kind == "expectErrors")
+                {
+                    const JsonValue& want = op.at("expectResult");
+                    bool same = want.arr.size() == caseErrors.size();
+                    for (size_t i = 0; same && i < want.arr.size(); ++i)
+                    {
+                        const JsonValue& w = want.arr[i];
+                        const PlayError& e = caseErrors[i];
+                        same = e.kind == w.at("kind").str && e.node == w.at("node").str && (!w.has("flow") || e.flow == w.at("flow").str);
+                    }
+                    if (!same)
+                    {
+                        JsonValue got = JsonValue::Arr();
+                        for (const PlayError& e : caseErrors)
+                        {
+                            JsonValue o = JsonValue::Obj();
+                            o.set("kind", JsonValue::Str(e.kind)); o.set("node", JsonValue::Str(e.node)); o.set("flow", JsonValue::Str(e.flow));
+                            got.push(o);
+                        }
+                        throw std::runtime_error("expectErrors: expected " + dump(want) + ", got " + dump(got));
+                    }
+                    caseErrors.clear();
+                }
+                // The locale in use (engine.locale) and the bundle's locales (engine.locales).
+                else if (kind == "expectLocale")
+                {
+                    const Locales locales = engine->locales();
+                    JsonValue got = JsonValue::Obj();
+                    got.set("locale", JsonValue::Str(engine->locale()));
+                    got.set("default", JsonValue::Str(locales.defaultLocale));
+                    JsonValue included = JsonValue::Arr();
+                    for (const auto& l : locales.included) included.push(JsonValue::Str(l));
+                    got.set("included", included);
+                    if (!matchValue(got, op.at("expectResult")))
+                        throw std::runtime_error("expectLocale: expected " + dump(op.at("expectResult")) + ", got " + dump(got));
                 }
                 else if (kind == "expectRefits")
                 {
@@ -1435,9 +1517,10 @@ static void runPendingClearedCheck()
     std::cout << "  [pending] a restart or a goto drops a chosen prompt still waiting to be replayed\n";
 }
 
-// A save written before choice prompts carried their pause (line padding) has prompts without `padAfter`. On
-// load each is worked out again from the prompt's beat: an authored prompt, or a bare snippet's first content
-// line, and the pending replay prompt's shown copy, as the JS reference's promptPadOf does.
+// A save written before choice prompts carried their pause (line padding) has prompts without `padAfter`. A
+// pending choice's prompts aren't read from a save any more (version 4 builds them as the choice is delivered,
+// so each carries its pause: an authored prompt's, or a bare snippet's first content line's); the pending
+// replay prompt's shown copy is worked out again on load.
 static void runOldSavePromptPadCheck()
 {
     const char* json = R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},
@@ -1458,7 +1541,7 @@ static void runOldSavePromptPadCheck()
         for (const auto& o : f->getChoices()) if (o.id == id && o.prompt) return o.prompt->hasPadAfter ? o.prompt->padAfter : 99.0;
         return 99.0;
     };
-    // A pending choice: both options' prompts.
+    // A pending choice: both options' prompts, built as the loaded choice is delivered.
     {
         Engine live(bundle, opts); Flow* f = live.openFlow("f", "s"); f->advance();
         if (padOfOption(f, "o") != -0.4 || padOfOption(f, "sn_bare") != 2) fail("old-save", "live", "a prompt did not carry its pause");
@@ -1541,20 +1624,19 @@ static void runSpeakerLabelCheck()
         if (os != "Tam hors champ") fail("speaker-label", "own label, translated", "an overridden pair did not show its translated label: got " + os);
     }
     {
-        // An old save: the pending prompt's label stripped, as a save from before labels existed has none.
+        // A pending choice's prompts aren't saved (version 4): each is built as the choice is delivered, its
+        // label in the loading engine's locale.
         Engine live(bundle, en); Flow* f = live.openFlow("f", "s"); f->advance(); f->advance(); f->advance();
         if (promptLabel(f) != "Tam (V.O.)") fail("speaker-label", "live prompt", "the prompt did not carry its label: got " + promptLabel(f));
-        std::string old = serializeState(live);
-        const std::string key = ",\"speakerLabel\":\"Tam (V.O.)\"";
-        for (std::size_t at; (at = old.find(key)) != std::string::npos;) old.erase(at, key.size());
-        if (old.find("speakerLabel") != std::string::npos) fail("speaker-label", "strip", "the test could not make an old save");
-        Engine same(bundle, en); deserializeState(same, old);
+        const std::string saved = serializeState(live);
+        if (saved.find("speakerLabel") != std::string::npos || saved.find("\"prompt\"") != std::string::npos)
+            fail("speaker-label", "pending save", "a pending choice's save kept its prompt text: " + saved);
+        Engine same(bundle, en); deserializeState(same, saved);
         Flow* g = same.getFlow("f");
-        if (!g || promptLabel(g) != "Tam (V.O.)") fail("speaker-label", "old save", "an old save's prompt label was not re-resolved");
-        if (serializeState(same).find(key) == std::string::npos) fail("speaker-label", "old save, saved again", "a re-resolved label did not save again");
-        Engine other(bundle, fr); deserializeState(other, old);
+        if (!g || promptLabel(g) != "Tam (V.O.)") fail("speaker-label", "loaded", "a loaded choice's prompt label was not built: got " + (g ? promptLabel(g) : std::string("no flow")));
+        Engine other(bundle, fr); deserializeState(other, saved);
         Flow* h = other.getFlow("f");
-        if (!h || promptLabel(h) != "Tam, voix off") fail("speaker-label", "old save, current locale", "an old save's prompt label was not re-resolved in the current locale: got " + (h ? promptLabel(h) : std::string("no flow")));
+        if (!h || promptLabel(h) != "Tam, voix off") fail("speaker-label", "loaded, current locale", "a loaded choice's prompt label was not built in the current locale: got " + (h ? promptLabel(h) : std::string("no flow")));
     }
     {
         // An old save taken between choose() and advance(): the prompt waiting to be spoken back has no label
@@ -1579,7 +1661,7 @@ static void runSpeakerLabelCheck()
     }
     if (formatSpeakerLabel("{name}/{qualifier}/{name}", "A{qualifier}", "Q{name}") != "A{qualifier}/Q{name}/A{qualifier}")
         fail("speaker-label", "placeholders", "the pattern's placeholders were not filled as plain text");
-    std::cout << "  [speaker-label] a stale speaker: string for a pair that isn't overridden is ignored; an old saved prompt's label, pending or waiting to be replayed, is worked out again\n";
+    std::cout << "  [speaker-label] a stale speaker: string for a pair that isn't overridden is ignored; a pending prompt's label is built in the locale in use; an old replayed prompt's is worked out again\n";
 }
 
 // A small local check for Engine::listProperties() (the live-inspector contract): it isn't part of
@@ -2090,8 +2172,10 @@ static void runOneRegistryCases()
     regCase("refuses a save version it does not read, naming it", []
     {
         auto engine = standalone(envelopeBundle(), 0);
-        SaveGame save; save.version = 4;
-        expectThrow([&] { engine->loadGame(save); }, "unsupported save version: 4", "a version 4 save");
+        SaveGame save; save.version = 5;
+        expectThrow([&] { engine->loadGame(save); }, "unsupported save version: 5", "a version 5 save");
+        save.version = 2;   // version 2 saves no longer load (1.0)
+        expectThrow([&] { engine->loadGame(save); }, "unsupported save version: 2", "a version 2 save");
     });
 }
 
@@ -2210,7 +2294,7 @@ static void runCombinedGameCases()
 // plain name -> value sections keyed by registry key, and games have saves on disk written that way. A
 // round-trip cannot tell the difference (a bag that serialised itself would round-trip perfectly and
 // still break every save on disk), so this reads the JSON, and loads saves written out by hand, in
-// version 3 and in the version 2 games shipped before the registry held the properties.
+// version 4 and in the version 3 games shipped before 1.0. Version 2 is refused.
 static std::unique_ptr<Engine> playedEnvelope()
 {
     auto engine = standalone(envelopeBundle(), 0);
@@ -2228,7 +2312,7 @@ static void runSaveEnvelopeCases()
         JsonValue save = parseJ(serializeState(*playedEnvelope())).at("save");
         // A standalone engine made its own registry, so its values ride in the save. Plain objects: no
         // class, no wrapper, and nothing else beside the values.
-        need(save.at("version").num == 3, "version " + dump(save.at("version")));
+        need(save.at("version").num == 4, "version " + dump(save.at("version")));
         expectJson(save.at("registry"), kEnvelopeRegistry, "registry");
         // A flow's snapshot holds no properties: those are the registry's.
         const auto flowKeys = sortedKeys(save.at("flows").at("f"));
@@ -2255,61 +2339,52 @@ static void runSaveEnvelopeCases()
         expectJson(parseJ(serializeState(*after)), dump(parseJ(blob)), "the re-saved envelope");
     });
 
-    regCase("save shape: loads a save written by HAND in today's format (version 3)", []
+    // Written out here rather than produced by saveGame(), so a change that alters the writer and the reader
+    // together cannot satisfy it. This is what a player's save looks like on disk: today's (version 4), and
+    // one written before 1.0 (version 3), which names the next beat by its index.
+    static const std::string kFlowsOnDisk = R"(,"sharedVisits":{"s":1,"b":1,"sn":1},"sharedSelectors":{},"flows":{"f":{"rngState":0,"visits":{"s":1,"b":1,"sn":1},"cursor":{"flowEnded":true,"currentSceneId":"s","stack":[],"activeSnippetId":null,%BEAT%"pendingChoice":null,"pendingPromptOwnerId":null,"selectors":{}}}}}})";
+    const auto onDisk = [](int version)
     {
-        // Written out here rather than produced by saveGame(), so a change that alters the writer and
-        // the reader together cannot satisfy it. This is what a player's save looks like on disk.
-        const std::string onDisk = std::string(R"({"schema":"patter/save@0","save":{"version":3,"registry":)") + kEnvelopeRegistry
-            + R"(,"sharedVisits":{"s":1,"b":1,"sn":1},"sharedSelectors":{},"flows":{"f":{"rngState":0,"visits":{"s":1,"b":1,"sn":1},"cursor":{"flowEnded":true,"currentSceneId":"s","stack":[],"activeSnippetId":null,"beatIndex":0,"pendingChoice":null,"pendingPromptOwnerId":null,"selectors":{}}}}}})";
+        std::string flows = kFlowsOnDisk;
+        flows.replace(flows.find("%BEAT%"), 6, version == 3 ? R"("beatIndex":0,)" : "");
+        return std::string(R"({"schema":"patter/save@0","save":{"version":)") + std::to_string(version) + R"(,"registry":)" + kEnvelopeRegistry + flows;
+    };
+
+    regCase("save shape: loads a save written by HAND in today's format (version 4)", [onDisk]
+    {
         auto engine = standalone(envelopeBundle(), 0);
-        deserializeState(*engine, onDisk);
+        deserializeState(*engine, onDisk(4));
         expectNumber(engine->getProperty("@gold"), 7, "@gold");
         need(engine->getFlow("f") != nullptr, "the flow did not come back");
         expectNumber(engine->getFlow("f")->getProperty("@scene.count"), 1, "@scene.count");
         expectNumber(engine->getFlow("f")->getProperty("@scene.tally"), 2, "@scene.tally");
-        expectJson(parseJ(serializeState(*engine)), onDisk, "the re-saved envelope");
+        expectJson(parseJ(serializeState(*engine)), onDisk(4), "the re-saved envelope");
     });
 
-    // The shape every runtime wrote before the registry held the properties. Players have these on
-    // disk; they must keep loading.
-    static const char* kV2 = R"({"version":2,"shared":{"patter":{"gold":7}},"sharedVisits":{"s":1,"b":1,"sn":1},"sharedSelectors":{},"stageBags":{"s":{"tally":2}},"flows":{"f":{"scopes":{"patter":{}},"sceneBags":{"s":{"count":1}},"rngState":0,"visits":{"s":1,"b":1,"sn":1},"cursor":{"flowEnded":true,"currentSceneId":"s","stack":[],"activeSnippetId":null,"beatIndex":0,"pendingChoice":null,"pendingPromptOwnerId":null,"selectors":{}}}}})";
-
-    regCase("save shape: loads a version 2 save written by HAND, moving its values into the registry", []
+    regCase("save shape: loads a version 3 save written by HAND, and writes it back as version 4", [onDisk]
     {
         auto engine = standalone(envelopeBundle(), 0);
-        deserializeState(*engine, std::string(R"({"schema":"patter/save@0","save":)") + kV2 + "}");
+        deserializeState(*engine, onDisk(3));
         expectNumber(engine->getProperty("@gold"), 7, "@gold");
         need(engine->getFlow("f") != nullptr, "the flow did not come back");
         expectNumber(engine->getFlow("f")->getProperty("@scene.count"), 1, "@scene.count");
-        JsonValue back = parseJ(serializeState(*engine)).at("save");
-        need(back.at("version").num == 3, "re-saved as version " + dump(back.at("version")));
-        expectJson(back.at("registry"), kEnvelopeRegistry, "the re-saved registry");
+        expectJson(parseJ(serializeState(*engine)), onDisk(4), "the re-saved envelope");
     });
 
-    regCase("save shape: moves a version 2 save into a registry the game supplied, beside values the game already loaded", []
-    {
-        auto registry = std::make_shared<ScopeRegistry>();
-        registry->load(blobOf(R"({"another-engine/deck/inn":{"drawn":3}})")); // the game's own load, waiting for its engine
-        EngineOptions opts; opts.registry = registry; opts.hasSeed = true; opts.seed = 0;
-        Engine engine(envelopeBundle(), opts);
-        deserializeState(engine, std::string(R"({"schema":"patter/save@0","save":)") + kV2 + "}");
-        need(engine.getFlow("f") != nullptr, "the flow did not come back");
-        expectNumber(engine.getFlow("f")->getProperty("@scene.count"), 1, "@scene.count");
-        expectJson(blobJson(registry->save()),
-            R"({"patter":{"gold":7},"patter/flow/f/patter":{},"patter/flow/f/scene/s":{"count":1},"patter/scene/s":{"tally":2},"another-engine/deck/inn":{"drawn":3}})",
-            "the game's registry");
-    });
+    // The shape every runtime wrote before the registry held the properties: no longer read (1.0).
+    static const char* kV2 = R"({"version":2,"shared":{"patter":{"gold":7}},"sharedVisits":{"s":1,"b":1,"sn":1},"sharedSelectors":{},"stageBags":{"s":{"tally":2}},"flows":{"f":{"scopes":{"patter":{}},"sceneBags":{"s":{"count":1}},"rngState":0,"visits":{"s":1,"b":1,"sn":1},"cursor":{"flowEnded":true,"currentSceneId":"s","stack":[],"activeSnippetId":null,"beatIndex":0,"pendingChoice":null,"pendingPromptOwnerId":null,"selectors":{}}}}})";
 
     // Everything a load reads is checked BEFORE anything changes. Each of these used to get further: a
     // bare snapshot with no envelope loaded, a version of 3.9 was read as 3, and a save with no flows
     // closed every flow before it was found wanting. Now each is refused and the engine is as it was:
     // the same flow, still open, at the same place, with the same values.
-    regCase("save shape: refuses a bare snapshot, a version that is not exactly 2 or 3, and a save with no flows, changing nothing", []
+    regCase("save shape: refuses a bare snapshot, a version that is not exactly 3 or 4, and a save with no flows, changing nothing", []
     {
         const std::string wrap = R"({"schema":"patter/save@0","save":)";
         const std::string v3Flows = R"("flows":{"f":{"rngState":0,"visits":{},"cursor":{"flowEnded":true,"currentSceneId":"s","stack":[],"activeSnippetId":null,"beatIndex":0,"pendingChoice":null,"pendingPromptOwnerId":null,"selectors":{}}}})";
         const std::vector<std::pair<std::string, std::string>> refused = {
             { kV2, "loadState: not a patter/save@0 envelope" },
+            { wrap + kV2 + "}", "unsupported save version: 2" },
             { wrap + R"({"version":3.9,"registry":{},"sharedVisits":{},"sharedSelectors":{},)" + v3Flows + "}}", "unsupported save version: 3.9" },
             { wrap + R"({"version":"3","registry":{},"sharedVisits":{},"sharedSelectors":{},)" + v3Flows + "}}", "unsupported save version: 3" },
             { wrap + R"({"registry":{},"sharedVisits":{},"sharedSelectors":{},)" + v3Flows + "}}", "unsupported save version: undefined" },
@@ -2499,7 +2574,7 @@ static void runFlowStateCases()
         inT(*engine, "npc/bob");
         const std::string json = serializeFlowState(engine->captureFlow("npc/bob"));
         JsonValue state = parseJ(json);
-        need(state.at("version").num == 3, "version " + dump(state.at("version")));
+        need(state.at("version").num == 4, "version " + dump(state.at("version")));
         expectJson(state.at("scopes"), R"({"patter":{"gold":3}})", "scopes");
         expectJson(state.at("sceneBags").at("s"), R"({"mine":7})", "sceneBags.s");
         need(json.find("npc") == std::string::npos, "the state names the flow it was captured from: " + json);
@@ -2594,12 +2669,13 @@ static void runFlowStateCases()
         FlowState unknown = state;
         unknown.version = 99;
         expectThrow([&] { engine->restoreFlow("g", unknown); }, "unsupported flow state version: 99", "restoring version 99");
+        unknown.version = 2;   // version 2 no longer restores (1.0)
+        expectThrow([&] { engine->restoreFlow("g", unknown); }, "unsupported flow state version: 2", "restoring version 2");
         // A version read from JSON is checked as a save's is: 3.9 is refused, not read as 3.
         std::string json = serializeFlowState(state);
-        json.replace(json.find("\"version\":3"), 11, "\"version\":3.9");
+        json.replace(json.find("\"version\":4"), 11, "\"version\":3.9");
         expectThrow([&] { deserializeFlowState(json); }, "unsupported flow state version: 3.9", "reading version 3.9");
-        // A state with no cursor, or one that isn't an object, is refused: a flow state never had the flat
-        // shape an old save's reader still accepts.
+        // A state with no cursor, or one that isn't an object, is refused.
         JsonValue noCursor = parseJ(serializeFlowState(state));
         noCursor.obj.erase(std::remove_if(noCursor.obj.begin(), noCursor.obj.end(),
             [](const auto& kv) { return kv.first == "cursor"; }), noCursor.obj.end());
@@ -3237,6 +3313,98 @@ static int runExprPrng(const JsonValue& arr)
     return pass;
 }
 
+// The runtime foundations before 1.0, where the corpus can't look: the exact words of a refused host write
+// (the corpus asks only that it's refused; every runtime and the Storylet Engine share the wording), and a
+// setup report's place in the decision log and the live tap, under no flow.
+static void runFoundationsCheck()
+{
+    const char* json = R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en","fr"]},
+      "properties":[{"name":"gold","type":"number","shared":true,"default":1},{"name":"mood","type":"enum","values":["calm","tense"],"shared":true,"default":""},
+                    {"name":"keys","type":"flags","values":["iron"],"shared":true},{"name":"act","type":"quality","stages":["one","two"],"shared":true,"default":"one"}],
+      "scopeRegistry":{"version":1,"scopes":[{"token":"world","declarations":[{"name":"alarm","type":"boolean","default":false}]}]},
+      "scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","sceneProps":[{"name":"count","type":"number","default":0}],
+        "blocks":[{"id":"b","type":"block","name":"B","gameId":"b","children":[{"id":"n","type":"snippet","beats":[{"id":"T","kind":"text"}]}]}]}},
+      "strings":{"en":{"T":"hi"},"fr":{"T":"salut"}}})JSON";
+    const Bundle bundle = parseBundle(JsonParser(json).parse());
+    const auto refusal = [](const std::function<void()>& call) -> std::string
+    {
+        try { call(); } catch (const EvalError& ex) { return ex.what(); }
+        return "<not refused>";
+    };
+    const auto want = [](const std::string& got, const std::string& expected, const std::string& what)
+    {
+        if (got != expected) fail("foundations", what, "expected \"" + expected + "\", got \"" + got + "\"");
+    };
+    {
+        Engine engine(bundle);
+        Flow* flow = engine.openFlow("f", "s");
+        want(refusal([&] { engine.setProperty("@gold", PatterValue::Str("lots")); }), "\"@patter.gold\" takes a number; \"lots\" doesn't fit", "a number");
+        want(refusal([&] { engine.setProperty("@mood", PatterValue::Str("angry")); }), "\"@patter.mood\" takes one of \"calm\", \"tense\"; \"angry\" doesn't fit", "an enum");
+        want(refusal([&] { engine.setProperty("@keys", PatterValue::Flags({ "iron", "gold" })); }), "\"@patter.keys\" takes a list of flags from \"iron\"; [\"iron\",\"gold\"] doesn't fit", "flags");
+        want(refusal([&] { engine.setProperty("@act", PatterValue::Str("three")); }), "\"@patter.act\" takes one of its stages \"one\", \"two\"; \"three\" doesn't fit", "a quality");
+        want(refusal([&] { engine.setProperty("@world.alarm", PatterValue::Num(1)); }), "\"@world.alarm\" takes true or false; 1 doesn't fit", "a host scope's boolean");
+        want(refusal([&] { engine.setProperty("@world.bells", PatterValue::Num(1)); }), "no property at \"@world.bells\": the content declares no @world.bells", "an undeclared host-scope name");
+        want(refusal([&] { flow->setProperty("@scene.count", PatterValue::Bool(true)); }), "\"@scene.count\" takes a number; true doesn't fit", "@scene, on a flow");
+        want(refusal([&] { engine.setProperty("@mood", PatterValue::Str("")); }), "<not refused>", "an enum whose default is \"\" takes \"\"");
+    }
+    {
+        EngineOptions opts; opts.log = true; opts.locale = "fr-CA";
+        std::vector<PlayError> errors;
+        opts.onError = [&errors](const PlayError& e) { errors.push_back(e); };
+        Engine engine(bundle, opts);
+        if (errors.size() != 1 || errors[0].kind != "setup" || errors[0].node != "fr-CA" || !errors[0].flow.empty())
+            fail("foundations", "setup report", "the constructor did not report the locale once, as setup, under no flow");
+        else if (errors[0].message != "this bundle has no locale \"fr-CA\", so it's using its language, \"fr\"")
+            fail("foundations", "setup wording", "got \"" + errors[0].message + "\"");
+        if (engine.log().size() != 1 || engine.log()[0].type != "diagnostic" || engine.log()[0].kind != "setup" || !engine.log()[0].flow.empty())
+            fail("foundations", "setup in the log", "the decision log did not record the setup report under no flow");
+        std::vector<std::string> tapped;
+        auto off = engine.onTrace([&tapped](const std::string& flow, const LogEntry& e) { tapped.push_back(flow + ":" + e.kind + ":" + e.node); });
+        engine.setLocale("de");
+        off();
+        if (tapped != std::vector<std::string>{ ":setup:de" }) fail("foundations", "setup on the tap", "the live tap did not hear setLocale's report under no flow");
+        if (engine.locale() != "en" || engine.locales().defaultLocale != "en" || engine.locales().included != std::vector<std::string>{ "en", "fr" })
+            fail("foundations", "locales", "locale() or locales() is wrong after falling back");
+    }
+    // Set-up reports are made once by a hot swap whose load is refused, not again by the engine it falls back on.
+    // The new bundle names another engine's scope that nothing registered, so the replacement's load is refused.
+    {
+        std::vector<std::string> nodes;
+        EngineOptions opts; opts.locale = "en-GB";
+        opts.onError = [&nodes](const PlayError& e) { if (e.kind == "setup") nodes.push_back(e.node); };
+        Engine engine(bundle, opts);
+        engine.openFlow("f", "s");
+        Bundle refusing = bundle;
+        refusing.externalScopes = { "quest" };
+        std::unique_ptr<Engine> fallback = engine.hotSwap(refusing);
+        if (nodes != std::vector<std::string>{ "en-GB", "en-GB" })
+            fail("foundations", "a refused-load hot swap", "the locale was reported " + std::to_string(nodes.size()) + " times, not twice");
+        nodes.clear();
+        std::unique_ptr<Engine> after = fallback->hotSwap(bundle);
+        if (nodes != std::vector<std::string>{ "en-GB" })
+            fail("foundations", "the fallback's own hot swap", "the locale was reported " + std::to_string(nodes.size()) + " times, not once");
+    }
+    // A start the bundle doesn't have (only a hand-edited bundle can) is passed over.
+    {
+        const auto opens = [&bundle](const std::string& scene, const std::string& block) -> std::string
+        {
+            Bundle b = bundle;
+            b.start.present = true; b.start.scene = scene; b.start.block = block;
+            try
+            {
+                Engine engine(b);
+                StepResult r = engine.openFlow("f")->advance();
+                return r.type == StepType::Text && r.id == "T" ? "T" : "not T";
+            }
+            catch (const std::exception& ex) { return ex.what(); }
+        };
+        want(opens("gone", ""), "T", "a start scene the bundle doesn't have starts at the first scene");
+        want(opens("s", "gone"), "T", "a start block the scene doesn't have starts at its first block");
+    }
+    std::cout << "  [foundations] a refused host write in the family's words; a setup report in the log and on the tap, under no flow;"
+                 " a refused-load hot swap reports once; a start the bundle doesn't have is passed over\n";
+}
+
 int main(int argc, char** argv)
 {
     std::string path = argc > 1 ? argv[1] : "corpus.json";
@@ -3287,6 +3455,7 @@ int main(int argc, char** argv)
     runOldSavePromptPadCheck();
     runNamelessQualifierCheck();
     runSpeakerLabelCheck();
+    runFoundationsCheck();
     runHostScopeWritableSmoke();
     runPlayErrorCases();
     runAddressLookupCases();

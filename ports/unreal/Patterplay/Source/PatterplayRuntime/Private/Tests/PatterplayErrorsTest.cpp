@@ -66,7 +66,7 @@ bool FPatterplayErrorsTest::RunTest(const FString& Parameters)
 
 	FPatterEngineOptions Options;
 	Options.bLog = true;
-	UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options);
+	UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options, {});
 	if (!TestNotNull(TEXT("engine"), Engine)) return false;
 
 	UPatterplayErrorsListener* Listener = NewObject<UPatterplayErrorsListener>();

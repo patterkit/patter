@@ -167,10 +167,18 @@ namespace Patterkit.Patterplay
             return output;
         }
 
-        [System.Obsolete("Use GameDataFields, the name every Patterplay runtime uses.")]
-        public static List<GameDataField> FieldsFor(Bundle bundle, string kind) => GameDataFields(bundle, kind);
-
-        [System.Obsolete("Use EffectiveGameData, the name every Patterplay runtime uses.")]
-        public static GameData Effective(List<GameDataField> fields, GameData node) => EffectiveGameData(fields, node);
+        /// <summary>A node's gameData as the game's own COPY, its flags lists too, or null for none. The bundle's
+        /// object is shared by every engine on the bundle (and a PatterBundleAsset keeps one parsed bundle), so a
+        /// game that edits what it was handed (a step's, an option's, an outline entry's) must not change what
+        /// any of them hands out next. Extension values are not copied: they are the extension runtime's to
+        /// read, can be large, and are read-only by contract.</summary>
+        internal static GameData CopyGameData(GameData gameData)
+        {
+            if (gameData == null) return null;
+            var copy = new GameData();
+            foreach (var pair in gameData)
+                copy[pair.Key] = pair.Value != null && pair.Value.IsFlags ? ExprValue.Flags(pair.Value.AsFlags) : pair.Value;
+            return copy;
+        }
     }
 }

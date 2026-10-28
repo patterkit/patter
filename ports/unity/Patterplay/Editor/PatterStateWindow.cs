@@ -221,7 +221,12 @@ namespace Patterkit.Patterplay.Editor
                 EditorGUILayout.LabelField(row.Path, GUILayout.Width(140));
 
                 ExprValue edited = DrawValueField(engine, row);
-                if (edited != null && !edited.ValueEquals(row.Value)) engine.SetProperty(row.Path, edited);
+                // The engine refuses a value that doesn't fit the declaration: say so, and leave the value as it was.
+                if (edited != null && !edited.ValueEquals(row.Value))
+                {
+                    try { engine.SetProperty(row.Path, edited); }
+                    catch (Exception e) { Debug.LogWarning("[Patterplay] " + e.Message); }
+                }
 
                 // Reset-to-default arrow.
                 using (new EditorGUI.DisabledScope(row.Value.ValueEquals(row.Default)))

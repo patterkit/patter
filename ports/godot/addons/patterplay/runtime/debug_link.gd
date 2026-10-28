@@ -85,12 +85,6 @@ func url() -> String:
 	return _url
 
 
-## Deprecated: use state(), build() and url(), the names every Patterplay runtime uses. Goes in a later
-## release.
-func status() -> Dictionary:
-	return { "state": state(), "build": _build, "url": _url }
-
-
 # -- public API (mirrors the JS DebugLink) -------------------------------------
 
 func flow_opened(flow_id: String) -> void:

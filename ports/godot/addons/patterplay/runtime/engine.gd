@@ -22,6 +22,9 @@ extends RefCounted
 ## game (it self-backs host scopes and saves the registry's values), though it is handed that
 ## registry. Not public API.
 const _OWNS_REGISTRY := "_owns_registry"
+# Internal: set only on the engine a refused hot_swap load falls back on, which stands in for a replacement
+# that has already made its set-up reports, so it makes none.
+const _SETUP_REPORTED := "_setup_reported"
 
 const FlowHost := preload("res://addons/patterplay/runtime/flow_host.gd")
 
@@ -40,8 +43,15 @@ var _creation_options: Dictionary = {}
 ## Every locale's string table, kept so set_locale() can re-point the host's `strings` live.
 ## Reassigned wholesale by replace_strings(). JS's allStrings.
 var _all_strings: Dictionary = {}
-## The active locale (string lookups and character names resolve in it). JS's currentLocale.
-var _current_locale: String = ""
+## The locale in use (string lookups and character names resolve in it), as _resolve_locale found it:
+## {"locale", "table" (absent when it fell back to the default), "problem" (when it isn't an exact match)}.
+## JS's currentLocale.
+var _current_locale: Dictionary = {}
+## The locale the game asked for (the "locale" option, or the last set_locale), which hot_swap() and
+## replace_strings() resolve again against the bundle they take; null when it asked for none.
+var _requested_locale = null
+## Set-up problems found while building, reported as the constructor ends: [node, message] pairs.
+var _setup: Array = []
 ## Host scopes the game bound through the "host_scopes" option, registered as foreign scopes, so
 ## _release() can remove them again. JS binds only `@world`, and finds it again in its creation
 ## options.
@@ -60,14 +70,26 @@ class Checkpoint extends RefCounted:
 		journal = j
 
 
+## Every key the options Dictionary takes. Another is reported ("setup"): the options are an untyped
+## Dictionary, so a mistyped or retired key would otherwise be ignored in silence. JS's ENGINE_OPTIONS.
+const ENGINE_OPTIONS := ["rng", "seed", "locale", "host_scopes", "registry", "replay_prompt_on_choose",
+	"closed_captions", "on_dry_choice", "on_error", "on_refit", "log"]
+
+
 func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	_creation_options = options
-	var locale: String = options.get("locale", "")
-	if locale == "":
-		locale = bundle["locales"]["default"]
+	for key in options:
+		if ENGINE_OPTIONS.has(key) or key == _OWNS_REGISTRY or key == _SETUP_REPORTED:
+			continue
+		_setup.append([str(key), ('the engine option "world" has gone: bind the scope as "host_scopes": {"world": ...}'
+			if str(key) == "world" else '"%s" isn\'t an engine option, so it\'s ignored' % key)])
 	var all_strings: Dictionary = bundle.get("strings", {})
 	_all_strings = all_strings
-	_current_locale = locale
+	var asked = options.get("locale")
+	_requested_locale = str(asked) if asked != null else null
+	_current_locale = _resolve_locale(bundle, _requested_locale)
+	if _current_locale.has("problem"):
+		_setup.append([str(_requested_locale), _current_locale["problem"]])
 	# Localisation mode (spec §11): "ids" + no source-debug -> emit beat IDs + omit character names.
 	var loc: Dictionary = bundle.get("localisation", {})
 	var emit_ids: bool = loc.get("mode", "embedded") == "ids" and not loc.get("sourceDebug", false)
@@ -84,7 +106,7 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	h.on_refit = options.get("on_refit")
 	h.bundle = bundle
 	h.emit_ids = emit_ids
-	h.strings = all_strings.get(locale, {})
+	h.strings = _table_of(all_strings, _current_locale)
 	h.default_strings = all_strings.get(bundle["locales"]["default"], {})
 	# The same instances the engine resolves addresses with.
 	h.scene_game_id_to_id = _scene_game_id_to_id
@@ -167,9 +189,41 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 				names[str(p["name"]).to_lower()] = true
 		_host.scene_shared_names[sid] = names
 
+	_index_options(bundle)
 	_register(bundle, options)
 	# The `patter` bag (and any self-backed host scope) claimed values the game may have loaded first.
 	_host.report_refits()
+	# Last, so the game's handler and the decision log hear about an engine that is ready to be asked.
+	# The engine a refused hot_swap load falls back on makes none: the replacement before it already did.
+	if not options.get(_SETUP_REPORTED, false):
+		for s in _setup:
+			_report_setup(s[0], s[1])
+	_setup = []
+
+
+## Report a set-up problem (a "setup" error, which belongs to no flow): to the game's on_error, and to
+## the decision log.
+func _report_setup(node: String, message: String) -> void:
+	_host.report({"flow": "", "kind": "setup", "node": node, "message": message})
+	_host.emit_engine("", {"type": "diagnostic", "kind": "setup", "node": node, "message": message})
+
+
+## Each option of every choice, by id, to its choice's id (the host's option_choice): a save stamps the
+## frame an option's content runs in with it.
+func _index_options(bundle: Dictionary) -> void:
+	for sid in bundle["scenes"]:
+		for block in bundle["scenes"][sid]["blocks"]:
+			_index_choices(block.get("children", []))
+
+
+func _index_choices(nodes: Array) -> void:
+	for n in nodes:
+		if n.get("type", "") != "group":
+			continue
+		if n.get("selector", "") == "choice":
+			for option in n.get("children", []):
+				_host.option_choice[option["id"]] = n["id"]
+		_index_choices(n.get("children", []))
 
 
 ## Register this engine's game-wide scopes in the registry: `@patter`, each host scope the game
@@ -197,6 +251,17 @@ func _register(bundle: Dictionary, options: Dictionary) -> void:
 		if refused != "":
 			break
 		var spec := _spec_for(specs, str(token))
+		# Tokens are case-sensitive everywhere, so a near miss is reported, never folded: folding would
+		# make a second spelling of the scope. Another engine's scope the content names is that engine's
+		# to declare.
+		if spec.is_empty() and not _host.external_scopes.has(str(token)):
+			var near := ""
+			for s in specs:
+				if str(s.get("token", "")).to_lower() == str(token).to_lower():
+					near = str(s.get("token", ""))
+					break
+			_setup.append([str(token), ('"host_scopes" binds "%s", which this bundle doesn\'t declare: it declares "%s", and a scope\'s token is case-sensitive' % [token, near])
+				if near != "" else ('"host_scopes" binds "%s", which this bundle doesn\'t declare' % token)])
 		var decls: Array = []
 		for d in spec.get("declarations", []):
 			decls.append(_host_decl(d, null))
@@ -469,7 +534,7 @@ func _undo_open_flow(id: String, flow: PatterFlow, prior: PatterFlow) -> void:
 ##
 ## One checkpoint at a time: a second is refused (push_error, returns null). Inside one, the calls
 ## that replace or drop flows or their bags wholesale (reset, load_game, hot_swap, close_flow,
-## open_flow on the name of an open flow, restore_flow, and a flow's own start and restore) are
+## open_flow on the name of an open flow, restore_flow, and a flow's own reset and restore) are
 ## refused the same way. Not undone: trace and log events already emitted, and draws from a custom
 ## "rng" the game supplied.
 func checkpoint() -> Checkpoint:
@@ -598,8 +663,17 @@ func _release(keep: bool) -> void:
 			reg.remove(t)
 
 
+## The locale in use (string and character-name lookups resolve in it): the one the game asked for, or
+## the one it fell back to ("fr" for "fr-FR", the default for a locale the bundle doesn't have).
 func locale() -> String:
-	return _current_locale
+	return str(_current_locale["locale"])
+
+
+## The bundle's locales: {"default": its default, "included": every locale it includes}. A fresh copy
+## each call.
+func locales() -> Dictionary:
+	var l: Dictionary = _host.bundle.get("locales", {})
+	return {"default": str(l.get("default", "")), "included": (l.get("included", []) as Array).duplicate()}
 
 
 # The compiled bundle's build hash (content.hash). Pass it to PatterDebugLink so Patterpad's live
@@ -614,12 +688,60 @@ func is_source_debug() -> bool:
 	return _source_debug
 
 
-# Switch the active locale LIVE - subsequent string lookups (new beats, character names, {@ref}) render in
-# it; flow position / state / visits / rng are untouched. All open flows share the host string table, so the
-# swap reaches them at once. A locale with no table resolves every string via the <Untranslated> fallback.
+## Switch the active locale LIVE - subsequent string lookups (new beats, a pending choice's options,
+## character names, {@ref}) render in it; flow position / state / visits / rng are untouched. All open
+## flows share the host string table, so the swap reaches them at once.
+##
+## The locale resolves by one rule, the same for the "locale" option: case and `_` / `-` don't matter, so
+## an exact match wins, then the language alone ("fr" for "fr-FR"), then the bundle's default, whose text
+## then keeps the `<Untranslated: id>` marker so the gap shows. Anything but an exact match is reported
+## ("setup"). "fr" never looks for "fr-FR". An IDs-only bundle takes the locale as given, unreported.
 func set_locale(locale: String) -> void:
-	_current_locale = locale
-	_host.strings = _all_strings.get(locale, {})
+	_requested_locale = locale
+	_use_locale(_resolve_locale(_host.bundle, locale))
+	if _current_locale.has("problem"):
+		_report_setup(locale, _current_locale["problem"])
+
+
+func _use_locale(choice: Dictionary) -> void:
+	_current_locale = choice
+	_host.strings = _table_of(_all_strings, choice)
+
+
+## The one rule for a locale, used wherever one is set (the constructor, set_locale, replace_strings, and
+## hot_swap through the constructor): {"locale" in use, "table" it reads (absent: every string falls back
+## to the default, marked untranslated), "problem" to report when it isn't an exact match}. JS's
+## resolveLocale.
+static func _resolve_locale(bundle: Dictionary, requested) -> Dictionary:
+	var def := str(bundle.get("locales", {}).get("default", ""))
+	if requested == null:
+		return {"locale": def, "table": def}
+	var asked := str(requested)
+	if str(bundle.get("localisation", {}).get("mode", "")) == "ids":
+		return {"locale": asked, "table": asked}
+	var have: Array = [def]
+	for l in bundle.get("locales", {}).get("included", []) + (bundle.get("strings", {}) as Dictionary).keys():
+		if not have.has(str(l)):
+			have.append(str(l))
+	if have.has(asked):
+		return {"locale": asked, "table": asked}
+	var norm := func(l: String) -> String: return l.to_lower().replace("_", "-")
+	for l in have:
+		if norm.call(l) == norm.call(asked):
+			return {"locale": l, "table": l,
+				"problem": 'the locale "%s" is spelled "%s" in this bundle, so it\'s using "%s"' % [asked, l, l]}
+	var language: String = (norm.call(asked) as String).split("-")[0]
+	for l in have:
+		if norm.call(l) == language:
+			return {"locale": l, "table": l,
+				"problem": 'this bundle has no locale "%s", so it\'s using its language, "%s"' % [asked, l]}
+	return {"locale": def,
+		"problem": 'this bundle has no locale "%s", so it\'s using the default, "%s", with every string marked untranslated' % [asked, def]}
+
+
+## The string table a resolved locale reads: empty when it fell back to the default (see _resolve_locale).
+static func _table_of(all: Dictionary, choice: Dictionary) -> Dictionary:
+	return all.get(choice["table"], {}) if choice.has("table") else {}
 
 
 # Live bundle refresh, tier 1 (strings only): swap every locale's string table in place from a freshly
@@ -629,14 +751,22 @@ func set_locale(locale: String) -> void:
 func replace_strings(bundle: Dictionary) -> void:
 	var all_strings: Dictionary = bundle.get("strings", {})
 	_all_strings = all_strings
-	_host.strings = all_strings.get(_current_locale, {})
+	# The requested locale resolves again against the new tables; a fallback is reported only when it
+	# changed, so a live text edit doesn't repeat what the game has already heard.
+	var was = _current_locale.get("problem")
+	_use_locale(_resolve_locale(bundle, _requested_locale))
 	_host.default_strings = all_strings.get(_host.bundle["locales"]["default"], {})
+	var now = _current_locale.get("problem")
+	if now != null and now != was:
+		_report_setup(str(_requested_locale), now)
 
 
 # Live bundle refresh, tier 2 (full swap): rebuild on an edited bundle with the whole run carried over
-# (save_game -> fresh engine -> load_game) plus the presentation state that isn't save state (active
-# locale, captions toggle). Content drift resolves per spec 9.8: stack frames re-find their next child
-# by id, drifted options drop, a vanished snippet is skipped.
+# (save_game -> fresh engine -> load_game) plus the presentation state that isn't save state (the locale
+# asked for, resolved again against the new bundle and reported again if it falls back; the captions
+# toggle). Content drift resolves per spec 9.8: stack frames re-find their next child and the next beat
+# by id, drifted options drop, and a place that has gone resumes at the nearest safe point, reported
+# ("save").
 #
 # Returns the REPLACEMENT engine, on the same registry. This one hands its bags over (each is removed
 # from the registry with its values kept, and the replacement claims them as it registers), its flows
@@ -653,6 +783,11 @@ func hot_swap(bundle: Dictionary) -> PatterEngine:
 	var opts := _creation_options.duplicate()
 	opts["registry"] = _host.registry
 	opts[_OWNS_REGISTRY] = _host.owns_registry
+	opts.erase(_SETUP_REPORTED)   # a fallback's own replacement reports again
+	# Built in the locale this one was asked for, so the new bundle's locales resolve it, as the
+	# constructor reports.
+	if _requested_locale != null:
+		opts["locale"] = _requested_locale
 	# On a game's registry, this engine's own values are parked again to be REFITTED as the replacement
 	# claims them: the edit may have deleted a stage, an enum value or a flag one of them holds, and the
 	# snapshot does not carry the game's registry. A standalone engine's snapshot carries its registry,
@@ -676,7 +811,10 @@ func hot_swap(bundle: Dictionary) -> PatterEngine:
 		var again = snapshot.get("registry") if _host.owns_registry else own
 		if again is Dictionary and not (again as Dictionary).is_empty():
 			_host.registry.load(again, {"keep_parked": true, "refit": true})
-		next = PatterEngine.new(bundle, opts)
+		# The fallback stands in for the replacement, which has made the set-up reports: it makes none.
+		var fallback_opts := opts.duplicate()
+		fallback_opts[_SETUP_REPORTED] = true
+		next = PatterEngine.new(bundle, fallback_opts)
 		var flows: Dictionary = snapshot.get("flows", {})
 		for id in flows:
 			var sid = (flows[id].get("cursor", {}) as Dictionary).get("currentSceneId")
@@ -684,7 +822,6 @@ func hot_swap(bundle: Dictionary) -> PatterEngine:
 				next.open_flow(str(id))
 			elif (bundle.get("scenes", {}) as Dictionary).has(str(sid)):
 				next.open_flow(str(id), str(sid))
-	next.set_locale(_current_locale)
 	next.set_closed_captions(_host.captions_on)
 	return next
 
@@ -774,17 +911,30 @@ func list_properties() -> Array:
 ## Write a shared property by ref. The GAME's surface, so it writes with HOST authority: a host
 ## declaration's "writable": false is the story's promise not to write the value, never a lock on
 ## the game that owns it. The story's own writes go through the flow, which the registry holds to it.
-func set_property(ref: String, value) -> void:
+##
+## Returns "" when the value was written, else why it was refused (also push_error'd), with nothing
+## changed: a value that doesn't fit the property's declaration (a string for a number, a value an enum
+## or a quality doesn't list, a flag a flags property doesn't), a name the content doesn't declare in
+## @patter or a scope it declares, an @scene ref (those are a flow's), or a write the registry turns
+## down. A scope that declares no names (an opaque one) takes anything; another engine's scope is that
+## engine's to check. GDScript can't throw, so the refusal is the return, as the Storylet Engine's is.
+func set_property(ref: String, value) -> String:
 	var sp := PatterFlow.split_host_ref(_host, ref)
 	if sp[0] == "scene":
-		push_error("'%s': @scene properties are scene-scoped - read/write them on a Flow" % ref)
-		return
-	# A refusal (an unknown scope, or a resolver with no setter) is push_error'd by the registry.
+		var msg := "'%s': @scene properties are scene-scoped - read/write them on a Flow" % ref
+		push_error(msg)
+		return msg
+	var unfit := PatterFlow.host_write_refusal(_host, sp[0], sp[1], value, "")
+	if unfit != "":
+		push_error(unfit)
+		return unfit
+	# A refusal from the registry (an unknown scope, or a resolver with no setter) it push_errors itself.
 	var journal = _host.journal
 	var prev = _host.registry.get_value(sp[0], sp[1]) if journal != null else null
 	var refused: String = _host.registry.set_value(sp[0], sp[1], value, {"host": true})
 	if journal != null and refused == "" and prev != null:
 		journal["undo"].append(Callable(_host.registry, "set_value").bind(sp[0], sp[1], prev, {"host": true}))
+	return refused
 
 
 ## A quality's ladder, for game code holding one of its values: the position of `value` on the ladder
@@ -856,9 +1006,9 @@ func list_bags() -> Array:
 	return mounts
 
 
-## The save version this engine writes. Version 2 (from before the registry held the properties)
-## still loads.
-const SAVE_VERSION := 3
+## The save version this engine writes. Version 3 still loads (its cursor names the next beat by index,
+## and its pending choice's prompt text is discarded); version 2 no longer does.
+const SAVE_VERSION := 4
 
 
 ## Snapshot the whole game's NON-property state: visit counts, shared selector cursors, and every
@@ -881,13 +1031,14 @@ func save_game() -> Dictionary:
 
 
 ## Restore a save_game(): visit counts, shared selector cursors, and every flow. Property values come
-## from the registry. A save that carries them (a standalone engine's, or a version 2 save from before
-## the registry held them) has them moved into the registry here; otherwise the game loads its
-## registry itself, before or after this call. Either order works: this engine's bags are handed back
-## to the registry (values kept) and the restored flows claim them as they register.
+## from the registry. A save that carries them (a standalone engine's) has them moved into the registry
+## here; otherwise the game loads its registry itself, before or after this call. Either order works:
+## this engine's bags are handed back to the registry (values kept) and the restored flows claim them
+## as they register. A flow whose saved place has gone from this build resumes at the nearest safe
+## point, reported through on_error ("save").
 ##
 ## Returns false (with push_error, and nothing changed) for a save version this engine cannot read
-## (exactly 2 or 3), a save with no "flows" object, or when the content names another engine's scope
+## (exactly 3 or 4), a save with no "flows" object, or when the content names another engine's scope
 ## that nothing on this registry registered. Everything a load reads is checked before anything changes.
 func load_game(save: Dictionary) -> bool:
 	if _refused_in_checkpoint("load_game"):
@@ -921,7 +1072,7 @@ func load_game(save: Dictionary) -> bool:
 			reg.remove(PatterFlow.key_stage(sid), {"keep": true})
 	_host.stage_bags = {}
 
-	var values = PatterFlow.sections_from_v2(save) if float(save["version"]) == 2.0 else save.get("registry")
+	var values = save.get("registry")
 	if values is Dictionary:
 		# The engine's own registry takes the save wholesale. A game's registry may hold values the
 		# game loaded for other engines, still waiting to be claimed: add to those, never replace them.
@@ -929,10 +1080,9 @@ func load_game(save: Dictionary) -> bool:
 			reg.load(values, {"refit": true})
 		else:
 			reg.load(values, {"keep_parked": true, "refit": true})
-	# Reads the family's camelCase shape and the snake_case one this addon wrote before 0.11.0.
-	var visits = PatterFlow._k(save, "sharedVisits", "shared_visits")
+	var visits = save.get("sharedVisits")
 	_host.shared_visits = (visits as Dictionary).duplicate(true) if visits is Dictionary else {}
-	_host.shared_selectors = PatterFlow._load_selectors(PatterFlow._k(save, "sharedSelectors", "shared_selectors"))
+	_host.shared_selectors = PatterFlow._load_selectors(save.get("sharedSelectors"))
 	for id in saved_flows:
 		var flow := PatterFlow.new(_host, float(_default_seed))
 		flow.id = str(id)
@@ -942,19 +1092,18 @@ func load_game(save: Dictionary) -> bool:
 	return true
 
 
-## "" when `version` is one a load reads (exactly 2 or SAVE_VERSION), else the refusal, naming
+## "" when `version` is one a load reads (exactly 3 or SAVE_VERSION), else the refusal, naming
 ## `what` (a save, or a flow state).
 static func _version_refusal(what: String, version) -> String:
 	var v := float(version) if (version is int or version is float) else -1.0
-	if v == 2.0 or v == float(SAVE_VERSION):
+	if v == 3.0 or v == float(SAVE_VERSION):
 		return ""
 	return "unsupported %s version: %s" % [what, str(int(v)) if v == floorf(v) and v >= 0.0 else str(version)]
 
 
 ## Take flow `id` out of the engine as plain data, to be put back later with restore_flow(): its
 ## snapshot as save_game() writes it, a "version" (SAVE_VERSION), and its own property values without
-## its id, so it can come back under another ("scopes" and "sceneBags", the sections a version 2 save
-## carried per flow). Shared state is never in it. The game saves it as it saves anything else.
+## its id, so it can come back under another ("scopes" and "sceneBags"). Shared state is never in it. The game saves it as it saves anything else.
 ## Doesn't close the flow: close it with close_flow() AFTER capturing, since closing drops its values.
 ## Only reads, so it is allowed while a checkpoint is open. Returns {} (with push_error) when no flow
 ## of that id is open.
@@ -975,7 +1124,7 @@ func capture_flow(id: String) -> Dictionary:
 ## was captured from. Against an edited bundle it re-finds its place by id, as a load does.
 ##
 ## Returns the flow, or null (with push_error, and nothing changed) while a checkpoint is open, for a
-## state version this engine cannot read (exactly 2 or 3, as a save), a state with no cursor object,
+## state version this engine cannot read (exactly 3 or 4, as a save), a state with no cursor object,
 ## when a flow of that id is open, or when the content names another engine's scope that nothing on
 ## this registry registered. Everything it reads is checked before anything changes, as a load's is:
 ## GDScript has no exceptions, so a restore can't fail part way and be cleaned up after.
@@ -1038,18 +1187,19 @@ func _resolve_block_ref(scene_id: String, r: String) -> String:
 # Author tags (#215): a beat's accumulated tags (own + every ancestor's), the same value its step carries.
 # Empty array for an unknown id or a beat with no tags anywhere up the chain.
 func tags_for_beat(beat_id: String) -> Array:
-	return _host.tag_index.get(beat_id, [])
+	return (_host.tag_index.get(beat_id, []) as Array).duplicate()
 
 
-# A scene's own tags, by internal id or gameId address.
+# A scene's own tags, by internal id or gameId address. A copy, as every tag list handed out is: the index
+# is shared by every flow, so a game editing what it was given must not change the next answer.
 func tags_for_scene(scene_ref: String) -> Array:
-	return _host.tag_index.get(_resolve_scene_ref(scene_ref), [])
+	return (_host.tag_index.get(_resolve_scene_ref(scene_ref), []) as Array).duplicate()
 
 
 # A block's accumulated tags (scene + block), by scene + block ref (id or gameId).
 func tags_for_block(scene_ref: String, block_ref: String) -> Array:
 	var scene_id := _resolve_scene_ref(scene_ref)
-	return _host.tag_index.get(_resolve_block_ref(scene_id, block_ref), [])
+	return (_host.tag_index.get(_resolve_block_ref(scene_id, block_ref), []) as Array).duplicate()
 
 
 # -- scene / block gameData ----------------------------------------------------
@@ -1215,7 +1365,7 @@ func get_outline() -> Array:
 		var sext := _own_extensions(scene)
 		if not sext.is_empty():
 			os["extensions"] = sext
-		var st: Array = _host.tag_index.get(scene["id"], [])
+		var st: Array = (_host.tag_index.get(scene["id"], []) as Array).duplicate()
 		if not st.is_empty():
 			os["tags"] = st
 		for block in scene["blocks"]:
@@ -1231,7 +1381,7 @@ func get_outline() -> Array:
 			var bext := _own_extensions(block)
 			if not bext.is_empty():
 				ob["extensions"] = bext
-			var bt: Array = _host.tag_index.get(block["id"], [])
+			var bt: Array = (_host.tag_index.get(block["id"], []) as Array).duplicate()
 			if not bt.is_empty():
 				ob["tags"] = bt
 			for n in block.get("children", []):
@@ -1269,7 +1419,7 @@ func _collect_beats(nodes: Array, scene_id: String, block_id: String, into: Arra
 func _outline_node(n: Dictionary) -> Dictionary:
 	if n.get("type", "") == "group":
 		var g := {"type": "group", "id": n["id"], "children": []}
-		var gt: Array = _host.tag_index.get(n["id"], [])
+		var gt: Array = (_host.tag_index.get(n["id"], []) as Array).duplicate()
 		if not gt.is_empty():
 			g["tags"] = gt
 		if n.has("selector"):
@@ -1280,7 +1430,7 @@ func _outline_node(n: Dictionary) -> Dictionary:
 			g["children"].append(_outline_node(c))
 		return g
 	var s := {"type": "snippet", "id": n["id"], "beats": []}
-	var stg: Array = _host.tag_index.get(n["id"], [])
+	var stg: Array = (_host.tag_index.get(n["id"], []) as Array).duplicate()
 	if not stg.is_empty():
 		s["tags"] = stg
 	for b in n.get("beats", []):
@@ -1321,11 +1471,12 @@ func _beat_info(beat: Dictionary) -> Dictionary:
 		var src = _host.default_strings.get(beat["id"])  # source text, un-interpolated
 		if src != null:
 			info["text"] = src
+	# The game's own copy of the gameData; extension values are the bundle's own, read-only by contract.
 	if beat.has("gameData") and not (beat["gameData"] as Dictionary).is_empty():
-		info["gameData"] = beat["gameData"]
+		info["gameData"] = _own_game_data(beat)
 	if beat.get("extensions") is Dictionary and not (beat["extensions"] as Dictionary).is_empty():
 		info["extensions"] = beat["extensions"]
-	var tg: Array = _host.tag_index.get(beat["id"], [])
+	var tg: Array = (_host.tag_index.get(beat["id"], []) as Array).duplicate()
 	if not tg.is_empty():
 		info["tags"] = tg
 	return info

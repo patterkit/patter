@@ -68,7 +68,7 @@ bool FPatterplayPluginPathTest::RunTest(const FString& Parameters)
 
 	// --- authored scene order, and the project's own caption cues kept while captions are on -----------
 	{
-		UPatterEngine* Engine = UPatterEngine::Create(Bundle);
+		UPatterEngine* Engine = UPatterEngine::Create(Bundle, {});
 		if (!TestNotNull(TEXT("engine"), Engine)) return false;
 		UPatterFlow* Flow = Engine->OpenFlow(TEXT("f"), TEXT(""));
 		if (!TestNotNull(TEXT("a flow opens with no scene named"), Flow)) return false;
@@ -81,7 +81,7 @@ bool FPatterplayPluginPathTest::RunTest(const FString& Parameters)
 	{
 		FPatterEngineOptions Options;
 		Options.bClosedCaptions = false;
-		UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options);
+		UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options, {});
 		if (!TestNotNull(TEXT("engine with captions off"), Engine)) return false;
 		UPatterFlow* Flow = Engine->OpenFlow(TEXT("f"), TEXT("scn_zz"));
 		if (!TestNotNull(TEXT("flow"), Flow)) return false;
@@ -99,7 +99,7 @@ bool FPatterplayPluginPathTest::RunTest(const FString& Parameters)
 		Options.bLog = true;
 		Options.bUseSeed = true;
 		Options.Seed = 7;
-		UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options);
+		UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options, {});
 		if (!TestNotNull(TEXT("engine with options"), Engine)) return false;
 		UPatterFlow* Flow = Engine->OpenFlow(TEXT("f"), TEXT("scn_aa"));
 		if (!TestNotNull(TEXT("flow"), Flow)) return false;
@@ -109,7 +109,7 @@ bool FPatterplayPluginPathTest::RunTest(const FString& Parameters)
 
 	// --- a number property is a double through Blueprint --------------------------------------------
 	{
-		UPatterEngine* Engine = UPatterEngine::Create(Bundle);
+		UPatterEngine* Engine = UPatterEngine::Create(Bundle, {});
 		if (!TestNotNull(TEXT("engine"), Engine)) return false;
 		Engine->SetPropertyNumber(TEXT("@x"), 0.1);
 		TestEqual(TEXT("0.1 reads back exactly"), Engine->GetPropertyNumber(TEXT("@x")), 0.1);

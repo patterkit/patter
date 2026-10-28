@@ -33,7 +33,7 @@ public:
 	FString Resolve(const FString& BeatId) const;
 
 protected:
-	// Read a manifest into a resolver Create or the deprecated UPatterAudio::Load made.
+	// Read a manifest into a resolver Create made.
 	static UPatterAudioResolver* Fill(UPatterAudioResolver* Audio, const FString& ManifestJson, const FString& BasePath);
 
 	// The core resolver (Pimpl: the std core stays out of this header). Null on an object nothing filled,

@@ -11,8 +11,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k1a333a0e_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0x1a333a0e
-#define WILDWINTER_EXPR_k1a333a0e_PROPERTYBAG_H
+#if !defined(WILDWINTER_EXPR_k481740d0_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0x481740d0
+#define WILDWINTER_EXPR_k481740d0_PROPERTYBAG_H
 
 #include <algorithm>
 #include <cctype>
@@ -26,7 +26,7 @@
 #include "OrderedMap.h"
 #include "Value.h"
 
-namespace wildwinter { namespace expr { inline namespace k1a333a0e
+namespace wildwinter { namespace expr { inline namespace k481740d0
 {
     /** The property type vocabulary (boolean / number / string / enum /
      *  flags). Kept as strings, exactly as the kernel and the bundle carry
@@ -184,6 +184,13 @@ namespace wildwinter { namespace expr { inline namespace k1a333a0e
             return value.isString() && (!stages.has_value() || listed(*stages, value.asString()));
         }
         return true;
+    }
+
+    /** Whether a declaration chose none: an enum whose own default is "". */
+    inline bool ChoosesNone(const ScopeDeclaration& decl)
+    {
+        return decl.type == PropertyTypes::Enum && decl.defaultValue.has_value()
+            && decl.defaultValue->isString() && decl.defaultValue->asString().empty();
     }
 
     inline bool ValueFits(const ScopeDeclaration& decl, const ExprValue& value, bool noneChosen = false)
@@ -404,7 +411,8 @@ namespace wildwinter { namespace expr { inline namespace k1a333a0e
             for (const auto& pair : decls_)
             {
                 const ExprValue* value = saved.get(pair.first);
-                if (!value || ValueFits(pair.second, *value)) continue;
+                // An enum whose own default is "" (none chosen) takes "" back, as a host write does.
+                if (!value || ValueFits(pair.second, *value, ChoosesNone(pair.second))) continue;
                 misfits.push_back(BagMisfit{pair.first, *value});
                 values_.set(pair.first, pair.second.defaultOrTypeDefault());
             }

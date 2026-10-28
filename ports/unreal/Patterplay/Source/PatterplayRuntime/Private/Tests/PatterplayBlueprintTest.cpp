@@ -43,7 +43,7 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("bundle loads"), Bundle)) return false;
 	FPatterEngineOptions Options;
 	Options.bLog = true;
-	UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options);
+	UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options, {});
 	if (!TestNotNull(TEXT("engine"), Engine)) return false;
 
 	// --- the engine's getters, addresses, tags and Game Data -------------------------------
@@ -152,7 +152,6 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("its speaker qualifier"), Knock.Prompt.bHasQualifier && Knock.Prompt.Qualifier == TEXT("radio"));
 		TestTrue(TEXT("and the qualifier's shown name"), Knock.Prompt.bHasQualifierName && Knock.Prompt.QualifierName == TEXT("RADIO"));
 		TestTrue(TEXT("and the speaker's label, the project's pattern filled in"), Knock.Prompt.bHasSpeakerLabel && Knock.Prompt.SpeakerLabel == TEXT("ANNA on the RADIO"));
-		TestEqual(TEXT("the deprecated flat Text still reads"), Knock.Text, FString(TEXT("Knock")));
 		TestTrue(TEXT("a text prompt"), Choices[1].Prompt.Kind == EPatterPromptKind::Text);
 		TestFalse(TEXT("with no speaker"), Choices[1].Prompt.bHasCharacter || Choices[1].Prompt.bHasSpeakerLabel);
 		TestEqual(TEXT("the step carries the same options"), Choice.Options.Num(), 2);

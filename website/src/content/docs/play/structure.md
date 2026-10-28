@@ -136,7 +136,9 @@ step: that resolves through the active locale and follows [`setLocale`](/play/lo
 
 These reads are read-only and static, so they reflect the compiled bundle, not a running flow.
 `gameData` is the author's raw overrides (the same the step carries); merge with your defaults if
-you want the full set. To read one scene's or block's without walking the outline, use
+you want the full set. It's your own copy, as a step's is, so changing it changes nothing the engine
+hands out next. `extensions`, an extension's data, is the bundle's own: treat it as read-only. To read
+one scene's or block's without walking the outline, use
 [`gameDataForScene` / `gameDataForBlock`](/play/integration/#scene-and-block-game-data).
 
 Text comes from the source locale. `text`, `characterName`, `qualifierName`, and `speakerLabel` come from the source language, and an

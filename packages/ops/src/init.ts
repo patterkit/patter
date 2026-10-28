@@ -75,6 +75,7 @@ export function runInit(opts: InitOptions): InitResult {
     schema: PROJECT_SCHEMA,
     project: { id: newId("proj"), name },
     locales: { default: "en", all: ["en"] },
+    start: { scene: sceneId }, // the one scene is where the story starts
     ...(opts.vcs ? { vcs: opts.vcs } : {}), // record the chosen VCS so it can be read / switched later
     voiced: true,
   };
