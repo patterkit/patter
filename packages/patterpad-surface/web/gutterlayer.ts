@@ -34,9 +34,16 @@ export interface GutterOverlayOpts {
   active(view: EditorView): boolean;
   /** Emit the chips for the currently-visible marked nodes, via `topOf` (cull) + `add` (place). */
   paint(ctx: GutterContext): void;
+  /** A LEFT lane: how many px its widest chip needs left of the column, gap included, so the scroller's
+   *  left padding can make room for it (`GUTTER_LEFT_ROOM`). `probe` is the lane's layer, to measure in. */
+  reserve?(view: EditorView, probe: HTMLElement): number;
 }
 
 interface Lane { layer: HTMLElement; opts: GutterOverlayOpts }
+
+/** Set on the scroller while a LEFT lane shows: the room its widest chip needs, which styles.css gives the
+ *  scroller's left padding as a floor. A narrow editor's margin is narrower than a chip, and cut it off. */
+export const GUTTER_LEFT_ROOM = "--gutter-left-room";
 
 interface Conductor {
   scroller: HTMLElement | null;
@@ -60,6 +67,15 @@ function conductorFor(view: EditorView): Conductor {
     raf = 0;
     const sc = view.dom.parentElement;
     if (!sc) return;
+    // A left lane showing reserves its room on the scroller before anything is measured. The room follows
+    // the chips that can show, not the ones on screen, so scrolling never moves the column.
+    const active = new Map([...lanes].map((lane) => [lane, lane.opts.active(view)]));
+    let room = 0;
+    for (const [lane, on] of active) if (on && lane.opts.side === "left" && lane.opts.reserve) room = Math.max(room, lane.opts.reserve(view, lane.layer));
+    const want = room > 0 ? `${Math.ceil(room)}px` : "";
+    if (sc.style.getPropertyValue(GUTTER_LEFT_ROOM) !== want) {
+      if (want) sc.style.setProperty(GUTTER_LEFT_ROOM, want); else sc.style.removeProperty(GUTTER_LEFT_ROOM);
+    }
     // Read the container geometry ONCE for every lane this frame, and cache each node's content-space top
     // (the same for every lane), so overlapping lanes don't re-measure the same beat.
     const er = sc.getBoundingClientRect();
@@ -75,7 +91,7 @@ function conductorFor(view: EditorView): Conductor {
     };
     for (const lane of lanes) {
       lane.layer.replaceChildren();
-      if (!lane.opts.active(view)) continue;
+      if (!active.get(lane)) continue;
       const leftPx = lane.opts.side === "left"
         ? Math.round(dr.left - er.left - lane.opts.gap)   // LEFT of the column - the icon gutter
         : Math.round(dr.right - er.left + lane.opts.gap);  // RIGHT of the column - notes / comments / suggestions
@@ -100,6 +116,7 @@ function conductorFor(view: EditorView): Conductor {
       lanes.delete(lane);
       lane.layer.remove();
       if (lanes.size === 0) { // last lane gone - tear the conductor down
+        scroller?.style.removeProperty(GUTTER_LEFT_ROOM);
         scroller?.removeEventListener("scroll", schedule);
         window.removeEventListener("resize", schedule);
         if (raf) cancelAnimationFrame(raf);

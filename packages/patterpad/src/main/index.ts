@@ -1064,6 +1064,10 @@ function registerIpc(): void {
   });
   ipcMain.handle("covWin:close", () => { windows.get("coverage")?.close(); });
   ipcMain.handle("covWin:run", async (_e, options: import("../shared/api.js").CoverageRunOptions) => {
+    // The sweep reads the project in main, which the editor's text reaches only when it's written (700 ms
+    // after the last change). Write it first, as Replace and the imports do: a run straight after a fix
+    // swept the script from before it, and the fixed row stayed in the table.
+    await flushEditorScene();
     const outcome = await jobs.start("coverage", async (ctx) => project.coverageAsync(options, {
       // The job's cancel flag, in the shape ops asks for. Read through a getter: ops checks it at the
       // top of every run, and the whole point is that it can change between two of them.
@@ -1352,7 +1356,13 @@ function registerIpc(): void {
     searchFocus = { sceneId: id, fromBeatId: caretId }; // keep the search window's content-ranking anchored at the live caret
   });
   ipcMain.handle("play:open", (_e, sceneId: string, blockId?: string) => openPlay(sceneId, blockId));
-  ipcMain.handle("play:start", () => { if (playSceneId) project.startPlay(playSceneId, playBlockId ?? undefined); });
+  // Every run starts here: the window opening, Restart, a language switch, and Play from the editor. The
+  // editor's text inside its write and refresh debounces is written first, so a Restart a moment after an
+  // edit plays what the editor shows rather than what was there before it.
+  ipcMain.handle("play:start", async () => {
+    await flushEditorScene();
+    if (playSceneId) project.startPlay(playSceneId, playBlockId ?? undefined);
+  });
   ipcMain.handle("play:info", () => ({
     address: playSceneId ? project.playAddress(playSceneId, playBlockId ?? undefined) : "",
     pinned: store.window("play").pinned(),

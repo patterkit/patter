@@ -57,6 +57,7 @@ interface StatusState { map: WritingStatusMap; shown: string[] }
 const key = new PluginKey<StatusState>("patterWritingStatus");
 
 const GUTTER_GAP = 12; // px LEFT of the script column - the icon gutter (the pill grows leftward from here)
+const GUTTER_EDGE = 4; // px kept between the widest pill and the editor's left edge
 
 /** The status badge for a beat: a PILL carrying the status NAME, tinted by the rung's palette slot - the
  *  text makes adjacent rungs unmistakable where bare colour dots blurred together. */
@@ -86,10 +87,29 @@ export function writingStatusPlugin(): Plugin<StatusState> {
     // A LEFT-gutter overlay (sibling of the doc on the scroll container, escaping the bubble/block paint
     // containment) holds the status pills, level with each line / prose beat.
     view(editorView) {
+      // The widest pill the shown rungs can draw, measured once per set of names: the margin the scroller
+      // keeps for them (a pill is never cut off at the editor's edge, the hands-on review of October 2026).
+      let measured = { sig: "", px: 0 };
       return createGutterOverlay(editorView, {
         className: "status-gutter",
         gap: GUTTER_GAP,
         side: "left",
+        reserve: (view, probe) => {
+          const names = key.getState(view.state)?.shown ?? [];
+          const sig = JSON.stringify([names, document.fonts?.status]); // measured again once the UI font is in
+          if (sig !== measured.sig) {
+            let px = 0;
+            for (const name of names) {
+              const pill = statusPill(name);
+              pill.style.visibility = "hidden";
+              probe.appendChild(pill);
+              px = Math.max(px, pill.offsetWidth);
+              pill.remove();
+            }
+            measured = { sig, px };
+          }
+          return measured.px + GUTTER_GAP + GUTTER_EDGE;
+        },
         active: (view) => {
           const st = key.getState(view.state);
           // Active only when at least one status is chosen to show AND there's a ladder. An unset beat

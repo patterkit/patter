@@ -158,6 +158,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **Status badges and Settings' buttons aren't cut off in a small window.** With Review ▸ Line Status on, the
+  pills beside the lines were cut off at the editor's left edge in a narrow window; the margin now makes room
+  for the widest one showing. A long status name in the inspector ends in an ellipsis instead of running past
+  a narrow inspector's edge, and Project Settings keeps Save and Cancel in view at the smallest window height.
 - **Your name is offered before a project is open.** The box asking for your name for comments and edits
   now fills in git's global user.name when no project is open, as Storyletter does. It used to come up
   empty in the installed app until a project was open.
@@ -176,6 +180,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **A comment appears as soon as you post it.** A reply posted with the Reply button didn't show until the comment
   popover was closed and opened again, and a second post on a new comment started a second thread. The popover
   now shows each thread as it stands after every change.
+- **Restart plays what the editor shows.** Restarting the play window straight after an edit could play the
+  script from before it until the edit was saved: an edit in a scene the run had jumped into showed live, then
+  went back to the saved copy on Restart, and an edit made just before Restart could be missed. The editor's
+  text is now written before every run starts, and Restart plays the latest edit in whichever scene it's in.
+- **A coverage run includes the edit you've just made.** Running coverage straight after fixing what a row
+  reported could sweep the script from before the fix, so the row stayed in the table. The editor's text is
+  now written before the sweep starts.
 
 ## [0.39.0] - 2026-10-22
 

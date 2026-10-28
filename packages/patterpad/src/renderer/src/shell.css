@@ -293,8 +293,9 @@
    control drops to the next line instead of being pushed off the side. */
 .insp-status { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 6.5px; min-width: 0; }
 /* Text is full --ink and the fill is a soft tint (mixed toward --bg inline via statusTint), so the rung name
-   stays readable on every palette; a saturated --char-N fill would swallow the text. */
-.insp-status-select { font: var(--text-xs) var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--card)); border: none; border-radius: var(--radius-sm); padding: 1.5px 6.5px; max-width: 176px; cursor: pointer; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
+   stays readable on every palette; a saturated --char-N fill would swallow the text. A long rung name ends
+   in an ellipsis inside its row, never past the inspector's edge, however narrow the inspector is. */
+.insp-status-select { font: var(--text-xs) var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--card)); border: none; border-radius: var(--radius-sm); padding: 1.5px 6.5px; max-width: min(176px, 100%); text-overflow: ellipsis; cursor: pointer; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
 .insp-status-select:focus-visible { box-shadow: 0 0 0 1px var(--accent); outline-offset: 0; }
 /* Audio Folders mode (#206): read-only recording status chip (the status is derived from files on disk). */
 .insp-rec-chip { font: var(--text-xs) var(--font-ui); color: var(--ink); background: color-mix(in oklab, var(--muted) 26%, var(--card)); border-radius: var(--radius-sm); padding: 1.5px 6.5px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
@@ -526,9 +527,11 @@
 /* Project Settings is the shell's `mountSettingsDialog` + settings.css (ui-review-2026-09, finding 4); the
    rail, the panels, the Save gate and their classes are its. Two things are this app's: the dialog is WIDE,
    because the Game Data and World lists put several fields on a line, and the body keeps a floor so the
-   dialog does not change height as the tabs change. */
+   dialog does not change height as the tabs change. The floor gives way on a short window: the shell caps
+   the dialog at 82vh, and its title and Save row take about 112px of that, so a fixed 480px pushed Save and
+   Cancel out of sight at the app's minimum height. */
 .settings-dialog { width: min(1024px, 94vw); }
-.settings-body { min-height: 480px; }
+.settings-body { min-height: min(480px, calc(82vh - 112px)); }
 .settings-tabs > * { flex: none; } /* tab BUTTONS would crush on a short window instead of scrolling (#30) */
 /* Scene properties (the inspector's Scene section), on the shell's dialog frame at a list's width. */
 .scene-props-dialog { --dialog-width: 640px; }

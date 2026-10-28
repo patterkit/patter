@@ -40,7 +40,9 @@ header .hint { color: var(--muted); font-size: var(--text-sm); }
 main { display: grid; grid-template-columns: 1fr 416px; gap: 0; flex: 1; min-height: 0; }
 /* tall bottom padding gives the last lines room to rise to the middle (typewriter
    scrolling in main.ts), so we are never forced to edit at the very page bottom. */
-#editor { overflow: auto; padding: 2.5rem clamp(1rem, 4vw, 3rem) 55vh; position: relative; } /* relative: the note-gutter overlay positions against it */
+/* While the writing-status pills show, the left margin is at least the room the widest of them needs
+   (gutterlayer.ts sets --gutter-left-room): a narrow editor's margin cut them off. */
+#editor { overflow: auto; padding: 2.5rem clamp(1rem, 4vw, 3rem) 55vh; padding-left: max(clamp(1rem, 4vw, 3rem), var(--gutter-left-room, 0px)); position: relative; } /* relative: the note-gutter overlay positions against it */
 aside { border-left: 1px solid var(--line); overflow: auto; background: var(--surface); }
 .aside-label { padding: 9.5px 16px; color: var(--muted); font: var(--text-xs) var(--font-ui); border-bottom: 1px solid var(--line); }
 #source { margin: 0; padding: 16px; font: var(--text-sm)/1.5 var(--font-mono); color: var(--muted); white-space: pre-wrap; }

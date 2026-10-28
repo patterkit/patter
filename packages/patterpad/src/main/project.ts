@@ -1624,6 +1624,9 @@ function applyExtensionShardAt(p: LoadedProject, path: string, content: string |
 }
 
 export function saveScene(sceneId: string, flowSource: string, locSource: string, author?: string, extensions: SceneExtensionShards = {}): Promise<SaveResult> {
+  // The play window's stash of this scene's unsaved source, as it stood when the save was asked for. The
+  // editor pushes its source and saves it in order, so a stash already here is no newer than these bytes.
+  const stashAtCall = playLiveSource;
   return enqueueForProject(async () => {
     const s = shards.get(sceneId);
     if (!s) return { ok: false, error: `unknown scene: ${sceneId}` };
@@ -1701,6 +1704,10 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
       // Keep the in-memory project current with the save, so validate / play don't re-read disk.
       try { if (loaded) applyLiveSource(loaded, { sceneId, flow: flowSource, loc: locSource, extensions }); }
       catch (e) { console.warn(`patterpad: saved scene ${sceneId} but couldn't refresh the in-memory copy (reloads on reopen):`, e); }
+      // The saved bytes now stand for the scene, so the play window's older stash of it goes: left, a
+      // Restart laid it over this save and played the edit before the last one. One pushed while the
+      // save was landing is newer, and stays.
+      if (playLiveSource && playLiveSource === stashAtCall && playLiveSource.sceneId === sceneId) playLiveSource = null;
       // The edit trail is an authoring-shard write like any other, and on a scene's FIRST save it CREATES
       // the shard: left out of the model, that new file read as "not in project" to a check that compared
       // disk with these lists (the Hamlet demo, 2026-09-03). Same sync as commitAuthoring.
@@ -2071,8 +2078,9 @@ let playLocale: string | null = null;
 // engine (no restart - resetting the run made changes hard to compare); already-shown lines stay, lines
 // from here on reflect the new setting. A fresh run (Rewind / re-open) starts from this persisted flag.
 let playCaptionsOn = true;
-// The editor's latest UNSAVED source for the scene being played, so Rewind / restart reflect in-progress
-// edits (not just the last save). Pushed from the renderer on edit; applied by startPlay when it matches.
+// The editor's latest UNSAVED source for the scene it last edited, so Restart and the live refresh reflect
+// in-progress edits (not just the last save). Pushed from the renderer on edit; dropped once a save of that
+// scene lands, since the save then holds it.
 let playLiveSource: LiveSceneSource | null = null;
 
 /** Stash the editor's current in-memory source (so the next play (re)start plays the latest edits). */
@@ -2129,15 +2137,18 @@ export function playRefusal(message: string, gameScopesDir?: string): string {
 
 const errBatch = (e: unknown): PlayBatch => ({ steps: [], stop: "error", error: e instanceof Error ? e.message : String(e) });
 
-/** Start (or restart) an interactive run; re-loads from disk so it reflects the last save. When
+/** Start (or restart) an interactive run, on the last save plus the editor's stashed live source. When
  *  `blockId` is given the run ENTERS that block (Play Block), else the scene's start. */
 export function startPlay(sceneId: string, blockId?: string): void {
   if (!loaded) { flow = null; playError = "no project open"; return; }
   ensureHydrated(); // the run compiles the whole project (cross-scene jumps need every scene present)
   try {
     const fresh = workingCopy(loaded);
-    // Play the editor's live (possibly unsaved) source for this scene, so Rewind reflects edits in flight.
-    if (playLiveSource && playLiveSource.sceneId === sceneId) {
+    // Play the editor's live (possibly unsaved) source, so Restart reflects edits in flight. Whichever
+    // scene it is, as the live refresh applies it: only the start scene's was applied, so an edit in a
+    // scene the run had jumped into showed live and then went back to the saved copy on Restart. A
+    // scene deleted since isn't brought back.
+    if (playLiveSource && loaded.scenes.some((s) => s.id === playLiveSource!.sceneId)) {
       try { applyLiveSource(fresh, playLiveSource); } catch { /* malformed in-flight edit -> fall back to the saved copy */ }
     }
     // Run in the chosen play locale (#195) when it's a real declared locale; else the bundle default.
