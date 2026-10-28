@@ -311,6 +311,46 @@ describe("loc-export / loc-import", () => {
     expect(lines).toContain(`dropped 1 translation(s) of action text, which isn't localised while "Localise text lines in dialogue scenes" (localiseDialogueText) is off`);
   });
 
+  // The 2026-10-28 rulings (Q7): a file for one language is refused as another, and only --force-locale
+  // overrides it; a file naming none imports as --locale, with a warning; and the import says what it skipped
+  // and what to check.
+  it("refuses a file for one language imported as another, unless --force-locale", async () => {
+    const dir = makeLocProject();
+    const proj = JSON.parse(readFileSync(join(dir, "game.patterproj"), "utf8")) as { locales: { all: string[] } };
+    proj.locales.all = ["en", "fr", "de"];
+    writeFileSync(join(dir, "game.patterproj"), JSON.stringify(proj));
+    const jsonPath = join(dir, "fr.json");
+    expect(await main(["loc-export", dir, "--format", "json", "--locale", "fr", "-o", jsonPath])).toBe(0);
+    const errors: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((m?: unknown) => { errors.push(String(m)); });
+    expect(await main(["loc-import", jsonPath, dir, "--locale", "de"])).toBe(2);
+    spy.mockRestore();
+    expect(errors.join("\n")).toContain("This file is for 'fr', not 'de', so nothing was imported. Pass --locale fr, or add --force-locale to import it as 'de' anyway.");
+    expect(existsSync(join(dir, "loc", "de"))).toBe(false);
+    expect(await main(["loc-import", jsonPath, dir, "--locale", "fr"])).toBe(0);              // the file's own language
+    expect(await main(["loc-import", jsonPath, dir, "--locale", "de", "--force-locale"])).toBe(0);
+    const de = parseSource(readFileSync(join(dir, "loc", "de", "strings.patterloc"), "utf8")) as { strings: Record<string, string> };
+    expect(de.strings.L1).toBe("Bonjour");
+  });
+
+  it("imports a file naming no language as --locale, with a warning, and lists what it skipped and what to check", async () => {
+    const dir = makeLocProject();
+    const jsonPath = join(dir, "old.json");
+    writeFileSync(jsonPath, JSON.stringify({ project: "loc", defaultLocale: "en", entries: [
+      { id: "T1", scene: "s1", source: "Narration", translation: "Narration {@x}", comments: [], stale: false },
+      { id: "GONE", scene: "s1", source: "Old", translation: "Vieux", comments: [], stale: false },
+    ] }));
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((m?: unknown) => { lines.push(String(m)); });
+    expect(await main(["loc-import", jsonPath, dir, "--locale", "fr"])).toBe(0);
+    spy.mockRestore();
+    expect(lines).toContain("This file doesn't say which language it's for, so it was imported as 'fr'. Check that's the right language.");
+    expect(lines).toContain("imported 1 string(s) for fr across 1 scene(s)");
+    expect(lines).toContain("Skipped 1 line this project doesn't have, so its translation wasn't imported:");
+    expect(lines).toContain("  GONE in 'Opening'");
+    expect(lines).toContain("  T1 in 'Opening': extra {@x}");
+  });
+
   it("rejects an unknown import format and a source-locale import", async () => {
     const dir = makeLocProject();
     writeFileSync(join(dir, "bad.txt"), "x");

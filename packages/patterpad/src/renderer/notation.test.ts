@@ -113,7 +113,7 @@ describe("the coverage meta line", () => {
 describe("the problems bar's copy", () => {
   const problem = (over: Partial<Problem>): Problem => ({ category: "structure", severity: "error", message: "x", ...over });
   const CODES = ["missing-prompt", "invalid-prompt", "unknown-character", "empty-snippet", "empty-container", "empty-scene",
-    "missing-name", "choice-can-empty", "jump-cycle", "multiple-fallbacks", "dangling-jump", "jump-into-non-addressable", "invalid-gameid",
+    "missing-name", "choice-can-empty", "jump-cycle", "unreachable-after-jump", "multiple-fallbacks", "dangling-jump", "jump-into-non-addressable", "invalid-gameid",
     "duplicate-gameid", "stale-build", "merge-conflict", "unknown-qualifier", "invalid-qualifier", "invalid-pad", "pad-overlaps-seam",
     "prompt-pad-without-beat", "qualifier-without-speaker"];
 
@@ -139,6 +139,8 @@ describe("the problems bar's copy", () => {
     expect(problemLineFor(problem({ detail: "missing-prompt" }))).toBe("This option needs a label. What does the player choose here?");
     expect(problemLineFor(problem({ detail: "empty-snippet" }))).toBe("This snippet is empty. Add a line, or send it somewhere.");
     expect(problemLineFor(problem({ detail: "choice-can-empty" }))).toBe("This choice can run dry. Once each option is used up and there's no fallback, it has nothing left to show.");
+    expect(problemLineFor(problem({ severity: "warning", detail: "unreachable-after-jump" })))
+      .toBe("This never plays: something before it always jumps away. Move it before the jump, or remove it.");
     expect(problemLineFor(problem({ detail: "dangling-jump" }))).toBe("This doesn't point anywhere valid. Choose where it goes.");
     expect(problemLineFor(problem({ detail: "invalid-gameid" }))).toBe("This Game ID isn't valid. Use lowercase letters, digits and hyphens.");
     expect(problemLineFor(problem({ detail: "duplicate-gameid" }))).toBe("This Game ID is already used elsewhere. Each one must be unique.");

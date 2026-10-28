@@ -99,8 +99,44 @@ describe("Excel round-trip", () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await catalogToXlsx(catalog) as unknown as ArrayBuffer);
     for (const ws of wb.worksheets) {
+      if (ws.state === "hidden") continue; // the language sheet: no header, and no translator reads it
       expect(ws.views[0], `${ws.name} header is not frozen`).toMatchObject({ state: "frozen", ySplit: 1 });
     }
+  });
+
+  // The 2026-10-28 rulings (Q7): every export says which language it's for, the spreadsheet included, so an
+  // import can refuse a file for one language chosen as another.
+  it("carries its language on a hidden sheet of its own, and reads it back", async () => {
+    const { default: ExcelJS } = await import("exceljs");
+    const buffer = await catalogToXlsx(catalog);
+    const back = await xlsxToCatalog(buffer);
+    expect(back).toMatchObject({ locale: "fr", defaultLocale: "en", project: "demo" });
+    expect(back.entries).toHaveLength(catalog.entries.length); // the language sheet adds no lines
+
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+    const info = wb.getWorksheet("Patter")!;
+    expect(info.state).toBe("hidden");
+    expect(wb.worksheets[wb.worksheets.length - 1]!.name).toBe("Patter"); // last, behind the scene sheets
+    // A template names no language.
+    const template: LocCatalog = { ...catalog, locale: undefined, entries: catalog.entries.map((e) => ({ ...e, translation: "", stale: false })) };
+    expect((await xlsxToCatalog(await catalogToXlsx(template))).locale).toBeUndefined();
+  });
+
+  it("finds the language sheet by its first cell, so a scene called Patter is still a scene", async () => {
+    const named: LocCatalog = { ...catalog, entries: [{ id: "L9", scene: "Patter", source: "Hi", translation: "Salut", comments: [], stale: false }] };
+    const back = await xlsxToCatalog(await catalogToXlsx(named));
+    expect(back.locale).toBe("fr");
+    expect(back.entries).toEqual([expect.objectContaining({ id: "L9", scene: "Patter", translation: "Salut" })]);
+  });
+
+  it("an older spreadsheet, with no language sheet, reads with no locale", async () => {
+    const { default: ExcelJS } = await import("exceljs");
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("s1");
+    ws.addRow(["ID", "Source", "Translation", "Comments", "Status", "Gender", "Scene", "Qualifier"]);
+    ws.addRow(["L1", "Yes.", "Oui.", "", "", "", "s1", ""]);
+    expect((await xlsxToCatalog(Buffer.from(await wb.xlsx.writeBuffer()))).locale).toBeUndefined();
   });
 
   it("still imports a sheet with no Gender column (an older export)", async () => {

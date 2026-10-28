@@ -1,7 +1,7 @@
 # Patterplay for Godot
 
 Play [Patter](https://patterkit.dev/) branching dialogue natively in Godot.
-Patterplay loads a compiled `.patterc` bundle (the file Patterpad's *Build Bundle* or the
+Patterplay loads a compiled `.patterc` bundle (the file Patterpad's *Publish Bundle* or the
 `patter` CLI writes) and plays it in pure GDScript: no web view, no native extension to
 compile. Every Patterplay runtime plays the same bundle with the same behaviour, so a story
 authored once runs identically here, on the web, in Unity, and in Unreal.

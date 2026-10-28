@@ -148,3 +148,43 @@ describe("runVoiceScript: plain text for the booth", () => {
     }
   });
 });
+
+// The 2026-10-28 rulings (Q9): the voice script carries each line's inline direction, so the actor reads the
+// parenthetical beside the line, and the spreadsheet has a Direction column for it.
+describe("runVoiceScript: the line's direction", () => {
+  function makeDirected(): string {
+    const dir = mkdtempSync(join(tmpdir(), "patter-vo-dir-"));
+    for (const d of ["scenes", "loc/en", "authoring"]) mkdirSync(join(dir, d), { recursive: true });
+    const w = (p: string, o: unknown) => writeFileSync(join(dir, p), JSON.stringify(o));
+    w("game.patterproj", { schema: "patter/project@0", project: { id: "vd", name: "VD" }, locales: { default: "en", all: ["en"] }, voiced: true, cast: [{ name: "ANNA" }] });
+    w("scenes/one.patterflow", { schema: "patter/flow@0", scene: { id: "s1", type: "scene", name: "S", blocks: [{ id: "b1", type: "block", name: "M", children: [
+      { id: "n1", type: "snippet", beats: [
+        { id: "L1", kind: "line", character: "ANNA", direction: "<i>whispering</i>" },
+        { id: "L2", kind: "line", character: "ANNA" },
+        { id: "L3", kind: "line", character: "ANNA", direction: "  " },
+      ], jump: { to: "END" } },
+    ] }] } });
+    w("loc/en/strings.patterloc", { schema: "patter/strings@0", scene: "s1", locale: "en", strings: { L1: "Over here.", L2: "Now.", L3: "Go." } });
+    return dir;
+  }
+
+  it("carries the direction as plain text, and leaves it out of a line without one", () => {
+    const byId = Object.fromEntries(runVoiceScript(loadProject(makeDirected()), { everything: true }).lines.map((l) => [l.id, l]));
+    expect(byId["L1"]!.direction).toBe("whispering"); // markup stripped for the booth, as the text's is
+    expect(byId["L2"]).not.toHaveProperty("direction");
+    expect(byId["L3"]).not.toHaveProperty("direction"); // blank is none
+  });
+
+  it("puts it in a Direction column, just before the text", async () => {
+    const vs = runVoiceScript(loadProject(makeDirected()), { everything: true });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await voiceScriptToXlsx(vs) as unknown as ArrayBuffer);
+    const ws = wb.worksheets[0]!;
+    const header = (ws.getRow(1).values as unknown[]).slice(1).map(String);
+    const col = header.indexOf("Direction") + 1;
+    expect(col).toBeGreaterThan(0);
+    expect(header[col]).toBe("Text");
+    expect(String(ws.getRow(2).getCell(col).value)).toBe("whispering");
+    expect(ws.getRow(3).getCell(col).value ?? "").toBe("");
+  });
+});

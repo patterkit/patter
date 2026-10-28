@@ -9,9 +9,10 @@ extends EditorPlugin
 # THE EXPORT PLUGIN IS NOT OPTIONAL (#45). Importing a bundle makes Godot ship the imported product
 # and drop the source, so `FileAccess.get_file_as_string("res://game.patterc")` - how every project
 # loads a bundle - read NOTHING in an exported build. That shipped in 0.4.3 and broke real games.
-# The export plugin puts the raw bundle back at its own path and skips the imported product, so a
-# build carries exactly what it did before any of this, at the same size. The three are one feature:
-# importing without exporting is the bug.
+# The export plugin puts the raw bundle back at its own path, and in place of the imported product
+# ships a small stand-in resource (and the import remap) that reads that same file, so `load()` still
+# gives a PatterBundleResource and the bundle ships once. The three are one feature: importing
+# without exporting is the bug.
 #
 # ports/godot/test/export_check.sh is the gate. It exports a project and RUNS the pack, because
 # everything else here runs in the editor, where the file is on disk whatever the addon does to it.

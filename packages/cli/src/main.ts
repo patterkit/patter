@@ -20,7 +20,7 @@ import { canonicalStringify, parseSource } from "@patterkit/core";
 import {
   loadProject, runValidate, runExport, runExportHtml, bundleOutputPath, besideBundlePath, runFormat, runPlay, renderPlay, runCoverage, renderCoverageText, proposeCoverageDrivers, runInit, runResolve, runPropertyUsage,
   runReport, renderReportText, runReportXlsx, runPack, runUnpack, runUnpackMerge, runMerge, planBuild, UnsupportedMergeError, SHARD_EXTENSIONS, CONFLICT_SIDECAR,
-  extractLoc, applyLoc, describeLocExport, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
+  extractLoc, applyLoc, describeLocExport, describeLocImport, importLocale, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf, scanAudioStatus,
   planShareScopes, defaultGameScopesDir, GAME_SCOPES_DIR,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, qualifierNamer,
@@ -120,13 +120,14 @@ Usage:
                  [--propose]   (print auto-proposed @world input drivers instead of running)
   patter resolve <query> [path]   Find a line by id, Game ID, or name: shows where it lives + what it says
   patter usage   <query> [path]   Find where a property is used (conditions / effects / text)
-                 [--json]   (query: @gold · world.threat · "faction rebels"; quote a value)
+                 [--json]   (query: @gold, world.threat, or "faction rebels"; quote a value)
   patter report  [path]           Production report: status, burndown, recording coverage (alias: stats)
                  [--xlsx file] [--json]  Also write the spreadsheet / emit JSON (for pipelines)
   patter loc-export [path] -o file  Export strings for translation (-o - streams json or po)
                  --format json|xlsx|po  [--locale xx]   (no --locale = a blank template / POT)
   patter loc-import <file> [path]  Import translated strings back into the project
-                 [--locale xx]     (format by extension; --locale overrides the file's)
+                 [--locale xx] [--force-locale]   (format by extension; a file for another
+                 language is refused unless --force-locale imports it as --locale)
   patter export-script [path] [-o file.pdf|.docx]  Readable screenplay of the script + flow
                  (dialogue, text, choices, jumps). Format from the extension; default
                  beside the bundle, as .pdf. The PDF embeds its fonts and covers any script or emoji.
@@ -175,7 +176,7 @@ const FLAGS = {
   usage: { boolean: ["json"], valued: [], positionals: 2 },
   report: { boolean: ["json"], valued: ["xlsx"], positionals: 1 },
   "loc-export": { boolean: [], valued: ["format", "o", "locale"], positionals: 1 },
-  "loc-import": { boolean: [], valued: ["locale"], positionals: 2 },
+  "loc-import": { boolean: ["force-locale"], valued: ["locale"], positionals: 2 },
   "voice-export": { boolean: ["all"], valued: ["o"], positionals: 1 },
   "export-script": { boolean: [], valued: ["o"], positionals: 1 },
   "export-editable": { boolean: ["status", "cast", "all-notes"], valued: ["o", "recipient", "by"], repeatable: ["scene"], positionals: 1 },
@@ -206,7 +207,7 @@ const SHORT: Record<Command, string> = {
   usage: "usage <query> [path] [--json]",
   report: "report [path] [--xlsx FILE] [--json]",
   "loc-export": "loc-export [path] -o FILE --format json|xlsx|po [--locale xx]",
-  "loc-import": "loc-import <file> [path] [--locale xx]",
+  "loc-import": "loc-import <file> [path] [--locale xx] [--force-locale]",
   "voice-export": "voice-export [path] -o FILE.xlsx [--all]",
   "export-script": "export-script [path] [-o FILE.pdf|FILE.docx]",
   "export-editable": "export-editable [path] -o FILE.docx [--scene name]... [--recipient X] [--status] [--cast] [--all-notes] [--by name]",
@@ -699,14 +700,26 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       else if (ext === ".po" || ext === ".pot") catalog = poToCatalog(readFileSync(file, "utf8"));
       else if (ext === ".xlsx") catalog = await xlsxToCatalog(readFileSync(file));
       else return usage("loc-import", `unknown format '${ext}' (.json | .po | .xlsx)`);
-      const locale = typeof flags.locale === "string" ? flags.locale : catalog.locale; // --locale overrides the file's
-      if (!locale) return usage("loc-import", "no locale (the file carries none; pass --locale xx)");
+      // A file for one language is refused as another (the 2026-10-28 rulings): --locale names the language
+      // to import as, and only --force-locale overrides the file's own. A file naming none (an older
+      // spreadsheet) takes --locale, with a warning.
+      const chosen = typeof flags.locale === "string" ? flags.locale : undefined;
+      const picked = importLocale(catalog.locale, chosen, { force: flags["force-locale"] === true });
+      if (!picked.ok) {
+        return usage("loc-import", picked.reason === "mismatch"
+          ? `${picked.error} Pass --locale ${catalog.locale}, or add --force-locale to import it as '${chosen}' anyway.`
+          : `${picked.error} Pass --locale xx.`);
+      }
+      const locale = picked.locale;
       if (locale === loaded.project.locales.default) return usage("loc-import", `'${locale}' is the source locale - nothing to import`);
-      const { writes, stats } = applyLoc(loaded, { ...catalog, locale });
-      if (writes.length === 0) { console.log("no translations to import"); return 0; }
+      if (picked.warning) console.log(picked.warning);
+      const { writes, stats, report } = applyLoc(loaded, { ...catalog, locale });
+      const told = describeLocImport(loaded, report); // what it skipped, and what to check
+      if (writes.length === 0) { console.log("no translations to import"); for (const l of told) console.log(l); return 0; }
       if (!commitWrites(writes)) return 1;
       console.log(`imported ${stats.updated} string(s) for ${locale} across ${stats.files} scene(s)`);
       if (stats.dropped) console.log(`dropped ${stats.dropped} translation(s) of action text, which isn't localised while "Localise text lines in dialogue scenes" (localiseDialogueText) is off`);
+      for (const l of told) console.log(l);
       return 0;
     }
 

@@ -50,7 +50,7 @@ and copyright notice; installed from npm, those libraries sit in `node_modules` 
 
 ### `patter init [dir]`
 Scaffold a new project: `<dir>.patter` with a starter scene and VCS config.
-`--name X` · `--vcs git|perforce|plastic|svn` · `--bundle commit|ignore`. (`init .`
+Options: `--name X`, `--vcs git|perforce|plastic|svn`, and `--bundle commit|ignore`. (`init .`
 in place stays a plain folder.)
 
 ### `patter validate [path]`
@@ -76,7 +76,7 @@ reports what *would* change and writes nothing, exiting **1** if anything differ
 
 ### `patter export [path] [-o file]`
 Compile to a `.patterc` bundle (a single JSON file). Defaults to the project's configured
-output, else `patter-dist/<name>.patterc` beside the project folder, where Patterpad's **Build Bundle**
+output, else `patter-dist/<name>.patterc` beside the project folder, where Patterpad's **Publish Bundle**
 writes too; `-o -` writes to stdout. `--ids` builds an IDs-only bundle (ships no strings);
 `--source-debug` is IDs-only but embeds the source language for debug playback. A project
 `validate` finds errors in (a jump to nowhere, a condition that doesn't parse) is refused, with the
@@ -104,7 +104,7 @@ source language, as [Building & shipping](/setup/building-and-shipping/) describ
 Run the story through Patterplay **non-interactively** and print a transcript, for
 scripted checks and CI, not for exploring (to actually play through a story, use Patterpad's Play
 window). Choices come from `--choices a,b,c` (option ids taken in order; otherwise the first
-eligible is picked). `--scene id` · `--block id` · `--seed N`. A line with a speaker qualifier
+eligible is picked). Also `--scene id`, `--block id`, and `--seed N`. A line with a speaker qualifier
 prints it after the name, `TAM (O.S.): …`. Exits **1** if the playthrough
 didn't reach the end, or if a condition or effect failed on the way (the engine plays on past it, and
 the transcript marks it with `!`): a completion gate for CI. A line that names another engine's scope
@@ -116,8 +116,8 @@ Narrative coverage: play the story many times with random choices and tally how 
 beat is reached, flagging never-reached content (`‼`, or `?` when it may just need an input) and
 content reached in fewer than 5% of runs (`~`). The table lists each beat's **reached** (the share of
 runs that played it) and **played** (times it played in all runs), least reached first; `--order
-script` lists them in the script's order instead, scene by scene. `--runs N` · `--max-steps M` ·
-`--seed S` · `--scene id` · `--block id`. `--json` for pipelines; `--fail-on-gap` exits **1** if any
+script` lists them in the script's order instead, scene by scene. Also `--runs N`, `--max-steps M`,
+`--seed S`, `--scene id`, and `--block id`. `--json` for pipelines; `--fail-on-gap` exits **1** if any
 beat is never reached (a CI gate). `--propose` prints auto-proposed `@world` coverage drivers instead
 of running. The same check has a window in Patterpad (**Review ▸ Coverage Test…**); see
 [Coverage testing](/production/coverage-testing/) for how to read it.
@@ -145,7 +145,7 @@ project, recording status is derived from the takes on disk, the same numbers Pa
 shows.
 
 ### `patter loc-export [path] -o file`
-Export strings for translation. `--format json|xlsx|po` (required) · `--locale xx`
+Export strings for translation. `--format json|xlsx|po` (required), and `--locale xx`
 (omit for a blank template / POT). `-o -` writes JSON or PO to stdout. Each string carries its translator context, including
 the speaker's [grammatical
 gender](/production/localisation/#who-is-speaking-grammatical-gender).
@@ -154,16 +154,24 @@ text lines it left out and that `localiseDialogueText` is off (see [Why lines ar
 export](/production/localisation/#why-lines-are-missing-from-an-export)), then lists every text line
 that has dropped out of the loc files or come into them since, by id and scene.
 
-### `patter loc-import <file> [path]`
-Import a translated file back; the format is read from the extension, and `--locale xx`
-overrides the file's locale. A file naming a scene the project doesn't have, or a language it doesn't
-declare, is refused and nothing is written. Any translation of a line that's now action is dropped,
-and the import says how many.
+### `patter loc-import <file> [path] [--locale xx] [--force-locale]`
+Import a translated file back; the format is read from the extension. `--locale` names the language
+to import as. Every export records its language (JSON `locale`, PO `Language:`, and a hidden "Patter"
+sheet in Excel), and a file for a different language than `--locale` is refused, writing nothing,
+unless you add `--force-locale`. Without `--locale`, the file's own language is used. A file that
+names no language (an Excel export from before this check) imports as `--locale`, with a warning.
+
+A file naming a scene the project doesn't have, or a language it doesn't declare, is refused and
+nothing is written. Lines the project no longer has are skipped and listed. A translation whose
+`{@…}` placeholders or `<b>`/`<i>`/`<bi>` formatting don't match the current source is imported and
+listed, after the counts. Any translation of a line that's now action is dropped, and the import says
+how many.
 
 ### `patter voice-export [path] -o file.xlsx`
 A voice-recording script. Requires a **Voiced** project (`voiced: true`), or it exits with an
 error. `--all` includes every voiced line (otherwise only those ready to record). In an
-**Audio Folders** project, each line's status column is derived from the takes on disk.
+**Audio Folders** project, each line's status column is derived from the takes on disk. The
+spreadsheet has a Direction column with each line's performance direction.
 
 ## Sharing & merging
 
@@ -208,9 +216,11 @@ writes only the shards the merge changed, and never brings back a scene you dele
 pack.
 
 ### `patter merge BASE OURS THEIRS`
-A 3-way structural merge of Patter source **by node id**. `-o out` (otherwise stdout)
-· `--type flow|loc|authoring|project` (otherwise auto-detected) · `--json`. Conflicts
-write a provisional result plus a `.patterconflict` sidecar and exit **1**. As git's merge driver
+A 3-way structural merge of Patter source **by node id**. `-o out` (otherwise stdout),
+`--type flow|loc|authoring|project` (otherwise auto-detected), and `--json`. Conflicts
+write a provisional result (our side) with each clash recorded under its `unresolved` entry, plus a
+`.patterconflict` sidecar saying what each side had, and exit **1**. Validate, export, and pack refuse
+both until the clash is resolved and its entry removed. As git's merge driver
 it runs as `patter merge %O %A %B -o %A --path %P`: `-o` is git's temporary file, and `--path`
 names the real one, so the sidecar lands beside the shard where validate finds it. Input that is not
 Patter source exits **2**, so the version control can fall back to its own merge.

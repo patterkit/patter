@@ -130,7 +130,7 @@ void UTourRunnerWidget::HandleEnded()
 {
 	if (ChoiceList) ChoiceList->ClearChildren();
 	if (ContinueButton) ContinueButton->SetVisibility(ESlateVisibility::Collapsed);
-	Show(FString(), TEXT("- The End -"));
+	Show(FString(), TEXT("The End"));
 }
 
 void UTourRunnerWidget::HandleContinue()

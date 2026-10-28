@@ -186,7 +186,7 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
           pdf.fontSize(8); draw(split(el.label.toUpperCase(), "Sans-Bold", ACCENT), cx, { width: w, characterSpacing: 1.2 });
           break;
         case "else":
-          pdf.fontSize(8); draw(split("ELSE · CATCH-ALL", "Sans", MUTED), cx, { width: w, characterSpacing: 1 });
+          pdf.fontSize(8); draw(split("ELSE (CATCH-ALL)", "Sans", MUTED), cx, { width: w, characterSpacing: 1 });
           break;
         case "option": {
           // ◇ marker out-dented (hanging); a quiet uppercase flag tag right-aligned on the first line.

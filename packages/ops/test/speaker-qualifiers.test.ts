@@ -97,7 +97,7 @@ describe("voice script export", () => {
     await wb.xlsx.load(await voiceScriptToXlsx(runVoiceScript(loaded, { everything: true })) as unknown as ArrayBuffer);
     const ws = wb.getWorksheet("Voice Script")!;
     const header = (ws.getRow(1).values as unknown[]).slice(1).map(String);
-    expect(header).toEqual(["Scope", "Line ID", "Character", "Qualifier", "Actor", "Text", "Comments", "Status"]);
+    expect(header).toEqual(["Scope", "Line ID", "Character", "Qualifier", "Actor", "Direction", "Text", "Comments", "Status"]);
     expect(String(ws.getRow(3).getCell(3).value)).toBe("TAM");
     expect(String(ws.getRow(3).getCell(4).value)).toBe("O.S.");
     expect(ws.getRow(2).getCell(4).value ?? "").toBe("");

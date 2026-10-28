@@ -69,10 +69,12 @@ Patter wires this into your VCS for you. On **git** it registers a merge driver,
 commands where a system needs them).
 
 When there *is* a real conflict, Patter never leaves raw `<<<<<<<` markers inside your files. The
-merged file stays valid and provisionally keeps your side, and the clash is recorded in a
-**`.patterconflict`** file next to it. A leftover `.patterconflict` is an error that
-[`patter validate`](/cli/) reports, so an unresolved merge can't be built or shipped by
-accident.
+merged file stays valid and provisionally keeps your side. The clash is recorded in the merged file
+itself, under an **`unresolved`** entry that travels with it, and in a **`.patterconflict`** file next
+to it that says what each side had (that one is for you to read, not to commit).
+[`patter validate`](/cli/), `export`, and `pack` refuse a project with either, so an unresolved merge
+can't be built or shipped by accident. To resolve one, make the content right, remove its entry from
+`unresolved`, and delete the `.patterconflict` file.
 
 ## Same rules for automation
 

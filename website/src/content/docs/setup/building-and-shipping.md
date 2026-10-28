@@ -120,19 +120,29 @@ three different acts:
 | Take back | **Merge Returned Patterpack…** | folds their changes into the project you have open |
 
 **Merge Returned Patterpack** asks for two files, in this order: the pack that came *back*, then the
-pack you *sent*. It then shows you what it found before writing anything, so you can back out. Where
-you both changed the same line, your version is kept and a `.patterconflict` file is left beside the
-shard saying what disagreed. Those are ordinary files: resolve them the way you would a version-control
-conflict, and delete them when you're done (`patter validate` fails while one is still lying about).
+pack you *sent*. It merges straight away and tells you what it did, with an **Undo** button on the
+message (Edit ▸ Undo works too). It asks first only when something looks wrong, as below.
 
-If the pack that came back, the pack you sent and your open project don't all belong to the same
+Where you both changed the same line, your version is kept for now and the clash is recorded in two
+places:
+
+- **An `unresolved` entry inside the shard itself.** It travels with the file: into version control,
+  through CI, and into any pack you send on, so nobody can miss it. `patter validate`, `patter export`,
+  and `patter pack` all refuse a project while one is there.
+- **A `.patterconflict` file beside the shard**, saying what each side had. It's for you to read while
+  you resolve the clash; don't commit it. A leftover one is refused too.
+
+To resolve a clash, make the line read the way it should, remove its entry from the shard's
+`unresolved` list, and delete the `.patterconflict` file.
+
+If the pack that came back, the pack you sent, and your open project don't all belong to the same
 project, Patterpad says so first and makes **Cancel** the default. It's a warning rather than a
 refusal, since a project can legitimately be forked, but usually it means one of the two files was
 the wrong one. `patter unpack --merge` prints the same warning.
 
 :::note
-A merge edits the open project in place and **can't be undone from the Edit menu**. Commit or check in
-before you run one, and your version control is the way back.
+A merge edits the open project in place. **Undo** takes it back while Patterpad is open; after that,
+your version control is the way back, so commit or check in before you run one.
 :::
 
 ### The game's shared scopes travel too

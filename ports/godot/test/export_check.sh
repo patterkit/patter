@@ -10,13 +10,13 @@
 # Skips (exit 0) when Godot or its export templates are missing, so it can sit in a script that runs
 # anywhere; it is a MAINTAINER gate, not a CI one, until a runner has an engine on it.
 #
-# Two assertions, and the first is the one that would have caught #45 on any machine:
+# What it checks:
 #
-#   1. The addon must NOT turn a bundle into an imported resource. `.patterc` is a plain file that
-#      games read with FileAccess; an importer changes how it ships and what `res://x.patterc`
-#      resolves to. If a .patterc.import appears, or ResourceLoader claims the path, that is the fault.
+#   1. Reported, not judged: whether the addon imports `.patterc` (it does: a PatterBundleResource).
 #   2. With the documented export setting (`*.patterc` in "filters to export non-resource files"), an
-#      exported pack must contain the bundle and the game must play its first beat from it.
+#      exported pack must let the game read the bundle BOTH ways, with FileAccess (the raw file, how
+#      every project loads one) and with `load()` (the imported PatterBundleResource), and play its
+#      first beat from it.
 #
 # The pack is run from a directory with NO project.godot above it. Getting that wrong makes the test
 # read the source tree instead of the pack, which is how three of my earlier results said "fine" about
@@ -73,6 +73,13 @@ func _ready() -> void:
 	print("EXPORT CHECK: FileAccess chars=", text.length(), " ResourceLoader.exists=", ResourceLoader.exists(path))
 	if text == "":
 		print("EXPORT CHECK: FAIL - the exported build cannot read ", path)
+		get_tree().quit(1)
+		return
+	# The imported route too: `load()` gives the PatterBundleResource, as it does in the editor. Before the
+	# October 2026 fix the export dropped the import remap, so this was null in every build.
+	var res = load(path)
+	if not (res is PatterBundleResource) or res.json_text != text:
+		print("EXPORT CHECK: FAIL - load(\"", path, "\") gave no PatterBundleResource holding the bundle")
 		get_tree().quit(1)
 		return
 	var bundle = PatterBundle.load_from_string(text)

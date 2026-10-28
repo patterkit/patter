@@ -67,6 +67,11 @@ reappears in the recording script as work to do, and the production report pulls
 **re-record** tally rather than leaving it hidden in "recorded". The audio file itself is untouched
 (you can still play the bad take from the inspector) until a new one replaces it.
 
+Patterpad also ticks it for you when you **change what a recorded or final line says**: the take no
+longer matches the script. Undo the edit and the tick goes with it. Changing only spaces or
+formatting, or the line's direction, leaves it alone, since the actor would say the same words. A
+line with no take yet, or only a scratch take, isn't flagged.
+
 When you tick it and the line has no [VO note](/patterpad/reviewing/) yet, Patterpad opens the note
 editor so you can jot down **why** it needs redoing. That note travels with the line into the
 recording script, so whoever records the retake sees the reason. The flag lives in your project, not

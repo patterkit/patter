@@ -12,6 +12,8 @@
 //     on the FIRST line of a run - the enclosing group / option's `vo` notes
 //     prepended (so the actor sees which option / beat this is).
 //   - Status = the line's RECORDING status (missing / scratch / recorded / final).
+//   - DIRECTION = the line's inline performance direction (the parenthetical), so the actor reads it beside
+//     the line it belongs to.
 //   - QUALIFIER = the line's speaker qualifier by its shown name (V.O., RADIO): how the line is delivered
 //     and processed. The CHARACTER stays the one character, so `TAM` and `TAM (O.S.)` are one actor's lines.
 // ---------------------------------------------------------------------------
@@ -33,6 +35,9 @@ export interface VoiceLine {
   qualifier?: string;
   /** The cast member's voice actor, if known. */
   actor?: string;
+  /** The line's inline performance direction (the parenthetical, `whispering`), when it has one. Language-neutral,
+   *  and plain text like `text`. */
+  direction?: string;
   /** The line's source-locale text. */
   text: string;
   /** `vo` notes: the line's own, plus the enclosing group/option's on the first line of a run. */
@@ -115,6 +120,7 @@ export function runVoiceScript(loaded: LoadedProject, opts: { everything?: boole
       character: beat.character ?? "",
       ...(beat.qualifier ? { qualifier: qualifierName.get(beat.qualifier) ?? beat.qualifier } : {}),
       actor: beat.character ? actorOf.get(beat.character) : undefined,
+      ...(beat.direction?.trim() ? { direction: plainVoice(beat.direction.trim()) } : {}),
       text: plainVoice(source[beat.id] ?? ""),
       comments: leadingVo ? [...leadingVo, ...own] : own, // first line of the run gets the enclosing context
       recordingStatus: recordingOf(beat.id),

@@ -2390,6 +2390,11 @@ async function writeScene(): Promise<boolean> {
   const res = await window.patter.saveScene(sceneId, src.flow, src.loc, src.extensions);
   if (res.ok) {
     if (sceneId === surfaceSceneId && openDisk) openDisk = afterWrite(openDisk, src);
+    // Editing a recorded line's spoken text flags it for re-record (and undoing the edit unflags it): show it.
+    if (res.rerecord && sceneId === currentSceneId) {
+      rerecordMap = res.rerecord;
+      lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
+    }
     void refreshProblems(); void refreshVcStatus(); return true; // re-validate + re-badge what's on disk
   }
   if (res.reread && sceneId === currentSceneId) {
@@ -3243,12 +3248,15 @@ async function openLocalisation(): Promise<void> {
     else status.textContent = `Couldn't export. ${res.error ?? "Try again, and check the file isn't locked in version control."}`;
   })());
   importBtn.addEventListener("click", () => void (async () => {
-    const fallback = localeSel.value || undefined; // used when the file carries no locale (Excel)
+    // The language picked: a file for another is refused, and one naming none (an older spreadsheet) imports
+    // as it. With the template picked, the file's own language is used.
+    const chosen = localeSel.value || undefined;
     status.textContent = "Importing…"; showChanges();
-    const res = await window.patter.importLoc(fallback);
+    const res = await window.patter.importLoc(chosen);
     if (res.ok) {
       status.textContent = `Imported ${res.updated ?? 0} string(s) for ${res.locale} across ${res.files ?? 0} scene(s).`
         + (res.dropped ? ` Dropped ${res.dropped} translation(s) of action text, which isn't translated while "Localise text lines in dialogue scenes" is off.` : "");
+      showChanges(res.report); // a missing language, the lines skipped, and the translations to check
       await refreshProblems(); // the bundle is now stale relative to the new strings
     } else if (res.canceled) status.textContent = "";
     else status.textContent = `Import failed: ${res.error ?? "unknown error"}`;

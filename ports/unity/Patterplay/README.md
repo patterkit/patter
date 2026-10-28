@@ -1,7 +1,7 @@
 # Patterplay for Unity
 
 Play [Patter](https://patterkit.dev/) branching dialogue natively in Unity.
-Patterplay loads a compiled `.patterc` bundle (the file Patterpad's *Build Bundle* or the
+Patterplay loads a compiled `.patterc` bundle (the file Patterpad's *Publish Bundle* or the
 `patter` CLI writes) and plays it directly in C#: no web view, no JavaScript, no IPC. Every
 Patterplay runtime plays the same bundle with the same behaviour, so a story authored once
 runs identically here, on the web, in Unreal, and in Godot.

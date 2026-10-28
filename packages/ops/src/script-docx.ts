@@ -77,7 +77,7 @@ export function paragraph(el: ScriptElement, prev: ScriptElement | undefined): P
     case "group":
       return new Paragraph({ keepNext: true, spacing: { before: 260, after: 60 }, indent: { left: el.indent * STEP }, children: [new TextRun({ text: el.label.toUpperCase(), font: SANS, bold: true, allCaps: true, color: TOKENS.accent, size: S.label, characterSpacing: 14 })] });
     case "else":
-      return new Paragraph({ keepNext: true, spacing: { before: 140, after: 20 }, indent: { left: el.indent * STEP }, children: [new TextRun({ text: "else · catch-all", font: SANS, allCaps: true, color: TOKENS.muted, size: S.label, characterSpacing: 12 })] });
+      return new Paragraph({ keepNext: true, spacing: { before: 140, after: 20 }, indent: { left: el.indent * STEP }, children: [new TextRun({ text: "else (catch-all)", font: SANS, allCaps: true, color: TOKENS.muted, size: S.label, characterSpacing: 12 })] });
     case "option": {
       const kids: TextRun[] = [new TextRun({ text: "◇  ", color: TOKENS.accent, size: S.body }), ...bodyRuns(el.runs, TOKENS.ink)];
       if (el.tag) kids.push(new TextRun({ text: "\t", size: S.body }), new TextRun({ text: el.tag, font: SANS, smallCaps: true, color: TOKENS.muted, size: S.tag }));

@@ -654,7 +654,7 @@ async function exportLoc(request: LocExportRequest): Promise<ExportResult> {
 }
 
 /** Import a translated file through a native Open dialog; applies it (format by extension). */
-async function importLoc(fallbackLocale?: string): Promise<LocImportResult> {
+async function importLoc(chosenLocale?: string): Promise<LocImportResult> {
   if (!win) return { ok: false, error: "no window" };
   const r = await dialog.showOpenDialog(win, {
     title: "Import localisation",
@@ -665,7 +665,7 @@ async function importLoc(fallbackLocale?: string): Promise<LocImportResult> {
   });
   const file = r.filePaths[0];
   if (r.canceled || !file) return { ok: false, canceled: true };
-  return project.locImport(file, fallbackLocale);
+  return project.locImport(file, chosenLocale);
 }
 
 /** Import a custom Hunspell spell-check dictionary (#177): pick the `.dic`; its matching `.aff` sibling
@@ -1226,7 +1226,7 @@ function registerIpc(): void {
   ipcMain.handle("patterpack:mergeDrop", () => { pendingMerge = null; });
   ipcMain.handle("project:shareScopes", () => shareScopesDialog());
   ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => publishJob(() => exportLoc(request)));
-  ipcMain.handle("project:importLoc", (_e, fallbackLocale?: string) => importLoc(fallbackLocale));
+  ipcMain.handle("project:importLoc", (_e, chosenLocale?: string) => importLoc(chosenLocale));
   ipcMain.handle("project:readSettings", () => project.readSettings());
   ipcMain.handle("project:renameStages", async (_e, renames: StageRenameDto[]) => {
     // The open scene's unsaved edits (its own @scene declarations among them) go to disk first, and it

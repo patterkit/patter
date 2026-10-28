@@ -7,7 +7,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
 import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runFieldBrowse, listGameDataFields, runReplace, renameStage, renameGameDataStage, stageDialect, stageGateCount, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
-  extractLoc, applyLoc, describeLocExport, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
+  extractLoc, applyLoc, describeLocExport, describeLocImport, importLocale, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs, handoffWrite,
   discoverGameScopes, gameScopesCatalogue, gameScopeTokens, worldSettingsScopes, planWorldSave, planShareScopes, defaultGameScopesDir,
@@ -260,15 +260,78 @@ function projectStringStamp(
 /** Build the planned write that stamps the edit trail into the scene's authoring shard (merged over any
  *  existing authoring, so comments / docs / status are untouched): the scene-level author trail plus a
  *  per-STRING `modifiedAt` for each source string whose text changed - the latter is what makes a
- *  translated line go stale on the next localisation export (loc / report read `modifiedAt` per id). */
-function editTrailWrite(s: SceneShards, sceneId: string, author: string | undefined, changedStringIds: string[]): { path: string; content: string; af: AuthoringFile } {
+ *  translated line go stale on the next localisation export (loc / report read `modifiedAt` per id). Also
+ *  sets and clears the re-record flags a change of spoken text calls for (`rerecordOnEdit`), so they land
+ *  in the same write as the edit. */
+function editTrailWrite(s: SceneShards, sceneId: string, author: string | undefined, changedStringIds: string[], rerecord?: RerecordChange | null): { path: string; content: string; af: AuthoringFile } {
   return authoringWrite(s, (af) => {
     const now = new Date().toISOString();
     const edits = { ...af.edits };
     if (author) edits[sceneId] = { ...edits[sceneId], modifiedAt: now, by: author }; // scene author trail
     for (const id of changedStringIds) edits[id] = { ...edits[id], modifiedAt: now }; // per-string staleness signal
     af.edits = edits;
+    if (rerecord) {
+      const flags: Record<string, boolean> = { ...af.rerecord };
+      for (const id of rerecord.set) flags[id] = true;
+      for (const id of rerecord.clear) delete flags[id];
+      af.rerecord = Object.keys(flags).length ? flags : undefined;
+    }
   });
+}
+
+/** Re-record flags a scene save sets and clears. */
+interface RerecordChange { set: string[]; clear: string[] }
+
+/** Lines this session flagged for re-record because their spoken text changed, by id: the scene, and the
+ *  spoken text the take was recorded against. A later save that puts that text back (an undo, or typing it
+ *  again) takes the flag off, so undoing the edit undoes the flag with it (the 2026-10-28 rulings, Q9). A
+ *  flag ticked by hand is never here, and unticking one drops it. */
+const autoRerecord = new Map<string, { scene: string; spoken: string }>();
+
+/** What an actor says: markup taken out and whitespace folded, so a whitespace-only or formatting-only change
+ *  isn't a change of the spoken text. */
+const spokenText = (text: string): string => text.replace(/<\/?(?:b|i|bi)>/g, "").replace(/\s+/g, " ").trim();
+
+/** Whether a line's recording status means a usable take exists (recorded or final): any rung but the lowest
+ *  (no take) and the scratch rung (the project's `scratchStatus`, else one named "scratch"). */
+function hasRecordedTake(status: string | undefined, project: ProjectFile): boolean {
+  if (!status) return false;
+  const ladder = (project.recordingStatuses ?? DEFAULT_RECORDING_STATUSES).map((r) => r.name);
+  const scratch = project.scratchStatus ?? (ladder.includes("scratch") ? "scratch" : undefined);
+  return ladder.includes(status) && status !== ladder[0] && status !== scratch;
+}
+
+/**
+ * The re-record flags a scene save calls for (the 2026-10-28 rulings, Q9): a line whose spoken (source) text
+ * changed, and whose take is recorded or final, is flagged; a line this session flagged so whose text is back
+ * to what was recorded is unflagged. A whitespace-only or formatting-only change isn't a change of the spoken
+ * text, and a direction lives in the flow, not the strings, so editing one never flags. The take's status is
+ * the Audio Folders index when the project uses it, else the scene's manual recording status. Only when the
+ * project tracks audio status. Null when nothing changes.
+ */
+function rerecordOnEdit(s: SceneShards, sceneId: string, prevLocSource: string | null, nextLocSource: string): RerecordChange | null {
+  if (!loaded || !isAudioTracked()) return null;
+  const strings = (src: string | null): Record<string, string> => {
+    if (!src) return {};
+    try { return (parseSource(src) as LocaleFile)?.strings ?? {}; } catch { return {}; }
+  };
+  const before = strings(prevLocSource), after = strings(nextLocSource);
+  const af = loadAuthoring(s.authoringPath);
+  const derived = recordingOverride();
+  const statusOf = (id: string): string | undefined => (derived ? derived.get(id) : af.recording?.[id]);
+  const change: RerecordChange = { set: [], clear: [] };
+  for (const [id, text] of Object.entries(after)) {
+    if (before[id] === undefined || before[id] === text) continue;
+    const memo = autoRerecord.get(id);
+    if (memo) {
+      if (spokenText(text) === memo.spoken) { autoRerecord.delete(id); if (af.rerecord?.[id]) change.clear.push(id); }
+      continue;
+    }
+    if (af.rerecord?.[id] || spokenText(text) === spokenText(before[id]!) || !hasRecordedTake(statusOf(id), loaded.project)) continue;
+    autoRerecord.set(id, { scene: sceneId, spoken: spokenText(before[id]!) });
+    change.set.push(id);
+  }
+  return change.set.length || change.clear.length ? change : null;
 }
 
 // The built-in spell-check dictionary ids (mirrors dictionaries.ts BUILTINS). Kept a plain const here -
@@ -875,6 +938,7 @@ function resetProjectState(): void {
   resetPlaySession();          // no play state from the project being left
   authoringCache.clear();      // no parsed shards cached from it
   forgetAllSceneSources();     // nor its scenes' bytes
+  autoRerecord.clear();        // nor the re-record flags its edits set
   importPlans.clear();         // nor an editable-script import planned against it
   if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; } // a pending rebuild was for it
   lastBuiltHash = undefined;   // the Auto-Rebuild dedup must not carry across projects
@@ -1483,12 +1547,17 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
     if (!writes.length) return { ok: true }; // nothing changed -> leave the shards (and the edit-trail) untouched
     // Which SOURCE strings changed - so each gets a fresh `modifiedAt` (the localisation-staleness signal).
     const changedStringIds = locChanged ? changedSourceStringIds(prevLoc, locSource) : [];
-    const trail = author || changedStringIds.length ? editTrailWrite(s, sceneId, author, changedStringIds) : null;
+    // A changed spoken line with a recorded take is flagged for re-record in this same write (Q9).
+    const memoBefore = new Map(autoRerecord);
+    const rerecord = locChanged ? rerecordOnEdit(s, sceneId, prevLoc, locSource) : null;
+    const trail = author || changedStringIds.length || rerecord ? editTrailWrite(s, sceneId, author, changedStringIds, rerecord) : null;
     if (trail) writes.push(trail);
     // All or nothing (the ruled note): a shard somebody else holds refuses the whole save, so the scene's
     // files never disagree. An emptied extension shard goes in the same batch.
     const applied = await writeStates(writes);
     const res: SaveResult = applied.ok ? { ok: true } : { ok: false, error: applied.error };
+    if (!res.ok) { autoRerecord.clear(); for (const [k, v] of memoBefore) autoRerecord.set(k, v); } // nothing landed
+    if (res.ok && rerecord && trail) res.rerecord = trail.af.rerecord ?? {};
     if (res.ok) {
       // A scene never read this session (or whose mirror was dropped) has the rest of its extension shards
       // read now, so the mirror never serves a partial set to the next readScene.
@@ -1671,6 +1740,8 @@ export function readSceneRerecord(sceneId: string): Record<string, boolean> {
 export function saveSceneRerecord(sceneId: string, map: Record<string, boolean>): Promise<SaveResult & { step?: ProjectStep }> {
   const kept: Record<string, boolean> = {};
   for (const [id, on] of Object.entries(map)) if (on) kept[id] = true;
+  // A flag a save set that's now unticked by hand is the author's call: a later edit back doesn't touch it.
+  for (const [id, m] of [...autoRerecord]) if (m.scene === sceneId && !kept[id]) autoRerecord.delete(id);
   return saveAuthoringField(sceneId, (af) => { af.rerecord = Object.keys(kept).length ? kept : undefined; }, "Re-record");
 }
 
@@ -2489,9 +2560,12 @@ export async function locExport(format: "json" | "xlsx" | "po", locale?: string)
 }
 
 /** Import a translated file back into the project: parse by extension, apply, commit, and refresh the
- *  cached project so validate / report / play reflect the new strings. `fallbackLocale` covers formats
- *  that don't carry one (Excel). Returns the locale + counts, or an error to surface. */
-export async function locImport(filePath: string, fallbackLocale?: string): Promise<{ ok: boolean; error?: string; locale?: string; updated?: number; files?: number; dropped?: number }> {
+ *  cached project so validate / report / play reflect the new strings. `chosenLocale` is the language picked
+ *  in the dialog: a file for another language is refused (the 2026-10-28 rulings), and one naming none (an
+ *  older spreadsheet) imports as it, with a warning. With none picked, the file's own language is used.
+ *  Returns the locale, the counts and what the import has to tell (lines skipped, translations to check), or
+ *  an error to surface. */
+export async function locImport(filePath: string, chosenLocale?: string): Promise<{ ok: boolean; error?: string; locale?: string; updated?: number; files?: number; dropped?: number; report?: string[] }> {
   if (!loaded) return { ok: false, error: "no project open" };
   ensureHydrated(); // applyLoc writes across every scene's loc shard
   const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
@@ -2503,8 +2577,14 @@ export async function locImport(filePath: string, fallbackLocale?: string): Prom
     else return { ok: false, error: `unsupported file type '${ext}' (use .json, .po, or .xlsx)` };
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
-  const locale = catalog.locale ?? fallbackLocale;
-  if (!locale) return { ok: false, error: "Couldn't tell which language this file is for. Pick a target language first." };
+  const picked = importLocale(catalog.locale, chosenLocale);
+  if (!picked.ok) {
+    return { ok: false, error: picked.reason === "mismatch"
+      ? `${picked.error} Choose '${catalog.locale}' as the language to import it, or check it's the right file.`
+      : `${picked.error} Pick a language first.` };
+  }
+  const locale = picked.locale;
+  const warned = picked.warning ? [picked.warning] : [];
   if (locale === loaded.project.locales.default) return { ok: false, error: `'${locale}' is the source language, so there's nothing to import.` };
 
   // Plan, commit, and reload as ONE queued write. `applyLoc` rebuilds each authoring shard it stamps whole
@@ -2516,12 +2596,13 @@ export async function locImport(filePath: string, fallbackLocale?: string): Prom
     try { planned = applyLoc(loaded, { ...catalog, locale }); }
     catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; } // a scene or language the project lacks
     const { writes, stats } = planned;
-    if (writes.length === 0) return { ok: true, locale, updated: 0, files: 0 };
+    const report = [...warned, ...describeLocImport(loaded, planned.report)];
+    if (writes.length === 0) return { ok: true, locale, updated: 0, files: 0, ...(report.length ? { report } : {}) };
     const res = await projectCommit("Import Translations", freshKey("loc"), writes);
     if (!res.ok) return { ok: false, error: res.error };
     try { reloadFromDisk(); }
     catch (e) { console.warn("patterpad: localisation import committed, but reloading the project failed - the in-memory strings are stale until reopen:", e); }
-    return { ok: true, locale, updated: stats.updated, files: stats.files, dropped: stats.dropped };
+    return { ok: true, locale, updated: stats.updated, files: stats.files, dropped: stats.dropped, ...(report.length ? { report } : {}) };
   });
 }
 

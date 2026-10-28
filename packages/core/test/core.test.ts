@@ -183,7 +183,8 @@ describe("validateProject", () => {
 
   it("allows a jump to END", () => {
     const s = scene();
-    s.blocks[1]!.children.push({ id: "dv_end", type: "snippet", jump: { to: "END" } });
+    // In place of the block's own jump back: a snippet after that one would never run (unreachable-after-jump).
+    s.blocks[1]!.children.splice(1, 1, { id: "dv_end", type: "snippet", jump: { to: "END" } });
     expect(validateProject({ project: project(), scenes: [s] })).toEqual([]);
   });
 

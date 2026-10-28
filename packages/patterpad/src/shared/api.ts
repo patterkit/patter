@@ -473,6 +473,9 @@ export interface SaveResult {
   reread?: true;
   /** The write was a step of the project history: the new step, or the one it merged into. */
   step?: ProjectStep;
+  /** A scene save set or cleared re-record flags (editing a recorded line's spoken text, or undoing that
+   *  edit): the scene's flags as they now are, for the editor to show. */
+  rerecord?: Record<string, boolean>;
 }
 
 /** A step of the project history (patterkit design/patterpad-undo.md, half B), as main announces it to the
@@ -728,6 +731,11 @@ export interface LocImportResult {
   files?: number;
   /** Translations dropped because their beat is now action text. */
   dropped?: number;
+  /** What the import has to tell beside its counts, as the CLI prints it: a warning when the file named no
+   *  language, the lines it skipped because the project doesn't have them, and the translations to check
+   *  (placeholders or formatting that don't match the source). A heading, then its lines indented by two
+   *  spaces. Absent when there's nothing to tell. */
+  report?: string[];
 }
 
 /** A search hit (spec §6). The palette finds nodes by Game ID / title / text content, and folds in
@@ -1248,9 +1256,10 @@ export interface PatterApi {
   shareScopes(): Promise<{ dir: string } | { shared: string } | { error: string } | null>;
   /** Export localisation strings (spec §14) in the chosen format: opens a native Save dialog, writes the file. */
   exportLoc(request: LocExportRequest): Promise<ExportResult>;
-  /** Import a translated file: opens a native Open dialog, applies it (format by extension). `fallbackLocale`
-   *  is used when the file itself carries no locale (e.g. Excel). */
-  importLoc(fallbackLocale?: string): Promise<LocImportResult>;
+  /** Import a translated file: opens a native Open dialog, applies it (format by extension). `chosenLocale`
+   *  is the language picked: a file for another language is refused, and one naming none (an older
+   *  spreadsheet) imports as it, with a warning. Omitted, the file's own language is used. */
+  importLoc(chosenLocale?: string): Promise<LocImportResult>;
   /** Export the production report as a producer spreadsheet (xlsx): opens a native Save dialog, writes the
    *  chosen file. `canceled` when the author dismisses the picker. */
   exportReport(): Promise<ExportResult>;

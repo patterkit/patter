@@ -34,7 +34,7 @@ from inside this folder, `npm run gen` does the same thing.)
 </script>
 ```
 
-`bundle.js` is the compiled bundle (the same artifact Patterpad's **Build Bundle**
+`bundle.js` is the compiled bundle (the same artifact Patterpad's **Publish Bundle**
 writes as `<name>.patterc`) wrapped as `window.PATTER_BUNDLE`. In a real game you
 would ship the `.patterc` and `fetch()` it instead.
 

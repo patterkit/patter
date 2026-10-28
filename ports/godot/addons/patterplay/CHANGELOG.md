@@ -83,6 +83,11 @@ Changes marked **Breaking (1.0)** change what an existing game sees. Pinned by t
   `hot_swap`'s load is refused, the engine it falls back on no longer repeats the replacement's set-up reports. A
   hand-edited bundle whose `start` names a block its scene doesn't have now starts at that scene's first block,
   rather than refusing the flow.
+- **An exported game can `load()` its `.patterc` as a `PatterBundleResource`.** The export plugin put the raw
+  bundle back but left out what `load("res://x.patterc")` needs at runtime, so the imported resource, and any
+  scene holding it, worked in the editor and was missing from an exported build. A build now carries both: the
+  raw file for `FileAccess`, and a small stand-in resource that reads it, so the bundle still ships once. (The
+  shared export plugin, fixed for both Godot addons.)
 
 ## [0.34.0] - 2026-10-21
 

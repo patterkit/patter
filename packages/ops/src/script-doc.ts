@@ -72,8 +72,8 @@ export function qualifierNamer(project: Pick<ProjectFile, "qualifiers">): (gameI
  *  mono); `bold`/`italic` carry Patter's closed `<b>/<i>/<bi>` markup. Renderers turn these into Word runs
  *  or PDF font/colour switches. */
 export interface TextRun { text: string; bold: boolean; italic: boolean; code: boolean }
-const MARKUP_RE = /<(b|i|bi)>([\s\S]*?)<\/\1>/g;
-const INTERP_RE = /\{@[^}]*\}/g; // {@property} interpolation - shown verbatim (braces kept), set in accent mono
+export const MARKUP_RE = /<(b|i|bi)>([\s\S]*?)<\/\1>/g;
+export const INTERP_RE = /\{@[^}]*\}/g; // {@property} interpolation - shown verbatim (braces kept), set in accent mono
 /** Split a body string into formatting runs: first by `<b>/<i>/<bi>` markup, then by `{@property}`
  *  interpolation within each piece. Literal text (a bare `<`, `>`, `&`) passes through verbatim. */
 export function textRuns(text: string): TextRun[] {
@@ -121,9 +121,9 @@ export type ScriptElement =
   /** A gating condition, set in accent mono above the beat it controls: `‹ if @brave ›`. `id` is the node
    *  it gates. */
   | { kind: "condition"; id: string; indent: number; snippet?: number; text: string }
-  /** A selector group's label ("Choose", "One of · first match wins", "In sequence"). */
+  /** A selector group's label ("Choose", "One of (first match wins)", "In sequence"). */
   | { kind: "group"; id: string; indent: number; label: string }
-  /** A branch's catch-all row header ("else · catch-all"). `id` is the catch-all row's node. */
+  /** A branch's catch-all row header ("else (catch-all)"). `id` is the catch-all row's node. */
   | { kind: "else"; id: string; indent: number }
   /** A choice option: a ◇-led prompt, plus a quiet small-caps flag tag (once only / repeatable). `id` is the
    *  prompt beat, `node` the option itself. */
@@ -131,7 +131,7 @@ export type ScriptElement =
   /** A jump, set apart right-aligned in accent: `↪ The Crossroads` (readable target, never the id). `id` is
    *  the snippet carrying it, `to` the target's id (or END). */
   | { kind: "jump"; id: string; to: string; indent: number; snippet?: number; text: string }
-  /** A game event, set apart right-aligned in accent mono: `⚙ game event · door.open`. `id` is the beat. */
+  /** A game event, set apart right-aligned in accent mono: `⚙ game event: door.open`. `id` is the beat. */
   | { kind: "gameEvent"; id: string; indent: number; snippet?: number; text: string }
   /** A documentation note on the element above, when the caller asked for notes (`ScriptDocOptions.notes`).
    *  `id` is the node or beat the note is on. The readable script asks for none. */
@@ -171,7 +171,7 @@ function gameEventLabel(beat: GameEventBeat): string {
       const val = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
       return val === "" ? k : `${k}: ${val}`;
     });
-    if (parts.length) return `game event · ${parts.join(", ")}`;
+    if (parts.length) return `game event: ${parts.join(", ")}`;
   }
   return "game event";
 }
@@ -183,7 +183,7 @@ function optionTag(node: Group | Snippet): string {
   if (node.fallback) parts.push("fallback");
   parts.push(node.sticky ? "repeatable" : "once only");
   if (node.secretUntilEligible) parts.push("hidden");
-  return parts.join(" · ");
+  return parts.join(", ");
 }
 
 /** A readable label for a sequence selector: "In sequence", with a qualifier only when non-default. */
@@ -193,7 +193,7 @@ function sequenceLabel(node: Group): string {
   if ((o.order ?? "sequential") === "shuffle") bits.push("shuffled");
   const ex = o.exhaust ?? "once";
   if (ex === "repeat") bits.push("repeating"); else if (ex === "stick") bits.push("holds on the last");
-  return bits.length ? `In sequence · ${bits.join(", ")}` : "In sequence";
+  return bits.length ? `In sequence (${bits.join(", ")})` : "In sequence";
 }
 
 /** Compute the readable script document. Pure: data out, no I/O. */
@@ -315,7 +315,7 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
     }
 
     if (node.selector === "branch") {
-      els.push({ kind: "group", id: node.id, indent, label: "One of · first match wins" });
+      els.push({ kind: "group", id: node.id, indent, label: "One of (first match wins)" });
       notes(node.id, indent, sid);
       const kids = (node.children ?? []).filter((c) => !cut.has(c.id));
       kids.forEach((child, i) => {

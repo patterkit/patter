@@ -12,6 +12,9 @@ export { humanizeNodeRefs } from "./noderefs.js";
 export { parseSource, canonicalStringify } from "./serialize.js";
 export type { StringifyOptions } from "./serialize.js";
 export { validateProject } from "./validate.js";
+// Content that can never run (after a jump, or behind a branch child that always wins): validate warns, coverage reads it
+export { neverRunNodes } from "./never-runs.js";
+export type { NeverRuns, RunTreeNode } from "./never-runs.js";
 // A stub scene another tool can hand a writer (Storyletter, for a card with no scene yet)
 export { planProject, planScene } from "./scene-scaffold.js";
 export type { SceneScaffold, ScenePlanTarget, ScenePlan } from "./scene-scaffold.js";

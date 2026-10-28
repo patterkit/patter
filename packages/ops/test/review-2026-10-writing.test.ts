@@ -122,7 +122,7 @@ describe("spreadsheet: scene ids that make awkward sheet names (item 36)", () =>
   it("exports without throwing, with legal and distinct sheet names", async () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await catalogToXlsx(catalog) as unknown as ArrayBuffer);
-    const names = wb.worksheets.map((ws) => ws.name);
+    const names = wb.worksheets.filter((ws) => ws.state !== "hidden").map((ws) => ws.name); // not the language sheet
     expect(names).toHaveLength(scenes.length);
     expect(new Set(names.map((n) => n.toLowerCase())).size).toBe(scenes.length);
     for (const n of names) {

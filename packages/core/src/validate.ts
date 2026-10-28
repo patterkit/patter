@@ -21,6 +21,7 @@ import { isValidGameId, effectiveGameId } from "@patterkit/model";
 import { isValidPropertyName, propertyNameify, RESERVED_PROPERTY_NAMES } from "@patterkit/model";
 import { qualityDeclarationProblems, stagesEitherSide, valueFits } from "@wildwinter/expr";
 import type { QualityDeclarationProblem } from "@wildwinter/expr";
+import { neverRunNodes } from "./never-runs.js";
 
 export interface ValidationIssue {
   code:
@@ -59,6 +60,7 @@ export interface ValidationIssue {
     | "invalid-gamedata-field"
     | "invalid-gamedata-value"
     | "jump-cycle"
+    | "unreachable-after-jump"
     | "no-start"
     | "dangling-start";
   message: string;
@@ -70,6 +72,8 @@ export interface ValidationIssue {
   /** A quality gameData value off its field's ladder (a deleted or renamed stage, most often): the field, the
    *  value, and the stages to offer in its place, in ladder order. An editor's quick fix reads it. */
   offLadder?: { field: string; bad: string; options: string[] };
+  /** `unreachable-after-jump`: the snippet whose jump means this node never runs (`id` is the node). */
+  jumper?: string;
 }
 
 export interface ProjectInput {
@@ -336,6 +340,15 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
         issues.push({ code: "empty-container", message: `block '${block.id}' in ${where} is empty`, id: block.id });
       } else {
         reportEmpty(block.children);
+      }
+
+      // Content after an unconditioned jump in the same run never plays (the hands-on review, 2026-10; Q6).
+      // A warning: the project still builds. Only the outermost such node is named; what's inside it goes too.
+      for (const n of neverRunNodes(block.children)) {
+        if (n.reason !== "after-jump") continue;
+        const where = n.to === "END" ? "to END" : `to '${n.to}'`;
+        issues.push({ code: "unreachable-after-jump", severity: "warning", id: n.id, jumper: n.jumper,
+          message: `${n.type} '${n.id}' in block '${block.id}' never runs: snippet '${n.jumper}' before it always jumps ${where}` });
       }
 
       walkNodes<Group | Snippet>(block.children, (node) => {

@@ -1,7 +1,7 @@
 # Patterplay for Unreal
 
 Play [Patter](https://patterkit.dev/) branching dialogue natively in Unreal
-Engine. Patterplay loads a compiled `.patterc` bundle (the file Patterpad's *Build Bundle* or
+Engine. Patterplay loads a compiled `.patterc` bundle (the file Patterpad's *Publish Bundle* or
 the `patter` CLI writes) and plays it directly in C++, with the whole API also exposed to
 Blueprint. Every Patterplay runtime plays the same bundle with the same behaviour, so a story
 authored once runs identically here, on the web, in Unity, and in Godot.

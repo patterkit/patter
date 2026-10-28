@@ -31,6 +31,21 @@ and from a CDN:
 Two script tags (this and the Storylet Engine's `storyletengine.min.js`) is the whole
 integration for a page running both families with no bundler.
 
+## Runner
+
+`Runner` plays a flow a beat at a time as events, for straightforward games: `begin()`, then `next()` for each
+beat and `choose(id)` at a choice. It dictates no UI and no audio. See [The runner](https://patterkit.dev/play/runner/).
+
+```ts
+import { Runner } from "@patterkit/play-helpers";
+
+const runner = new Runner(engine);
+runner.on("line", (step) => show(step.speakerLabel, step.text));
+runner.on("choice", (step) => offer(step.options));   // then runner.choose(id)
+runner.on("ended", () => close());
+runner.begin();
+```
+
 ## Save / load
 
 Wrap the engine's whole-game snapshot in a tagged, versioned envelope - drop it into
@@ -91,10 +106,13 @@ pushes** back when the author edits, for hot reload without restarting:
 import { createDebugLink, applyLiveBundle } from "@patterkit/play-helpers";
 
 let engine = new Engine(bundle);
+let flow = engine.openFlow("main");
 const link = createDebugLink({
   build: bundle.content.hash,
   onBundle: (msg) => {
-    ({ engine, bundle } = applyLiveBundle(engine, bundle, msg.data));
+    const r = applyLiveBundle(engine, bundle, msg.data);
+    ({ engine, bundle } = r);
+    if (r.kind === "structure") flow = engine.getFlow("main")!;   // a hot swap made a new engine and flow
     link.setBuild(msg.build);   // re-hello under the new build id
     rerender();
   },

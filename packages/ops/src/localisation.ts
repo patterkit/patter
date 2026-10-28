@@ -36,6 +36,7 @@ import type { LoadedProject } from "./load.js";
 import { tableFor, mergeAuthoring } from "./loaded-helpers.js";
 import type { PlannedWrite } from "./write.js";
 import { resolveDocumentation } from "./documentation.js";
+import { INTERP_RE, MARKUP_RE } from "./script-doc.js";
 
 /** One localisable string. `id` is the beat id (or `cast:<NAME>` for a display name, `qualifier:<gameId>` for a
  *  speaker qualifier's name, `speaker:pattern` for the speaker pattern, `speaker:<NAME>:<gameId>` for a
@@ -74,6 +75,27 @@ export interface ApplyStats {
   files: number;
   /** Translations dropped because their beat is now action text. */
   dropped: number;
+}
+
+/** A line a translated file names that the import left alone, by its id and the scene the file put it in. */
+export interface LocImportLine {
+  id: string;
+  scene: string;
+}
+
+/** A translation whose `{@ref}` placeholders or `<b>`/`<i>`/`<bi>` markup differ from the source's as it is now.
+ *  It was imported all the same. `missing` is what the source has and the translation lacks, `extra` the reverse:
+ *  each a placeholder as written (`{@gold}`) or a markup tag (`<b>`), once for each time it's short or over. */
+export interface LocMismatch extends LocImportLine {
+  missing: string[];
+  extra: string[];
+}
+
+/** What an import found beside what it wrote: the lines it skipped because the project has no such line, and
+ *  the translations it imported whose placeholders or markup don't match the source. */
+export interface LocImportReport {
+  unknown: LocImportLine[];
+  mismatched: LocMismatch[];
 }
 
 /** A text beat whose place in the loc files has changed since loc import last wrote them: `dropped` (its scene's
@@ -352,19 +374,101 @@ const findFile = <T>(files: string[], items: T[], path: string): T | undefined =
   return i >= 0 ? items[i] : undefined;
 };
 
+/** Every line id the project has, by the scene that holds it: each scene's beats (game events left out, as they
+ *  carry no text) and option prompts, and the project-level strings (`@project`). What an import checks a
+ *  translated file's ids against. */
+export function locLineHomes(loaded: Pick<LoadedProject, "project" | "scenes">, sourceTable: Record<string, string>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const scene of loaded.scenes) {
+    for (const block of scene.blocks) {
+      walkNodes<Group | Snippet>(block.children, (node) => {
+        if (node.type === "group") { if (node.prompt) out.set(node.prompt.id, scene.id); return; }
+        for (const beat of node.beats ?? []) if (beat.kind !== "gameEvent") out.set(beat.id, scene.id);
+      });
+    }
+  }
+  for (const id of Object.keys(projectStringSources(loaded.project, sourceTable))) out.set(id, PROJECT_LOCALE_SCENE);
+  return out;
+}
+
+/** The `{@ref}` placeholders and markup tags in a text, each as written, in order (`<b>` for a `<b>...</b>` pair). */
+function textTokens(text: string): string[] {
+  const out = [...text.matchAll(INTERP_RE)].map((m) => m[0]);
+  for (const m of text.matchAll(MARKUP_RE)) out.push(`<${m[1]}>`);
+  return out;
+}
+
+/** What `source` has that `translation` lacks (`missing`) and the reverse (`extra`), as multisets, sorted. Null
+ *  when they match. */
+export function compareLocTokens(source: string, translation: string): { missing: string[]; extra: string[] } | null {
+  const count = (list: string[]): Map<string, number> => {
+    const m = new Map<string, number>();
+    for (const t of list) m.set(t, (m.get(t) ?? 0) + 1);
+    return m;
+  };
+  const a = count(textTokens(source)), b = count(textTokens(translation));
+  const short = (x: Map<string, number>, y: Map<string, number>): string[] =>
+    [...x].flatMap(([t, n]) => Array<string>(Math.max(0, n - (y.get(t) ?? 0))).fill(t)).sort();
+  const missing = short(a, b), extra = short(b, a);
+  return missing.length || extra.length ? { missing, extra } : null;
+}
+
+/** The language a translated file is imported as, from what the file says (`fileLocale`) and what the person
+ *  chose (`chosen`: the CLI's `--locale`, Patterpad's Language). A file for one language is refused as another
+ *  unless `force` (the CLI's `--force-locale`); a file that names none (an older spreadsheet) takes the chosen
+ *  language, with a warning; with neither there's nothing to go on. */
+export function importLocale(fileLocale: string | undefined, chosen: string | undefined, opts: { force?: boolean } = {}):
+  { ok: true; locale: string; warning?: string } | { ok: false; reason: "none" | "mismatch"; error: string } {
+  if (fileLocale && chosen && fileLocale !== chosen && !opts.force) {
+    return { ok: false, reason: "mismatch", error: `This file is for '${fileLocale}', not '${chosen}', so nothing was imported.` };
+  }
+  const locale = chosen ?? fileLocale;
+  if (!locale) return { ok: false, reason: "none", error: "This file doesn't say which language it's for, so nothing was imported." };
+  if (!fileLocale) return { ok: true, locale, warning: `This file doesn't say which language it's for, so it was imported as '${locale}'. Check that's the right language.` };
+  return { ok: true, locale };
+}
+
+/** What a loc import tells a person beside its counts, for the CLI and Patterpad alike: the lines it skipped
+ *  because the project doesn't have them, then the translations it imported whose placeholders or markup don't
+ *  match the source, each with a heading and the lines indented under it. Empty when there's nothing to say. */
+export function describeLocImport(loaded: Pick<LoadedProject, "scenes">, report: LocImportReport): string[] {
+  const nameOf = new Map(loaded.scenes.map((sc) => [sc.id, sc.name]));
+  const where = (scene: string): string => (scene === PROJECT_LOCALE_SCENE ? "the project's strings" : `'${nameOf.get(scene) ?? scene}'`);
+  const out: string[] = [];
+  const u = report.unknown.length;
+  if (u) {
+    out.push(`Skipped ${u} line${u === 1 ? "" : "s"} this project doesn't have, so ${u === 1 ? "its translation wasn't" : "their translations weren't"} imported:`);
+    for (const l of report.unknown) out.push(`  ${l.id} in ${where(l.scene)}`);
+  }
+  const m = report.mismatched.length;
+  if (m) {
+    out.push(`${m} translation${m === 1 ? "" : "s"} ${m === 1 ? "doesn't" : "don't"} match the source's placeholders or formatting. ${m === 1 ? "It was" : "They were"} imported, but check ${m === 1 ? "it" : "them"}:`);
+    for (const l of report.mismatched) {
+      const parts = [l.missing.length ? `missing ${l.missing.join(", ")}` : "", l.extra.length ? `extra ${l.extra.join(", ")}` : ""].filter(Boolean);
+      out.push(`  ${l.id} in ${where(l.scene)}: ${parts.join("; ")}`);
+    }
+  }
+  return out;
+}
+
 /**
  * Write a catalog's translations back. Throws, writing nothing, when the catalogue names a locale the
  * project does not declare or a scene it does not have. Produces the loc-shard writes (one per scene touched) and stamps
  * `localisedAt[locale]` into the per-scene authoring shards (skipped when importing the default locale -
  * staleness is tracked against the source, not for it). Caller commits the returned writes.
  *
+ * A line the project doesn't have is skipped (not written, counted or stamped) and listed in the report; a line
+ * the file puts in another scene than the one holding it now goes to its own scene. A translation whose
+ * placeholders or markup differ from the source as it is now is imported and listed (the 2026-10-28 rulings).
+ *
  * Import conflict policy (decision 3a): a translation is accepted even when the source has since changed;
  * the stale flag stays derivable from `localisedAt` vs source `modifiedAt` and surfaces on the next export.
  */
-export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now?: string } = {}): { writes: PlannedWrite[]; stats: ApplyStats } {
+export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now?: string } = {}): { writes: PlannedWrite[]; stats: ApplyStats; report: LocImportReport } {
+  const report: LocImportReport = { unknown: [], mismatched: [] };
   const locale = catalog.locale;
   if (!locale || locale === loaded.project.locales.default) {
-    return { writes: [], stats: { updated: 0, files: 0, dropped: 0 } }; // nothing to import into the source language
+    return { writes: [], stats: { updated: 0, files: 0, dropped: 0 }, report }; // nothing to import into the source language
   }
   // The catalogue is a file from outside (a translator, a vendor), and the target paths are built from
   // its own scene and locale names: refuse any the project does not have before planning a write, or a
@@ -378,6 +482,9 @@ export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now
     throw new Error(`the file names scene(s) this project does not have: ${unknown.map((u) => `'${u}'`).join(", ")}; nothing was imported`);
   }
   const now = opts.now ?? new Date().toISOString();
+  const sourceTable = tableFor(loaded, loaded.project.locales.default);
+  const projectSources = projectStringSources(loaded.project, sourceTable);
+  const homes = locLineHomes(loaded, sourceTable);
 
   // Group accepted translations by scene. `fresh` ids (not flagged stale) get their localisedAt
   // restamped to now; stale-flagged ids keep their text written but stay flagged for review (decision
@@ -387,9 +494,14 @@ export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now
   const bySceneFresh = new Map<string, Set<string>>();
   for (const e of catalog.entries) {
     if (!e.translation.trim()) continue; // empty = not translated; leave any existing value untouched
-    if (action.get(e.scene)?.has(e.id)) continue; // action text has no translations (an older file may hold one)
-    (bySceneText.get(e.scene) ?? bySceneText.set(e.scene, new Map()).get(e.scene)!).set(e.id, e.translation);
-    if (!e.stale) (bySceneFresh.get(e.scene) ?? bySceneFresh.set(e.scene, new Set()).get(e.scene)!).add(e.id);
+    const scene = homes.get(e.id);
+    if (scene === undefined) { report.unknown.push({ id: e.id, scene: e.scene }); continue; } // no such line: skipped, listed
+    if (action.get(scene)?.has(e.id)) continue; // action text has no translations (an older file may hold one)
+    const source = sourceTable[e.id] ?? projectSources[e.id];
+    const diff = source === undefined ? null : compareLocTokens(source, e.translation);
+    if (diff) report.mismatched.push({ id: e.id, scene, ...diff });
+    (bySceneText.get(scene) ?? bySceneText.set(scene, new Map()).get(scene)!).set(e.id, e.translation);
+    if (!e.stale) (bySceneFresh.get(scene) ?? bySceneFresh.set(scene, new Set()).get(scene)!).add(e.id);
   }
 
   const writes: PlannedWrite[] = [];
@@ -435,5 +547,5 @@ export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now
     writes.push({ path: aPath, content: canonicalStringify(authoring) });
   }
 
-  return { writes, stats: { updated, files, dropped } };
+  return { writes, stats: { updated, files, dropped }, report };
 }

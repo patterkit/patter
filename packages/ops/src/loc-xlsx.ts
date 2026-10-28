@@ -19,6 +19,12 @@
 // collide, and an id with a barred character would come back as a different id.
 // The sheet name is now only a readable label; a sheet without the Scene column (an
 // older export) still takes its scene from the name, as it always did.
+//
+// The language: every export says which language the file is for, so an import can refuse a file for one
+// language chosen as another (the 2026-10-28 rulings). A workbook has nowhere a translator can't reach, so it
+// goes on a sheet of its own, "Patter", hidden and last: a translator works in the scene sheets and never needs
+// it, and the reader finds it by its first cell, not its name or place. A workbook without one (an export from
+// before) reads with no locale, and imports as the language chosen, with a warning.
 // ---------------------------------------------------------------------------
 
 import type { LocCatalog, LocEntry } from "./localisation.js";
@@ -27,6 +33,13 @@ import { checkCatalogField } from "./loc-format.js";
 const HEADERS = ["ID", "Source", "Translation", "Comments", "Status", "Gender", "Scene", "Qualifier"] as const;
 /** The 1-based column of the hidden scene id. */
 const SCENE_COLUMN = HEADERS.indexOf("Scene") + 1;
+/** The hidden sheet that says which language the file is for: its name, and the first cell the reader knows it by. */
+const INFO_SHEET = "Patter";
+const INFO_MARKER = "Patter localisation file";
+/** The info sheet's rows, by their label in column A. */
+const INFO_LANGUAGE = "Language";
+const INFO_SOURCE = "Source language";
+const INFO_PROJECT = "Project";
 /** Excel's (and exceljs's) cap on a sheet name's length. */
 const SHEET_NAME_MAX = 31;
 
@@ -78,7 +91,7 @@ export async function catalogToXlsx(catalog: LocCatalog): Promise<Buffer> {
   const byScene = new Map<string, LocEntry[]>();
   for (const e of catalog.entries) (byScene.get(e.scene) ?? byScene.set(e.scene, []).get(e.scene)!).push(e);
 
-  const used = new Set<string>();
+  const used = new Set<string>([INFO_SHEET.toLowerCase()]); // a scene called "Patter" takes "Patter (2)"
   for (const [scene, entries] of byScene) {
     const ws = wb.addWorksheet(uniqueSheetName(scene, used));
     ws.columns = [
@@ -104,19 +117,39 @@ export async function catalogToXlsx(catalog: LocCatalog): Promise<Buffer> {
         gender: e.context?.gender ?? "", scene, qualifier: e.context?.qualifier ?? "" });
     }
   }
+  // Which language the file is for (blank for a template), on a hidden sheet of its own, last. Shown when it's
+  // the only sheet: Excel won't open a workbook with nothing visible.
+  const info = wb.addWorksheet(INFO_SHEET, { state: byScene.size ? "hidden" : "visible" });
+  info.columns = [{ width: 18 }, { width: 40 }];
+  info.addRow([INFO_MARKER]);
+  info.addRow(["Patter reads this sheet to check which language the file is for. Please leave it as it is."]);
+  info.addRow([INFO_LANGUAGE, catalog.locale ?? ""]);
+  info.addRow([INFO_SOURCE, catalog.defaultLocale]);
+  info.addRow([INFO_PROJECT, catalog.project]);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
 /** Parse an .xlsx workbook back into a catalog. Scene = the hidden Scene column (else, for an older export,
- *  the sheet name); stale = Status "stale". `locale` is not carried in the sheet, so the caller supplies it
- *  (--locale). Throws when a scene is not a plain scene id (see `checkCatalogField`). */
+ *  the sheet name); stale = Status "stale". `locale` (and the project and source language) come from the
+ *  hidden "Patter" sheet; an older export has none, so its `locale` is undefined and the caller supplies one.
+ *  Throws when a scene or locale is not a plain name (see `checkCatalogField`). */
 export async function xlsxToCatalog(buffer: Buffer): Promise<LocCatalog> {
   const { default: ExcelJS } = await import("exceljs");
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer as unknown as ArrayBuffer);
 
   const entries: LocEntry[] = [];
+  let locale: string | undefined, defaultLocale = "", project = "";
   for (const ws of wb.worksheets) {
+    if (cellText(ws.getCell(1, 1).value).trim() === INFO_MARKER) {
+      ws.eachRow((row) => {
+        const label = cellText(row.getCell(1).value).trim(), value = cellText(row.getCell(2).value).trim();
+        if (label === INFO_LANGUAGE && value) locale = checkCatalogField("spreadsheet", "locale", value);
+        else if (label === INFO_SOURCE) defaultLocale = value;
+        else if (label === INFO_PROJECT) project = value;
+      });
+      continue;
+    }
     // Confirm the header row matches before trusting column positions.
     const header = (ws.getRow(1).values as unknown[]).slice(1).map(cellText);
     if (header[0] !== HEADERS[0]) continue; // not a loc sheet
@@ -137,5 +170,5 @@ export async function xlsxToCatalog(buffer: Buffer): Promise<LocCatalog> {
         comments: cell(4) ? cell(4).split("\n").filter(Boolean) : [], stale: status === "stale" });
     });
   }
-  return { project: "", defaultLocale: "", locale: undefined, entries };
+  return { project, defaultLocale, locale, entries };
 }

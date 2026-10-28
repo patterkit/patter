@@ -9,7 +9,9 @@ import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { loadProject, extractLoc, applyLoc, applyWrites } from "../src/index.js";
+import { loadProject, extractLoc, applyLoc, applyWrites, describeLocImport, importLocale, compareLocTokens } from "../src/index.js";
+import { readFileSync } from "node:fs";
+import { parseSource } from "@patterkit/core";
 
 function makeProject(): string {
   const dir = mkdtempSync(join(tmpdir(), "patter-loc-"));
@@ -165,5 +167,96 @@ describe("grammatical gender is free text", () => {
 
     const byId = Object.fromEntries(extractLoc(loadProject(d)).entries.map((e) => [e.id, e]));
     expect(byId["L1"]!.context?.gender).toBe("inanimate");
+  });
+});
+
+// The 2026-10-28 rulings (Q7): a line the project doesn't have is skipped and listed; a translation whose
+// placeholders or markup differ from the source as it is now is imported and listed; a file for one language is
+// refused as another, and one that names none imports as chosen, with a warning.
+describe("translation import checks", () => {
+  /** A fresh copy of the project, its English with a placeholder and markup in L1. */
+  function project(): string {
+    const d = makeProject();
+    writeFileSync(join(d, "loc/en/strings.patterloc"), JSON.stringify({ schema: "patter/strings@0", scene: "s1", locale: "en", default: true,
+      strings: { L1: "You have {@gold} coins, <b>friend</b>.", L2: "Yes", T1: "Narration", CT1: "Pick me" } }));
+    return d;
+  }
+  const entry = (id: string, translation: string, scene = "s1") => ({ id, scene, source: "", translation, comments: [], stale: false });
+
+  it("skips a line the project doesn't have: not written, counted or stamped, and listed", () => {
+    const d = project();
+    const p = loadProject(d);
+    const { writes, stats, report } = applyLoc(p, { project: "loc", defaultLocale: "en", locale: "fr",
+      entries: [entry("L2", "Oui"), entry("GHOST", "Fantôme"), entry("cast:NOBODY", "Personne", "@project")] }, { now: "2026-10-28T00:00:00Z" });
+    expect(stats.updated).toBe(1); // L2 only
+    expect(report.unknown).toEqual([{ id: "GHOST", scene: "s1" }, { id: "cast:NOBODY", scene: "@project" }]);
+    const all = writes.map((w) => w.content).join("\n");
+    expect(all).not.toContain("GHOST");
+    expect(all).not.toContain("NOBODY");
+    applyWrites(writes);
+    const fr = parseSource(readFileSync(join(d, "loc/fr/strings.patterloc"), "utf8")) as { strings: Record<string, string> };
+    expect(fr.strings).not.toHaveProperty("GHOST");
+    expect(fr.strings.L2).toBe("Oui");
+  });
+
+  it("a line the file puts in the wrong scene goes to the scene that holds it", () => {
+    const p = loadProject(project());
+    const { writes, report } = applyLoc(p, { project: "loc", defaultLocale: "en", locale: "fr", entries: [entry("L2", "Oui", "@project")] });
+    expect(report.unknown).toEqual([]);
+    expect(writes.find((w) => w.path.endsWith("_project.patterloc"))).toBeUndefined();
+    expect(writes.find((w) => w.content.includes('"L2"') && w.content.includes('"s1"'))).toBeDefined();
+  });
+
+  it("imports a translation whose placeholders or markup don't match the source, and lists what's missing or extra", () => {
+    const p = loadProject(project());
+    const { writes, stats, report } = applyLoc(p, { project: "loc", defaultLocale: "en", locale: "fr", entries: [
+      entry("L1", "Tu as {@gold} pièces, <b>ami</b>."),   // matches: not listed
+      entry("CT1", "Choisis {@name}"),                     // a placeholder the source hasn't
+    ] });
+    expect(stats.updated).toBe(2);
+    expect(writes.some((w) => w.content.includes("Choisis {@name}"))).toBe(true);
+    expect(report.mismatched).toEqual([{ id: "CT1", scene: "s1", missing: [], extra: ["{@name}"] }]);
+
+    const wrong = applyLoc(p, { project: "loc", defaultLocale: "en", locale: "fr", entries: [entry("L1", "Tu as des pièces, ami {@gold} {@gold}.")] });
+    expect(wrong.report.mismatched).toEqual([{ id: "L1", scene: "s1", missing: ["<b>"], extra: ["{@gold}"] }]);
+    expect(wrong.stats.updated).toBe(1); // imported all the same
+  });
+
+  it("compares with the source as it is now, not as the file quotes it", () => {
+    expect(compareLocTokens("Hi {@name}", "Salut {@name}")).toBeNull();
+    expect(compareLocTokens("<i>Run</i> {@a}", "Cours")).toEqual({ missing: ["<i>", "{@a}"], extra: [] });
+    expect(compareLocTokens("<b>x</b>", "<i>x</i>")).toEqual({ missing: ["<b>"], extra: ["<i>"] });
+    const p = loadProject(project());
+    // The file's own `source` is stale (no placeholder); the project's current source has one.
+    const { report } = applyLoc(p, { project: "loc", defaultLocale: "en", locale: "fr", entries: [{ ...entry("L1", "Bonjour, <b>ami</b>."), source: "Hello, <b>friend</b>." }] });
+    expect(report.mismatched).toEqual([{ id: "L1", scene: "s1", missing: ["{@gold}"], extra: [] }]);
+  });
+
+  it("tells a person what it skipped and what to check, in plain lines", () => {
+    const p = loadProject(project());
+    const lines = describeLocImport(p, {
+      unknown: [{ id: "GHOST", scene: "s1" }, { id: "cast:NOBODY", scene: "@project" }],
+      mismatched: [{ id: "L1", scene: "s1", missing: ["{@gold}"], extra: ["<i>"] }],
+    });
+    expect(lines).toEqual([
+      "Skipped 2 lines this project doesn't have, so their translations weren't imported:",
+      "  GHOST in 'Opening'",
+      "  cast:NOBODY in the project's strings",
+      "1 translation doesn't match the source's placeholders or formatting. It was imported, but check it:",
+      "  L1 in 'Opening': missing {@gold}; extra <i>",
+    ]);
+    expect(describeLocImport(p, { unknown: [], mismatched: [] })).toEqual([]);
+    for (const l of lines) expect(l).not.toMatch(/[\u2014\u00b7]/); // no em-dash, no interpunct
+  });
+
+  it("refuses a file for one language chosen as another, unless forced; one with none imports as chosen, warned", () => {
+    expect(importLocale("fr", "fr")).toEqual({ ok: true, locale: "fr" });
+    expect(importLocale("fr", undefined)).toEqual({ ok: true, locale: "fr" });
+    expect(importLocale("fr", "de")).toMatchObject({ ok: false, reason: "mismatch", error: "This file is for 'fr', not 'de', so nothing was imported." });
+    expect(importLocale("fr", "de", { force: true })).toEqual({ ok: true, locale: "de" });
+    const none = importLocale(undefined, "de");
+    expect(none).toMatchObject({ ok: true, locale: "de" });
+    expect(none.ok && none.warning).toMatch(/doesn't say which language .* imported as 'de'/);
+    expect(importLocale(undefined, undefined)).toMatchObject({ ok: false, reason: "none" });
   });
 });

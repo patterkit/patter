@@ -30,7 +30,7 @@ layout_mode = 2
 [node name="Title" type="Label" parent="Layout/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Patter · The Tour"
+text = "Patter: The Tour"
 
 [node name="AudioToggle" type="CheckBox" parent="Layout/Header"]
 layout_mode = 2

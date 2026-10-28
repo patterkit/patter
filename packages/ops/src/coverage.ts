@@ -18,6 +18,7 @@ import { compileLoaded } from "./compile.js";
 import { Engine } from "@patterkit/runtime";
 import type { PlayError } from "@patterkit/runtime";
 import { isContentlessBeat, walkNodes } from "@patterkit/model";
+import { neverRunNodes } from "@patterkit/core";
 import type {
   Group, Snippet, Bundle, CompiledGroup, CompiledSnippet, CompiledEffect, Expression,
   CoverageDriver, ScalarValue,
@@ -214,8 +215,9 @@ interface HostScopeAnalysis {
    *  assignment, a computed value). Any such write makes every flag of that property unrefutable, so the
    *  hop drops it rather than guessing. */
   opaqueWrites: Set<string>;
-  /** Beats that a `branch` sibling before them always wins over (one with no condition): never reached,
-   *  whatever any input does, so no hint about an input applies to them. */
+  /** Beats that can never run, whatever any input does, so no hint about an input applies to them: after
+   *  an unconditioned jump in the same run, or behind a `branch` sibling with no condition (which always
+   *  wins). Read from core's `neverRunNodes`, the walk the validator's `unreachable-after-jump` reads. */
   shadowed: Set<string>;
   /** The block each beat is in, for the gates its block's way in adds. */
   blockOfBeat: Map<string, string>;
@@ -342,20 +344,15 @@ function analyzeHostScopes(bundle: Bundle, hostTokens: Set<string>): HostScopeAn
 
   const walk = (
     nodes: Array<CompiledGroup | CompiledSnippet>, blockId: string, gate: Set<string>, fine: Set<string>,
-    branch: boolean, dead: boolean,
+    dead: boolean, never: Set<string>,
   ): void => {
-    // In a `branch`, the first eligible child wins, so once a child with no condition has been passed,
-    // every later sibling is never picked. Nothing else shadows: a run skips what is ineligible and goes
-    // on, a sequence moves along, and a choice offers every option.
-    let won = false;
     for (const node of nodes) {
-      const shadow = dead || won;
-      if (branch && !node.condition) won = true;
+      const shadow = dead || never.has(node.id);
       const here = new Set([...gate, ...refsIn(node.condition)]);
       const hereFine = new Set([...fine, ...fineIn(node.condition)]);
       if (node.type === "group") {
         // a group's prompt carries no expression
-        walk(node.children, blockId, here, hereFine, node.selector === "branch", shadow);
+        walk(node.children, blockId, here, hereFine, shadow, never);
       } else {
         const beats = (node.beats ?? []).map((b) => b.id);
         if (beats.length) siteBeats.set(node.id, beats);
@@ -372,7 +369,10 @@ function analyzeHostScopes(bundle: Bundle, hostTokens: Set<string>): HostScopeAn
 
   for (const scene of Object.values(bundle.scenes)) {
     scanEffects(scene.onEntry, scene.id);
-    for (const block of scene.blocks) walk(block.children, block.id, new Set(), new Set(), false, false);
+    for (const block of scene.blocks) {
+      const never = new Set(neverRunNodes(block.children).map((n) => n.id));
+      walk(block.children, block.id, new Set(), new Set(), false, never);
+    }
   }
   return empty;
 }

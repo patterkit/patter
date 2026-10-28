@@ -243,7 +243,7 @@ void ATourDemoActor::HandleVoice(const FPatterStep& Step)
 
 void ATourDemoActor::HandleEnded()
 {
-	AddLine(TEXT(""), TEXT("- The End -"), NoticeColour);
+	AddLine(TEXT(""), TEXT("The End"), NoticeColour);
 	// Offer another run: the tour branches, so a replay actually differs.
 	ChoiceBox->AddSlot().AutoHeight().Padding(0.f, 4.f)
 	[

@@ -148,7 +148,7 @@ export async function exportEditableScript(loaded: LoadedProject, opts: Editable
     sections: [{
       properties: { page: { size: { width: 11906, height: 16838 } } },
       headers: { default: new Header({ children: [new Paragraph({ children: [
-        new TextRun({ text: `${loaded.project.project.name} · Editable script · Handoff ${id} · exported ${date} · Please keep the grey [#…] markers`, font: SANS, size: 15, color: TOKENS.muted }),
+        new TextRun({ text: `${loaded.project.project.name}: editable script. Handoff ${id}, exported ${date}. Please keep the grey [#…] markers`, font: SANS, size: 15, color: TOKENS.muted }),
       ] })] }) },
       children: body,
     }],
@@ -162,7 +162,7 @@ export async function exportEditableScript(loaded: LoadedProject, opts: Editable
 function contextText(el: Exclude<ScriptElement, Editable>): string {
   switch (el.kind) {
     case "group": return el.label;
-    case "else": return "else · catch-all";
+    case "else": return "else (catch-all)";
     default: return el.text;
   }
 }

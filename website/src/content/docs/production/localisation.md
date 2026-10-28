@@ -114,10 +114,26 @@ both halves:
 1. **Export** writes the source text (and, for a chosen language, its current translations)
    in the translator's preferred format (below). Hand the file over.
 2. The translator fills in the Translation column/fields and sends it back.
-3. **Import** reads the language from the file (or you set it) and reports how many
+3. **Import** reads the language from the file and reports how many
    translations **changed** (re-importing an unedited file reports **0**, since unchanged rows
    aren't counted). Translations go into that language's own file; the source is untouched,
    and the writing surface still shows only the source language.
+
+### What import checks
+
+Every export says which language it's for, so a file can't land in the wrong one by mistake:
+
+- **The wrong language is refused.** If you pick a language in the dialog and the file says it's for
+  another, nothing is imported. Pick the file's language, or leave **Template** picked and
+  Patterpad uses the file's own.
+- **An older file with no language** (an Excel export from before this check) imports as the
+  language you pick, with a warning to make sure that's right.
+- **Lines the project no longer has are skipped.** A line cut since the export isn't written back,
+  isn't counted, and the import lists it by its ID and scene.
+- **Placeholders and formatting are compared with the source.** If a translation drops or adds a
+  `{@property}` placeholder or `<b>`, `<i>`, or `<bi>` formatting compared with the source as it
+  is now, it's still imported, and the import lists it with what's missing or extra, so you can
+  send it back to the translator.
 
 Run the loop as often as you like, since it's incremental rather than a one-shot. Which brings us to:
 
@@ -149,7 +165,8 @@ All three carry the same IDs and the same staleness signal; pick by who's receiv
 
 - **Excel (.xlsx)** is for human translators working by hand, with one sheet per scene and columns
   ID / Source / Translation / Comments / Status / Gender / Qualifier, which makes it the friendliest
-  to non-technical folk.
+  to non-technical folk. The language it's for is on a hidden sheet named **Patter**; leave it as
+  it is.
 - **PO / POT** is for agencies and gettext-based tooling (Poedit, Weblate, Crowdin, …), where
   exporting with no language gives a blank POT template and staleness is `#, fuzzy`.
 - **JSON** is for pipelines and engines, plain ID → string tables, easy to transform or feed into
@@ -247,7 +264,10 @@ patter loc-import fr.xlsx                                 # bring a translated f
 ```
 
 `--format` is `json | xlsx | po`; omitting `--locale` produces a blank template / POT. The
-build mode is picked per export too: `patter export --ids` / `--source-debug`.
+build mode is picked per export too: `patter export --ids` / `--source-debug`. On import,
+`--locale` names the language to import as: a file for another language is refused unless you
+add `--force-locale`. The import prints the same list of skipped lines and translations to check
+as Patterpad shows.
 
 ## For the game team
 

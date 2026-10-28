@@ -84,7 +84,7 @@ func _on_game_event(step: Dictionary) -> void:
 
 
 func _on_ended() -> void:
-	_append("[center]· The End ·[/center]")
+	_append("[center]The End[/center]")
 	_show_restart()
 
 

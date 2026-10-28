@@ -8,6 +8,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **A warning for lines that never play.** Anything after a snippet that always jumps, to END or anywhere
+  else, now shows a warning on it in the page and the problems bar, so lines left after an END don't go
+  unnoticed. A jump with a condition, a call, or a jump inside a choice's option doesn't count.
 - **What's new, after an update.** The first time Patterpad opens after an update, it shows what's new in that
   version, or in every version since you last ran it. Help ▸ What's New shows the latest at any time, and a
   tickbox turns the after-update window off.
@@ -17,6 +20,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **Change by, for a number.** Setting a number property in an effect now offers "Change by" first: add or
   take away an amount, and Patterpad writes it as the property plus or minus that amount. Adding 1 to a
   counter is one step instead of building the sum by hand.
+
+- **Direction in the voice script.** The exported voice script has a Direction column, so an actor reads each
+  line's performance direction beside it.
+- **Re-record, flagged for you.** Editing what a recorded or final line says now ticks its "Needs re-record"
+  box, and undoing the edit unticks it. Changing only spaces or formatting, or the line's direction, doesn't.
 
 ### Changed
 
@@ -73,6 +81,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   looks like the search field it opens.
 - **The font theme changes only the script.** View ▸ Font Theme no longer changes the typeface of the menus,
   panes, and dialogs.
+
+- **Translation import checks the file.** A file for one language won't import as another: pick the language
+  the file is for, or leave Template picked and Patterpad uses the file's. Lines the project no longer has are
+  skipped rather than written, and the import lists them, along with any translation whose placeholders or
+  formatting don't match the source. Excel exports now say which language they're for; an older spreadsheet
+  still imports as the language you pick, with a warning to check it.
 
 ### Fixed
 

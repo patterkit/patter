@@ -43,8 +43,8 @@ export type {
   ReportTotals, VoicedCounts, WrittenCounts,
 } from "./report.js";
 export { runReportXlsx } from "./report-xlsx.js";
-export { extractLoc, applyLoc, actionTextChanges, actionTextIds, describeLocExport, sceneTextIds, projectStringSources, authoringPath } from "./localisation.js";
-export type { LocEntry, LocCatalog, ApplyStats, ActionTextChange } from "./localisation.js";
+export { extractLoc, applyLoc, actionTextChanges, actionTextIds, describeLocExport, describeLocImport, importLocale, compareLocTokens, locLineHomes, sceneTextIds, projectStringSources, authoringPath } from "./localisation.js";
+export type { LocEntry, LocCatalog, ApplyStats, ActionTextChange, LocImportReport, LocImportLine, LocMismatch } from "./localisation.js";
 export { catalogToJson, jsonToCatalog, catalogToPo, poToCatalog } from "./loc-format.js";
 export { catalogToXlsx, xlsxToCatalog } from "./loc-xlsx.js";
 export { runVoiceScript } from "./voice-script.js";

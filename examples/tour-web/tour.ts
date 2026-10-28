@@ -63,7 +63,7 @@ function step(): void {
       showChoices(r);
       break;
     case "end":
-      append("end", "· The End ·");
+      append("end", "The End");
       showRestart();
       break;
   }

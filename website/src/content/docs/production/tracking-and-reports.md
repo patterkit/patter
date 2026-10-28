@@ -67,7 +67,8 @@ writing status by beat and by scene, branching, recording coverage (when
 Choose **Export Production Info…** to write that same report as an `.xlsx` spreadsheet.
 
 Use **Export Voice Script…** for a recording script for voice actors, either every voiced line or
-only those marked ready to record. A **Qualifier** column gives each line's
+only those marked ready to record. A **Direction** column gives each line's performance direction, so the
+actor reads it beside the line. A **Qualifier** column gives each line's
 [speaker qualifier](/setup/cast/#speaker-qualifiers), so the actor knows a line is a thought or
 off-screen, and the studio knows it can record a `RADIO` line clean and filter it later; the lines
 still sit under the one character. Once takes come back, drop them into folders by status and

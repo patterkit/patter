@@ -28,7 +28,7 @@ Each ships a pre-generated bundle so it runs without a build step.
 
 ## Notes
 
-- Building a project with Patterpad's **Build Bundle** writes its compiled `.patterc` to a sibling
+- Building a project with Patterpad's **Publish Bundle** writes its compiled `.patterc` to a sibling
   `patter-dist/` folder by default; those are build artifacts and are git-ignored (see the repo
   `.gitignore`). The tour's `patter-dist/tour.patterc` (and its `audio/` folder) are deliberately
   committed so the demos run from a fresh clone; regenerating the bundle needs `git add -f`.

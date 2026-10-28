@@ -71,6 +71,10 @@ export const PATTERPAD_PROBLEM_COPY: ProblemCopyTable = {
     text: "These jumps go round in a loop with nothing in between.",
     next: "Add a line, a choice, or a condition somewhere in the loop, or the story gets stuck here.",
   }),
+  "unreachable-after-jump": () => ({
+    text: "This never plays: something before it always jumps away.",
+    next: "Move it before the jump, or remove it.",
+  }),
   "dangling-jump": () => ({ text: "This doesn't point anywhere valid.", next: "Choose where it goes." }),
   "jump-into-non-addressable": () => ({ text: "This doesn't point anywhere valid.", next: "Choose where it goes." }),
   "invalid-gameid": (p) => ({

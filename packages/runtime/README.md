@@ -2,7 +2,7 @@
 
 **Patterplay JS** - play [Patter](https://patterkit.dev/) branching
 dialogue in JavaScript or TypeScript. Load a compiled bundle (a `.patterc`, the
-artifact Patterpad's *Build Bundle* writes) and play the dialogue: flows, selectors,
+artifact Patterpad's *Publish Bundle* writes) and play the dialogue: flows, selectors,
 choices, jumps, effects, properties, save/load. One of the four Patterplay runtimes
 (JS, Unity, Unreal, Godot): every runtime plays the same bundle with the same
 behaviour, and the whole set is **versioned in lockstep** (see

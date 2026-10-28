@@ -1,5 +1,6 @@
 // The producer-facing spreadsheet view of a VoiceScript (spec §16): one sheet, one row per spoken line,
-// with the scope trail + run-leading comments. exceljs is lazy-loaded (heavy), like report-xlsx / loc-xlsx.
+// with the scope trail, each line's direction, and run-leading comments. exceljs is lazy-loaded (heavy),
+// like report-xlsx / loc-xlsx.
 
 import type { VoiceScript } from "./voice-script.js";
 
@@ -16,6 +17,7 @@ export async function voiceScriptToXlsx(data: VoiceScript): Promise<Buffer> {
     { header: "Character", key: "character", width: 16 },
     { header: "Qualifier", key: "qualifier", width: 11 },
     { header: "Actor", key: "actor", width: 16 },
+    { header: "Direction", key: "direction", width: 24 },
     { header: "Text", key: "text", width: 60 },
     { header: "Comments", key: "comments", width: 36 },
     { header: "Status", key: "status", width: 12 },
@@ -29,8 +31,9 @@ export async function voiceScriptToXlsx(data: VoiceScript): Promise<Buffer> {
   for (const l of data.lines) {
     const row = ws.addRow({
       scope: l.scope, id: l.id, character: l.character, qualifier: l.qualifier ?? "", actor: l.actor ?? "",
-      text: l.text, comments: l.comments.join("\n"), status: l.recordingStatus,
+      direction: l.direction ?? "", text: l.text, comments: l.comments.join("\n"), status: l.recordingStatus,
     });
+    row.getCell("direction").alignment = { wrapText: true, vertical: "top" };
     row.getCell("text").alignment = { wrapText: true, vertical: "top" };
     row.getCell("comments").alignment = { wrapText: true, vertical: "top" };
   }

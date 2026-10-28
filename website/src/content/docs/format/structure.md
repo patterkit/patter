@@ -129,6 +129,12 @@ A jump can carry a **condition**: "jump if X, otherwise carry on." When a snippe
 falls off the end of its block, the dialogue is finished: the same signal as an
 explicit `→ END` (a `call` returns to its caller first).
 
+Anything after a snippet that always jumps never plays. When a snippet with no condition
+jumps (to `END` or anywhere else, beats or not), whatever follows it in the same run gets an
+`unreachable-after-jump` warning from the validator. A `call` comes back, so it doesn't count,
+and nor does a jump with a condition, or one inside an option or another selector's child:
+those might not be taken, so what follows the choice or group still runs.
+
 ## Choices and selectors
 
 Branching past a simple run (the `branch`, `sequence`, and `choice` selectors,
