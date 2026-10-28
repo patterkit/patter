@@ -141,7 +141,7 @@ export default defineConfig({
           ],
         },
         { label: "The CLI", items: ["cli"] },
-        { label: "Reference", items: ["specification", "licensing"] },
+        { label: "Reference", items: ["specification", "licensing", "contact"] },
       ],
     }),
   ],

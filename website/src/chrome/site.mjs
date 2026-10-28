@@ -54,6 +54,10 @@ export default {
       {
         "label": "GitHub",
         "href": "https://github.com/patterkit/patter"
+      },
+      {
+        "label": "Contact",
+        "href": "contact/"
       }
     ]
   },
