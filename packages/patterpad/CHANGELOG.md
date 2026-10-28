@@ -14,6 +14,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **A command palette.** Press Cmd+K (Ctrl+K on Windows and Linux) to run any menu command by typing its
   name, or to open a scene, a block, or the Properties page. It lists exactly what the menus hold, greyed where
   a command can't run just now.
+- **Change by, for a number.** Setting a number property in an effect now offers "Change by" first: add or
+  take away an amount, and Patterpad writes it as the property plus or minus that amount. Adding 1 to a
+  counter is one step instead of building the sum by hand.
 
 ### Changed
 
