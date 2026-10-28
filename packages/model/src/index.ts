@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import type { AstNode } from "@wildwinter/expr";
+import { gameIdify, isValidGameId } from "@wildwinter/toolkit";
 
 export type ScalarValue = boolean | number | string | string[];
 
@@ -326,26 +327,14 @@ export function isContentlessBeat(beat: Beat, hasText: boolean): boolean {
 // ---------------------------------------------------------------------------
 // Game IDs (spec §6) - the author-editable, host-facing ADDRESS for an
 // addressable node (scene / block): a hyphen-slug the runtime targets, distinct
-// from the opaque immutable `id` and the computed readable `handle`. These pure
-// helpers live in the shape layer so the runtime can compute effective addresses
-// without depending on @patterkit/core (which re-exports them).
+// from the opaque immutable `id` and the computed readable `handle`. The rules
+// are the family's, in `@wildwinter/toolkit` (Storylets addresses its cards by
+// the same ones), and live in the shape layer's dependencies so the runtime can
+// compute effective addresses without depending on @patterkit/core (which
+// re-exports them). Re-exported here, so `@patterkit/model`'s API is unchanged.
 // ---------------------------------------------------------------------------
 
-/** Slugify a name into a hyphen-form game id: lowercase, drop apostrophes, runs of
- *  other punctuation -> a single hyphen, collapse repeats, no leading / trailing hyphen. */
-export function gameIdify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/['’]/g, "")
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-/** A valid authored game id: lowercase alphanumerics + hyphens, no leading / trailing hyphen. */
-export function isValidGameId(gameId: string): boolean {
-  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(gameId);
-}
+export { gameIdify, isValidGameId };
 
 // ---------------------------------------------------------------------------
 // Property names (design: `@wildwinter/app-shell` src/property-names.ts, which

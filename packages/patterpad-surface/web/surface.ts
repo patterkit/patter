@@ -118,6 +118,10 @@ export interface MountOptions {
   /** Prepend the scene-name title above the script (the harness / a single-scene view wants this). The
    *  scene's entry effects, when it has any, show in a quiet line under it. */
   showTitle?: boolean;
+  /** Asked as the author renames the scene in its title, before the rename lands: answer a gameId to pin
+   *  on the scene in the SAME edit (one undo step), or undefined to rename only. Patterpad pins the
+   *  scene's current address when storylet cards play it and its address follows the name (Q19). */
+  pinOnRename?: (scene: { id: string; name: string; gameId?: string }, next: string) => string | undefined;
   /** Make a jump target from the picker (Q13). When given, typing a name no scene or block has in any
    *  jump picker (`/jump`, `editJump`, `editJumps`, `pickNode`) offers "+ New scene 'name'" and
    *  "+ New block 'name' in this scene". Choosing one calls this with the trimmed name (and, for a block,
@@ -264,8 +268,12 @@ export interface SurfaceHandle {
   /** Replace a SNIPPET's onEnter / onExit effect list (the inspector's effects editor). An empty
    *  list clears the phase. Returns false if the id isn't a snippet here. */
   setEffects(id: string, phase: "onEnter" | "onExit", effects: SnippetEffect[]): boolean;
-  /** Set the scene's display name (the editable title) - rides in the doc's scene `raw`. */
-  setSceneName(name: string): void;
+  /** Set the scene's display name (the editable title) - rides in the doc's scene `raw`. `pinGameId`
+   *  pins the scene's gameId in the same edit, so one undo takes back both. */
+  setSceneName(name: string, pinGameId?: string): void;
+  /** Put the caret in the scene's title with all of it selected, so typing renames the scene (New Scene).
+   *  False when there's no editable title. */
+  focusTitle(): boolean;
   /** Set (or clear, with "") the host-facing gameId ADDRESS on the scene (pass the scene id) or a
    *  block (pass the block id). Clearing reverts to the name-derived address. Returns false on a bad id. */
   setGameId(id: string, gameId: string): boolean;
@@ -1129,7 +1137,14 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       if (!titleDirty || !isEditable) { title.textContent = handle.sceneName(); return; }
       titleDirty = false;
       const n = (title.textContent ?? "").trim();
-      if (n && n !== handle.sceneName()) handle.setSceneName(n); else title.textContent = handle.sceneName();
+      if (!n || n === handle.sceneName()) { title.textContent = handle.sceneName(); return; }
+      let pin: string | undefined;
+      try {
+        const raw = JSON.parse(view.state.doc.attrs.raw as string) as { id?: unknown; gameId?: unknown };
+        const gameId = typeof raw.gameId === "string" && raw.gameId.trim() ? raw.gameId.trim() : undefined;
+        if (typeof raw.id === "string") pin = opts.pinOnRename?.({ id: raw.id, name: handle.sceneName(), ...(gameId ? { gameId } : {}) }, n);
+      } catch { pin = undefined; }
+      handle.setSceneName(n, pin);
     }, { signal: sig });
     // Right-click the scene header -> a scene menu: add / edit a scene-level note (#148) + set the writing
     // status of the whole scene (#196). The scene id rides in the doc.
@@ -1331,9 +1346,10 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       view.dispatch(tr);
       return true;
     },
-    setSceneName(name) {
+    setSceneName(name, pinGameId) {
       const raw = JSON.parse(view.state.doc.attrs.raw as string) as Record<string, unknown>;
       raw.name = name;
+      if (pinGameId?.trim()) raw.gameId = pinGameId.trim();
       view.dispatch(view.state.tr.setDocAttribute("raw", JSON.stringify(raw)));
       refreshJumpLabels(); // a jump targeting this scene shows its title - repaint those chips
     },
@@ -1712,6 +1728,16 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       return opened.flow.scene.name;
     },
     focus: () => view.focus(),
+    focusTitle: () => {
+      if (!titleEl || titleEl.getAttribute("contenteditable") === "false") return false;
+      titleEl.focus();
+      const range = document.createRange();
+      range.selectNodeContents(titleEl);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      return true;
+    },
     // The hint bar is the HOST's element, filled by us: emptying it belongs here, or its last hints
     // outlive the editor they describe. Patterpad's welcome screen showed "Tab -> dialogue" with
     // nothing to type into (from-storylets/welcome-screen-shape, spotted in a screenshot).

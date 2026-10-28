@@ -125,15 +125,18 @@ scenes, showing how many `@patter` properties the project declares (see
 Below it, your list of scenes. The open scene unfolds to list its **blocks**. The block your
 cursor is in stays marked, and clicking one jumps straight to it. **Drag** a scene to
 reorder the list; the order is saved with the project (it changes nothing about how the
-story plays). Add a scene with the **+ New Scene** row at the foot of the list (or
-**File ▸ New Scene…**, `⇧⌘N`). A new scene starts from a **scene kit**: **Blank**, a
+story plays). Add a scene with the **+ New scene** row at the foot of the list (or
+**File ▸ New Scene**, `⇧⌘N`): an **Untitled scene** appears straight after the one you're in,
+opens, and has its title selected, so just type its name and press Return. To start from a
+**scene kit** instead, choose **File ▸ New Scene from Kit…**: **Blank**, a
 **Conversation with choices**, a **Hub conversation**, **Barks**, or a **Cutscene**. Each one
 plays the moment it lands, and the kit you pick is described before anything is made. A kit
 with lines asks who speaks them; if your cast is empty, the name you give is added to it.
-Delete a scene from its right-click menu (or
-**File ▸ Delete Scene…**), and if other scenes jump into it, the confirm names them, and the
-dangling jumps show as problems until you repoint them. Toggle the pane with
-**View ▸ Show Scenes** (`⌘1`).
+Delete a scene from its right-click menu (or **File ▸ Delete Scene**). It goes at once, with
+**Undo** on the toast; if other scenes jump into it, the dangling jumps show as problems until
+you repoint them. Where a [Storylets project is paired](/patterpad/conditions-and-data/#storylet-cards-that-play-a-scene) with
+this one and its cards play the scene, Patterpad asks first, naming the cards. Toggle the pane
+with **View ▸ Show Navigator** (`⌘1`).
 
 In the centre, **the script**, where you write. This one stays put; the sides are guests.
 

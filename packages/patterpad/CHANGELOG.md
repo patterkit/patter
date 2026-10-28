@@ -8,6 +8,19 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **Resolve clashes in the app.** When a merge (a returned Patterpack, or a `git merge` through Patter's
+  merge driver) leaves clashes, a banner across the top of the window says how many, and its Resolve…
+  button, or File ▸ Resolve Clashes…, opens the resolver. Each clash says where it is in words ("Line L12
+  in The Tavern", "Property @gold") and shows both sides as text. Keep mine keeps your side, Take theirs
+  writes theirs, and Edit takes you to the place to change it yourself, after which the clash offers Mark
+  resolved. A clash that isn't one value, such as two different reorderings, offers Keep mine and Edit.
+  Each choice is one step Edit ▸ Undo takes back, and a shard's `.patterconflict` file goes with its last
+  clash. The resolver is the family's: Storyletter uses the same one.
+- **Storylet cards keep their scenes.** Where a Storylets project nearby is paired with this one, Patterpad
+  reads its cards when the project opens and whenever you come back to the window. Deleting a scene that cards
+  play, or changing its Game ID, now asks first and names them ("2 storylet cards play this scene: Tavern
+  Brawl, Last Orders."). Renaming such a scene while its Game ID follows its name pins the Game ID it had, so
+  the cards still find it, and a toast says so with Undo.
 - **A warning for lines that never play.** Anything after a snippet that always jumps, to END or anywhere
   else, now shows a warning on it in the page and the problems bar, so lines left after an END don't go
   unnoticed. A jump with a condition, a call, or a jump inside a choice's option doesn't count.
@@ -50,6 +63,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
+- **New Scene makes the scene at once.** File ▸ New Scene (still Shift+Cmd+N) and the "+ New scene" row
+  add an "Untitled scene" straight after the one you're in and open it with its title selected, so you just
+  type its name. A second one is "Untitled scene 2", and so on. To start from a scene kit, choose New Scene
+  from Kit… in the same menu.
+- **Show Navigator.** View ▸ Show Scenes is now Show Navigator, as in Storyletter.
+- **Undo names in sentence case.** Edit ▸ Undo and Redo name the change the way Storyletter does: "Undo
+  Move scene up", "Undo Writing status", "Undo New scene". Names such as Patterpack stay capitalised.
+- **The merge's message points at the resolver.** After a Merge Returned Patterpack with clashes, the
+  message says how many and where to settle them, instead of pointing at the `.patterconflict` files.
 - **Game scopes, as in Storyletter.** Project Settings ▸ World properties is now Game scopes. `@world` comes
   first, and + Add scope adds another, such as `@player`, with its own name and a Remove button. Each scope
   can be read-only to the story, or take any name unchecked. A name that can't be used says why where you
@@ -136,6 +158,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **Your name is offered before a project is open.** The box asking for your name for comments and edits
+  now fills in git's global user.name when no project is open, as Storyletter does. It used to come up
+  empty in the installed app until a project was open.
+- **The game's scopes file keeps up with the project.** Where the game shares its scopes, `patter.scopes.json`
+  is now brought up to date with every change to the project file (a pack merge, a new or deleted scene, the
+  cast, a quick fix, and an undo or redo of any of them), not only when Project Settings are saved, as
+  Storyletter does with its own.
 - **A deleted jump target says so.** A jump or condition whose scene or block has been deleted reads
   "Missing scene" or "Missing block" in red, on the page and in the inspector, with the old id in its
   tooltip, instead of showing the raw id.

@@ -38,10 +38,12 @@ import { askPropertyType, withNewProperty } from "./new-property.js";
 import { mountSurface, moveKeyDir, initTooltips, tipBold, type SurfaceHandle, type InspectorContext, type DocNote, type CommentOpenRequest, type SuggestionOpenRequest, type SpellChecker } from "@patterkit/patterpad-surface/surface";
 import { buildSpellEngine } from "./spellcheck.js";
 import { adoptSceneName, relabelNavScene } from "./scene-name.js";
+import { deletePlayedScenePrompt, gameIdChangePrompt, renamePin } from "./paired-scene.js";
+import type { PairedCard } from "../../shared/paired-cards.js";
 import { selectAllOutsideEditor, undoRoute } from "./edit-commands.js";
 import { UndoJournal, type EntryResult, type JournalEntry } from "./undo-journal.js";
 import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
-import type { BootState, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectHistoryOutcome, ProjectSettingsDto, ProjectStep, RecentProject, ReportData, ReviewItem, SaveResult, StageRenameDto, ThemePrefs, VcsKind } from "../../shared/api.js";
+import type { BootState, ClashDto, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectHistoryOutcome, ProjectSettingsDto, ProjectStep, RecentProject, ReportData, ReviewItem, SaveResult, StageRenameDto, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector, formatSeconds } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
 // open, because they are all the one panel.
@@ -71,8 +73,11 @@ import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are ma
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
 import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way for both apps
 import { isThemeChoice, stageGateNote, toast, type ToastKind } from "@wildwinter/app-shell";
+// The family's clash resolver (ruling Q21): the dialog and the banner are the shell's; the adapter is ours.
+import { openClashResolver, clashBanner, type ClashAdapter, type ClashResolver } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/clashes.css";
 import { landed } from "./results.js";
-import { fileSafeName } from "../../shared/file-name.js";
+import { fileSafeName, untitledSceneName } from "../../shared/file-name.js";
 // The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
 // (plural / formatCount / debounce) are the shell's (ui-review-2026-09, shell step 6).
 import { EXAMPLES } from "../../shared/examples.js";
@@ -191,6 +196,10 @@ const inspectorStackEl = $("inspector-stack");
 shell.inspector.append(inspectorStackEl); // no "Inspector" header: the pane is named by its contents (and its label)
 shell.inspector.setAttribute("aria-label", "Inspector");
 frameHost.hidden = false;
+// The banner for a project holding clashes a merge left (Q21): under the title bar, above everything the
+// window shows. Hidden at 0, which is also how it sits with no project open.
+const clashBar = clashBanner({ onResolve: () => openClashes() });
+shell.topbar.after(clashBar.el);
 
 /** The project kits New Project offers. One today: what `patter init` writes (ops/src/init.ts),
  *  said in the concrete. More arrive as the Patter side specifies them; inventing plausible ones
@@ -641,13 +650,27 @@ function renderNav(): void {
   const add = document.createElement("button");
   add.className = "nav-add-scene shell-nav-row shell-nav-add"; add.type = "button";
   add.append(iconNode("add", 12), Object.assign(document.createElement("span"), { textContent: "New scene" })); // the drawn add, not a typed "+"
-  add.addEventListener("click", () => newScenePrompt());
+  add.addEventListener("click", () => void newSceneNow());
   navListEl.appendChild(add);
   paintNavBadges(); // re-apply VC badges after a list rebuild
   if (currentSceneId) highlightNav(currentSceneId);
 }
 
-// --- new scene (File > New Scene… / the nav's + row) --------------------------
+// --- new scene (File > New Scene / the nav's + row; File > New Scene from Kit…) ------------------
+
+/** New Scene (the hands-on fixes review, Q20): no dialog. An "Untitled scene" (numbered when there's one
+ *  already) is made at once straight after the open scene and opened, its title selected, so what the
+ *  author types next names it. The kits are File > New Scene from Kit…. */
+async function newSceneNow(): Promise<void> {
+  if (!project) return;
+  const name = untitledSceneName(project.scenes.map((s) => s.name));
+  const res = await tracked(window.patter.createScene(name, "blank", undefined, newSceneAfter()));
+  if (!landed(res, "Couldn't add the scene") || !res.project || !res.sceneId) return;
+  project = res.project;
+  renderNav();
+  await loadScene(res.sceneId);
+  if (surfaceSceneId === res.sceneId) surface?.focusTitle();
+}
 
 /** The scene kits, worded for the gallery (storylet-studio design/kit-gallery.md, section 7a, approved
  *  2026-09-27). What each one writes is main/scene-kits.ts; these lines are written from it. A feature
@@ -673,7 +696,7 @@ const SCENE_KIT_ITEMS: KitGalleryItem<SceneKitId>[] = [
     features: ["Scripted scene", "Camera cues", "Animation cues"] },
 ];
 
-/** New Scene: the shell's kit gallery, the moment Storyletter's New Box draws. A kit with lines needs a
+/** New Scene from Kit: the shell's kit gallery, the moment Storyletter's New Box draws. A kit with lines needs a
  *  speaker, chosen here from the cast; with nobody in the cast yet, the name typed is added to it. */
 function newScenePrompt(): void {
   if (!project) return;
@@ -786,7 +809,10 @@ async function deleteScenePrompt(sceneId?: string): Promise<void> {
 
   // No question first (the October 2026 review: Undo replaces "Are you sure?"): the delete is one step of
   // the project history, so the toast's Undo, or Edit > Undo, brings every one of its files back. Unsaved
-  // edits in it are saved first, so the undo brings those back too.
+  // edits in it are saved first, so the undo brings those back too. A scene storylet cards play is the
+  // exception (Q19): deleting it leaves them with nothing to play, so it asks first, naming them.
+  const ask = deletePlayedScenePrompt(scene.name, info.cards);
+  if (ask && await promptDialog(ask) !== 1) return;
   if (id === currentSceneId && saver.pending) await save();
   const step = await doDeleteScene(id);
   if (!step) return;
@@ -816,6 +842,50 @@ async function doDeleteScene(id: string): Promise<ProjectStep | undefined> {
     if (neighbour) await loadScene(neighbour);
   } else if (currentSceneId) highlightNav(currentSceneId);
   return res.step;
+}
+
+// --- storylet cards that play a scene (the hands-on fixes review, Q19) ---------------------------------
+
+/** The paired Storylets project's cards, as main read them last (on open and whenever the window regains
+ *  focus). Empty when nothing pairs. */
+let pairedCards: PairedCard[] = [];
+async function refreshPairedCards(): Promise<void> {
+  if (!project) { pairedCards = []; return; }
+  try { pairedCards = await window.patter.pairedCards(); } catch { /* keep what we had */ }
+}
+const sceneIdSet = (): Set<string> => new Set(project?.scenes.map((s) => s.id) ?? []);
+
+/** The Game ID editor's commit: the scene's Game ID changing under cards that play it asks first. A block's
+ *  Game ID isn't a card's concern. */
+async function commitGameId(id: string, pinned: string, next: string): Promise<void> {
+  if (id === surfaceSceneId && surface && pairedCards.length) {
+    await refreshPairedCards();
+    const ask = gameIdChangePrompt(pairedCards, { id, name: surface.sceneName(), ...(pinned.trim() ? { gameId: pinned } : {}) }, sceneIdSet(), next);
+    if (ask && await promptDialog(ask) !== 1) return;
+  }
+  surface?.setGameId(id, next);
+}
+
+/** A rename of a scene cards play whose Game ID follows its name: pin the Game ID it has, in the same edit,
+ *  and say so with Undo (which takes back the rename and the pin together). */
+function pinGameIdOnRename(scene: { id: string; name: string; gameId?: string }, next: string): string | undefined {
+  const pin = renamePin(pairedCards, scene, sceneIdSet(), next);
+  if (!pin) return undefined;
+  const sceneId = scene.id;
+  // After the rename has landed (the surface applies it once this returns): Undo takes it back only while
+  // it's still the newest edit in this scene.
+  window.setTimeout(() => {
+    const depth = surface && surfaceSceneId === sceneId ? surface.undoDepth() : -1;
+    toast(pin.message, "info", { action: { label: "Undo", run: () => void undoRenameIfNewest(sceneId, depth) } });
+  }, 0);
+  return pin.gameId;
+}
+
+async function undoRenameIfNewest(sceneId: string, depth: number): Promise<void> {
+  await settleForUndo();
+  const top = journal.peekUndo();
+  if (!surface || surfaceSceneId !== sceneId || surface.undoDepth() !== depth || top?.kind !== "scene" || top.sceneId !== sceneId) { toast(STALE_UNDO); return; }
+  await journal.undo(applyJournalEntry);
 }
 
 /** The nav's context menu: the shell's. Move up / Move down keep their places when they can't apply (the
@@ -1058,7 +1128,7 @@ function scriptFocusHome(): HTMLElement | null {
 // A dialog whose opener and its whole row were redrawn away gives focus to the script, never to <body>.
 setDialogFocusFallback(() => scriptFocusHome());
 
-/** Cmd+1 / Cmd+2 and View > Show Scenes / Show Inspector: focus into an open pane, open a closed one,
+/** Cmd+1 / Cmd+2 and View > Show Navigator / Show Inspector: focus into an open pane, open a closed one,
  *  close one that holds focus (app-shell's `focusOrToggle`). Electron flips a checkbox item's tick on
  *  every click, even when the pane only took focus, so the View menu is re-synced from the real state
  *  after each press. */
@@ -1245,6 +1315,75 @@ function selectAllCommand(): void {
   document.execCommand("selectAll");
 }
 
+// --- the clash resolver (ruling Q21) ------------------------------------------------------------------
+// The shell lists and asks; main decides, as one step of the project history each, through the same
+// `projectCommit` every project write uses. A decision lands like an undo does: the project is read back
+// and the open scene reloads when its files changed (`afterProjectHistory`), and the step goes on the
+// journal, so Edit ▸ Undo takes it back.
+
+let clashResolver: ClashResolver | null = null;
+
+/** One decision, as the resolver asks for it: the editor's pending writes land first (the shard is read from
+ *  disk), then main writes the step. A refusal throws, and the resolver says so and keeps the clash. */
+async function decideClash(id: string, decision: "ours" | "theirs" | "resolved"): Promise<ClashDto[]> {
+  if (!project) return [];
+  await flushPending();
+  const r = await tracked(window.patter.decideClash(id, decision));
+  clashBar.update(r.clashes.length);
+  if (!r.ok) throw new Error(r.error ?? "it couldn't be written");
+  if (r.step && r.project) {
+    await afterProjectHistory({ ok: true, label: r.step.label, id: r.step.id, project: r.project, scenes: r.step.scenes, authoring: r.step.authoring });
+  }
+  return r.clashes;
+}
+
+/** Edit: take the author to the place the clash names, so they can settle it by hand and come back to
+ *  Mark resolved. A scene's node (or its title), a Project Settings tab, or the Properties page. */
+async function goToClash(id: string): Promise<void> {
+  if (!project) return;
+  const t = await window.patter.clashTarget(id);
+  if (t.kind === "scene") {
+    if (!project.sceneIds.includes(t.sceneId)) { toast("That scene isn't in the project any more.", "error"); return; }
+    if (!overviewEl.hidden) await openSceneFromOverview(t.sceneId);
+    else if (t.sceneId !== currentSceneId || !propsDocEl.hidden) await loadScene(t.sceneId);
+    if (t.nodeId && surface?.revealNode(t.nodeId)) { surface.focus(); return; }
+    if (!surface?.focusTitle()) surface?.focus();
+  } else if (t.kind === "settings") {
+    await openProjectSettings(t.tab.startsWith("extension:") ? settingsSectionId(t.tab.slice("extension:".length)) : t.tab);
+  } else if (t.kind === "properties") {
+    await showPropertiesDoc();
+    if (t.name) revealRowWhenReady(propsDocHostEl, t.name);
+  } else {
+    toast("That clash has no place in the editor\nKeep mine, or take theirs, in the resolver.", "info");
+  }
+}
+
+const clashAdapter: ClashAdapter = {
+  list: () => window.patter.listClashes(),
+  resolve: (id, side) => decideClash(id, side),
+  edit: (id) => void goToClash(id),
+  markResolved: (id) => decideClash(id, "resolved"),
+};
+
+/** File ▸ Resolve Clashes…, the banner's Resolve…, and the command palette's entry. */
+function openClashes(): void {
+  if (!project) return;
+  if (clashResolver?.isOpen()) return;
+  clashResolver = openClashResolver({
+    adapter: clashAdapter,
+    onChange: (left) => clashBar.update(left.length),
+    onClose: () => { clashResolver = null; },
+  });
+}
+
+/** Ask main for the clashes again: on open, after a merge, after an undo or redo. The open resolver asks
+ *  for itself (and feeds the banner); otherwise the banner and the menu item are brought up to date. */
+async function refreshClashes(): Promise<void> {
+  if (!project) { clashBar.update(0); return; }
+  if (clashResolver?.isOpen()) { await clashResolver.refresh(); return; }
+  try { clashBar.update((await window.patter.listClashes()).length); } catch { /* the banner keeps its count */ }
+}
+
 /** Edit > Undo and Redo in the main window: the focused field's own text, or the journal's newest entry
  *  (the open scene's history or the project's), by `undoRoute` (edit-commands.ts). On the Properties page
  *  only a project step: the page's own saves. */
@@ -1334,7 +1473,7 @@ async function applyJournalEntry(entry: JournalEntry, way: "undo" | "redo"): Pro
     return (way === "undo" ? surface.undo() : surface.redo()) ? "done" : "skip";
   }
   const r = await (way === "undo" ? window.patter.projectUndo(entry.id) : window.patter.projectRedo(entry.id));
-  if (r.ok) { await afterProjectHistory(r); return "done"; }
+  if (r.ok) { await afterProjectHistory(r); void refreshClashes(); return "done"; }
   // Out of step with main: either a step is still on its way here (catch up, and ask again), or main has
   // really let this one go.
   if (r.stale) {
@@ -2234,7 +2373,7 @@ function showInspector(ctx: InspectorContext): void {
     }),
     condPreview: (src) => renderConditionPills(src, sceneProps, nodeLabel),
     effectsPreview: (effects) => renderEffectsPills(effects, sceneProps, nodeLabel),
-    editGameId: (id, gameId, address, anchor) => { openGameIdEditor({ anchor, value: gameId, derived: address, onCommit: (g) => { surface?.setGameId(id, g); }, slugify: gameIdify, validate: isValidGameId, prefer: "left", keepClear: PANEL_KEEP_CLEAR }); },
+    editGameId: (id, gameId, address, anchor) => { openGameIdEditor({ anchor, value: gameId, derived: address, onCommit: (g) => void commitGameId(id, gameId, g), slugify: gameIdify, validate: isValidGameId, prefer: "left", keepClear: PANEL_KEEP_CLEAR }); },
     editGroupProps: (id, patch) => { surface?.setGroupProps(id, patch); },
     editJump: (id, _current, anchor) => surface?.editJump(id, anchor),
     // A multi-selection's edits: each writes every chunk in the run, as one undo step (the surface's batch).
@@ -2777,6 +2916,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     onDuplicate: (idMap) => carryDuplicatedMetadata(idMap), // Duplicate: carry status + notes to the copies
     onAddCharacter: (name) => void registerCharacter(name), // "+ Add" in the cue popup persists to the master cast
     onCreateTarget: (req) => createJumpTarget(req), // a jump picker's "+ New scene" / "+ New block" (Q13)
+    pinOnRename: (scene, next) => pinGameIdOnRename(scene, next), // storylet cards keep playing a renamed scene (Q19)
     // An edit the surface refused because it would lose structure (a condition, effects, a jump, a whole
     // choice): one finished sentence saying what and what to do instead (ruling D, October 2026 review).
     onRefuse: (message) => toast(message, "info"),
@@ -2919,6 +3059,7 @@ async function showProject(open: OpenResult): Promise<void> {
   // as a tooltip, and the overview shows it in full (with a click-to-reveal).
   projectNameEl.dataset.tip = project.root;
   currentSceneId = null;
+  pairedCards = []; void refreshPairedCards(); // the paired Storylets project's cards, for the scene warnings (Q19)
   journal.clear(); // main's history starts again with the project, so the journal does too
   keptScenes.clear(); // and no scene of another project comes back
   // Back and Forward are journeys inside ONE project: carried over, Back landed on this project's overview
@@ -2946,6 +3087,7 @@ async function showProject(open: OpenResult): Promise<void> {
   } else {
     await showOverview();
   }
+  void refreshClashes(); // a project a merge left clashes in says so as it opens
 }
 
 /** Switch the chrome to the editing WORKSPACE (panes + toggles), leaving welcome / overview. */
@@ -3060,7 +3202,7 @@ async function createPatterProperty(name: string): Promise<{ scope: string; name
   const s = await window.patter.readSettings();
   if (!s) return null;
   const made = withNewProperty(s.properties, name, type);
-  if (made.added && !(await saveProjectSettings({ ...s, properties: made.props }, { propertiesOnly: true, undo: { label: "New Property", key: `new-property:${name}:${Date.now()}` } }))) return null;
+  if (made.added && !(await saveProjectSettings({ ...s, properties: made.props }, { propertiesOnly: true, undo: { label: "New property", key: `new-property:${name}:${Date.now()}` } }))) return null;
   patterProps = made.props;
   paintPropsCount();
   return { scope: "patter", name: made.decl.name, type: made.decl.type };
@@ -3213,6 +3355,7 @@ function showWelcome(state: Pick<BootState, "recents">): void {
   journal.clear(); // the project's history went with it
   keptScenes.clear();
   views.closeAll(); // and so did every view of it
+  clashResolver?.close(); clashBar.update(0); // no project -> no clashes
   debugLink.setVisible(false); // no project -> hide the live-debug-link control
   titleObserver?.disconnect(); titleObserver = null; sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = ""; // no scene -> no suffix
   vcMap.clear(); vcsSceneEl.hidden = true; shell.centre.querySelector(":scope > .vc-lock")?.remove(); // no project -> no VC state
@@ -3584,6 +3727,7 @@ async function mergePatterpack(): Promise<void> {
   else if (project.scenes[0]) await loadScene(project.scenes[0].id); // their pack deleted the scene we were in
   void refreshProblems();
   void refreshVcStatus();
+  void refreshClashes(); // the banner says what the merge left to settle
 
   const added = r.summary.shards.filter((sh) => sh.added).length;
   const merged = r.summary.shards.length - added;
@@ -3596,7 +3740,7 @@ async function mergePatterpack(): Promise<void> {
   // A conflict is not a failure - the merge committed - but it is not a quiet success either. The error
   // voice is what stops an author walking away from unresolved conflicts thinking they were done.
   if (r.summary.conflicts > 0) {
-    toastWithUndo(`${counts}. ${plural(r.summary.conflicts, "conflict")} need a look.\nSee the .patterconflict files.${worldNote}`, "error", undoable);
+    toastWithUndo(`${counts}. ${plural(r.summary.conflicts, "clash", "clashes")} ${r.summary.conflicts === 1 ? "needs" : "need"} a look.\nResolve them from the banner, or File ▸ Resolve Clashes…${worldNote}`, "error", undoable);
   } else toastWithUndo(`Merged the returned pack\n${counts}${worldNote}`, world?.error ? "error" : "ok", undoable);
 }
 
@@ -4341,7 +4485,8 @@ window.patter.onMenu((cmd) => {
   if (cmd === "command-palette") openPalette();
   else if (cmd === "whats-new") void window.patter.whatsNewState().then((st) => openWhatsNew({ ...whatsNewOpts, version: st.version, show: st.show }));
   else if (cmd === "new") createDialog();
-  else if (cmd === "new-scene") newScenePrompt();
+  else if (cmd === "new-scene") void newSceneNow();
+  else if (cmd === "new-scene-kit") newScenePrompt();
   else if (cmd === "delete-scene") void deleteScenePrompt();
   else if (cmd === "open") void openDialog();
   else if (cmd.startsWith("open-example:")) void openExample(cmd.slice("open-example:".length));
@@ -4350,6 +4495,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "save-as") void saveAs();
   else if (cmd === "export-patterpack") void exportPatterpack();
   else if (cmd === "merge-patterpack") void mergePatterpack();
+  else if (cmd === "resolve-clashes") openClashes();
   else if (cmd === "share-scopes") void shareScopes();
   else if (cmd === "extensions") void window.patter.openExtensions();
   else if (cmd.startsWith("remove-extension:")) void removeExtension(cmd.slice("remove-extension:".length));
@@ -4507,6 +4653,8 @@ window.patter.onOpenProject((result) => void showProject(result));
 // VC state changes OUTSIDE the app (a teammate grabs a lock, a newer revision lands). Re-pull when the
 // window regains focus, and poll on a slow timer so badges stay live even while focused (#145).
 window.addEventListener("focus", () => void refreshVcStatus());
+// Storyletter may have changed the paired project's cards while the window was away.
+window.addEventListener("focus", () => void refreshPairedCards());
 window.setInterval(() => void refreshVcStatus(), 30_000);
 
 void boot();

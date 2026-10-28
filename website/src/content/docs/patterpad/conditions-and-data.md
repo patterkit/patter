@@ -130,6 +130,19 @@ first time the scene goes out, since that's when your game can start relying on 
 then you can rename freely. Either way, renaming never breaks a jump inside the story. Edit it
 in the inspector at the scene or block level.
 
+### Storylet cards that play a scene
+
+When a Storylets project nearby is paired with this one, its storylet cards play scenes by their
+addresses. Patterpad reads the paired project's cards when the project opens and whenever you come
+back to the window, and looks out for them:
+
+- **Deleting** a scene that cards play asks first, naming them: *2 storylet cards play this scene:
+  Tavern Brawl, Last Orders.*
+- **Changing the Game ID** of a scene that cards play asks the same question before the change.
+- **Renaming** a scene that cards play, while its address still follows its name, pins the address
+  it had, so the cards still find it. A toast says so (*Kept its Game ID 'tavern' so 2 storylet cards
+  still play it.*), and its **Undo** takes back the rename and the pin together.
+
 ## When something's off
 
 The **problems bar** along the bottom flags issues in plain language as you type, with `‹ ›`

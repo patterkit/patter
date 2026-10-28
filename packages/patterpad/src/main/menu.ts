@@ -10,7 +10,7 @@ import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 // apps spell them the same; the click handlers stay Patterpad's, because the mechanism behind each is
 // per app (the editor's journal over ProseMirror and the project history here, file-byte replay in Storyletter). What is hand-typed
 // below is only what is this app's alone (Patterpack, scenes, spelling, notes, fonts).
-import { EDIT_MENU, GO_MENU, HELP_MENU, APP_MENU, FILE_MENU, PLAY_MENU, PANE_MENU, REVIEW_MENU, PUBLISH_MENU, VIEW_MENU, namedMenuItems, recentsSubmenu } from "@wildwinter/app-shell/menu";
+import { EDIT_MENU, GO_MENU, HELP_MENU, APP_MENU, FILE_MENU, PLAY_MENU, PANE_MENU, REVIEW_MENU, PUBLISH_MENU, VIEW_MENU, namedMenuItems, recentsSubmenu, resolveClashesMenuItem } from "@wildwinter/app-shell/menu";
 import type { NamedMenuItem } from "@wildwinter/app-shell/menu";
 import { EXAMPLES } from "../shared/examples.js";
 
@@ -52,6 +52,16 @@ export function setUndoLabels(labels: { undo?: string; redo?: string }): boolean
   const next = { ...(labels.undo ? { undo: labels.undo } : {}), ...(labels.redo ? { redo: labels.redo } : {}) };
   if (next.undo === undoLabels.undo && next.redo === undoLabels.redo) return false;
   undoLabels = next;
+  return true;
+}
+
+/** How many clashes a merge left in the open project: Resolve Clashes… is enabled only while there are some.
+ *  Main learns it whenever the resolver's list is asked for (on open, after a merge, an undo, a decision). */
+let clashCount = 0;
+/** Set the clash count; true when it changed, so the caller rebuilds the menu. */
+export function setClashCount(n: number): boolean {
+  if (n === clashCount) return false;
+  clashCount = n;
   return true;
 }
 
@@ -154,9 +164,15 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // The return leg of the line above, and a THIRD act rather than a mode of Open: export writes a
         // file, Open Patterpack replaces the project with a new one, this edits the open project in place.
         { label: "Merge Returned Patterpack…", enabled: hasProject, click: () => send("merge-patterpack") },
+        // The family's clash resolver (ruling Q21): settle what a merge couldn't, one clash at a time. In File
+        // beside the merge, since Patterpad's project-level commands live here (it has no Project menu).
+        { ...resolveClashesMenuItem(hasProject ? clashCount : 0), click: () => send("resolve-clashes") },
         { type: "separator" },
         // Scene-level actions: within the OPEN project (project-level New/Open live above).
-        { label: "New Scene…", accelerator: "Shift+CmdOrCtrl+N", enabled: hasProject, click: () => send("new-scene") },
+        // New Scene makes an "Untitled scene" at once, its title selected to be typed over (Q20); the kits'
+        // gallery is the item after it.
+        { label: "New Scene", accelerator: "Shift+CmdOrCtrl+N", enabled: hasProject, click: () => send("new-scene") },
+        { label: "New Scene from Kit…", enabled: hasProject, click: () => send("new-scene-kit") },
         { label: "Delete Scene", enabled: hasProject, click: () => send("delete-scene") },
         { type: "separator" },
         { ...FILE_MENU.projectSettings, enabled: hasProject, click: () => send("project-settings") },
@@ -378,9 +394,8 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { label: GO_MENU.back.label, accelerator: process.platform === "darwin" ? GO_MENU.back.acceleratorMac : GO_MENU.back.acceleratorOther, click: () => send("nav-back") },
         { label: GO_MENU.forward.label, accelerator: process.platform === "darwin" ? GO_MENU.forward.acceleratorMac : GO_MENU.forward.acceleratorOther, click: () => send("nav-forward") },
         { type: "separator" },
-        // The spine's pane items. The navigator's LABEL is this app's on purpose: its left pane lists scenes
-        // and the bar's toggle says "Show scenes" too, so the menu keeps that word over the spine's "Navigator".
-        { ...PANE_MENU.showNav, label: "Show Scenes", type: "checkbox", checked: panes.nav, click: () => send("toggle-nav") },
+        // The spine's pane items, with the shell's own labels ("Show Navigator" in both apps, Q20).
+        { ...PANE_MENU.showNav, type: "checkbox", checked: panes.nav, click: () => send("toggle-nav") },
         { ...PANE_MENU.showInspector, type: "checkbox", checked: panes.inspector, click: () => send("toggle-inspector") },
         { ...PANE_MENU.resetView, click: () => send("reset-view") }, // reset side-pane widths + visibility to defaults
         // Full-bleed: hide ALL chrome (panes, bars, topbar, review gutters/tints). A REAL accelerator

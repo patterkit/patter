@@ -132,8 +132,23 @@ places:
 - **A `.patterconflict` file beside the shard**, saying what each side had. It's for you to read while
   you resolve the clash; don't commit it. A leftover one is refused too.
 
-To resolve a clash, make the line read the way it should, remove its entry from the shard's
-`unresolved` list, and delete the `.patterconflict` file.
+Patterpad shows a banner across the top of the window while the project holds clashes. Its
+**Resolve…** button, and **File ▸ Resolve Clashes…**, open the resolver: one card per clash, saying
+where it is ("Line L12 in The Tavern", "Property @gold"), what kind of clash it is, and both sides as
+you'd read them. Each clash offers three choices:
+
+- **Keep mine** keeps your side, which the shard already holds, and clears the clash.
+- **Take theirs** writes their side in its place and clears the clash. A clash that isn't one value,
+  such as two different reorderings of the same scenes or lines, can't take theirs: keep yours, or
+  edit it.
+- **Edit** takes you to the place, so you can make it read the way it should. Open the resolver again
+  and that clash offers **Mark resolved**, which keeps what's there now.
+
+Each choice is one step you can undo with Edit ▸ Undo. When a shard's last clash goes, so does its
+`.patterconflict` file.
+
+Without Patterpad, resolve a clash by hand: make the line read the way it should, remove its entry
+from the shard's `unresolved` list, and delete the `.patterconflict` file once the list is empty.
 
 If the pack that came back, the pack you sent, and your open project don't all belong to the same
 project, Patterpad says so first and makes **Cancel** the default. It's a warning rather than a

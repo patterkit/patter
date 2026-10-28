@@ -43,7 +43,7 @@ describe("a new scene goes after the open one (ruling 3)", () => {
     // A fresh load reads it back in the same place.
     expect(loadProject(dir).scenes.map((s) => s.id)).toEqual(["scn_street", res.sceneId, "scn_tavern"]);
     // One step: its undo takes the scene and its place in the order back out.
-    expect(project.projectHistoryState().undo?.label).toBe("New Scene");
+    expect(project.projectHistoryState().undo?.label).toBe("New scene");
     expect(await project.stepProjectHistory("undo")).toMatchObject({ ok: true });
     expect(order()).toEqual(["scn_street", "scn_tavern"]);
     expect(projectFile(dir).sceneOrder).toBeUndefined();
@@ -66,7 +66,7 @@ describe("Move Up / Move Down for a scene (ruling 3)", () => {
     expect(order()).toEqual(["scn_tavern", "scn_street"]);
     expect(res.project!.scenes.map((s) => s.id)).toEqual(["scn_tavern", "scn_street"]);
     expect(projectFile(dir).sceneOrder).toEqual(["scn_tavern", "scn_street"]);
-    expect(project.projectHistoryState().undo?.label).toBe("Move Scene Up");
+    expect(project.projectHistoryState().undo?.label).toBe("Move scene up");
     await project.stepProjectHistory("undo");
     expect(projectFile(dir).sceneOrder).toBeUndefined();
   });

@@ -72,6 +72,18 @@ const probeShard = JSON.stringify({
 // ?view=extlock does too, with the probe's data for the scene and the project held by bob.
 const extView = ["ext", "extlock"].includes(new URLSearchParams(location.search).get("view") ?? "");
 const extLock = new URLSearchParams(location.search).get("view") === "extlock";
+// ?view=clashes: the project holds three clashes a merge left (the resolver and its banner, Q21). A decision
+// takes the clash away; the preview has no history to undo it with.
+const clashView = new URLSearchParams(location.search).get("view") === "clashes";
+let previewClashes: Array<Record<string, unknown>> = clashView ? [
+  { id: "loc/en/tavern.patterloc#strings.L_greet", where: "Line L_greet in The Tavern", path: "strings.L_greet", kind: "both-changed", settable: true,
+    ours: "What'll it be, stranger?", theirs: "What can I get you?", base: "What'll it be?" },
+  { id: "authoring/tavern.patterx#writing.L_greet2", where: "Line L_greet2's writing status in The Tavern", path: "writing.L_greet2", kind: "no-timestamp",
+    kindLabel: "Both sides changed it, with no edit times to say which came last", settable: true, ours: "final", theirs: "draft" },
+  { id: "scenes/tavern.patterflow#scene.blocks[intro].children", where: "Order of what's in Block intro in The Tavern", path: "scene.blocks[intro].children",
+    kind: "moved", kindLabel: "Moved on both sides", settable: false, ours: "Snippet sn_intro_greet, then Snippet sn_intro_scene", theirs: "Snippet sn_intro_scene, then Snippet sn_intro_greet",
+    detail: "Both sides inserted here; kept ours-then-theirs: review the order." },
+] : [];
 
 // The project's speaker qualifiers (the defaults, as a project that never edited them reads).
 const QUALIFIERS = [
@@ -296,9 +308,13 @@ const stub = {
   openExample: async () => null,
   shareScopes: async () => null,
   showInStoryletter: async () => ({ ok: false, canceled: true }),
+  pairedCards: async () => [{ title: "Tavern Brawl", ref: "the-tavern" }, { title: "Last Orders", ref: "the-tavern" }],
   mergePatterpackPlan: async () => null,
   mergePatterpackCommit: async () => ({ error: "the preview cannot merge" }),
   mergePatterpackDrop: async () => {},
+  listClashes: async () => previewClashes as never,
+  decideClash: async (id: string) => { previewClashes = previewClashes.filter((c) => c.id !== id); return { ok: true, clashes: previewClashes as never }; },
+  clashTarget: async (id: string) => (id.includes("children") ? { kind: "scene", sceneId: "scn_tavern", nodeId: "intro" } : { kind: "scene", sceneId: "scn_tavern", nodeId: id.includes("L_greet2") ? "L_greet2" : "L_greet" }),
   toggleAutoRebuild: async () => true,
   buildAudioManifest: async () => ({ ok: true, path: "/Users/ian/Projects/the-tavern.patter/audio/patteraudio.json" }),
   exportVoiceScript: async (everything: boolean) => ({ ok: true, path: `The Tavern - voice script${everything ? " (all)" : ""}.xlsx` }),
@@ -355,6 +371,7 @@ const stub = {
       untouched: !original, lines: original ? 12 : 0, blocks: original ? 2 : 1,
       startsHere: sceneId === "scn_tavern", lastScene: project.scenes.length <= 1, vcs: true,
       referrers: sceneId === "scn_tavern" ? [{ sceneId: "scn_street", name: "Street", jumps: 2, conditions: 1 }] : [],
+      cards: sceneId === "scn_tavern" ? ["Tavern Brawl", "Last Orders"] : [],
     };
   },
   deleteScene: async (sceneId: string) => {
@@ -507,7 +524,7 @@ const stub = {
   onUpdaterReady: (h: (info: { appName: string; version: string }) => void) => { (window as unknown as { __updateReady: unknown }).__updateReady = h; },
   updaterRestart: () => undefined,
   paletteCommands: async () => [
-    { id: "File\u001fNew Scene\u2026", path: ["File"], label: "New Scene\u2026", accelerator: "CmdOrCtrl+Shift+N", enabled: true },
+    { id: "File\u001fNew Scene", path: ["File"], label: "New Scene", accelerator: "CmdOrCtrl+Shift+N", enabled: true },
     { id: "View\u001fProject Overview", path: ["View"], label: "Project Overview", enabled: true },
     { id: "Edit\u001fMove Up", path: ["Edit"], label: "Move Up", accelerator: "Ctrl+Cmd+Up", enabled: true },
     { id: "Edit\u001fMove Down", path: ["Edit"], label: "Move Down", accelerator: "Ctrl+Cmd+Down", enabled: true },

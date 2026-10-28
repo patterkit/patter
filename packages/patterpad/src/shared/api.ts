@@ -8,6 +8,8 @@ import type { WhatsNewState } from "@wildwinter/app-shell/whats-new-main";
 import type { GameDataFields, GameDataNodeKind, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier } from "@patterkit/model";
 
 export type { VcsKind } from "@patterkit/model";
+import type { PairedCard } from "./paired-cards.js";
+export type { PairedCard } from "./paired-cards.js";
 
 export type { DocLine } from "@patterkit/model";
 
@@ -431,6 +433,8 @@ export interface SceneDeleteInfo {
   vcs: boolean;
   /** Other scenes that jump into this one, or whose conditions name its nodes. */
   referrers: Array<{ sceneId: string; name: string; jumps: number; conditions: number }>;
+  /** The paired Storylets project's cards that play this scene, by title (none when nothing pairs). */
+  cards: string[];
 }
 
 export interface SceneSource {
@@ -528,6 +532,24 @@ export interface AddExtensionResult extends SaveResult {
 export interface ViewOfferDto { extension: string; view: string; installed: boolean }
 
 export interface ProjectStep { id: number; label: string; merged: boolean; scenes: string[]; authoring: string[] }
+
+/** One unresolved clash a merge left in a shard (its `unresolved` entry), as the shell's resolver lists it
+ *  (app-shell `Clash`): where it is in words, the two sides as text, and whether Take theirs can be written. */
+export type ClashDto = import("@wildwinter/app-shell").Clash;
+
+/** Where the resolver's Edit takes the author: a scene (and a node in it, or its title), a tab of Project
+ *  Settings (and a row on it), the Properties page, or nowhere the editor shows (a moved scene order). */
+export type ClashTarget =
+  | { kind: "scene"; sceneId: string; nodeId?: string; title?: boolean }
+  | { kind: "settings"; tab: string; row?: string }
+  | { kind: "properties"; name?: string }
+  | { kind: "none" };
+
+/** What a clash decision came to: the clashes left, and (when it wrote) the step and the refreshed project. */
+export interface ClashDecisionResult extends SaveResult {
+  clashes: ClashDto[];
+  project?: OpenedProject;
+}
 
 /** What a project undo or redo came to, and what the editor must refresh. */
 export interface ProjectHistoryOutcome {
@@ -1262,6 +1284,14 @@ export interface PatterApi {
   mergePatterpackCommit(): Promise<{ project: OpenedProject; summary: PackMergeSummary } | { error: string }>;
   /** Or the author cancelled: let the held plan go. */
   mergePatterpackDrop(): Promise<void>;
+  /** Every unresolved clash a merge left in the open project's shards (the one clash resolver, Q21). Also
+   *  keeps Project ▸ Resolve Clashes… enabled by the count. */
+  listClashes(): Promise<ClashDto[]>;
+  /** Settle one clash: "ours" (Keep mine), "theirs" (Take theirs), or "resolved" (Mark resolved, after an
+   *  edit by hand), as one undoable step. Answers with the clashes left. */
+  decideClash(id: string, decision: "ours" | "theirs" | "resolved"): Promise<ClashDecisionResult>;
+  /** Where the resolver's Edit goes for a clash. */
+  clashTarget(id: string): Promise<ClashTarget>;
   /** File ▸ Share Scopes with Other Tools: create the game's `game-scopes/` folder (where, asked in main)
    *  with Patter's file and a `game.scopes.json` of the project's World properties, so the game's other
    *  editing tools check and preview this project's names and it checks theirs. `shared` when the
@@ -1294,6 +1324,9 @@ export interface PatterApi {
   buildBundle(opts?: { pin?: boolean }): Promise<ExportResult>;
   /** Show Card in Storyletter: open the paired Storyletter project at the card this scene plays. */
   showInStoryletter(sceneId: string): Promise<{ ok: boolean; error?: string; canceled?: boolean }>;
+  /** The paired Storylets project's cards (title and the scene reference each plays), read again where a
+   *  deck file changed; none when nothing pairs. Asked on open and when the window regains focus. */
+  pairedCards(): Promise<PairedCard[]>;
   /** Toggle Auto Rebuild (Publish menu checkbox): flip the author's own setting (app state, not the
    *  project), and return the new state. */
   toggleAutoRebuild(): Promise<boolean>;

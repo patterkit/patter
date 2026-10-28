@@ -76,6 +76,9 @@ export {
   PROJECT_HANDLED,
 } from "./merge.js";
 export type { MergeResult, MergeFileType, Conflict, ConflictKind, ShardText } from "./merge.js";
+// Settling a merge's clashes: a decision per `unresolved` entry, applied to the shard (the one clash resolver)
+export { applyResolutions, isSettableClash, unresolvedClashes, clashPathSegments, valueAtClashPath, findMarkedShards, ResolutionError } from "./resolutions.js";
+export type { Resolution, ResolutionDecision, UnresolvedClash, ClashPathSegment, MarkedShard, ConflictSidecar } from "./resolutions.js";
 // Patter extensions: a project's manifests, as a merge reads them from the working tree
 export { manifestPath, readProjectManifest, soundManifest, projectManifests, planExtensionUpgrades, renameCastKeys } from "./extensions.js";
 export type { ExtensionUpgrade, CastKeyRewrite } from "./extensions.js";

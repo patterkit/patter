@@ -22,20 +22,21 @@ import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQu
 import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD, PROJECT_EXTENSION_STEM, castStringKey } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
-import type { ReviewItem, ProjectStep, ProjectHistoryOutcome } from "../shared/api.js";
+import type { ReviewItem, ProjectStep, ProjectHistoryOutcome, ClashDto, ClashTarget } from "../shared/api.js";
 import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync, prepareToWriteFilesAsync,
   setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
 import { fileSafeName } from "../shared/file-name.js";
 import { hostScopesProblem, renameScopesInLocale, renameScopesInScene } from "./scope-rename.js";
 import type { EditableExportRequest, EditableImportRequest, EditableImportSummary, OpenSuggestionDto } from "../shared/api.js";
 import type { ImportPlan } from "@patterkit/ops";
+import { applyResolutions, findMarkedShards, ResolutionError, CONFLICT_SIDECAR, SHARD_EXTENSIONS, type Resolution } from "@patterkit/ops";
 import { castColours, keepCastColours, cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, renameCastKeys, readProjectManifest, manifestPath, planExtensionUpgrades } from "@patterkit/ops";
 import { createHash, randomUUID } from "node:crypto";
 import type { StageRenameDto } from "../shared/api.js";
 import type { SceneExtensionShards, LiveSceneSource, SceneExtensionSourceDto } from "../shared/api.js";
 import type { ExtensionShard, ProjectExtension } from "@patterkit/model";
 import { EXTENSION_SCHEMA } from "@patterkit/model";
-import type { Manifest } from "@wildwinter/toolkit/extensions";
+import { unresolvedOf, type Manifest } from "@wildwinter/toolkit/extensions";
 import { extensionDtos, extensionNodeIndex } from "../shared/extensions.js";
 import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult, PackMergeSummary } from "../shared/api.js";
 import type { CoverageDriver } from "@patterkit/model";
@@ -43,6 +44,9 @@ import { editorScopes } from "../shared/host-scopes.js";
 import type { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { startAudioIndex, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
 import { keepUnresolvedMark } from "./unresolved-mark.js";
+import { describeClashes, splitClashId, type ClashContext } from "./clash-words.js";
+import { refreshPairedCards } from "./paired-cards.js";
+import { cardsPlaying } from "../shared/paired-cards.js";
 import { DiskStamps, History, captureBefore, UNDO_LIMIT, type FileState, type Applied, type FileRestorer } from "@wildwinter/app-shell/history";
 import { patterxRestorer, conversationChanged } from "./patterx-restore.js";
 
@@ -446,9 +450,10 @@ function extensionSummary(p: LoadedProject): Pick<OpenedProject, "extensions" | 
 }
 
 // --- the game's shared scopes (patterkit/design/shared-scopes.md) -----------------------------------
-// Where the game has a `game-scopes/` folder, Patter keeps `patter.scopes.json` there current (whenever
-// the project's properties are saved, and on a build), World properties edit the game's
-// `game.scopes.json`, and the project keeps a synced copy. With no folder, none of this does anything.
+// Where the game has a `game-scopes/` folder, Patter keeps `patter.scopes.json` there current (with every
+// write of the project file, as Storyletter keeps its own with every project-shard write, and on a build),
+// World properties edit the game's `game.scopes.json`, and the project keeps a synced copy. With no folder,
+// none of this does anything.
 
 /** Re-read the game scopes folder (after a write to it, or before showing World properties, since
  *  another tool may have changed it since the project opened). */
@@ -459,20 +464,37 @@ function refreshGameScopes(): void {
   if (missing) loaded.gameScopesMissing = missing; else delete loaded.gameScopesMissing;
 }
 
-/** The write that brings `patter.scopes.json` in line with `project`, as a list to spread into a batch:
- *  empty with no folder, or when the file already says exactly this. */
-function patterScopesWrites(project: ProjectFile): { path: string; content: string }[] {
-  const w = loaded ? patterScopesWrite(project, loaded.gameScopes) : undefined;
-  return w ? [w] : [];
+/**
+ * A project-history batch with Patter's share of the game's scopes added: when the batch writes the project
+ * file and the game shares its scopes, `patter.scopes.json` joins it, said as the written project would say
+ * it (Storyletter's `withGameScopes`). Every project-file write (settings, cast, properties, a quick fix, a
+ * pack merge, a new or deleted scene) goes through `projectCommit`, which calls this, so the file is never
+ * left behind; and it's one step, so an undo or redo puts the file back with the project's. The folder is
+ * read again first (another tool may have made or moved it), and the file compared with the disk, not the
+ * copy read at open: `projectCommit` drops it when the disk already says this.
+ */
+function withPatterScopes(given: StepWrite[]): StepWrite[] {
+  if (!loaded) return given;
+  const projectWrite = [...given].reverse().find((w) => w.path === loaded!.projectFile);
+  if (!projectWrite || projectWrite.content === null) return given;
+  refreshGameScopes();
+  const gs = loaded.gameScopes;
+  if (!gs || given.some((w) => w.path === join(gs.dir, PATTER_SCOPES_FILE))) return given;
+  let next: ProjectFile;
+  try { next = parseSource(projectWrite.content) as ProjectFile; } catch { return given; } // a mark the merge left: the next write catches up
+  const { patterText: _seen, ...unseen } = gs;
+  const w = patterScopesWrite(next, unseen);
+  return w ? [...given, w] : given;
 }
 
-/** After a batch with Patter's file in it landed: remember what the file now says, so the next save
- *  compares against it rather than re-writing. */
-function notePatterScopesWritten(writes: { path: string; content: string }[]): void {
+/** After a batch with Patter's file in it landed: remember what the file now says, so validation and the
+ *  next build compare against it. */
+function notePatterScopesWritten(writes: readonly { path: string; content: string | null }[]): void {
   const gs = loaded?.gameScopes;
   if (!gs) return;
   const w = writes.find((x) => x.path === join(gs.dir, PATTER_SCOPES_FILE));
-  if (w) gs.patterText = w.content;
+  if (!w) return;
+  if (w.content === null) delete gs.patterText; else gs.patterText = w.content;
 }
 
 /** Write through the VC layer (lock-aware); fall back to a plain write if it throws. */
@@ -639,6 +661,7 @@ async function writeStates(all: StepWrite[], opts: { writeLocalThroughVc?: boole
     if (s.content === null) rmSync(s.path, { force: true });
     else { mkdirSync(dirname(s.path), { recursive: true }); writeFileSync(s.path, s.content, "utf8"); }
   }
+  notePatterScopesWritten(all); // a step, an undo, or a redo that wrote Patter's scopes file
   return { ok: true };
 }
 
@@ -679,9 +702,10 @@ async function projectCommit(
   label: string, key: string, given: StepWrite[],
   opts: { before?: Map<string, string | null>; local?: ReadonlySet<string> } = {},
 ): Promise<SaveResult & { step?: ProjectStep }> {
-  // One state per path, the last one given winning (a batch can name a shard twice).
+  // One state per path, the last one given winning (a batch can name a shard twice). A batch that writes
+  // the project file brings Patter's scopes file with it.
   const byPath = new Map<string, StepWrite>();
-  for (const w of given) byPath.set(w.path, { path: w.path, content: w.content });
+  for (const w of withPatterScopes(given)) byPath.set(w.path, { path: w.path, content: w.content });
   const writes = [...byPath.values()];
   const current = captureBefore(writes.map((w) => w.path));
   const beforeOf = (w: StepWrite, i: number): string | null => (opts.before?.has(w.path) ? opts.before.get(w.path)! : current[i]!.content);
@@ -1155,6 +1179,89 @@ export function commitPackMerge(plan: PackMergePlan): Promise<SaveResult & { ste
     // project (Close Project then left it loaded) and the play session and version-control state reset.
     reloadFromDisk();
     return { ok: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
+  });
+}
+
+// --- the clash resolver (ruling Q21) ------------------------------------------------------------------
+// A merge (a returned Patterpack, a git merge through `patter merge`) keeps our side of each clash and names
+// it in the shard under `unresolved`. The shell's resolver lists those entries through this app's adapter
+// and asks for one decision at a time; each is one step of the project history, through `projectCommit`
+// like every other project write, so Edit ▸ Undo takes it back. The sidecar goes, as bookkeeping, in the
+// same step as the shard's last entry.
+
+/** The open project's lookups, for the resolver's words (clash-words.ts). */
+function clashContext(p: LoadedProject): ClashContext {
+  const def = p.project.locales.default;
+  const strings = new Map<string, Record<string, string>>();
+  for (const loc of p.locales) if (loc && (loc.locale === def || loc.default) && !strings.has(loc.scene)) strings.set(loc.scene, loc.strings ?? {});
+  const names = new Map(takenExtensions().map((x) => [x.id, x.manifest.name || x.id]));
+  return {
+    defaultLocale: def,
+    sceneName: (id) => p.scenes.find((sc) => sc.id === id)?.name,
+    sceneTree: (id) => p.scenes.find((sc) => sc.id === id) as unknown as Record<string, unknown> | undefined,
+    sceneOfAuthoring: (file) => [...shards].find(([, sh]) => resolve(sh.authoringPath) === resolve(file))?.[0],
+    text: (scene, id) => strings.get(scene)?.[id],
+    extensionName: (id) => names.get(id) ?? id,
+  };
+}
+
+/** Every clash in the open project, as rows, with where Edit goes for each. */
+function collectClashes(): Array<{ clash: ClashDto; target: ClashTarget }> {
+  if (!loaded) return [];
+  ensureHydrated(); // the words name nodes in every scene
+  const p = loaded;
+  const ctx = clashContext(p);
+  return findMarkedShards(p.root).flatMap((m) => describeClashes(ctx, m, relative(p.root, m.file).split(sep).join("/")));
+}
+
+/** The resolver's list. */
+export function listClashes(): ClashDto[] {
+  return collectClashes().map((c) => c.clash);
+}
+
+/** Where the resolver's Edit goes for clash `id`. */
+export function clashTarget(id: string): ClashTarget {
+  return collectClashes().find((c) => c.clash.id === id)?.target ?? { kind: "none" };
+}
+
+/** The shard a clash id names, inside the open project and of a shard type, or null. */
+function clashShardPath(rel: string): string | null {
+  if (!loaded || !rel) return null;
+  const file = resolve(loaded.root, rel);
+  const inside = relative(loaded.root, file);
+  if (!inside || inside.startsWith("..") || isAbsolute(inside)) return null;
+  return SHARD_EXTENSIONS.some((ext) => file.endsWith(ext)) ? file : null;
+}
+
+/**
+ * Settle clash `id`: "ours" keeps the value the shard holds and clears the entry, "theirs" writes their side
+ * and clears it, "resolved" clears it only (the author has edited the place). One step of the project
+ * history, labelled "Resolve clash"; when the shard's last entry clears, its `.patterconflict` goes in the
+ * same step (bookkeeping, as the merge wrote it, so an undo puts it back). The project is read again from
+ * disk afterwards, as after an undo, and the step names the scenes it rewrote, so the editor reloads the open
+ * one as it does after Replace. Patterpad's own saves carry a mark only while the file on disk has one
+ * (unresolved-mark.ts), and every scene this rewrites has its mirror dropped, so a later save can't put a
+ * cleared entry back. Answers with the clashes left.
+ */
+export function decideClash(id: string, decision: Resolution): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; clashes: ClashDto[] }> {
+  return enqueueForProject(async () => {
+    if (!loaded) return { ok: false, error: "no project open", clashes: [] };
+    const { rel, path } = splitClashId(id);
+    const file = clashShardPath(rel);
+    const refuse = (error: string) => ({ ok: false, error, clashes: listClashes() });
+    if (!file || !path) return refuse("That clash isn't in this project.");
+    let text: string;
+    try { text = readFileSync(file, "utf8"); } catch { return refuse(`Couldn't read ${rel}.`); }
+    let next: string;
+    try { next = applyResolutions(text, [{ path, decision }]); }
+    catch (e) { return refuse(e instanceof ResolutionError ? "That clash has already gone, or can't take their side." : (e instanceof Error ? e.message : String(e))); }
+    const writes: StepWrite[] = [{ path: file, content: next }];
+    const sidecar = `${file}${CONFLICT_SIDECAR}`;
+    if (unresolvedOf(parseSource(next)) === undefined && existsSync(sidecar)) writes.push({ path: sidecar, content: null });
+    const res = await projectCommit("Resolve clash", freshKey("clash"), writes, { local: new Set([sidecar]) });
+    if (!res.ok) return { ...res, clashes: listClashes() };
+    reloadAfterHistory(); // the shard is the project's model too: read it back, as after an undo
+    return { ok: true, project: summarise(loaded), clashes: listClashes(), ...(res.step ? { step: res.step } : {}) };
   });
 }
 
@@ -1737,7 +1844,7 @@ export function readSceneWriting(sceneId: string): Record<string, string> {
 export function saveSceneWriting(sceneId: string, map: Record<string, string>): Promise<SaveResult & { step?: ProjectStep }> {
   const kept: Record<string, string> = {};
   for (const [id, name] of Object.entries(map)) if (name) kept[id] = name;
-  return saveAuthoringField(sceneId, (af) => { af.writing = Object.keys(kept).length ? kept : undefined; }, "Writing Status");
+  return saveAuthoringField(sceneId, (af) => { af.writing = Object.keys(kept).length ? kept : undefined; }, "Writing status");
 }
 
 /** Read a scene's per-beat MANUAL recording status (#206): beat id -> ladder rung. Source-only metadata. */
@@ -1749,7 +1856,7 @@ export function readSceneRecording(sceneId: string): Record<string, string> {
 export function saveSceneRecording(sceneId: string, map: Record<string, string>): Promise<SaveResult & { step?: ProjectStep }> {
   const kept: Record<string, string> = {};
   for (const [id, name] of Object.entries(map)) if (name) kept[id] = name;
-  return saveAuthoringField(sceneId, (af) => { af.recording = Object.keys(kept).length ? kept : undefined; }, "Recording Status");
+  return saveAuthoringField(sceneId, (af) => { af.recording = Object.keys(kept).length ? kept : undefined; }, "Recording status");
 }
 
 /** A scene's "needs re-record" flags (#227): beat id -> true, from the authoring shard. */
@@ -1900,7 +2007,7 @@ export function applyEditableImport(planId: string): Promise<SaveResult> {
   return enqueueWrite(async () => {
     const plan = importPlans.get(planId);
     if (!plan) return { ok: false, error: "That import plan has expired; choose the file again." };
-    const res = await projectCommit("Import Script", freshKey("import"), plan.writes);
+    const res = await projectCommit("Import script", freshKey("import"), plan.writes);
     if (res.ok) { importPlans.delete(planId); reloadFromDisk(); }
     return res;
   });
@@ -1930,7 +2037,7 @@ export function decideSuggestions(decisions: Array<{ id: string; accept: boolean
     ensureHydrated();
     const plan = applySuggestionDecisions(loaded, decisions, { by });
     if (!plan.writes.length) return { ok: true, results: plan.results };
-    const res = await projectCommit(decisions.length === 1 ? (decisions[0]!.accept ? "Accept Suggestion" : "Reject Suggestion") : "Decide Suggestions", freshKey("decide"), plan.writes);
+    const res = await projectCommit(decisions.length === 1 ? (decisions[0]!.accept ? "Accept suggestion" : "Reject suggestion") : "Decide suggestions", freshKey("decide"), plan.writes);
     if (res.ok) reloadFromDisk();
     return { ...res, results: plan.results };
   });
@@ -2347,17 +2454,15 @@ export function applyFix(fix: QuickFix): Promise<SaveResult & { step?: ProjectSt
     if (fix.kind === "add-to-cast") {
       const cast = [...(loaded.project.cast ?? [])];
       if (!cast.some((c) => c.name === fix.character)) cast.push({ name: fix.character });
-      return commitProjectFile({ ...loaded.project, cast }, "Add to Cast"); // and the cached project shows the new cast
+      return commitProjectFile({ ...loaded.project, cast }, "Add to cast"); // and the cached project shows the new cast
     }
     if (fix.kind === "declare-property") {
       const properties = [...(loaded.project.properties ?? [])];
       if (!properties.some((p) => p.name === fix.name)) properties.push({ name: fix.name, type: fix.propType });
       const next = { ...loaded.project, properties };
-      // The properties changed, so the game's scopes folder (when there is one) hears about it too.
-      const writes = [{ path: loaded.projectFile, content: canonicalStringify(next) }, ...patterScopesWrites(next)];
-      const res = await projectCommit("Declare Property", freshKey("project"), writes);
-      if (res.ok) { loaded.project = next; notePatterScopesWritten(writes); } // reflect the new property in the cached project
-      return res;
+      // The properties changed, so the game's scopes folder (when there is one) hears about it too: the
+      // project commit brings it.
+      return commitProjectFile(next, "Declare property"); // and the cached project shows the new property
     }
     return { ok: false, error: "unknown fix (handled in the renderer?)" }; // e.g. retarget-jump is a surface edit
   });
@@ -2624,7 +2729,7 @@ export async function locImport(filePath: string, chosenLocale?: string): Promis
     const { writes, stats } = planned;
     const report = [...warned, ...describeLocImport(loaded, planned.report)];
     if (writes.length === 0) return { ok: true, locale, updated: 0, files: 0, ...(report.length ? { report } : {}) };
-    const res = await projectCommit("Import Translations", freshKey("loc"), writes);
+    const res = await projectCommit("Import translations", freshKey("loc"), writes);
     if (!res.ok) return { ok: false, error: res.error };
     try { reloadFromDisk(); }
     catch (e) { console.warn("patterpad: localisation import committed, but reloading the project failed - the in-memory strings are stale until reopen:", e); }
@@ -2733,7 +2838,7 @@ export function buildBundle(opts?: { pin?: boolean }): Promise<{ ok: boolean; pa
       const plan = planPins(loaded);
       if (plan.writes.length) {
         // The pins are an edit to the scenes, so they are a step; the bundle that follows is output, and is not.
-        const res = await projectCommit("Pin Scene Addresses", freshKey("pins"), plan.writes);
+        const res = await projectCommit("Pin scene addresses", freshKey("pins"), plan.writes);
         if (!res.ok) return { ok: false, error: res.error };
         // Swap the pinned scenes into the working copy (element swap, never in place), and drop their source
         // mirror so the open scene's reload reads the pinned bytes from disk.
@@ -2997,7 +3102,7 @@ export function renameStages(renames: StageRenameDto[], openScene?: { sceneId: s
     const flowPath = openScene ? loaded.sceneFiles[openScene.sceneId] : undefined;
     const before = flowPath && openScene ? new Map([[flowPath, openScene.flowBefore]]) : undefined;
     if (flowPath && !writes.some((w) => w.path === flowPath)) writes.push({ path: flowPath, content: readFileSync(flowPath, "utf8") });
-    const res = await projectCommit("Rename Stage", freshKey("stages"), writes, before ? { before } : {});
+    const res = await projectCommit("Rename stage", freshKey("stages"), writes, before ? { before } : {});
     if (!res.ok) return { ...res, expressions: 0 };
     reloadFromDisk(); // the rewritten scenes, read back whole
     return { ok: true, expressions, ...(res.step ? { step: res.step } : {}) };
@@ -3226,7 +3331,8 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
       // clean file) + `export.localisation` only when IDs-only, preserving any other export fields (e.g. targets).
       export: buildExport(loaded, s.buildBundle, s.buildLocalisation, s.buildSourceDebug, loaded.project.export),
     };
-    const writes = [...sharedWrites, { path: loaded.projectFile, content: canonicalStringify(next) }, ...patterScopesWrites(next)];
+    // The project commit adds `patter.scopes.json` when the game shares its scopes.
+    const writes = [...sharedWrites, { path: loaded.projectFile, content: canonicalStringify(next) }];
     // A qualifier whose gameId changed is a rename: every line using the old gameId is rewritten to the new
     // one, and its translated names and labels, suggestions, edit records, and handoff records move with it,
     // in the same batch as the project file (the caller flushed the open scene first, and reloads it after).
@@ -3276,7 +3382,7 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
     if (s.vcs !== prevVcs && s.vcs !== "none") writes.push(...vcsConfigWrites(loaded.root, s.vcs, currentBundlePosture(loaded.root, prevVcs === "none" ? undefined : prevVcs)));
     // One step of the project history, with its renames: the Properties page keys its saves, so a run of
     // edits there is one step.
-    const res = await projectCommit(undo.label ?? "Project Settings", undo.key ?? freshKey("settings"), [...writes, ...extensionDeletes]);
+    const res = await projectCommit(undo.label ?? "Project settings", undo.key ?? freshKey("settings"), [...writes, ...extensionDeletes]);
     if (!res.ok) return res;
     // Remove the PREVIOUS system's now-orphaned config files (e.g. git's .gitattributes / .gitignore when
     // moving to Perforce), so a switched project never carries stale VCS hygiene. The shared vcs-setup.md is
@@ -3312,7 +3418,7 @@ export function setStart(start: { scene: string; block?: string }): Promise<Save
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const next: ProjectFile = { ...loaded.project, start: start.scene ? start : undefined };
-    const res = await commitProjectFile(next, "Set Start");
+    const res = await commitProjectFile(next, "Set start");
     if (!res.ok) return res;
     return { ok: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
   });
@@ -3357,7 +3463,7 @@ export function createScene(name: string, kit: SceneKit = "blank", speaker?: str
     const nextProject: ProjectFile = { ...loaded.project, ...(addToCast ? { cast } : {}), ...(sceneOrder ? { sceneOrder } : {}) };
     // One step: its undo deletes the files it made (and takes the speaker back out of the cast, and the
     // scene back out of the order).
-    const res = await projectCommit("New Scene", freshKey("scene"), [
+    const res = await projectCommit("New scene", freshKey("scene"), [
       { path: flowPath, content: canonicalStringify(flow) },
       { path: locPath, content: canonicalStringify(locale) },
       ...(addToCast || sceneOrder ? [{ path: loaded.projectFile, content: canonicalStringify(nextProject) }] : []),
@@ -3432,7 +3538,14 @@ export function sceneDeleteInfo(sceneId: string): SceneDeleteInfo | null {
     lastScene: loaded.scenes.length <= 1,
     vcs: !!loaded.project.vcs,
     referrers,
+    cards: sceneCards(scene),
   };
+}
+
+/** The titles of the paired Storylets project's cards that play `scene` (read again first, by mtime). */
+function sceneCards(scene: { id: string; name: string; gameId?: string }): string[] {
+  if (!loaded) return [];
+  return cardsPlaying(refreshPairedCards(), scene, new Set(loaded.scenes.map((s) => s.id)));
 }
 
 /** Delete a scene: its flow shard, its loc shard in EVERY locale, its authoring shard, and its data for
@@ -3477,7 +3590,7 @@ export function deleteScene(sceneId: string): Promise<SaveResult & { project?: O
     // A refused delete comes back as a result, not a throw, and stops the rest: once this ignored it,
     // reported the scene deleted, and left its strings on disk for a scene that no longer existed. What
     // did go is still a step, so it can be put back.
-    const res = await projectCommit("Delete Scene", freshKey("scene"), [
+    const res = await projectCommit("Delete scene", freshKey("scene"), [
       ...(hadOrder || startsHere ? [{ path: p.projectFile, content: canonicalStringify(next) }] : []),
       ...files.map((path) => ({ path, content: null })),
     ]);
@@ -3532,7 +3645,7 @@ export function reorderScenes(ids: string[]): Promise<SaveResult & { step?: Proj
       return { ok: false, error: "The scene list changed, so the reorder was ignored." };
     }
     const next: ProjectFile = { ...loaded.project, sceneOrder: ids };
-    const res = await commitProjectFile(next, "Reorder Scenes");
+    const res = await commitProjectFile(next, "Reorder scenes");
     if (!res.ok) return res;
     const rank = new Map(ids.map((id, i) => [id, i]));
     loaded.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
@@ -3555,7 +3668,7 @@ export function moveScene(sceneId: string, dir: -1 | 1): Promise<SaveResult & { 
     if (j < 0 || j >= ids.length) return { ok: true, moved: false };
     [ids[i], ids[j]] = [ids[j]!, ids[i]!];
     const next: ProjectFile = { ...loaded.project, sceneOrder: ids };
-    const res = await commitProjectFile(next, dir < 0 ? "Move Scene Up" : "Move Scene Down");
+    const res = await commitProjectFile(next, dir < 0 ? "Move scene up" : "Move scene down");
     if (!res.ok) return res;
     const rank = new Map(ids.map((id, k) => [id, k]));
     loaded.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
@@ -3573,7 +3686,7 @@ export function addDictionaryWord(word: string): Promise<SaveResult & { step?: P
     if (!w || cur.includes(w)) return { ok: true, words: cur };
     const words = [...cur, w];
     const next: ProjectFile = { ...loaded.project, dictionary: { ...loaded.project.dictionary, words } };
-    const res = await commitProjectFile(next, "Add to Dictionary");
+    const res = await commitProjectFile(next, "Add to dictionary");
     if (!res.ok) return res;
     return { ok: true, words, ...(res.step ? { step: res.step } : {}) };
   });
@@ -3590,7 +3703,7 @@ export function addIgnoreWord(word: string): Promise<SaveResult & { step?: Proje
     if (!w || cur.includes(w)) return { ok: true, ignore: cur };
     const ignore = [...cur, w];
     const next: ProjectFile = { ...loaded.project, dictionary: { ...loaded.project.dictionary, ignore } };
-    const res = await commitProjectFile(next, "Ignore Word");
+    const res = await commitProjectFile(next, "Ignore word");
     if (!res.ok) return res;
     return { ok: true, ignore, ...(res.step ? { step: res.step } : {}) };
   });
@@ -3644,7 +3757,7 @@ export function shareScopes(dir: string): Promise<SaveResult & { step?: ProjectS
     try { mkdirSync(dir, { recursive: true }); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
     const projectChanged = plan.project.gameScopes !== loaded.project.gameScopes;
     const writes = [...plan.writes, ...(projectChanged ? [{ path: loaded.projectFile, content: canonicalStringify(plan.project) }] : [])];
-    const res = await projectCommit("Share Scopes", freshKey("share"), writes);
+    const res = await projectCommit("Share scopes", freshKey("share"), writes);
     if (!res.ok) return res;
     loaded.project = plan.project;
     refreshGameScopes();

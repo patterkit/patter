@@ -129,7 +129,7 @@ describe("every write in the project history undoes and redoes to the exact byte
       qualifiers: s.qualifiers.map((q) => (q.gameId === "os" ? { ...q, gameId: "offscreen" } : q)), qualifierRenames: { os: "offscreen" },
       stageRenames: [{ scope: "", name: "cue", gameData: "gameEvent", from: "camera_focus", to: "camera_wide" }],
       cast: s.cast.map((c) => (c.name === "BARKEEP" ? { ...c, name: "INNKEEPER" } : c)), castRenames: { BARKEEP: "INNKEEPER" },
-    }), "Project Settings");
+    }), "Project settings");
     expect(readFileSync(join(dir, "scenes", "tavern.patterflow"), "utf8")).toContain("INNKEEPER");
     expect(readFileSync(join(dir, "scenes", "tavern.patterflow"), "utf8")).toContain("camera_wide");
     // And the model read back what the redo wrote.
@@ -138,24 +138,24 @@ describe("every write in the project history undoes and redoes to the exact byte
 
   it("the quick fixes: add to cast, declare a property", async () => {
     const dir = openCopy();
-    await roundTrip(dir, () => project.applyFix({ kind: "add-to-cast", character: "GUARD" }), "Add to Cast");
-    await roundTrip(dir, () => project.applyFix({ kind: "declare-property", name: "mood", propType: "string" }), "Declare Property");
+    await roundTrip(dir, () => project.applyFix({ kind: "add-to-cast", character: "GUARD" }), "Add to cast");
+    await roundTrip(dir, () => project.applyFix({ kind: "declare-property", name: "mood", propType: "string" }), "Declare property");
   });
 
   it("set start, reorder scenes, and the dictionary", async () => {
     const dir = openCopy();
-    await roundTrip(dir, () => project.setStart({ scene: "scn_street" }), "Set Start");
+    await roundTrip(dir, () => project.setStart({ scene: "scn_street" }), "Set start");
     const ids = project.hydrate()!.sceneIds;
-    await roundTrip(dir, () => project.reorderScenes([...ids].reverse()), "Reorder Scenes");
+    await roundTrip(dir, () => project.reorderScenes([...ids].reverse()), "Reorder scenes");
     expect(project.hydrate()!.sceneIds).toEqual([...ids].reverse());
-    await roundTrip(dir, () => project.addDictionaryWord("Tankard"), "Add to Dictionary");
-    await roundTrip(dir, () => project.addIgnoreWord("grog"), "Ignore Word");
+    await roundTrip(dir, () => project.addDictionaryWord("Tankard"), "Add to dictionary");
+    await roundTrip(dir, () => project.addIgnoreWord("grog"), "Ignore word");
     await roundTrip(dir, () => project.setDictionary({ enabled: false }), "Spelling");
   });
 
   it("a new scene: its undo deletes the files it made, and the speaker it added to the cast", async () => {
     const dir = openCopy();
-    await roundTrip(dir, () => project.createScene("The Cellar", "conversation", "COOK"), "New Scene");
+    await roundTrip(dir, () => project.createScene("The Cellar", "conversation", "COOK"), "New scene");
     expect(project.hydrate()!.scenes.map((s) => s.name)).toContain("The Cellar");
     await undo();
     expect(project.hydrate()!.scenes.map((s) => s.name)).not.toContain("The Cellar");
@@ -206,12 +206,12 @@ describe("every write in the project history undoes and redoes to the exact byte
 
   it("writing status, recording status, re-record, and notes: each a step of its own (ruling 3)", async () => {
     const dir = openCopy();
-    await roundTrip(dir, () => project.saveSceneWriting("scn_tavern", { L_greet: "draft" }), "Writing Status");
-    await roundTrip(dir, () => project.saveSceneRecording("scn_tavern", { L_greet: "recorded" }), "Recording Status");
+    await roundTrip(dir, () => project.saveSceneWriting("scn_tavern", { L_greet: "draft" }), "Writing status");
+    await roundTrip(dir, () => project.saveSceneRecording("scn_tavern", { L_greet: "recorded" }), "Recording status");
     await roundTrip(dir, () => project.saveSceneRerecord("scn_tavern", { L_greet: true }), "Re-record");
     await roundTrip(dir, () => project.saveSceneDocs("scn_tavern", { L_greet: [{ text: "Gruff." }] }), "Notes");
     // Four steps, one each, and they undo in turn.
-    for (const label of ["Notes", "Re-record", "Recording Status", "Writing Status"]) expect((await undo()).label).toBe(label);
+    for (const label of ["Notes", "Re-record", "Recording status", "Writing status"]) expect((await undo()).label).toBe(label);
     expect(project.readSceneWriting("scn_tavern")).toEqual({});
   });
 
@@ -225,7 +225,7 @@ describe("every write in the project history undoes and redoes to the exact byte
     expect(text).toContain("Bonjour");
     const file = join(dir, "..", "fr.json");
     writeFileSync(file, text);
-    await roundTrip(dir, () => project.locImport(file), "Import Translations");
+    await roundTrip(dir, () => project.locImport(file), "Import translations");
   });
 
   it("sharing the project's scopes: its undo takes the folder's files away", async () => {
@@ -238,7 +238,7 @@ describe("every write in the project history undoes and redoes to the exact byte
     const scopes = join(gameDir, "game-scopes");
     expect((await project.shareScopes(scopes)).ok).toBe(true);
     expect(existsSync(join(scopes, "game.scopes.json"))).toBe(true);
-    expect((await undo()).label).toBe("Share Scopes");
+    expect((await undo()).label).toBe("Share scopes");
     expect(existsSync(join(scopes, "game.scopes.json"))).toBe(false);
     expect(existsSync(join(scopes, "patter.scopes.json"))).toBe(false);
     expect((await redo()).ok).toBe(true);
@@ -253,7 +253,7 @@ describe("every write in the project history undoes and redoes to the exact byte
     expect(built.ok).toBe(true);
     expect(built.pinned).toBeGreaterThan(0); // the tavern has scenes and blocks still following their names
     const bundle = readFileSync(built.path!, "utf8");
-    expect((await undo()).label).toBe("Pin Scene Addresses");
+    expect((await undo()).label).toBe("Pin scene addresses");
     expect(flows()).toEqual(before);
     expect(readFileSync(built.path!, "utf8")).toBe(bundle); // the bundle is output: no undo touches it
   });
@@ -282,7 +282,7 @@ describe("deleting a scene", () => {
     expect(project.hydrate()!.sceneIds).toEqual(["scn_street"]);
 
     const undone = await undo();
-    expect(undone).toMatchObject({ ok: true, label: "Delete Scene" });
+    expect(undone).toMatchObject({ ok: true, label: "Delete scene" });
     expect(undone.scenes).toContain("scn_tavern");
     expect(Object.fromEntries(snapshot(dir))).toEqual(Object.fromEntries(before));
     expect(project.hydrate()!.sceneIds).toEqual(["scn_tavern", "scn_street"]);
@@ -351,9 +351,9 @@ describe("an editable-script import, and deciding its suggestion", () => {
     const dir = openCopy();
     const returned = await exportAndEdit(dir, "L_greet", "What will it be, friend?");
     const summary = await project.planEditableImportFile(returned, { strictQuotes: false, direct: false }, "Ian");
-    await roundTrip(dir, () => project.applyEditableImport(summary.planId!), "Import Script");
+    await roundTrip(dir, () => project.applyEditableImport(summary.planId!), "Import script");
     const id = project.listSuggestions({})[0]!.id;
-    await roundTrip(dir, () => project.decideSuggestions([{ id, accept: true }], "Ian"), "Accept Suggestion", false);
+    await roundTrip(dir, () => project.decideSuggestions([{ id, accept: true }], "Ian"), "Accept suggestion", false);
     expect(project.readScene("scn_tavern").locSource).toContain("What will it be, friend?");
     await undo();
     // The suggestion is open again: the decision changed the conversation, so its undo puts it back.
@@ -376,7 +376,7 @@ describe("a scene property's stage rename, paired with the declaration edit it f
       { sceneId: "scn_tavern", flowBefore: beforeDeclaration },
     );
     expect(res).toMatchObject({ ok: true });
-    expect(res.step?.label).toBe("Rename Stage");
+    expect(res.step?.label).toBe("Rename stage");
     expect(readFileSync(flowPath, "utf8")).toContain("camera_wide");
     expect(await undo()).toMatchObject({ ok: true, scenes: ["scn_tavern"] });
     expect(readFileSync(flowPath, "utf8")).toBe(beforeDeclaration);
@@ -447,7 +447,7 @@ describe("the history's rules", () => {
     const pulled = readFileSync(projFile, "utf8").replace("The Tavern", "The Pulled Tavern");
     writeFileSync(projFile, pulled); // a pull lands between the step and its undo
     const refused = await undo();
-    expect(refused).toMatchObject({ ok: false, drift: true, label: "Set Start" });
+    expect(refused).toMatchObject({ ok: false, drift: true, label: "Set start" });
     expect(refused.error).toContain("tavern.patterproj has changed since");
     expect(readFileSync(projFile, "utf8")).toBe(pulled);
     expect(project.projectHistoryState().undo).toBeUndefined(); // the dictionary word went with it
@@ -476,7 +476,7 @@ describe("the history's rules", () => {
     expect(refused.drift).toBeUndefined();
     expect(refused.error).toContain("bob@bob-ws");
     expect(readFileSync(projFile, "utf8")).toBe(after);
-    expect(project.projectHistoryState().undo?.label).toBe("Set Start");
+    expect(project.projectHistoryState().undo?.label).toBe("Set start");
     vcs.lockedSuffix = null;
     expect((await undo()).ok).toBe(true);
     expect(readFileSync(projFile, "utf8")).toBe(readFileSync(join(TAVERN, "tavern.patterproj"), "utf8"));
@@ -503,7 +503,7 @@ describe("the history's rules", () => {
     await project.saveSceneWriting("scn_street", { x: "draft" });
     project.onProjectStep(() => {});
     expect(steps[0]).toMatchObject({ label: "Replace", merged: false, scenes: ["scn_tavern"] });
-    expect(steps[1]).toMatchObject({ label: "Writing Status", scenes: [], authoring: ["scn_street"] });
+    expect(steps[1]).toMatchObject({ label: "Writing status", scenes: [], authoring: ["scn_street"] });
   });
 
   it("keeps the newest hundred steps", async () => {
@@ -542,9 +542,9 @@ describe("review fixes", () => {
     await project.saveSceneWriting("scn_tavern", { L_greet: "draft" });
     const comments = [{ id: "c1", anchor: "L_greet", messages: [{ author: "Sam", ts: "2026-10-02T00:00:00Z", body: "Better." }] }];
     await project.saveSceneComments("scn_tavern", comments);
-    expect(await undo()).toMatchObject({ ok: true, label: "Writing Status" });
+    expect(await undo()).toMatchObject({ ok: true, label: "Writing status" });
     expect(project.readSceneComments("scn_tavern")).toEqual(comments);
-    expect(project.projectHistoryState().undo?.label).toBe("Accept Suggestion");
+    expect(project.projectHistoryState().undo?.label).toBe("Accept suggestion");
   });
 
   it("a redo a lock refuses part way writes nothing, so it can be tried again once the lock lifts", async () => {
@@ -561,7 +561,7 @@ describe("review fixes", () => {
     expect(refused.error).toContain("bob@bob-ws");
     expect(Object.fromEntries(snapshot(dir))).toEqual(Object.fromEntries(restored)); // nothing landed
     vcs.lockedSuffix = null;
-    expect(await redo()).toMatchObject({ ok: true, label: "Delete Scene" });
+    expect(await redo()).toMatchObject({ ok: true, label: "Delete scene" });
     expect(existsSync(join(dir, "scenes", "street.patterflow"))).toBe(false);
   });
 
@@ -580,7 +580,7 @@ describe("review fixes", () => {
     openCopy();
     const first = (await project.setStart({ scene: "scn_street" })).step!;
     const second = (await project.addDictionaryWord("Tankard")).step!;
-    expect(await undo(first.id)).toMatchObject({ ok: false, stale: true, top: { id: second.id, label: "Add to Dictionary" } });
+    expect(await undo(first.id)).toMatchObject({ ok: false, stale: true, top: { id: second.id, label: "Add to dictionary" } });
   });
 
   it("clearing the redo clears the history's own, so it can't claim a redo later", async () => {

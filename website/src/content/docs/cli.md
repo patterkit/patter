@@ -220,7 +220,10 @@ A 3-way structural merge of Patter source **by node id**. `-o out` (otherwise st
 `--type flow|loc|authoring|project` (otherwise auto-detected), and `--json`. Conflicts
 write a provisional result (our side) with each clash recorded under its `unresolved` entry, plus a
 `.patterconflict` sidecar saying what each side had, and exit **1**. Validate, export, and pack refuse
-both until the clash is resolved and its entry removed. As git's merge driver
+both until the clash is resolved. From the command line, that's by hand: make the content right,
+remove its entry from `unresolved`, and delete the sidecar once the list is empty. Patterpad's
+**File ▸ Resolve Clashes…** does the same one clash at a time (keep yours, take theirs, or edit it),
+each as a step you can undo. As git's merge driver
 it runs as `patter merge %O %A %B -o %A --path %P`: `-o` is git's temporary file, and `--path`
 names the real one, so the sidecar lands beside the shard where validate finds it. Input that is not
 Patter source exits **2**, so the version control can fall back to its own merge.

@@ -108,7 +108,7 @@ describe("a scope renamed in Project Settings", () => {
       scopeRenames: { player: "hero" },
     });
     expect(res.ok).toBe(true);
-    expect(res.step?.label).toBe("Project Settings");
+    expect(res.step?.label).toBe("Project settings");
 
     const flow = parseSource(read().flowSource) as Flow;
     expect(flow.scene.onEntry).toEqual([{ kind: "set", target: "@hero.hp", value: "@hero.hp + 1" }]);
@@ -124,7 +124,7 @@ describe("a scope renamed in Project Settings", () => {
 
     // One step: the declarations, the scenes, and the strings come back together.
     const undone = await project.stepProjectHistory("undo");
-    expect(undone).toMatchObject({ ok: true, label: "Project Settings" });
+    expect(undone).toMatchObject({ ok: true, label: "Project settings" });
     expect(read().flowSource).toBe(flowBefore);
     expect(read().locSource).toBe(locBefore);
     expect(readFileSync(join(project.currentRoot()!, "story.patterproj"), "utf8")).toBe(fileBefore);

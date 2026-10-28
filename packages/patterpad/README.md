@@ -86,7 +86,7 @@ node node_modules/vite/bin/vite.js --config packages/patterpad/preview.vite.conf
   direction / gameData, a snippet's condition / jump / effects, a group's selector / condition, a
   block's name; a header click jumps to that node. Read view for M0 (per-field editors are M1).
 - **Slide / pin / full-bleed:** both side panes slide to 0 (editor goes full-bleed), toggled from the
-  topbar or the **View menu** (Show Scenes ⌘1 / Show Inspector ⌘2); the open/closed state is the pin,
+  topbar or the **View menu** (Show Navigator ⌘1 / Show Inspector ⌘2); the open/closed state is the pin,
   remembered per user in the session store.
 - **Native app menus** (File: New, Open, Open Recent, Save; Edit: PM-correct undo/redo and clipboard;
   Run: Play), top-level commands live where people expect them, not in-window chrome.

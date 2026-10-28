@@ -8,16 +8,18 @@ import { guardAllWindows } from "@wildwinter/app-shell/window-guard";
 import { viewSchemePrivileges } from "@wildwinter/app-shell/view-host";
 import { createViewExtensions, viewsDir, VIEW_SCHEME } from "./views.js";
 import { findPairedStorylets, findStoryletter, launchStoryletter } from "./storyletter.js";
+import { setPairedStorylets, refreshPairedCards } from "./paired-cards.js";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { userInfo } from "node:os";
-import { currentUserAsync, writeBinaryFileAsync, writeTextFileAsync } from "@wildwinter/simple-vc-lib";
+import { writeBinaryFileAsync, writeTextFileAsync } from "@wildwinter/simple-vc-lib";
+import { offeredIdentity } from "./identity-offer.js";
 import * as project from "./project.js";
 import { fileSafeName } from "../shared/file-name.js";
 import * as dictionaries from "./dictionaries.js";
 import { createStore, type ToolWindowName } from "./store.js";
-import { applyMenu, setUndoLabels, setMoveEnabled } from "./menu.js";
+import { applyMenu, setUndoLabels, setMoveEnabled, setClashCount } from "./menu.js";
 import { createDebugServer, type DebugServer } from "./debug-link.js";
 import { centeredOnPrimary, defineToolWindows, frontForModal, pinToolWindow } from "@wildwinter/app-shell/tool-window";
 import { plural } from "@wildwinter/app-shell/util";
@@ -286,6 +288,7 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     project.closeProject();
     currentRoot = null;      // the second-instance jump-in-place guard must not point at a closed project
     pairedStorylets = undefined;
+    setPairedStorylets(undefined); // and its cards
     searchFocus = undefined; // and the search window's ranking anchor belongs to that project too
     lastCoverageResult = null;
     pendingMerge = null;     // a merge planned against it is no answer for the next (Storyletter drops its own here too)
@@ -311,6 +314,7 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     views.closeAll();        // a view of the project before is a view of nothing here
     void views.update();     // the views this one offers, and whether they're installed here
     pairedStorylets = findPairedStorylets(proj.root); // Show Card in Storyletter, when a project there pairs with this one
+    setPairedStorylets(pairedStorylets);              // and its cards, read now (and again on focus) for the scene warnings
     // A file-association launch onto a specific scene shard (Finder / argv) lands ON that scene;
     // otherwise (the project root / `.patter` package) fall back to where the author last left off.
     const launched = project.sceneForPath(path);
@@ -1223,6 +1227,18 @@ function registerIpc(): void {
   ipcMain.handle("patterpack:open", (): Promise<OpenResult | null> => openPatterpackDialog());
   ipcMain.handle("patterpack:mergePlan", () => publishJob(planPatterpackMerge));
   ipcMain.handle("patterpack:mergeCommit", () => publishJob(commitPatterpackMerge));
+  // The clash resolver (ruling Q21). Listing keeps File ▸ Resolve Clashes… enabled by the count; a decision
+  // lands the open scene's pending edits first (the shard is read from disk), then is one project step.
+  const noteClashes = <T extends { length: number }>(list: T): T => { if (setClashCount(list.length)) refreshMenu(); return list; };
+  ipcMain.handle("clashes:list", () => noteClashes(project.listClashes()));
+  ipcMain.handle("clashes:target", (_e, id: string) => project.clashTarget(id));
+  ipcMain.handle("clashes:decide", async (_e, id: string, decision: "ours" | "theirs" | "resolved") => {
+    await flushEditorScene();
+    const r = await project.decideClash(id, decision);
+    noteClashes(r.clashes);
+    if (r.ok) session.invalidateSatellites(); // a play or coverage report of the project as it was
+    return r;
+  });
   ipcMain.handle("patterpack:mergeDrop", () => { pendingMerge = null; });
   ipcMain.handle("project:shareScopes", () => shareScopesDialog());
   ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => publishJob(() => exportLoc(request)));
@@ -1399,6 +1415,9 @@ function registerIpc(): void {
   ipcMain.handle("play:setFollow", (_e, on: boolean) => { store.setPlayFollow(on); });
   ipcMain.handle("play:resetMarks", () => { win?.webContents.send("play:reset"); });
   // Show Card in Storyletter: the storylet card the open scene plays, in the paired Storyletter project.
+  // The paired Storylets project's cards, read again by mtime: the renderer asks on open and whenever the
+  // window regains focus, for the Game ID editor's warning and a rename's pin.
+  ipcMain.handle("storyletter:cards", () => [...refreshPairedCards()]);
   ipcMain.handle("storyletter:show", async (_e, sceneId: string): Promise<{ ok: boolean; error?: string; canceled?: boolean }> => {
     if (!pairedStorylets) return { ok: false, error: "No Storyletter project nearby is paired with this one." };
     const name = project.cardNameFor(sceneId);
@@ -1503,13 +1522,10 @@ function registerIpc(): void {
    * workspace account is not always a name somebody wants on their words. Null whenever the VCS cannot
    * say, which is the filesystem provider always, git with no `user.name`, and svn ever.
    *
-   * Keyed off the open project so it asks THAT working copy; with nothing open it falls back to the
-   * process directory, where a machine-level answer (p4, plastic) may still arrive and git's will not.
+   * Keyed off the open project so it asks THAT working copy; with nothing open it asks git from the home
+   * folder, which reads the global user.name (identity-offer.ts, as Storyletter does).
    */
-  ipcMain.handle("identity:suggest", async (): Promise<string | null> => {
-    try { return (await currentUserAsync(currentRoot ?? undefined)) ?? null; }
-    catch { return null; } // a suggestion is never worth failing a dialog over
-  });
+  ipcMain.handle("identity:suggest", (): Promise<string | null> => offeredIdentity(currentRoot ?? undefined));
   // A blank name falls back to the OS user name (else "Author"), so skipping the first-run prompt still
   // yields a sensible signature for review comments + the per-line edit trail.
   ipcMain.handle("identity:set", (_e, identity: Identity) => {

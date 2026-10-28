@@ -73,7 +73,12 @@ merged file stays valid and provisionally keeps your side. The clash is recorded
 itself, under an **`unresolved`** entry that travels with it, and in a **`.patterconflict`** file next
 to it that says what each side had (that one is for you to read, not to commit).
 [`patter validate`](/cli/), `export`, and `pack` refuse a project with either, so an unresolved merge
-can't be built or shipped by accident. To resolve one, make the content right, remove its entry from
+can't be built or shipped by accident.
+
+To resolve one in Patterpad, use the banner that appears while the project holds clashes, or
+**File ▸ Resolve Clashes…**: for each clash, **Keep mine**, **Take theirs**, or **Edit** it by hand
+and then **Mark resolved**. Each is a step Edit ▸ Undo takes back, and the `.patterconflict` file goes
+with a shard's last clash. Without Patterpad, make the content right, remove its entry from
 `unresolved`, and delete the `.patterconflict` file.
 
 ## Same rules for automation

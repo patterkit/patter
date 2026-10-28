@@ -16,6 +16,7 @@ the editor always shows the keys that matter right where your cursor is.
 | `⌘N` | New Project |
 | `⌘O` | Open Project |
 | `⌘S` | Save |
+| `⇧⌘N` | New Scene (an Untitled scene, its title ready to type over) |
 | `⌘,` | Project Settings |
 | `⌘Z` / `⇧⌘Z` | Undo / Redo |
 | `⌘D` | Duplicate the selected snippet, group, option, or block (contents and all) |
@@ -23,7 +24,7 @@ the editor always shows the keys that matter right where your cursor is.
 | `⌘P` | Play |
 | `⌘F` | Search (go to anything) |
 | `⌘⌥F` / `Ctrl-H` | Replace text across the project |
-| `⌘1` / `⌘2` | Show Scenes / Show Inspector |
+| `⌘1` / `⌘2` | Show Navigator / Show Inspector |
 | `⌃⌘←` / `⌃⌘→` | Back / Forward through the pages you have visited (`Alt`+arrows off the Mac) |
 | `⇧⌘M` | Writing View (toggle; **Esc** also exits) |
 | `⇧⌘B` | Publish Bundle |
