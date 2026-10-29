@@ -1,5 +1,17 @@
 # @patterkit/ops
 
+## 0.25.2
+
+### Patch Changes
+
+- 5a0609b: How long a line with no recording lasts is Patter's own rule. The model gains `estimateLineDuration(text, locale?)`: the line's characters at 14 a second (`LINE_CHARS_PER_SECOND`), clamped to 1.5 to 18 seconds (`LINE_DURATION_MIN`, `LINE_DURATION_MAX`), a character outside the Basic Multilingual Plane counted once and soft hyphens (U+00AD) not counted. The locale is reserved for per-language reading rates and changes nothing yet. The playable HTML page times its lines by it, through the runtime it inlines, and ops no longer depends on `@wildwinter/game-subtitles`. A page's line timing is unchanged.
+- 5b2347e: Uses `@patterkit/runtime` 0.36.0, the Patterplay 0.36.0 release.
+- Updated dependencies [5a0609b]
+  - @patterkit/model@0.22.0
+  - @patterkit/compiler@0.15.1
+  - @patterkit/core@0.10.1
+  - @patterkit/dialect@0.2.19
+
 ## 0.25.1
 
 ### Patch Changes
