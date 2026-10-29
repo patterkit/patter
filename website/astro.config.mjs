@@ -28,12 +28,13 @@ export default defineConfig({
     starlight({
       title: "Patter",
       tagline: "Write playable dialogue.",
-      customCss: ["./src/chrome/fonts.css", "./src/styles/patter.css", "./src/chrome/palette.css", "./src/chrome/chrome.css"],
+      customCss: ["./src/chrome/fonts.css", "./src/styles/patter.css", "./src/chrome/palette.css", "./src/chrome/chrome.css", "./src/styles/extensions.css"],
       // Every docs page ends with the mailing-list sign-up and the credit line naming the
       // licence and the author. Generated from patterkit/site-chrome, like the stylesheet
       // above; the landing page carries the same credit through its own footer, because it is
       // a standalone page outside Starlight's chrome.
-      components: { Footer: "./src/chrome/Footer.astro" },
+      // The page title takes a trail home on an extension's pages (PatterKit / Patterstage / Recipes).
+      components: { Footer: "./src/chrome/Footer.astro", PageTitle: "./src/components/PageTitle.astro" },
       // Code follows the theme: a light block on a light page and a dark one on a dark page, on the
       // chrome tier with a hairline and no shadow (the October 2026 UI review; until then a dark slab
       // in both themes, which on a white page was the heaviest thing on it).

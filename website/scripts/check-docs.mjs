@@ -8,9 +8,9 @@
 // 0. AN EDITED COPY OF THE SHARED CHROME. src/chrome/ is generated from
 //    patterkit/site-chrome and hashed in its own manifest, so a change made
 //    here is a change that the next sync silently throws away. The same goes
-//    for an extension's section (src/content/docs/<slug>/), which
-//    scripts/sync-extensions.mjs copies in from the extension's own repository
-//    and hashes in src/extensions/manifest.json.
+//    for an extension's section (src/content/docs/<slug>/, and its play/ pages
+//    in public/<slug>/play/), which scripts/sync-extensions.mjs copies in from
+//    the extension's own repository and hashes in src/extensions/manifest.json.
 //
 // 1. A BLANK LINE INSIDE A RAW <svg>. Markdown ends an HTML block at the first
 //    blank line, so the rest of the diagram is re-parsed as prose and the page
@@ -87,7 +87,7 @@ const blank = (m) => m.replace(/[^\n]/g, " ");
 
 const docsDir = join(root, "src/content/docs");
 const docs = walk(docsDir, [".md", ".mdx"]);
-const astro = [join(root, "src/pages/index.astro"), ...walk(join(root, "src/chrome"), [".astro"])];
+const astro = [join(root, "src/pages/index.astro"), ...walk(join(root, "src/chrome"), [".astro"]), ...walk(join(root, "src/components"), [".astro"])];
 
 // --- 0. the shared chrome is generated, not written here -----------------------
 // src/chrome/ is rendered into this repository by patterkit/site-chrome, which keeps one
@@ -130,8 +130,9 @@ const synced = existsSync(extensionsFile) ? JSON.parse(readFileSync(extensionsFi
       if (found !== digest) problems.push(`${path}  ${found ? "edited" : "missing"}: ${EDITED}`);
     }
     for (const slug of manifest.slugs) {
-      const dir = join(docsDir, slug);
-      for (const file of existsSync(dir) ? walk(dir, [""]) : []) {
+      // The pages, and the play/ pages served from public/ beside them.
+      const dirs = [join(docsDir, slug), join(root, "public", slug)];
+      for (const file of dirs.flatMap((dir) => (existsSync(dir) ? walk(dir, [""]) : []))) {
         if (!(rel(file) in manifest.files)) problems.push(`${rel(file)}  not in src/extensions/manifest.json: ${EDITED}`);
       }
     }

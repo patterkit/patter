@@ -1,0 +1,38 @@
+---
+// Starlight's page title, with a trail home on an extension's pages: the site, the extension, and
+// the page's group (PatterKit / Patterstage / Recipes), so a reader deep in an extension's docs can
+// see whose they are and get back to either home. The header logo goes to the site's home too, but
+// doesn't read as a link home. On the extension's overview the trail ends with the extension, as
+// plain text. Patter's own pages are unchanged.
+//
+// The sections come from the file scripts/sync-extensions.mjs writes; with nothing synced there's
+// no file, and every page is Patter's. The trail's data-extension is what src/styles/extensions.css
+// keys the page's tint on.
+import Default from "@astrojs/starlight/components/PageTitle.astro";
+import site from "../chrome/site.mjs";
+
+type Group = { label: string; items: string[] };
+type Extension = { id: string; name: string; slug: string; sidebar: { items: Group[] } };
+
+const generated = Object.values(import.meta.glob("../extensions/generated.json", { eager: true, import: "default" }));
+const extensions = ((generated[0] as { extensions?: Extension[] } | undefined)?.extensions ?? []) as Extension[];
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/"); // normalise to a trailing slash
+const id = Astro.locals.starlightRoute.id;
+const ext = extensions.find((e) => id === e.slug || id.startsWith(`${e.slug}/`));
+const overview = ext && id === `${ext.slug}/overview`;
+const group = ext && !overview ? ext.sidebar.items.find((g) => g.items.includes(id))?.label : undefined;
+---
+
+{
+  ext && (
+    <nav class="ext-trail" aria-label="Breadcrumb" data-extension={ext.id}>
+      <a href={base}>{site.brand}</a>
+      <span aria-hidden="true">/</span>
+      {overview ? <span aria-current="page">{ext.name}</span> : <a href={`${base}${ext.slug}/overview/`}>{ext.name}</a>}
+      {group && <span aria-hidden="true">/</span>}
+      {group && <span>{group}</span>}
+    </nav>
+  )
+}
+<Default />

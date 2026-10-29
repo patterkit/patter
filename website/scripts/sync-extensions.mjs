@@ -27,6 +27,8 @@
 //
 //   src/content/docs/<slug>/          the pages, with the banner added
 //   src/content/docs/<slug>/_assets/  the images, with the pages' links to them rewritten
+//   public/<slug>/play/               the extension's play/ pages (a playable demo, say), served as
+//                                     they are: single-file .html, built by the extension, no banner
 //   src/extensions/generated.json     each section's name, licence, sidebar and downloads, read
 //                                     by astro.config.mjs, the chrome and check-docs.mjs
 //   src/extensions/manifest.json      a hash of every file above, so check-docs.mjs fails a
@@ -35,6 +37,9 @@
 // With nothing pinned and nothing local, it writes nothing, and the site builds exactly as it
 // does without this script. A re-sync rewrites only what changed and removes what's gone, so a
 // dev server watching the pages sees edits rather than a folder vanishing and coming back.
+//
+// Each extension's sidebar group starts closed (Starlight opens it on the extension's own pages), and
+// the site tints it, its banner, and its trail home (src/styles/extensions.css, PageTitle.astro).
 //
 // No dependencies: the zip is read with node:zlib.
 // ---------------------------------------------------------------------------
@@ -53,6 +58,8 @@ const GENERATED = `${OUT}/generated.json`;
 const MANIFEST = `${OUT}/manifest.json`;
 const NOTE = "Written by scripts/sync-extensions.mjs from each extension's docs; never edited or committed here";
 const ASSETS = "_assets";
+const PUBLIC = "public";
+const PLAY_LIMIT = 2 * 1024 * 1024; // a play page is one file with everything inlined; 2 MB is plenty
 
 const sha = (data) => createHash("sha256").update(data).digest("hex");
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -67,8 +74,8 @@ const fail = (message) => {
 const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 
 /** A slug's folder must be git-ignored and hold nothing tracked: the pages are never committed. */
-function checkSlugFolder(slug) {
-  const dir = `${DOCS}/${slug}/`;
+function checkSlugFolder(slug, under = DOCS) {
+  const dir = `${under}/${slug}/`;
   try {
     if (git("ls-files", "--", dir).trim()) {
       fail(`${dir} holds pages tracked in this repository: an extension's slug can't share Patter's folder`);
@@ -204,6 +211,15 @@ function buildSection(ext, files, version) {
   for (const s of slugs.keys()) if (!listed.includes(s)) fail(`${id}: pages/${slugs.get(s)} isn't in docs.json's groups`);
   if (docs.groups[0].items[0] !== "overview") fail(`${id}: the first item of the first group must be "overview"`);
   if (!slugs.has(licence.page)) fail(`${id}: the licence page "${licence.page}" isn't a page`);
+  // play/ holds single-file pages and nothing else: a folder, an image or a script there would be
+  // served as a stranger, so it's refused, named, as the other mistakes are.
+  const play = [...files.keys()].filter((k) => k.startsWith("play/"));
+  for (const path of play) {
+    if (!/^play\/[^/]+\.html$/.test(path)) fail(`${id}: ${path} isn't a page directly under play/, which holds single-file .html pages only`);
+    const size = files.get(path).length;
+    if (size > PLAY_LIMIT) fail(`${id}: ${path} is ${(size / 1024 / 1024).toFixed(1)} MB, over the ${PLAY_LIMIT / 1024 / 1024} MB a play page may be`);
+  }
+  if (play.length) checkSlugFolder(slug, PUBLIC);
   const hasDownload = slugs.has("download");
   if (!hasDownload) console.warn(`sync-extensions: ${id} has no download page yet (required before launch); the banner leaves its link out`);
 
@@ -219,6 +235,7 @@ function buildSection(ext, files, version) {
   }
   for (const [path, data] of files) {
     if (path.startsWith("assets/")) out.set(`${DOCS}/${slug}/${ASSETS}/${path.slice("assets/".length)}`, data);
+    if (play.includes(path)) out.set(`${PUBLIC}/${slug}/${path}`, data);
   }
 
   const entry = {
@@ -227,7 +244,9 @@ function buildSection(ext, files, version) {
     slug,
     version,
     licence,
-    sidebar: { label: name, items: docs.groups.map((g) => ({ label: g.label, items: g.items.map((i) => `${slug}/${i}`) })) },
+    // Closed unless the page is in it (Starlight opens a collapsed group holding the current
+    // page); the groups inside it stay open, so opening it shows the whole outline.
+    sidebar: { label: name, collapsed: true, items: docs.groups.map((g) => ({ label: g.label, items: g.items.map((i) => `${slug}/${i}`) })) },
   };
   if (docs.downloads?.sections) {
     if (!ext.repo) fail(`${id}: docs.json has downloads, but extensions.json names no repo to read them from`);
@@ -246,7 +265,7 @@ function prune(previous, keep) {
   for (const path of Object.keys(previous?.files ?? {})) {
     if (keep.has(path)) continue;
     rmSync(join(root, path), { force: true });
-    for (let d = posix.dirname(path); d.startsWith(`${DOCS}/`) || d === OUT; d = posix.dirname(d)) dirs.add(d);
+    for (let d = posix.dirname(path); d.startsWith(`${DOCS}/`) || d.startsWith(`${PUBLIC}/`) || d === OUT; d = posix.dirname(d)) dirs.add(d);
   }
   for (const d of [...dirs].sort((a, b) => b.length - a.length)) {
     try {

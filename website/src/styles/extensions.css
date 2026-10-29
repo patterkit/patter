@@ -1,0 +1,61 @@
+/* The extension sections: a tint for each, so it's clear what lives where.
+ *
+ * An extension's top-level sidebar group and its pages' banner take a tint of their own. The tint is
+ * a character colour from the family palette (src/chrome/palette.css), so it follows the theme in
+ * light and dark, and the site picks it, keyed by the extension's id: an extension's docs.json names
+ * none, so the brand's colours stay in the palette.
+ *
+ * Starlight's sidebar groups take no class, so a group is found by its links (the extension's slug),
+ * and a page by the trail src/components/PageTitle.astro writes (its id). An extension gets its line
+ * below when it's added to extensions.json; one without a line is shown untinted.
+ */
+
+/* Patterstage: slug stage. */
+#starlight__sidebar ul.top-level > li:has(> details a[href^="/stage/"]),
+:root:has(.ext-trail[data-extension="patterstage"]) .sl-banner {
+  --ext-tint: var(--app-char-5);
+}
+
+/* The sidebar group: a wash behind the group, its label and its pages. The margin and padding cancel
+   out, so a group without a tint sits exactly where it did. */
+#starlight__sidebar ul.top-level > li {
+  margin-inline: -0.5rem;
+  padding-inline: 0.5rem;
+  border-radius: var(--app-radius-md);
+  background: color-mix(in oklab, var(--ext-tint, transparent) 9%, transparent);
+}
+
+/* The banner: the licence note, on the section's tint rather than the accent. */
+:root:has(.ext-trail) .sl-banner {
+  background-color: color-mix(in oklab, var(--ext-tint, var(--app-accent)) 14%, var(--app-card));
+  color: var(--app-ink);
+  box-shadow: none;
+  border-bottom: 1px solid color-mix(in oklab, var(--ext-tint, var(--app-accent)) 30%, var(--app-line));
+}
+:root:has(.ext-trail) .sl-banner a {
+  color: var(--app-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The trail home, above the page title. */
+.ext-trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  margin-top: 1rem;
+  font-size: var(--sl-text-sm);
+  color: var(--app-muted);
+}
+.ext-trail a {
+  color: var(--app-ink-read);
+  text-decoration: none;
+}
+.ext-trail a:hover {
+  color: var(--app-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ext-trail + h1 {
+  margin-top: 0.25rem;
+}
