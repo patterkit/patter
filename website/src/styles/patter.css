@@ -42,3 +42,5 @@
    draws both). An extension gets its line here when it's added to extensions.json. */
 [data-extension="patterstage"],
 :root:has(.chrome-trail[data-extension="patterstage"]) .sl-banner { --chrome-ext-tint: var(--app-char-5); }
+[data-extension="pattershot"],
+:root:has(.chrome-trail[data-extension="pattershot"]) .sl-banner { --chrome-ext-tint: var(--app-char-9); }

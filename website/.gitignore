@@ -10,3 +10,5 @@ node_modules/
 src/extensions/
 src/content/docs/stage/
 public/stage/
+src/content/docs/shot/
+public/shot/
