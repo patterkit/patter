@@ -17,11 +17,11 @@ set -e
 # bundle, the hook stayed quiet, and CI caught a stale blob after the push.
 #
 # It inlines npm packages too, and the only ones it reaches are `@wildwinter/*` (expr, expr-specificity,
-# scoperegistry, game-subtitles). A bump of one changes the blob with no source change at all: on
+# scoperegistry). A bump of one changes the blob with no source change at all: on
 # 2026-10-17, 6c7eb79 moved `@wildwinter/expr` from 0.5.1 to 0.5.2, the hook stayed quiet, and CI failed.
 # So when the lockfile is staged, compare the `@wildwinter/*` versions it installs with HEAD's: every one,
 # a little more than the blob inlines (app-shell, say), because a rebuild that changes nothing stages
-# nothing, and a list of exactly the inlined four would drift. It costs one small node run on a lockfile
+# nothing, and a list of exactly the inlined three would drift. It costs one small node run on a lockfile
 # commit and nothing on any other.
 bundled_source_changed() {
   git diff --cached --name-only --diff-filter=ACMR | grep -qE '^packages/(runtime|model|dialect)/src/'

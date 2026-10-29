@@ -17,13 +17,13 @@ import { evaluate, deserialiseAst, makePrng } from "@wildwinter/expr";
 import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
-import { Engine, effectiveGameData, extensionDecls, extensionsOf, gameDataFields } from "@patterkit/runtime";
+import { Engine, effectiveGameData, estimateLineDuration, extensionDecls, extensionsOf, gameDataFields } from "@patterkit/runtime";
 import type { Checkpoint, EngineOptions, HostScope, LoadMisfit, PlayError, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, FlowState, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
-  AudioCase, LogCase,
+  AudioCase, DurationCase, LogCase,
   ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptOption, TranscriptPrompt, TranscriptStep,
 } from "./types.js";
 
@@ -528,4 +528,9 @@ export function runLogCase(c: LogCase, maxSteps = 200): { log: unknown[]; traced
 /** What the audio resolver gives for each lookup of an audio case (the reference's createAudioResolver). */
 export function runAudioCase(c: AudioCase): (string | null)[] {
   return c.lookups.map((l) => createAudioResolver(c.manifest, l.base).resolve(l.beatId));
+}
+
+/** How long a duration case's line lasts, by the reference's estimateLineDuration. */
+export function runDurationCase(c: DurationCase): number {
+  return estimateLineDuration(c.text, c.locale);
 }

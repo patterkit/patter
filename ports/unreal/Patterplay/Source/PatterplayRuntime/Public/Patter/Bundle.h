@@ -30,6 +30,32 @@ namespace patter
     // (line padding, design/proposals/line-padding.md): the same on every runtime and in Patterpad's Play window.
     inline constexpr double DEFAULT_PAD_AFTER = 0.6;
 
+    // The reading rate estimateLineDuration times a line by, in characters a second, and the shortest and longest
+    // a line with no recording lasts, in seconds.
+    inline constexpr double LINE_CHARS_PER_SECOND = 14.0;
+    inline constexpr double LINE_DURATION_MIN = 1.5;
+    inline constexpr double LINE_DURATION_MAX = 18.0;
+
+    /** How long a line with no recording lasts, in seconds: its characters at 14 a second, clamped to 1.5 to 18
+     *  seconds. `text` is UTF-8, and a character is a Unicode code point (one outside the Basic Multilingual Plane
+     *  counts once, however many bytes it takes); soft hyphens (U+00AD) aren't counted. This is the one rule every
+     *  Patter tool and runtime times a line by, held to the same numbers by the conformance corpus. `locale` is
+     *  reserved for per-language reading rates and is unused for now. */
+    inline double estimateLineDuration(const std::string& text, const std::string& locale = "")
+    {
+        (void)locale;
+        std::size_t count = 0;
+        for (std::size_t i = 0; i < text.size(); ++i)
+        {
+            const unsigned char b = static_cast<unsigned char>(text[i]);
+            if ((b & 0xC0) == 0x80) continue;                                                       // a continuation byte
+            if (b == 0xC2 && i + 1 < text.size() && static_cast<unsigned char>(text[i + 1]) == 0xAD) continue; // U+00AD
+            ++count;
+        }
+        const double seconds = static_cast<double>(count) / LINE_CHARS_PER_SECOND;
+        return seconds < LINE_DURATION_MIN ? LINE_DURATION_MIN : seconds > LINE_DURATION_MAX ? LINE_DURATION_MAX : seconds;
+    }
+
     // The speaker pattern a project starts with, how a character's label reads with a qualifier: `You (V.O.)`.
     // `{name}` and `{qualifier}` are plain placeholders, never run through line interpolation.
     inline constexpr const char* DEFAULT_SPEAKER_PATTERN = "{name} ({qualifier})";

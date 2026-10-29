@@ -1,8 +1,8 @@
 // The Blueprint surface the other runtimes' users already have: a flow's choices, properties (its @scene
 // included), log, interpolation and caption stripping; the engine's locale, captions and source-debug
 // getters, addresses, scene and block tags and Game Data, every open flow, and OpenFlow with a block and
-// a seed; an option's prompt as one value, the flags that tell an unset speaker from an empty one, and
-// StepFor, a beat's step before it plays.
+// a seed; an option's prompt as one value, the flags that tell an unset speaker from an empty one,
+// StepFor, a beat's step before it plays, and EstimateLineDuration, how long a line with no recording lasts.
 // Runs via
 //   -ExecCmds="Automation RunTests Patterplay.Blueprint"
 
@@ -86,6 +86,18 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("GameDataValue: the block's override"), UPatterGameData::GameDataValue(BlockFields, BlockData, TEXT("light"), Light, TypedLight) && Light == TEXT("2"));
 	TestTrue(TEXT("GameDataValue: the override typed"), TypedLight.Kind == EPatterValueKind::Number && TypedLight.Number == 2.0);
 	TestFalse(TEXT("GameDataValue: an undeclared field with no override"), UPatterGameData::GameDataValue(BlockFields, {}, TEXT("nothing"), Light, TypedLight));
+
+	// --- how long a line with no recording lasts: an FString reaches the core's rule whole ---------------
+	// (UTF-16 in, so an emoji's surrogate pair is one character; the corpus holds the core to every case.)
+	TestEqual(TEXT("EstimateLineDuration: the shortest"), UPatterGameData::EstimateLineDuration(TEXT("Ah.")), 1.5);
+	TestEqual(TEXT("EstimateLineDuration: 14 a second"), UPatterGameData::EstimateLineDuration(TEXT("The lamps are lit along the harbour wall tonight.")), 3.5);
+	FString Moons;
+	for (int32 I = 0; I < 28; ++I) Moons += TEXT("\U0001F319");
+	TestEqual(TEXT("EstimateLineDuration: an emoji counts once"), UPatterGameData::EstimateLineDuration(Moons), 2.0);
+	FString Hyphens;
+	for (int32 I = 0; I < 100; ++I) Hyphens += TEXT("\u00AD");
+	TestEqual(TEXT("EstimateLineDuration: soft hyphens don't count"), UPatterGameData::EstimateLineDuration(Hyphens, TEXT("fr")), 1.5);
+	TestEqual(TEXT("EstimateLineDuration: the longest"), UPatterGameData::EstimateLineDuration(FString::ChrN(400, TEXT('x'))), 18.0);
 
 	// --- the audio resolver joins its base and a take, keeping a base that is a root --------------------
 	const FString Manifest = TEXT(R"({"clips": {"L": {"file": "final/L.wav"}}})");

@@ -88,6 +88,10 @@ namespace Patterkit.Patterplay.TestHost
             int au = RunAudio(audioArr);
             Console.WriteLine($"  [audio] the audio resolver's path for each beat: {au}/{audioArr.GetArrayLength()}");
             if (au != audioArr.GetArrayLength()) Fail("audio", "section total", $"{au} of {audioArr.GetArrayLength()} passed");
+            if (!root.TryGetProperty("durations", out var durationsArr)) { Console.Error.WriteLine("corpus has no durations section"); return 2; }
+            int du = RunDurations(durationsArr);
+            Console.WriteLine($"  [durations] how long a line with no recording lasts: {du}/{durationsArr.GetArrayLength()}");
+            if (du != durationsArr.GetArrayLength()) Fail("durations", "section total", $"{du} of {durationsArr.GetArrayLength()} passed");
 
             // Verify the Unity JSON save/load: replay the scripted cases routing saveLoad through
             // PatterSave's JSON string round-trip.

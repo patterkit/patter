@@ -60,7 +60,9 @@ both too. Show `SpeakerLabel` as the speaker's name: it's localised and already 
 way the writer and the translator chose (see [How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)).
 `PadAfter` is the writer's pause after a line or text step, in seconds, already resolved. It's always
 set on a `Line` or `Text` step and 0 on any other, so it has no `bHas` flag. The
-[timing rules](/play/engine/#step-shapes) say how to play it. A `Text` step with `bAction` set
+[timing rules](/play/engine/#step-shapes) say how to play it, and `Estimate Line Duration`
+(`UPatterGameData::EstimateLineDuration`, `patter::estimateLineDuration` in C++) how long a line with no
+recording lasts. A `Text` step with `bAction` set
 (`action` on the C++ `StepResult`) is [action](/play/engine/#step-shapes), a direction for whoever
 stages the scene: stage it, or let it pass, but don't show it as on-screen text. It's false on any
 other step and on a replayed prompt.

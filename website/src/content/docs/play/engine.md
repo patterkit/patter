@@ -160,6 +160,13 @@ these are the rules the writer expects:
 - Give action no time of its own: like a game event, only its `padAfter` separates it from the next beat.
 - Apply no pauses when the player clicks through.
 
+A line with no recording lasts **`estimateLineDuration(text)`** seconds: its characters at 14 a second,
+never less than 1.5 seconds or more than 18. A character outside the Basic Multilingual Plane, such as an
+emoji, counts once, and soft hyphens don't count. It's Patter's one rule, the same in every runtime, in
+Patterpad's Play window, and in the playable HTML page, so a line your game times by it lasts as long as the
+writer heard it. An optional second argument, a locale, is kept for per-language reading rates and changes
+nothing yet.
+
 A **`ChoiceOption`** is `{ id, prompt?, eligible, gameData? }`: ineligible options are still present
 (greyed) unless they're secret; pass `id` to `choose()`. Its `prompt` is `{ kind, text, padAfter }`,
 where `kind` is `"line"` or `"text"` and `padAfter` is the pause before the reply, for a game that voices

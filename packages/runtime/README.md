@@ -49,7 +49,8 @@ speaker qualifier, `qualifier` (its `gameId`, `os`) and `qualifierName` (its sho
 text steps both carry `padAfter`, the writer's pause after the beat in seconds, already resolved; a negative
 one means the next line cuts in. Line, text, and game event steps can carry `gameData` and `tags`. The
 [step shapes](https://patterkit.dev/play/engine/#step-shapes) give the full list and the timing rules a game
-should follow.
+should follow. For a line with no recording, `estimateLineDuration(text)` gives how long it lasts, in seconds:
+Patter's one rule, the same in every runtime and in Patterpad's Play window.
 
 `new Engine(bundle, options)` takes `{ rng?, seed?, locale?, hostScopes?, registry?, replayPromptOnChoose?, closedCaptions?, onError?, onRefit?, onDryChoice?, log? }`
 (any other key is reported to `onError` as a `setup` problem):

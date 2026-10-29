@@ -13,6 +13,35 @@ namespace Patterkit.Patterplay
         /// <summary>The built-in `padAfter`, in seconds, for a project that sets no default of its own (line
         /// padding): the same on every runtime and in Patterpad's Play window.</summary>
         public const double DefaultPadAfter = 0.6;
+
+        /// <summary>How long a line with no recording lasts, in seconds: its characters at 14 a second, clamped to
+        /// 1.5 to 18 seconds. A character is a Unicode code point (one outside the Basic Multilingual Plane, a
+        /// surrogate pair in a C# string, counts once), and soft hyphens (U+00AD) aren't counted. This is the one
+        /// rule every Patter tool and runtime times a line by, held to the same numbers by the conformance corpus.
+        /// <paramref name="locale"/> is reserved for per-language reading rates and is unused for now.</summary>
+        public static double EstimateLineDuration(string text, string locale = "")
+        {
+            int count = 0;
+            if (text != null)
+            {
+                for (int i = 0; i < text.Length; i++)
+                {
+                    char c = text[i];
+                    if (c == '­') continue;
+                    // The low half of a surrogate pair belongs to the character its high half began.
+                    if (char.IsLowSurrogate(c) && i > 0 && char.IsHighSurrogate(text[i - 1])) continue;
+                    count++;
+                }
+            }
+            return System.Math.Min(System.Math.Max(count / LineCharsPerSecond, LineDurationMin), LineDurationMax);
+        }
+
+        /// <summary>The reading rate <see cref="EstimateLineDuration"/> times a line by, in characters a second.</summary>
+        public const double LineCharsPerSecond = 14;
+        /// <summary>The shortest a line with no recording lasts, in seconds.</summary>
+        public const double LineDurationMin = 1.5;
+        /// <summary>The longest a line with no recording lasts, in seconds.</summary>
+        public const double LineDurationMax = 18;
         /// <summary>The speaker pattern a project starts with, for a bundle that ships none: `You (V.O.)`.
         /// `{name}` and `{qualifier}` are plain placeholders, never run through line interpolation.</summary>
         internal const string DefaultSpeakerPattern = "{name} ({qualifier})";

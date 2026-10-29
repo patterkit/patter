@@ -33,6 +33,15 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **How long a line with no recording lasts.** `estimateLineDuration(text, locale?)`, re-exported from
+  `@patterkit/model`, gives it in seconds: the line's characters at 14 a second, clamped to 1.5 to 18 seconds, a
+  character outside the Basic Multilingual Plane counted once and soft hyphens (U+00AD) not counted. It's
+  Patter's one rule, the same in all four runtimes, in Patterpad's Play window, and in the playable HTML page.
+  The locale is reserved for per-language reading rates and changes nothing yet. The conformance corpus is
+  version 9, whose `durations` section holds every runtime to it.
+
 ## [0.35.0] - 2026-10-29
 
 The runtime foundations before 1.0, from the hands-on review of October 2026. Changes marked **Breaking

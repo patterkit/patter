@@ -77,7 +77,9 @@ last line or text beat is never negative. A choice option's `Prompt` carries its
 that voices the prompts itself. When your game times lines itself, follow the
 [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects. A game event step
 carries none. `GetOutline` and `GetBeatSequence` report the same `PadAfter` on a line or text
-beat's `BeatInfo`, with `OwnPadAfter` when the beat sets its own.
+beat's `BeatInfo`, with `OwnPadAfter` when the beat sets its own. For a line with no recording,
+`Bundle.EstimateLineDuration(text)` gives how long it lasts, in seconds: Patter's one rule, the same in every
+runtime and in Patterpad's Play window.
 
 A text step with `Action` set is action: a direction for whoever stages the scene, such as "MARA turns
 away.", that the player never sees. It's a dialogue scene's text when the project doesn't localise it, and its

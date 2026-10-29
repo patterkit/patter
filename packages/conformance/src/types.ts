@@ -369,6 +369,7 @@ export interface Corpus {
   describes: DescribeCase[];
   outlines: OutlineCase[];
   audio: AudioCase[];
+  durations: DurationCase[];
 }
 
 /**
@@ -392,6 +393,19 @@ export interface AudioCase {
   name: string;
   manifest: string;
   lookups: { base: string; beatId: string; expected: string | null }[];
+}
+
+/**
+ * A duration case (corpus 9): how long a line with no recording lasts, in seconds, by the one rule every runtime
+ * shares (`estimateLineDuration`): its characters at 14 a second, clamped to 1.5 to 18, a character being a Unicode
+ * code point (one outside the Basic Multilingual Plane counts once) and soft hyphens (U+00AD) not counted. `locale`,
+ * when given, is passed through; it changes nothing yet. A runner compares to within 1e-9.
+ */
+export interface DurationCase {
+  name: string;
+  text: string;
+  locale?: string;
+  expected: number;
 }
 
 /**
@@ -523,6 +537,7 @@ export interface Fixtures {
   describes: DescribeFixture[];
   outlines: DescribeFixture[];
   audio: AudioCase[];
+  durations: DurationCase[];
 }
 
 /** An authored describe fixture (source form; compiled by buildCorpus into a DescribeCase). */

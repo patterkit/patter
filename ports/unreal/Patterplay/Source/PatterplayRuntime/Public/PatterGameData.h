@@ -131,4 +131,11 @@ public:
 	 *  False, logged, when Stage isn't a stage. */
 	UFUNCTION(BlueprintPure, Category = "Patterplay|GameData")
 	static bool NextStage(const FPatterGameDataField& Field, const FString& Stage, FString& OutStage);
+
+	/** How long a line with no recording lasts, in seconds: its characters at 14 a second, clamped to 1.5 to 18
+	 *  seconds, a character outside the Basic Multilingual Plane counted once and soft hyphens (U+00AD) not
+	 *  counted. The one rule every Patter tool and runtime times a line by (the core's
+	 *  patter::estimateLineDuration). Locale is reserved for per-language reading rates and is unused for now. */
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Timing", meta = (AdvancedDisplay = "Locale"))
+	static double EstimateLineDuration(const FString& Text, const FString& Locale = TEXT(""));
 };

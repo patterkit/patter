@@ -36,7 +36,8 @@ at a time. **◼ Stop** pauses the reveal, and Step/Continue picks it back up. T
 to step one beat at a time.
 
 **Continue** times the scene the way the game will. A line lasts as long as its recording, when
-it has one, or as long as it would take to read, and then waits for its
+it has one, or as long as it would take to read, by [Patter's reading estimate](/play/engine/#step-shapes),
+and then waits for its
 [pause](/patterpad/writing-surface/#pauses-between-lines) before the next line starts. Text is
 timed by the same reading estimate. Action, a dialogue scene's text when the project doesn't
 localise it, is shown as a direction, in muted italic, and takes no time of its own: like a game

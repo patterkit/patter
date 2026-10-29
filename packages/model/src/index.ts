@@ -630,6 +630,23 @@ export const DEFAULT_PAD_AFTER = 0.6;
 export const PAD_AFTER_MIN = -10;
 export const PAD_AFTER_MAX = 60;
 
+/** The reading rate a line with no recording is timed by, in characters a second (`estimateLineDuration`). */
+export const LINE_CHARS_PER_SECOND = 14;
+/** The shortest and longest a line with no recording lasts, in seconds (`estimateLineDuration`). */
+export const LINE_DURATION_MIN = 1.5;
+export const LINE_DURATION_MAX = 18;
+
+/** How long a line with no recording lasts, in seconds: its characters at 14 a second, clamped to 1.5 to 18
+ *  seconds. A character is a Unicode code point (one outside the Basic Multilingual Plane counts once), and soft
+ *  hyphens (U+00AD) aren't counted. This is the one rule every Patter tool and runtime times a line by: Patterpad's
+ *  Play window, the playable HTML page, and the Unity, Unreal, and Godot runtimes, which the conformance corpus
+ *  holds to the same numbers. `locale` is reserved for per-language reading rates and is unused for now. */
+export function estimateLineDuration(text: string, _locale?: string): number {
+  let count = 0;
+  for (const ch of text ?? "") if (ch !== "\u00AD") count++;
+  return Math.min(Math.max(count / LINE_CHARS_PER_SECOND, LINE_DURATION_MIN), LINE_DURATION_MAX);
+}
+
 /** A qualifier as it reaches a compiled bundle: its `gameId` and authored name (the unlocalised fallback). */
 export interface BundleQualifier {
   gameId: string;

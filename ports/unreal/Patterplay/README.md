@@ -59,6 +59,8 @@ line's own, else the nearest default above it (its snippet, groups, block, scene
 else the built-in 0.6. A negative value starts the next line that long before this one ends (a cut-in);
 only a snippet's last line is never negative (a negative pause before a game event stands). An option's
 `Prompt` carries its pause too, as `PadAfter`, for a game that voices the prompts itself. When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects.
+For a line with no recording, `UPatterGameData::EstimateLineDuration` (C++ `patter::estimateLineDuration`)
+gives how long it lasts, in seconds: Patter's one rule, the same in every runtime and in Patterpad's Play window.
 
 A text step with `bAction` set is action: a direction for whoever stages the scene, such as "Mara turns
 away.", that the player never sees. A dialogue scene's text is action unless the project localises it, so

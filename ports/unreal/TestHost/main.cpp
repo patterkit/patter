@@ -877,6 +877,27 @@ static int runAudio(const JsonValue& arr)
     return pass;
 }
 
+// The corpus's duration cases: each text (UTF-8, as the corpus holds it) through the core's estimateLineDuration,
+// held to the reference's seconds.
+static int runDurations(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            const JsonValue* locale = c.find("locale");
+            const double got = locale ? estimateLineDuration(c.at("text").str, locale->str) : estimateLineDuration(c.at("text").str);
+            const double want = c.at("expected").num;
+            if (std::fabs(got - want) <= 1e-9) ++pass;
+            else fail("durations", name, "expected " + std::to_string(want) + ", got " + std::to_string(got));
+        }
+        catch (const std::exception& ex) { fail("durations", name, ex.what()); }
+    }
+    return pass;
+}
+
 // A property row as the reference's listProperties() serialises it: values and stages only where the
 // declaration has them.
 static JsonValue propertiesToJson(const std::vector<PropertyRow>& rows)
@@ -3641,6 +3662,11 @@ int main(int argc, char** argv)
     int au = runAudio(*audioArr);
     std::cout << "  [audio] the audio resolver's joins, through the reader the plugin uses: " << au << "/" << audioArr->arr.size() << "\n";
     if (au != static_cast<int>(audioArr->arr.size())) fail("audio", "section total", std::to_string(au) + " of " + std::to_string(audioArr->arr.size()) + " passed");
+    const JsonValue* durationsArr = root.find("durations");
+    if (!durationsArr) { std::cerr << "corpus has no durations section\n"; return 2; }
+    int du = runDurations(*durationsArr);
+    std::cout << "  [durations] how long a line with no recording lasts: " << du << "/" << durationsArr->arr.size() << "\n";
+    if (du != static_cast<int>(durationsArr->arr.size())) fail("durations", "section total", std::to_string(du) + " of " + std::to_string(durationsArr->arr.size()) + " passed");
     runInspectorSmoke();
     runOneRegistry();
     runFlowStateCases();

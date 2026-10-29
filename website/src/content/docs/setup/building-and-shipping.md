@@ -71,8 +71,8 @@ It's the real runtime. Choices, conditions, sequences, and jumps behave exactly 
 game, because it's the same engine the bundle ships with rather than an approximation. There's a
 Restart, and Save/Load (kept in that browser).
 
-Lines arrive on the scene's own timing. With no recordings in the page, each line is held for an
-estimate of its reading time, then waits for the writer's
+Lines arrive on the scene's own timing. With no recordings in the page, each line is held for
+[Patter's estimate of its reading time](/play/engine/#step-shapes), then waits for the writer's
 [pause](/patterpad/writing-surface/#pauses-between-lines), so a cut-in arrives before the line it
 cuts into has finished. [Action](/production/localisation/#what-gets-translated), a dialogue
 scene's text when the project doesn't localise it, reads as a direction, in muted italic, and takes

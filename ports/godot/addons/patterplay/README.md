@@ -58,7 +58,9 @@ negative; a negative pause before a game event stands. A replayed prompt carries
 so does each choice option's `prompt`, as `padAfter`, for a game that voices the prompts itself. A line
 silenced by closed captions keeps its pause.
 When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects. `get_outline()` and `get_beat_sequence()`
-give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the beat sets its own.
+give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the beat sets its own. For a
+line with no recording, `PatterBundle.estimate_line_duration(text)` gives how long it lasts, in seconds: Patter's
+one rule, the same in every runtime and in Patterpad's Play window.
 
 A `"text"` step with `action: true` is action: a direction for whoever stages the scene, never shown to the
 player. It's a dialogue scene's text when the project doesn't localise it, and its text is the source in

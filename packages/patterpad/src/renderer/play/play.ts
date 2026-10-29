@@ -18,7 +18,7 @@ import { applyTheme } from "../src/apply-theme.js";
 import { initTooltips, pinButton, followButton, toolWindowHead, iconNode, type IconName } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/tool-window.css"; // the head bar, the pin and the close travel with it
 import { colourFor } from "@patterkit/patterpad-surface/colour";
-import { estimateDuration } from "@wildwinter/game-subtitles"; // the same estimate Patterstage times a line by
+import { estimateLineDuration } from "@patterkit/model"; // Patter's own rule for how long a line with no recording lasts
 import type { PlayBatch, PlayChoiceOption, PlayStep } from "../../shared/api.js";
 import { Timeline, PlayClock, SPEED_RATE, lineLength, readSpeed, type PlaySpeed } from "./timing.js";
 
@@ -407,7 +407,7 @@ async function revealFrom(batch: PlayBatch, gen: number, startIdx: number): Prom
     clock.delay(performance.now() - clock.at(start));
     // A game event, and action text (a direction, never shown to the player), take no time of their own: only
     // their pause separates them from the next beat.
-    const length = s.kind === "gameEvent" || s.action ? 0 : lineLength(clip?.duration, estimateDuration(s.text));
+    const length = s.kind === "gameEvent" || s.action ? 0 : lineLength(clip?.duration, estimateLineDuration(s.text ?? ""));
     timeline.place(s, length);
     const el = appendStep(s); play.mark(s.id, s.scene); scrollToEnd();
     if (clip && audioOn) playLoaded(clip, el);

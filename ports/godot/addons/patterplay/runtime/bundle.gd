@@ -248,6 +248,22 @@ static func format_speaker_label(pattern: String, name: String, qualifier: Strin
 ## runtime and in Patterpad's Play window.
 const DEFAULT_PAD_AFTER := 0.6
 
+## The reading rate estimate_line_duration times a line by, in characters a second.
+const LINE_CHARS_PER_SECOND := 14.0
+## The shortest and longest a line with no recording lasts, in seconds.
+const LINE_DURATION_MIN := 1.5
+const LINE_DURATION_MAX := 18.0
+
+
+## How long a line with no recording lasts, in seconds: its characters at 14 a second, clamped to 1.5 to 18
+## seconds. A character is a Unicode code point (a Godot String holds one per character, so one outside the
+## Basic Multilingual Plane counts once), and soft hyphens (U+00AD) aren't counted. This is the one rule every
+## Patter tool and runtime times a line by, held to the same numbers by the conformance corpus. `_locale` is
+## reserved for per-language reading rates and is unused for now.
+static func estimate_line_duration(text: String, _locale: String = "") -> float:
+	var count := text.length() - text.count(char(0xAD))
+	return clampf(count / LINE_CHARS_PER_SECOND, LINE_DURATION_MIN, LINE_DURATION_MAX)
+
 
 # Line padding: the pause after a line or text beat, `padAfter`, in seconds. A beat without its own takes
 # the nearest `padAfterDefault` above it (snippet, then each group, innermost first, then block, then

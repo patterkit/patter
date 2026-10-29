@@ -80,6 +80,13 @@ func _initialize() -> void:
 	var au := _run_audio(root["audio"])
 	print("audio: %d/%d  (the audio resolver's path for a beat under a base)" % [au, root["audio"].size()])
 	_expect_all("audio", au, root["audio"].size())
+	if not root.has("durations"):
+		push_error("corpus has no durations section")
+		quit(2)
+		return
+	var du := _run_durations(root["durations"])
+	print("durations: %d/%d  (how long a line with no recording lasts)" % [du, root["durations"].size()])
+	_expect_all("durations", du, root["durations"].size())
 	_run_describe_smoke()
 	_run_host_scope_writable_check()
 
@@ -684,6 +691,20 @@ func _run_audio(arr: Array) -> int:
 				ok = false
 		if ok:
 			pass_count += 1
+	return pass_count
+
+
+# Each text through PatterBundle.estimate_line_duration, held to the reference's seconds.
+func _run_durations(arr: Array) -> int:
+	var pass_count := 0
+	for c in arr:
+		var name: String = c["name"]
+		var got: float = PatterBundle.estimate_line_duration(c["text"], c.get("locale", ""))
+		var want: float = c["expected"]
+		if absf(got - want) <= 1e-9:
+			pass_count += 1
+		else:
+			_fail("durations", name, "expected %s, got %s" % [want, got])
 	return pass_count
 
 

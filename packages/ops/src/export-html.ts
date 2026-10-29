@@ -12,7 +12,7 @@
 import { canonicalStringify } from "@patterkit/core";
 import { runExportFull } from "./export.js";
 import { DEFAULT_PAD_AFTER } from "@patterkit/model";
-import { PLAYABLE_RUNTIME_JS, PLAYABLE_TIMING_JS } from "./playable-runtime.js";
+import { PLAYABLE_RUNTIME_JS } from "./playable-runtime.js";
 import { createTimeline, createClock } from "./play-timeline.js";
 import type { LoadedProject } from "./load.js";
 
@@ -36,8 +36,8 @@ const PLAYER_JS = String.raw`
   function add(cls, html) { var d = document.createElement("div"); d.className = cls; d.innerHTML = html; stage.appendChild(d); return d; }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
 
-  // Pacing (line padding): a source-only reader carries no audio, so each line is timed by the estimate
-  // Patterstage uses for a line with no recording (game-subtitles' estimateDuration), and the step's padAfter
+  // Pacing (line padding): a source-only reader carries no audio, so each line is timed by Patter's own rule
+  // for a line with no recording (estimateLineDuration, from the runtime), and the step's padAfter
   // says when the next one starts: after a pause, at once, or cutting in before this one ends. The player
   // rules are play-timeline.ts's, inlined below by their source: the first line starts at once, as does the
   // reply to a choice; a cut-in never starts before the line it cuts into; a game event is never held here,
@@ -56,7 +56,7 @@ const PLAYER_JS = String.raw`
   var speedKey = (function () { try { return localStorage.getItem("patter.playSpeed") || "normal"; } catch (e) { return "normal"; } })();
   if (own(OLD_SPEED, speedKey)) speedKey = OLD_SPEED[speedKey];
   if (!own(SPEED_RATE, speedKey)) speedKey = "normal";
-  var estimate = window.GameSubtitles.estimateDuration;
+  var estimate = window.Patterplay.estimateLineDuration;
   var clock = null, wake = null; // the run's clock, and a hook that re-times the wait in flight
   // Call then() when script time "at" comes on the run's clock. A change of speed wakes the wait, which
   // works out the time again; a superseded run's wait just stops.
@@ -245,7 +245,6 @@ export function runExportHtml(loaded: LoadedProject): string {
   const { title, lang, bundleJson } = sourceStory(loaded);
   return page(title, lang, `<style>${STYLE}</style>`,
     `<script>${PLAYABLE_RUNTIME_JS}</script>
-<script>${PLAYABLE_TIMING_JS}</script>
 <script>window.PATTER_BUNDLE=${bundleJson};</script>
 <script>${PLAYER_JS}</script>`);
 }
@@ -259,7 +258,7 @@ export interface WebExport {
   indexHtml: string;
   /** The look of the page, separated so it's approachable to edit. Published once. */
   styleCss: string;
-  /** The Patterplay runtime, the line-timing estimate, and this page's player glue. Refreshed on every publish. */
+  /** The Patterplay runtime (with the line-timing estimate) and this page's player glue. Refreshed on every publish. */
   patterplayJs: string;
   /** The compiled story as `window.PATTER_BUNDLE = …`. Refreshed on every publish. */
   storyJs: string;
@@ -273,7 +272,7 @@ export function runExportWeb(loaded: LoadedProject): WebExport {
       `<script src="story.js"></script>
 <script src="patterplay.js"></script>`),
     styleCss: `${STYLE.trim()}\n`,
-    patterplayJs: `${PLAYABLE_RUNTIME_JS}\n${PLAYABLE_TIMING_JS}\n${PLAYER_JS}`,
+    patterplayJs: `${PLAYABLE_RUNTIME_JS}\n${PLAYER_JS}`,
     storyJs: `window.PATTER_BUNDLE=${bundleJson};\n`,
   };
 }

@@ -8,7 +8,7 @@
 // corpus.json; the test asserts the reference engine reproduces every value.
 // ---------------------------------------------------------------------------
 
-import type { DescribeFixture, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
+import type { DescribeFixture, DurationCase, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
 import type { Bundle, CompiledGroup, CompiledSnippet, ProjectFile, LocaleFile, SaveGame, Scene } from "@patterkit/model";
 import { castStringKey, qualifierStringKey, speakerLabelKey, SPEAKER_PATTERN_KEY } from "@patterkit/model";
 import type { ExtensionShard } from "@patterkit/model";
@@ -3846,6 +3846,27 @@ const audioManifest = {
   ],
 };
 
+// --- how long a line lasts (corpus 9) ----------------------------------------------------------------
+// A line with no recording lasts its characters at 14 a second, clamped to 1.5 to 18 seconds: the one rule every
+// Patter tool and runtime times a line by (estimateLineDuration). A character is a Unicode code point, so neither
+// UTF-16 units nor UTF-8 bytes: a character outside the Basic Multilingual Plane counts once, as does one beyond
+// Latin inside it. Soft hyphens (U+00AD), which only mark where a word may break, aren't counted.
+const harbourLine = "The lamps are lit along the harbour wall tonight."; // 49 characters
+const durationCases: DurationCase[] = [
+  { name: "an empty line lasts the shortest time", text: "", expected: 1.5 },
+  { name: "a short line is held for the shortest time", text: "Ah.", expected: 1.5 },
+  { name: "21 characters is exactly the shortest time", text: "Twenty-one letters!!!", expected: 1.5 },
+  { name: "a line lasts its characters at 14 a second", text: harbourLine, expected: 3.5 },
+  { name: "soft hyphens aren't counted", text: "In\u00ADcom\u00ADpre\u00ADhen\u00ADsi\u00ADble and ex\u00ADtra\u00ADor\u00ADdi\u00ADnar\u00ADy!", expected: 2.5 },
+  { name: "a line of nothing but soft hyphens is an empty line", text: "\u00AD".repeat(100), expected: 1.5 },
+  { name: "a character outside the Basic Multilingual Plane counts once", text: "Look up, Tam: \u{1F319} \u{1F30A} \u{1F319} \u{1F30A}, the moon on the sea", expected: 3 },
+  { name: "a line of astral characters counts each once", text: "\u{1F319}".repeat(28), expected: 2 },
+  { name: "a character beyond Latin counts once", text: "こんにちは、港の灯りが見えますか。今夜は潮が満ちています", expected: 2 },
+  { name: "252 characters is exactly the longest time", text: "x".repeat(252), expected: 18 },
+  { name: "a longer line is held to the longest time", text: "x".repeat(400), expected: 18 },
+  { name: "the locale changes nothing yet", text: harbourLine, locale: "fr-FR", expected: 3.5 },
+];
+
 // --- the runtime foundations before 1.0 (corpus 8) ---------------------------------------------------
 // The hands-on review of October 2026 found five ways the runtimes went quiet where they should have spoken, or
 // spoke in a language the player had left. Each case below pins one of the fixes on every runtime.
@@ -4333,4 +4354,5 @@ export const cases: Fixtures = {
   describes: [describeEverything],
   outlines: [outlineEverything, outlineExtensions],
   audio: [audioManifest],
+  durations: durationCases,
 };

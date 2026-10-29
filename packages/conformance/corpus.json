@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "expressions": [
     {
       "name": "number comparison",
@@ -31439,6 +31439,69 @@
           "expected": null
         }
       ]
+    }
+  ],
+  "durations": [
+    {
+      "name": "an empty line lasts the shortest time",
+      "text": "",
+      "expected": 1.5
+    },
+    {
+      "name": "a short line is held for the shortest time",
+      "text": "Ah.",
+      "expected": 1.5
+    },
+    {
+      "name": "21 characters is exactly the shortest time",
+      "text": "Twenty-one letters!!!",
+      "expected": 1.5
+    },
+    {
+      "name": "a line lasts its characters at 14 a second",
+      "text": "The lamps are lit along the harbour wall tonight.",
+      "expected": 3.5
+    },
+    {
+      "name": "soft hyphens aren't counted",
+      "text": "In­com­pre­hen­si­ble and ex­tra­or­di­nar­y!",
+      "expected": 2.5
+    },
+    {
+      "name": "a line of nothing but soft hyphens is an empty line",
+      "text": "­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­",
+      "expected": 1.5
+    },
+    {
+      "name": "a character outside the Basic Multilingual Plane counts once",
+      "text": "Look up, Tam: 🌙 🌊 🌙 🌊, the moon on the sea",
+      "expected": 3
+    },
+    {
+      "name": "a line of astral characters counts each once",
+      "text": "🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙",
+      "expected": 2
+    },
+    {
+      "name": "a character beyond Latin counts once",
+      "text": "こんにちは、港の灯りが見えますか。今夜は潮が満ちています",
+      "expected": 2
+    },
+    {
+      "name": "252 characters is exactly the longest time",
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected": 18
+    },
+    {
+      "name": "a longer line is held to the longest time",
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected": 18
+    },
+    {
+      "name": "the locale changes nothing yet",
+      "text": "The lamps are lit along the harbour wall tonight.",
+      "locale": "fr-FR",
+      "expected": 3.5
     }
   ]
 }

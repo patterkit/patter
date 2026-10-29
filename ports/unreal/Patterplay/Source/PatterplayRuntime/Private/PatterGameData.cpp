@@ -248,3 +248,8 @@ bool UPatterGameData::NextStage(const FPatterGameDataField& Field, const FString
 	try { OutStage = Ue(wildwinter::expr::NextStage(LadderOf(Field), patter::PatterValue::Str(Std(Stage)))); return true; }
 	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
+
+double UPatterGameData::EstimateLineDuration(const FString& Text, const FString& Locale)
+{
+	return patter::estimateLineDuration(Std(Text), Std(Locale));
+}

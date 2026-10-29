@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // ---------------------------------------------------------------------------
-// The playable page's line timing (line padding): each line is timed by game-subtitles' estimateDuration, the
-// estimate Patterstage uses, and the step's padAfter says when the next one starts, under the player rules
+// The playable page's line timing (line padding): each line is timed by Patter's own estimateLineDuration, the
+// rule every Patter tool and runtime uses, and the step's padAfter says when the next one starts, under the player rules
 // (the choices as the last line starts, the end as every line still playing ends, a cut-in never before
 // the line it cuts into, a game event done at once). The Speed setting scales the whole timing from the
 // moment it's changed, and keeps the stored key Patterpad's Play window shares, reading the old reading-pace
@@ -12,8 +12,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { estimateDuration } from "@wildwinter/game-subtitles";
 import { exportBundle } from "@patterkit/compiler";
+import { estimateLineDuration } from "@patterkit/model";
 import type { Bundle, LocaleFile, ProjectFile, Scene } from "@patterkit/model";
 import { loadProject, runExportHtml, runExportWeb } from "../src/index.js";
 
@@ -52,7 +52,7 @@ const scene: Scene = {
 const en: LocaleFile = { schema: "patter/strings@0", scene: "s", locale: "en", strings: TEXT };
 const bundle: Bundle = exportBundle({ project, scenes: [scene], locales: [en] });
 
-// The generated page's scripts, in order (runtime, timing, bundle, player), and its body markup.
+// The generated page's scripts, in order (runtime, bundle, player), and its body markup.
 const html = runExportHtml(loadProject(fixtureDir));
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
 const bodyMarkup = html.slice(html.indexOf("<body>") + 6, html.indexOf("<script>"));
@@ -79,10 +79,9 @@ const stage = (): string[] => Array.from(document.querySelectorAll("#stage > div
 const startPage = (story: Bundle = bundle): void => {
   document.body.innerHTML = bodyMarkup;
   const w = window as unknown as Record<string, unknown>;
-  (0, eval)(scripts[0]!); // the runtime: window.Patterplay
-  (0, eval)(scripts[1]!); // the timing: window.GameSubtitles
+  (0, eval)(scripts[0]!); // the runtime, with the line-timing estimate: window.Patterplay
   w.PATTER_BUNDLE = JSON.parse(JSON.stringify(story));
-  (0, eval)(scripts[3]!); // the player, which starts a new game
+  (0, eval)(scripts[2]!); // the player, which starts a new game
 };
 
 beforeEach(() => {
@@ -93,13 +92,14 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); });
 
 describe("playable HTML: line timing", () => {
-  it("inlines the estimate with the runtime, and offers the speed-up values", () => {
-    expect(scripts).toHaveLength(4);
-    expect(scripts[1]).toContain("GameSubtitles");
+  it("times lines by the runtime's estimate, carries no other timing script, and offers the speed-up values", () => {
+    expect(scripts).toHaveLength(3);
+    expect(scripts[2]).toContain("window.Patterplay.estimateLineDuration");
+    expect(html).not.toContain("GameSubtitles");
     expect(html).toContain('<option value="half">');
     expect(html).toContain('<option value="double">');
     expect(html).not.toContain('value="slow"');
-    expect(runExportWeb(loadProject(fixtureDir)).patterplayJs).toContain("GameSubtitles");
+    expect(runExportWeb(loadProject(fixtureDir)).patterplayJs).toContain("window.Patterplay.estimateLineDuration");
   });
 
   it("times lines by the estimate and padAfter, under the player rules", () => {
@@ -107,14 +107,14 @@ describe("playable HTML: line timing", () => {
     expect(stage()).toEqual(["ANNA" + TEXT.A]); // the first line starts at once
 
     // A cut-in: B starts half a second before A's estimated end.
-    const aToB = ms(estimateDuration(TEXT.A) - 0.5);
+    const aToB = ms(estimateLineDuration(TEXT.A) - 0.5);
     vi.advanceTimersByTime(aToB - 1);
     expect(stage()).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(stage()).toHaveLength(2);
 
     // A pause, with a game event between that isn't held: it runs from B's end as usual.
-    const bToC = ms(estimateDuration(TEXT.B) + 2);
+    const bToC = ms(estimateLineDuration(TEXT.B) + 2);
     vi.advanceTimersByTime(bToC - 1);
     expect(stage()).toHaveLength(2);
     vi.advanceTimersByTime(1);
@@ -132,7 +132,7 @@ describe("playable HTML: line timing", () => {
     expect(stage()[4]).toBe("BEN" + TEXT.R);
 
     // The last line's pause is unused: the end comes as the line ends.
-    vi.advanceTimersByTime(ms(estimateDuration(TEXT.R)) - 1);
+    vi.advanceTimersByTime(ms(estimateLineDuration(TEXT.R)) - 1);
     expect(stage()).toHaveLength(5);
     vi.advanceTimersByTime(1);
     expect(stage()[5]).toBe("The End");
@@ -143,7 +143,7 @@ describe("playable HTML: line timing", () => {
   ])("the stored speed %s scales the whole timing by %s, reading the old values", (stored, scale) => {
     localStorage.setItem("patter.playSpeed", stored);
     startPage();
-    const gap = Math.round((estimateDuration(TEXT.A) - 0.5) * scale * 1000);
+    const gap = Math.round((estimateLineDuration(TEXT.A) - 0.5) * scale * 1000);
     vi.advanceTimersByTime(gap - 1);
     expect(stage()).toHaveLength(1);
     vi.advanceTimersByTime(1);
@@ -167,7 +167,7 @@ describe("playable HTML: line timing", () => {
 
   it("ends when every line still playing has finished, an earlier cut-in-on line included", () => {
     startPage(cutInThen("end"));
-    const long = estimateDuration(LONG.L), short = estimateDuration(LONG.S);
+    const long = estimateLineDuration(LONG.L), short = estimateLineDuration(LONG.S);
     vi.advanceTimersByTime(ms(long - 4));
     expect(stage()).toHaveLength(2); // the short line cuts in four seconds before the long one ends
     vi.advanceTimersByTime(ms(short) + 1);
@@ -180,7 +180,7 @@ describe("playable HTML: line timing", () => {
 
   it("shows the choices as the last line before them starts, while an earlier one still plays", () => {
     startPage(cutInThen("choice"));
-    vi.advanceTimersByTime(ms(estimateDuration(LONG.L) - 4) - 1);
+    vi.advanceTimersByTime(ms(estimateLineDuration(LONG.L) - 4) - 1);
     expect(document.querySelector("#controls .choice")).toBeNull();
     vi.advanceTimersByTime(1);
     expect(stage()).toHaveLength(2);
@@ -189,7 +189,7 @@ describe("playable HTML: line timing", () => {
 
   it("applies a change of speed at once, keeping the time already played", () => {
     startPage(); // A lasts 1.5 seconds (the estimate's floor) and B cuts in half a second before it ends
-    expect(estimateDuration(TEXT.A)).toBe(1.5);
+    expect(estimateLineDuration(TEXT.A)).toBe(1.5);
     vi.advanceTimersByTime(500); // half a second played at normal speed
     const select = document.querySelector<HTMLSelectElement>("#speed")!;
     select.value = "half";

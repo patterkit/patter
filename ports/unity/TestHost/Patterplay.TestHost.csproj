@@ -39,6 +39,8 @@
     <Compile Include="OutlineChecks.cs" />
     <!-- The corpus's audio cases (PatterAudioResolver). -->
     <Compile Include="AudioChecks.cs" />
+    <!-- The corpus's duration cases (Bundle.EstimateLineDuration). -->
+    <Compile Include="DurationChecks.cs" />
     <!-- The runtime foundations before 1.0: set-up reports, host-write refusals, the copies handed out. -->
     <Compile Include="FoundationsChecks.cs" />
     <!-- The thin runner (PatterRunner): the flow API as events (a port of the JS play-helpers tests). -->

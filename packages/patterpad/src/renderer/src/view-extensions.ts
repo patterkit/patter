@@ -14,7 +14,7 @@
 
 import { hostViews } from "@wildwinter/app-shell";
 import type { ViewAdapter, ViewEdit, ViewMediaLength, ViewNode, ViewRefusal, ViewSelection, ViewWritable } from "@wildwinter/app-shell";
-import { estimateDuration } from "@wildwinter/game-subtitles"; // the estimate Play times a line by
+import { estimateLineDuration } from "@patterkit/model"; // Patter's own rule, the one Play times a line by
 import type { ValueAdapter } from "@wildwinter/app-shell/value-rows";
 import type { ExtensionWrite, InspectorContext, SceneModel } from "@patterkit/patterpad-surface/surface";
 import type { ExtensionDto, OpenedProject } from "../../shared/api.js";
@@ -221,7 +221,7 @@ export function createViewHost(deps: ViewHostDeps, target?: Window): ViewHost {
         // Action text is a direction, never played: it takes no time, as in Play.
         if (node.kind === "text" && node.host["action"] === true) { out[id] = { seconds: 0, measured: false }; continue; }
         const recorded = node.kind === "line" ? await deps.recordedSeconds(id) : null;
-        out[id] = lineMedia(recorded, estimateDuration(String(node.host["text"] ?? "")));
+        out[id] = lineMedia(recorded, estimateLineDuration(String(node.host["text"] ?? "")));
       }
       return out;
     },

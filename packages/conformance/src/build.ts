@@ -43,8 +43,10 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  gameData); a scripted case's `locale` and `hostScopes`; `setProperty` refuses a value that doesn't fit its
  *  declaration, or an undeclared name; a save case's `keyPaths` are what a runtime writes back having loaded its
  *  envelope. `scriptedHotSwapDeleteActive` and `scriptedHotSwapEmptiedBlock` now also expect a `save` report.
+ *  9: the section `durations`: how long a line with no recording lasts (`estimateLineDuration`), the one rule every
+ *  Patter tool and runtime times a line by. No earlier expectation changed.
  */
-export const CORPUS_VERSION = 8;
+export const CORPUS_VERSION = 9;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at
@@ -173,7 +175,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     };
   });
 
-  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, describes, outlines, audio: fixtures.audio };
+  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, describes, outlines, audio: fixtures.audio, durations: fixtures.durations };
 }
 
 // The corpus as the committed corpus.json text. Every case's inputs (`bundle`, `bundleB`, `envelope`) write a
