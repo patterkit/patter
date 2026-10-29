@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-10-29
+
 ### Added
 
 - **How long a line with no recording lasts.** `UPatterGameData::EstimateLineDuration` (Blueprint) and

@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-10-29
+
 ### Added
 
 - **How long a line with no recording lasts.** `PatterBundle.estimate_line_duration(text, locale)` gives it in

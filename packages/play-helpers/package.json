@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@patterkit/model": "^0.21.0",
-    "@patterkit/runtime": "0.35.0",
+    "@patterkit/runtime": "0.36.0",
     "@wildwinter/app-shell": ">=0.49.0 <1.0.0"
   },
   "peerDependencies": {

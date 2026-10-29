@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-10-29
+
 ### Added
 
 - **How long a line with no recording lasts.** `estimateLineDuration(text, locale?)`, re-exported from
