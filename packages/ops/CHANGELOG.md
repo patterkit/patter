@@ -1,5 +1,11 @@
 # @patterkit/ops
 
+## 0.25.1
+
+### Patch Changes
+
+- e6c7d61: Takes `@wildwinter/game-subtitles` 0.4.0. A playable page's line timing is unchanged.
+
 ## 0.25.0
 
 ### Minor Changes
