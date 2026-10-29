@@ -81,7 +81,7 @@ export default defineConfig({
       sidebar: [
         {
           label: "Start here",
-          items: ["getting-started", "download", "concepts", "architecture", "why"],
+          items: ["getting-started", "web-story", "download", "concepts", "architecture", "why"],
         },
         {
           label: "Writing in Patterpad",

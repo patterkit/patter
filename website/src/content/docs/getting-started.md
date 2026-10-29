@@ -56,6 +56,9 @@ from a CDN), described on [JavaScript & web](/play/javascript/). Unity (C#), Unr
 and Godot (GDScript) each have a native plugin with the same API, and
 [Playing in your game](/play/overview/) is where those start.
 
+No game yet? [Make an interactive story for the web](/web-story/) builds a small web page
+that plays your story, from a folder on your computer with no server, for you to style as you like.
+
 Each runtime loads the bundle and walks it beat by beat (line, text, choice) while your
 game reads its own [Game Data](/format/gamedata-and-addressing/) off each beat to drive audio,
 camera, quests, and everything else.

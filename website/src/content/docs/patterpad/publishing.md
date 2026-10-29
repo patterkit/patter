@@ -78,6 +78,9 @@ leaving your customisations exactly as you made them. (Deleted one? It's re-crea
 the next publish.) The folder plays straight from disk with a double-click on `index.html`,
 and uploads as-is to itch.io (zipped) or any static host.
 
+To write the page yourself instead, [Make an interactive story for the web](/web-story/)
+builds one from scratch on the same `story.js`.
+
 ## A readable script: for people who'd rather read
 
 **Publish ▸ Publish Readable Script…** writes the whole story as a screenplay-style **PDF** or

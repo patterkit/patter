@@ -8,7 +8,8 @@ sidebar:
 The JavaScript runtime plays a `.patterc` [bundle](/format/overview/) in any browser or
 Node app. Two ways in: a **zero-build drop-in** for a plain HTML page, or the
 **`@patterkit/runtime`** npm package for a bundled app. Both expose the same
-[play loop](/play/concepts/).
+[play loop](/play/concepts/). New to this? [Make an interactive story for the web](/web-story/)
+walks through a whole page, step by step, on the [runner](/play/runner/).
 
 ## Install
 
