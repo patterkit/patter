@@ -13,8 +13,8 @@ const credit = site.credit.replaceAll("{base}", base);
   <div class:list={[site.wrapClass, "chrome-foot-signup"]}><Newsletter variant="landing" /></div>
   <div class:list={[site.wrapClass, "chrome-foot-inner"]}>
     <div class="chrome-foot-brand">
-      <Fragment set:html={landing.footMark} />
-      <span>{site.brand}</span>
+      <Fragment set:html={landing.mark} />
+      <span set:html={landing.wordmark} />
     </div>
     <nav class="chrome-foot-links" aria-label="Footer">
       {landing.footNav.map((link: { label: string; href: string }) => (

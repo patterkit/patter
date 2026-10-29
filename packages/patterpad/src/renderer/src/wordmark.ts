@@ -6,14 +6,15 @@
 // part of an About box that genuinely cannot be shared. So it lives here.
 //
 // Inline rather than a file so the text renders in the app's own Newsreader and
-// the word colours follow the theme. The leaf marks keep the fixed brand teal and
-// ember, which stay readable on every palette, exactly as the website footer's
-// mark does; the geometry is the site's.
+// "Patter" follows the theme's ink. The leaves and "Kit" are the brand's, never
+// the theme accent: teal and ember on a light palette, and on a dark one the
+// lighter teal the dark docs wordmark uses (light-dark() follows the palette's
+// --color-scheme). The geometry and colours are the website header's.
 
 export const PATTERKIT_WORDMARK =
   '<svg viewBox="0 0 820 220" role="img" aria-label="PatterKit" xmlns="http://www.w3.org/2000/svg">' +
   '<g transform="translate(40,30) scale(0.98)">' +
-  '<g transform="translate(36.7,6) rotate(270 50 50)"><path fill="#57a294" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"/></g>' +
+  '<g transform="translate(36.7,6) rotate(270 50 50)"><path style="fill:light-dark(#214f4b,#6fa39c)" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"/></g>' +
   '<g transform="translate(3.3,56) rotate(90 50 50)"><path fill="#d2603e" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"/></g></g>' +
-  '<text x="232" y="150" font-family="Newsreader, Georgia, serif" font-weight="500" font-size="120" letter-spacing="-2" fill="var(--ink)">Patter<tspan fill="var(--accent)">Kit</tspan></text>' +
+  '<text x="232" y="150" font-family="Newsreader, Georgia, serif" font-weight="500" font-size="120" letter-spacing="-2" fill="var(--ink)">Patter<tspan style="fill:light-dark(#214f4b,#6fa39c)">Kit</tspan></text>' +
   "</svg>";

@@ -1,7 +1,7 @@
 # Patter
 
 [![CI](https://github.com/patterkit/patter/actions/workflows/ci.yml/badge.svg)](https://github.com/patterkit/patter/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/badge/docs-patterkit.dev-2f6f66)](https://patterkit.dev)
+[![Docs](https://img.shields.io/badge/docs-patterkit.dev-214f4b)](https://patterkit.dev)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Patter** is an open toolkit for authoring and running spoken dialogue in games -

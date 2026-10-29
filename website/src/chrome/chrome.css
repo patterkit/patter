@@ -279,12 +279,15 @@ a.action.minimal { color: var(--sl-color-text-accent); }
   padding-bottom: 36px;
 }
 .chrome-foot-brand { display: flex; align-items: center; gap: 11px; }
+
+.chrome-foot-brand svg { display: block; flex: none; width: auto; height: 24px; }
 .chrome-foot-brand span {
   font-family: var(--chrome-display);
   font-weight: 600;
   font-size: 17px;
   color: var(--chrome-foot-brand-ink);
 }
+.chrome-foot-brand span span { color: var(--chrome-land-wordmark-accent, inherit); }
 .chrome-foot-links { display: flex; flex-wrap: wrap; gap: 12px 22px; font-size: 14px; }
 
 .chrome-foot .chrome-foot-links a { color: var(--chrome-foot-link); text-decoration: none; }
