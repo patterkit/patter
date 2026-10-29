@@ -1,5 +1,74 @@
 # @patterkit/ops
 
+## 0.25.0
+
+### Minor Changes
+
+- 28540ab: **Settle a merge's clashes from the shard.** `applyResolutions(shardText, decisions)` takes a shard carrying
+  the `unresolved` mark and a decision per clash path, and answers the shard's new canonical text: `"ours"`
+  keeps the value the shard holds and clears the entry, `"theirs"` writes their side at the path (or removes
+  what's there, where theirs had none) and clears it, and `"resolved"` clears it only, for a place edited by
+  hand. With no entries left, the `unresolved` key goes. A path the mark doesn't hold, or `"theirs"` for a
+  clash that isn't one value (`moved`, `structural`, or a declaration list's `:order`), throws
+  `ResolutionError`; `isSettableClash` says which can take theirs. Alongside it: `unresolvedClashes(shard)`
+  reads a shard's entries, `findMarkedShards(root)` finds every marked shard in a project with its
+  `.patterconflict` sidecar (the same walk validate makes), and `clashPathSegments` and `valueAtClashPath` read
+  the merge's path grammar. Patterpad's clash resolver is built on these. The toolkit moves to 0.4.
+- b7325b5: **A character keeps their colour through a rename.** `CastMember` gains an optional, authoring-only `colour`:
+  a slot of the editors' 12-colour palette (0 to 11). Absent, a character's colour still comes from a hash of
+  their name, so a cast needs no setup; renaming a character in Patterpad stamps the slot their old name had,
+  so their cues don't change colour. It never reaches a bundle: `BundleCastMember` leaves it out, and the
+  compiler's cast allow-list doesn't copy it. In ops, `characterColour(name, stored?)` answers the stored slot
+  when it's a valid one, `castColours(cast)` maps names to their stored slots, a `line` element of the readable
+  script carries its speaker's `colour`, so the Word, PDF, and editable scripts paint the cue in it, and
+  `keepCastColours(cast, renames)` stamps the old name's slot on each renamed member that has none.
+- b7325b5: **Effects in the script exports.** The readable script (Word and PDF) and the editable script show a
+  snippet's `onEnter` and `onExit` effects, and a scene's `onEntry`, as a quiet line of plain words labelled as
+  Patterpad labels them: `On begin: sets gold to gold + 1`, `On end: sets @world.threat to 3`. A Patter
+  property is named bare and any other scope's in full; a quality advancing itself reads `advances debt`, a
+  flags change `adds calm to mood`, and an enum value or stage is shown without its quotes. `ScriptElement`
+  gains an `effect` kind (`phase` is `begin` or `end`), and `effectDescriber` gives the wording. In the
+  editable script an effect line has its own paragraph style and isn't part of the handoff record: the
+  re-import reads it as a `ReadEffect` and skips it, so an edit to one changes nothing, and a comment on one
+  lands on the line it sits with. The project's comment threads are never written into the editable script,
+  so the only comments in a returned file are the editor's.
+- 3190418: Save format 4, for 1.0 (the hands-on review of October 2026). **Breaking:** a saved pending choice keeps its options' ids, not their text, so it shows in the current language; a flow's cursor saves the next beat's id (`beatId`) instead of its index, and a frame inside a choice's option its choice's id (`choiceId`), so a save loads into a patched build. `SAVE_VERSION` is 4; the model keeps the version 3 shape (`SaveGameV3`) for loading, and drops the version 2 shapes (`SaveGameV2`, `FlowSnapshotV2`). Coverage drops a saved driver value that no longer fits its declaration, and skips a write the engine refuses, rather than failing the run.
+- 3190418: The project's start scene reaches the game (the hands-on review of October 2026). The bundle gains `start` (`{ scene, block? }`), written by the compiler when the project's start names a scene, and block, the bundle has, and folded into both hashes only when present, so bundles without one are unchanged. `validate` warns `no-start` when a project with scenes sets none, and `dangling-start` when it names a scene or block that has gone: either way a game that doesn't name a scene starts at the first one. `patter init`, and so Patterpad's New Project, sets the start to its one scene, and the playable HTML export opens at the bundle's start, block included.
+- aced374: **Translation import checks the file.** `applyLoc` skips a line the project doesn't have (it isn't written,
+  counted, or stamped) and returns a `report` listing those lines and every translation whose `{@ref}`
+  placeholders or `<b>`/`<i>`/`<bi>` markup don't match the source as it is now (those still import).
+  `describeLocImport` turns the report into lines to show, and `importLocale` decides the language: a file for
+  one language is refused as another, and one naming none imports as the language chosen, with a warning. The
+  Excel export now carries its language on a hidden "Patter" sheet. `patter loc-import` refuses a file whose
+  language differs from `--locale` unless `--force-locale` is given, and prints the report after its counts.
+- aced374: **Direction in the voice script.** `VoiceLine` gains the line's inline `direction`, and the voice script
+  spreadsheet (`patter voice-export`) has a Direction column before the Text.
+
+### Patch Changes
+
+- b226f49: Uses `@patterkit/runtime` 0.35.0, the Patterplay 0.35.0 release.
+- aced374: **Plainer labels in script exports and the CLI's help.** The Word, PDF, and editable scripts no longer use "·" as a
+  separator: `game event: door.open`, `One of (first match wins)`, `In sequence (shuffled)`, `else (catch-all)`, and
+  an option's flags joined with commas. The editable script's header reads `Name: editable script. Handoff X,
+exported D.` Re-importing an edited script is unaffected.
+- aced374: **A warning for content that can never run.** `validateProject` raises `unreachable-after-jump` (a warning) on
+  anything after an unconditioned snippet that jumps (`END` included, beats or not) in the same run: a block's
+  children, a plain group's, or an option's own run. A `call`, a jump with a condition, and a jump inside an
+  option, a conditional group, or a `branch` or `sequence` child hide nothing outside it. The issue's `id` is the
+  node that never runs and `jumper` the snippet that jumps. The walk is exported as `neverRunNodes`, and
+  coverage's input hints now read it too, so a beat after an unconditioned jump no longer gets a `needsInput` or
+  `blockedBy` hint.
+- Updated dependencies [b7325b5]
+- Updated dependencies [28540ab]
+- Updated dependencies [3190418]
+- Updated dependencies [3190418]
+- Updated dependencies [28540ab]
+- Updated dependencies [aced374]
+  - @patterkit/model@0.21.0
+  - @patterkit/core@0.10.0
+  - @patterkit/compiler@0.15.0
+  - @patterkit/dialect@0.2.18
+
 ## 0.24.1
 
 ### Patch Changes

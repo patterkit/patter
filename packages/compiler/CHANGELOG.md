@@ -1,5 +1,23 @@
 # @patterkit/compiler
 
+## 0.15.0
+
+### Minor Changes
+
+- 3190418: The project's start scene reaches the game (the hands-on review of October 2026). The bundle gains `start` (`{ scene, block? }`), written by the compiler when the project's start names a scene, and block, the bundle has, and folded into both hashes only when present, so bundles without one are unchanged. `validate` warns `no-start` when a project with scenes sets none, and `dangling-start` when it names a scene or block that has gone: either way a game that doesn't name a scene starts at the first one. `patter init`, and so Patterpad's New Project, sets the start to its one scene, and the playable HTML export opens at the bundle's start, block included.
+
+### Patch Changes
+
+- 28540ab: On `@wildwinter/toolkit` 0.4, with the rest of the family.
+- Updated dependencies [b7325b5]
+- Updated dependencies [28540ab]
+- Updated dependencies [3190418]
+- Updated dependencies [3190418]
+- Updated dependencies [aced374]
+  - @patterkit/model@0.21.0
+  - @patterkit/core@0.10.0
+  - @patterkit/dialect@0.2.18
+
 ## 0.14.1
 
 ### Patch Changes

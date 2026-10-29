@@ -1,5 +1,24 @@
 # @patterkit/play-helpers
 
+## 0.10.0
+
+### Minor Changes
+
+- 605d6a5: **A thin runner for straightforward games.** `new Runner(engine, flowId?)` plays a flow a beat at a time as events
+  (`line`, `text`, `gameEvent`, `choice`, `ended`): `begin(scene?, block?)`, then `next()` for each beat and
+  `choose(id)` at a choice, with `stop()` and `rebind(engine)` after a hot swap. Every beat waits for `next()`;
+  handlers may call it themselves without deepening the stack. It keeps no save state and dictates no UI or audio.
+  The same runner is in Unity, Godot, and Unreal.
+
+### Patch Changes
+
+- b226f49: Uses `@patterkit/runtime` 0.35.0, the Patterplay 0.35.0 release.
+- Updated dependencies [b7325b5]
+- Updated dependencies [28540ab]
+- Updated dependencies [3190418]
+- Updated dependencies [3190418]
+  - @patterkit/model@0.21.0
+
 ## 0.9.6
 
 ### Patch Changes
