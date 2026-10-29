@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-10-29
+
 ### Added
 
 - **Resolve clashes in the app.** When a merge (a returned Patterpack, or a `git merge` through Patter's
