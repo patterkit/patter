@@ -1,6 +1,14 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import { existsSync, readFileSync } from "node:fs";
+
+// The extension sections (Patterstage first): each extension's docs, copied in at its pinned
+// release by scripts/sync-extensions.mjs, never committed, and each one a top-level sidebar group
+// after Patter's own. With nothing synced the file is absent and the sidebar is Patter's alone.
+// The contract is patterkit/design/extension-docs.md.
+const generated = new URL("./src/extensions/generated.json", import.meta.url);
+const extensions = existsSync(generated) ? JSON.parse(readFileSync(generated, "utf8")).extensions : [];
 
 // A fully STATIC build (Astro's default; no SSR adapter) for GitHub Pages, served at the custom domain
 // patterkit.dev (site root; CI overrides nothing). The downloads page reads the public, CORS-enabled
@@ -143,6 +151,7 @@ export default defineConfig({
         },
         { label: "The CLI", items: ["cli"] },
         { label: "Reference", items: ["specification", "licensing", "contact"] },
+        ...extensions.map((e) => e.sidebar),
       ],
     }),
   ],

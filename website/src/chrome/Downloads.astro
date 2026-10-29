@@ -1,11 +1,19 @@
 ---
 // Generated from patterkit/site-chrome; do not edit here, edit the source and run sync
 import site from "./site.mjs";
+import { sectionOf } from "./extensions.mjs";
 
 const { kind = site.downloads.default } = Astro.props;
+let { repo } = Astro.props;
+let spec;
+const section = sectionOf(Astro.url.pathname, import.meta.env.BASE_URL.replace(/\/?$/, "/"));
+if (section?.downloads?.sections?.[kind]) {
+  spec = JSON.stringify(section.downloads.sections[kind]);
+  repo ??= section.downloads.repo;
+}
 ---
 
-<div class="chrome-dl not-content" data-chrome-dl={kind}>
+<div class="chrome-dl not-content" data-chrome-dl={kind} data-chrome-dl-repo={repo} data-chrome-dl-spec={spec}>
   <p class="chrome-dl-status">Loading the latest release…</p>
 </div>
 
@@ -41,11 +49,18 @@ const { kind = site.downloads.default } = Astro.props;
     return `<p class="chrome-dl-meta">Version ${esc(ver)}${date ? ", released " + esc(date) : ""}. <a href="${esc(r.html_url)}">Release notes</a>.</p>`;
   };
 
-  let partial = false;
+  const repoOf = (m: HTMLElement): string => m.dataset.chromeDlRepo ?? cfg.repo;
+  const specOf = (m: HTMLElement): any =>
+    m.dataset.chromeDlSpec ? JSON.parse(m.dataset.chromeDlSpec) : cfg.sections[m.dataset.chromeDl!];
+  const releasesPage = (repo: string): string => (repo === cfg.repo ? cfg.releases : `https://github.com/${repo}/releases`);
+
+  const partial = new Set<string>();
   const empty = (root: HTMLElement, what: string): void => {
-    root.innerHTML = partial
-      ? `<p class="chrome-dl-empty">${esc(what)} can't be listed here right now. See <a href="${esc(cfg.releases)}">GitHub Releases</a>.</p>`
-      : `<p class="chrome-dl-empty">${esc(what)} will appear here once the first release ships. See <a href="${esc(cfg.releases)}">GitHub Releases</a>.</p>`;
+    const repo = repoOf(root);
+    const link = `<a href="${esc(releasesPage(repo))}">GitHub Releases</a>`;
+    root.innerHTML = partial.has(repo)
+      ? `<p class="chrome-dl-empty">${esc(what)} can't be listed here right now. See ${link}.</p>`
+      : `<p class="chrome-dl-empty">${esc(what)} will appear here once the first release ships. See ${link}.</p>`;
   };
 
   const linkRow = (spec: any): string => row(icon(spec.icon), spec.name, spec.sub, go(`${base}${spec.link}`, spec.label));
@@ -110,20 +125,20 @@ const { kind = site.downloads.default } = Astro.props;
     root.innerHTML = list(rows) + line;
   }
 
-  const wanted = (): RegExp[] =>
-    mounts.flatMap((m) => {
-      const spec = cfg.sections[m.dataset.chromeDl!];
+  const wanted = (from: HTMLElement[]): RegExp[] =>
+    from.flatMap((m) => {
+      const spec = specOf(m);
       if (!spec) return [];
       return spec.kind === "engines" ? spec.engines.map((e: any) => new RegExp(e.tag)) : [new RegExp(spec.tag)];
     });
 
   const PER_PAGE = 100;
   const MAX_PAGES = 10;
-  async function fetchReleases(): Promise<Release[]> {
-    const need = wanted();
+  async function fetchReleases(repo: string, from: HTMLElement[]): Promise<Release[]> {
+    const need = wanted(from);
     const all: Release[] = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
-      const res = await fetch(`https://api.github.com/repos/${cfg.repo}/releases?per_page=${PER_PAGE}&page=${page}`, {
+      const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=${PER_PAGE}&page=${page}`, {
         headers: { Accept: "application/vnd.github+json" },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -132,23 +147,28 @@ const { kind = site.downloads.default } = Astro.props;
       if (batch.length < PER_PAGE) return all;
       if (need.every((re) => all.some((r) => re.test(r.tag_name)))) return all;
     }
-    partial = true;
+    partial.add(repo);
     return all;
   }
 
-  async function load(): Promise<void> {
-    if (!mounts.length) return;
+  async function loadRepo(repo: string, from: HTMLElement[]): Promise<void> {
     try {
-      const releases = await fetchReleases();
-      for (const mount of mounts) {
-        const spec = cfg.sections[mount.dataset.chromeDl!];
+      const releases = await fetchReleases(repo, from);
+      for (const mount of from) {
+        const spec = specOf(mount);
         if (!spec) continue;
         if (spec.kind === "engines") renderEngines(mount, spec, releases);
         else renderRelease(mount, spec, releases);
       }
     } catch {
-      for (const mount of mounts) empty(mount, "The downloads");
+      for (const mount of from) empty(mount, "The downloads");
     }
+  }
+
+  async function load(): Promise<void> {
+    const byRepo = new Map<string, HTMLElement[]>();
+    for (const mount of mounts) byRepo.set(repoOf(mount), [...(byRepo.get(repoOf(mount)) ?? []), mount]);
+    await Promise.all([...byRepo].map(([repo, from]) => loadRepo(repo, from)));
   }
 
   load();

@@ -39,6 +39,9 @@ jobs:
           cache: npm
           cache-dependency-path: website/package-lock.json
       - run: npm ci
+      # The extension sections (website/extensions.json): each pinned extension's docs, from the
+      # zip on its public release. With nothing pinned this writes nothing and the build is Patter's alone.
+      - run: node scripts/sync-extensions.mjs
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'   # a PR proves the build; there is nothing to publish

@@ -9,7 +9,11 @@
     "build": "astro build",
     "preview": "astro preview",
     "postbuild": "node scripts/search-index.mjs && node scripts/check-docs.mjs",
-    "check": "node scripts/check-docs.mjs"
+    "check": "node scripts/check-docs.mjs",
+    "extensions:sync": "node scripts/sync-extensions.mjs",
+    "extensions:clean": "node scripts/sync-extensions.mjs --clean",
+    "extension:preview": "node scripts/preview-extension.mjs dev",
+    "extension:check": "node scripts/preview-extension.mjs build"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.41.3",

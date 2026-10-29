@@ -7,7 +7,10 @@
 //
 // 0. AN EDITED COPY OF THE SHARED CHROME. src/chrome/ is generated from
 //    patterkit/site-chrome and hashed in its own manifest, so a change made
-//    here is a change that the next sync silently throws away.
+//    here is a change that the next sync silently throws away. The same goes
+//    for an extension's section (src/content/docs/<slug>/), which
+//    scripts/sync-extensions.mjs copies in from the extension's own repository
+//    and hashes in src/extensions/manifest.json.
 //
 // 1. A BLANK LINE INSIDE A RAW <svg>. Markdown ends an HTML block at the first
 //    blank line, so the rest of the diagram is re-parsed as prose and the page
@@ -39,7 +42,8 @@
 //
 // 5. A SIDEBAR ORPHAN. Starlight's sidebar here is an explicit list of slugs
 //    in astro.config.mjs, so a page that is not in it is reachable only by a
-//    link or a search. The 404 page is the one page that is meant to be.
+//    link or a search. The 404 page is the one page that is meant to be. An
+//    extension's pages are listed in the generated sidebar instead.
 //
 // 6. THE SITE'S OWN STYLESHEETS (design-language.md section 4). "Captions are
 //    words, not overlines": a tracked ALL-CAPS caption survives only where
@@ -107,6 +111,32 @@ const astro = [join(root, "src/pages/index.astro"), ...walk(join(root, "src/chro
     for (const name of readdirSync(dir)) {
       if (name !== "manifest.json" && !(name in listed)) problems.push(`src/chrome/${name}  not in the manifest: ${EDITED}`);
     }
+  }
+}
+
+// --- 0b. an extension's section is synced, not written here -------------------
+// Its pages live in the extension's repository; editing the copy here changes nothing the next
+// sync keeps, and the copy is git-ignored anyway. The manifest names every file the sync wrote.
+const extensionsFile = join(root, "src/extensions/generated.json");
+const synced = existsSync(extensionsFile) ? JSON.parse(readFileSync(extensionsFile, "utf8")).extensions : [];
+{
+  const EDITED = "synced from the extension's own docs by scripts/sync-extensions.mjs; edit them there and sync again";
+  const manifestFile = join(root, "src/extensions/manifest.json");
+  if (existsSync(manifestFile)) {
+    const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
+    for (const [path, digest] of Object.entries(manifest.files)) {
+      const file = join(root, path);
+      const found = existsSync(file) ? createHash("sha256").update(readFileSync(file)).digest("hex") : null;
+      if (found !== digest) problems.push(`${path}  ${found ? "edited" : "missing"}: ${EDITED}`);
+    }
+    for (const slug of manifest.slugs) {
+      const dir = join(docsDir, slug);
+      for (const file of existsSync(dir) ? walk(dir, [""]) : []) {
+        if (!(rel(file) in manifest.files)) problems.push(`${rel(file)}  not in src/extensions/manifest.json: ${EDITED}`);
+      }
+    }
+  } else if (synced.length) {
+    problems.push(`src/extensions/manifest.json  missing: ${EDITED}`);
   }
 }
 
@@ -184,6 +214,9 @@ for (const file of [...docs, ...astro]) {
 {
   const config = readFileSync(join(root, "astro.config.mjs"), "utf8");
   const quoted = new Set([...config.matchAll(/["'`]([^"'`\n]+)["'`]/g)].map((m) => m[1]));
+  // An extension's sidebar is read from the generated file, which the config spreads in.
+  const items = (group) => group.items.flatMap((i) => (typeof i === "string" ? [i] : items(i)));
+  for (const e of synced) for (const slug of items(e.sidebar)) quoted.add(slug);
   for (const file of docs) {
     const slug = relative(docsDir, file).replace(/\.mdx?$/, "").replace(/\/index$/, "");
     if (slug === "404") continue;                   // the one page that is meant to be unlisted

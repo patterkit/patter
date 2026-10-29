@@ -4,6 +4,7 @@ export default {
   "product": "Patter",
   "wrapClass": "pt-wrap",
   "credit": "Open source under the <a href=\"{base}licensing/\">MIT licence</a>, made by <a href=\"https://ian.wildwinter.net\" rel=\"author\">Ian Thomas</a>.",
+  "extensionCredit": "{name} is a separate download under <a href=\"{base}{page}\">{licence}</a>, not Patter's MIT licence. Made by <a href=\"https://ian.wildwinter.net\" rel=\"author\">Ian Thomas</a>.",
   "landing": {
     "mark": "<svg viewBox=\"8 25 124 112\" width=\"33\" height=\"30\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\"><g transform=\"translate(36.7,6) rotate(270 50 50)\"><path fill=\"#214f4b\" d=\"M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z\"></path></g><g transform=\"translate(3.3,56) rotate(90 50 50)\"><path fill=\"#d2603e\" d=\"M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z\"></path></g></svg>",
     "footMark": "<svg viewBox=\"8 25 124 112\" width=\"27\" height=\"24\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\"><g transform=\"translate(36.7,6) rotate(270 50 50)\"><path fill=\"#57a294\" d=\"M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z\"></path></g><g transform=\"translate(3.3,56) rotate(90 50 50)\"><path fill=\"#d2603e\" d=\"M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z\"></path></g></svg>",

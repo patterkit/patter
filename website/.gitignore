@@ -2,3 +2,9 @@
 dist/
 .astro/
 node_modules/
+
+# Extension sections, written by scripts/sync-extensions.mjs from each extension's release. Never
+# committed: the pages are under the extension's own licence, not this repository's MIT one. Each
+# extension's slug needs its line here before its first sync, which refuses a slug that hasn't.
+src/extensions/
+src/content/docs/stage/
