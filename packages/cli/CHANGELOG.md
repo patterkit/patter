@@ -1,5 +1,40 @@
 # @patterkit/cli
 
+## 0.14.0
+
+### Minor Changes
+
+- aced374: **Translation import checks the file.** `applyLoc` skips a line the project doesn't have (it isn't written,
+  counted, or stamped) and returns a `report` listing those lines and every translation whose `{@ref}`
+  placeholders or `<b>`/`<i>`/`<bi>` markup don't match the source as it is now (those still import).
+  `describeLocImport` turns the report into lines to show, and `importLocale` decides the language: a file for
+  one language is refused as another, and one naming none imports as the language chosen, with a warning. The
+  Excel export now carries its language on a hidden "Patter" sheet. `patter loc-import` refuses a file whose
+  language differs from `--locale` unless `--force-locale` is given, and prints the report after its counts.
+
+### Patch Changes
+
+- aced374: **Plainer labels in script exports and the CLI's help.** The Word, PDF, and editable scripts no longer use "·" as a
+  separator: `game event: door.open`, `One of (first match wins)`, `In sequence (shuffled)`, `else (catch-all)`, and
+  an option's flags joined with commas. The editable script's header reads `Name: editable script. Handoff X,
+exported D.` Re-importing an edited script is unaffected.
+- 28540ab: On `@wildwinter/toolkit` 0.4, with the rest of the family.
+- aced374: **Direction in the voice script.** `VoiceLine` gains the line's inline `direction`, and the voice script
+  spreadsheet (`patter voice-export`) has a Direction column before the Text.
+- Updated dependencies [28540ab]
+- Updated dependencies [b7325b5]
+- Updated dependencies [b7325b5]
+- Updated dependencies [28540ab]
+- Updated dependencies [b226f49]
+- Updated dependencies [aced374]
+- Updated dependencies [3190418]
+- Updated dependencies [3190418]
+- Updated dependencies [aced374]
+- Updated dependencies [aced374]
+- Updated dependencies [aced374]
+  - @patterkit/ops@0.25.0
+  - @patterkit/core@0.10.0
+
 ## 0.13.4
 
 ### Patch Changes

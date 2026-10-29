@@ -1,5 +1,31 @@
 # @patterkit/core
 
+## 0.10.0
+
+### Minor Changes
+
+- 3190418: The project's start scene reaches the game (the hands-on review of October 2026). The bundle gains `start` (`{ scene, block? }`), written by the compiler when the project's start names a scene, and block, the bundle has, and folded into both hashes only when present, so bundles without one are unchanged. `validate` warns `no-start` when a project with scenes sets none, and `dangling-start` when it names a scene or block that has gone: either way a game that doesn't name a scene starts at the first one. `patter init`, and so Patterpad's New Project, sets the start to its one scene, and the playable HTML export opens at the bundle's start, block included.
+- aced374: **A warning for content that can never run.** `validateProject` raises `unreachable-after-jump` (a warning) on
+  anything after an unconditioned snippet that jumps (`END` included, beats or not) in the same run: a block's
+  children, a plain group's, or an option's own run. A `call`, a jump with a condition, and a jump inside an
+  option, a conditional group, or a `branch` or `sequence` child hide nothing outside it. The issue's `id` is the
+  node that never runs and `jumper` the snippet that jumps. The walk is exported as `neverRunNodes`, and
+  coverage's input hints now read it too, so a beat after an unconditioned jump no longer gets a `needsInput` or
+  `blockedBy` hint.
+
+### Patch Changes
+
+- 28540ab: **One Game ID rule for the family.** `gameIdify` and `isValidGameId` now come from `@wildwinter/toolkit`
+  (0.4), which Storylets addresses its cards by too, so a scene and the card that plays it can't disagree
+  about an address. `@patterkit/model` takes the toolkit as a dependency and re-exports both, as
+  `@patterkit/core` re-exports model's, so nothing that imports them changes. The rules are the same as
+  before: lower case, apostrophes dropped, any other run of punctuation a single hyphen.
+- Updated dependencies [b7325b5]
+- Updated dependencies [28540ab]
+- Updated dependencies [3190418]
+- Updated dependencies [3190418]
+  - @patterkit/model@0.21.0
+
 ## 0.9.6
 
 ### Patch Changes
