@@ -20,8 +20,10 @@
 //     its line in .gitignore before its first sync, and the sync refuses one that hasn't), and a
 //     slug with a tracked file under it is refused, so a section can't land on Patter's pages.
 //   - Every page says it isn't Patter's. The sync adds Starlight's banner to each page's front
-//     matter, naming the extension's licence, so no page can leave it out; the footer credit
-//     changes on the same pages (site-chrome's extensions.mjs reads the generated file).
+//     matter, so no page can leave it out; the footer credit changes on the same pages
+//     (site-chrome's extensions.mjs reads the generated file). Once an extension has launched
+//     (`launched` in extensions.json) the banner names its licence; until then the licence isn't
+//     settled, so the banner says only that it's in testing, with who to ask.
 //
 // What it writes:
 //
@@ -38,8 +40,9 @@
 // does without this script. A re-sync rewrites only what changed and removes what's gone, so a
 // dev server watching the pages sees edits rather than a folder vanishing and coming back.
 //
-// Each extension's sidebar group starts closed (Starlight opens it on the extension's own pages), and
-// the site tints it, its banner, and its trail home (src/styles/extensions.css, PageTitle.astro).
+// The site shows each extension as a product of its own: a switcher at the top of the sidebar, a
+// sidebar of only that product's pages, a trail home above each title, and a tinted banner
+// (site-chrome's Sidebar.astro, route.mjs and PageTitle.astro; the tint is in src/styles/patter.css).
 //
 // No dependencies: the zip is read with node:zlib.
 // ---------------------------------------------------------------------------
@@ -59,6 +62,7 @@ const MANIFEST = `${OUT}/manifest.json`;
 const NOTE = "Written by scripts/sync-extensions.mjs from each extension's docs; never edited or committed here";
 const ASSETS = "_assets";
 const PUBLIC = "public";
+const CONTACT = "ian@storytools.se"; // who to ask about an extension before it launches
 const PLAY_LIMIT = 2 * 1024 * 1024; // a play page is one file with everything inlined; 2 MB is plenty
 
 const sha = (data) => createHash("sha256").update(data).digest("hex");
@@ -223,10 +227,12 @@ function buildSection(ext, files, version) {
   const hasDownload = slugs.has("download");
   if (!hasDownload) console.warn(`sync-extensions: ${id} has no download page yet (required before launch); the banner leaves its link out`);
 
-  const banner =
-    `${esc(name)} is a separate download from Patter, under <a href="/${slug}/${licence.page}/">${esc(licence.name)}</a> rather than Patter's MIT licence. ` +
-    esc(licence.summary) +
-    (hasDownload ? ` <a href="/${slug}/download/">Download ${esc(name)}</a>.` : "");
+  const launched = ext.launched === true;
+  const banner = launched
+    ? `${esc(name)} is a separate download from Patter, under <a href="/${slug}/${licence.page}/">${esc(licence.name)}</a> rather than Patter's MIT licence. ` +
+      esc(licence.summary) +
+      (hasDownload ? ` <a href="/${slug}/download/">Download ${esc(name)}</a>.` : "")
+    : `${esc(name)} is in testing and will be released soon. For details, contact Ian at <a href="mailto:${CONTACT}">${CONTACT}</a>.`;
 
   const out = new Map();
   for (const page of pages) {
@@ -243,10 +249,9 @@ function buildSection(ext, files, version) {
     name,
     slug,
     version,
+    launched,
     licence,
-    // Closed unless the page is in it (Starlight opens a collapsed group holding the current
-    // page); the groups inside it stay open, so opening it shows the whole outline.
-    sidebar: { label: name, collapsed: true, items: docs.groups.map((g) => ({ label: g.label, items: g.items.map((i) => `${slug}/${i}`) })) },
+    sidebar: { label: name, items: docs.groups.map((g) => ({ label: g.label, items: g.items.map((i) => `${slug}/${i}`) })) },
   };
   if (docs.downloads?.sections) {
     if (!ext.repo) fail(`${id}: docs.json has downloads, but extensions.json names no repo to read them from`);

@@ -2,15 +2,18 @@
   "note": "Generated from patterkit/site-chrome; do not edit here, edit the source and run sync",
   "source": "patterkit/site-chrome",
   "files": {
-    "site.mjs": "6955f131ae11ae63b24518821743ce1f9d9a56784e9ff5705d20734148b5238b",
-    "palette.css": "ee02704c71a612f6922994d05a9f0d0155cffe526c1c4b44f782d95fb2a6e5c5",
-    "chrome.css": "6e97884588f18f449b93779afc323d1edd5c6c9a8a94000222226635b7c668e7",
+    "site.mjs": "33195db3d5dd688f94d3c7c4919c679c0c8e44acb6270123d15e54238f212381",
+    "palette.css": "6c1989ae2f43090fb6a8a7cabdf53f9e8988c23d9d35171c35656458ec0bc52f",
+    "chrome.css": "f75f35c4ee06a6df892e33d9a5f2a803ffc94e6093680e14f1bdf581f54caa5c",
     "fonts.css": "15881be7b3d33daac654e91b75f52667af03950164b8dfe7ede8b27eb227aa3f",
-    "Footer.astro": "aeefef327557c006d65b332345dcbcd978289a2a9046e0708080f1074acac721",
+    "Footer.astro": "61c22c60e163fd5122c50375fb5e4cf169e468ce24771dbe86fe93649c7fb369",
     "Newsletter.astro": "39c27da67857b73c67d96f0f42ece2f0dcf4727265745ad611799a4f9fce813a",
     "Downloads.astro": "226df1dfc8c6505133cb4e0e5766f4b044a147f4640dd03a418d95e65757d7d8",
     "LandingHeader.astro": "60675c087c5be259b5c5e0e4ba9b4e416bad8b85097d2cb5fd7a51d5f6d9737c",
     "LandingFooter.astro": "269aed7afdb5962c1313045ed83db61cd76b8233abdc376356fe727256ab1245",
-    "extensions.mjs": "19dc9aaf02a0cfeb53b8b64e767d516c04ba9210c730305f66568614a2fe718a"
+    "extensions.mjs": "19dc9aaf02a0cfeb53b8b64e767d516c04ba9210c730305f66568614a2fe718a",
+    "Sidebar.astro": "72ee1e54d3561d2e7d1fb6d1fa9a6d8cd5724d6aa1995cd2947aebace57d06f6",
+    "PageTitle.astro": "e94366190b5590ffcbd4c4b063839283d71a95ef204fcb4b0f5c68123bb3d672",
+    "route.mjs": "c30bdbf091474ef398c74a6e54725eb113147b0920f724523ffdce2054d9bd4e"
   }
 }

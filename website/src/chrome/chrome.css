@@ -304,3 +304,63 @@ a.action.minimal { color: var(--sl-color-text-accent); }
   text-underline-offset: 3px;
 }
 .chrome-foot .chrome-foot-credit a:hover { color: var(--chrome-foot-link-hover); }
+
+.chrome-products {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 14px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--chrome-products-edge);
+}
+
+.chrome-products a { --chrome-product-tint: var(--chrome-products-home-tint); }
+.chrome-products a[data-extension] { --chrome-product-tint: var(--chrome-ext-tint, var(--chrome-products-home-tint)); }
+#starlight__sidebar .chrome-products a {
+  padding: 4px 11px;
+  border: 1px solid var(--chrome-products-edge);
+  border-radius: 999px;
+  font-size: var(--sl-text-sm);
+  line-height: 1.4;
+  color: var(--chrome-products-ink);
+  text-decoration: none;
+  background: color-mix(in oklab, var(--chrome-product-tint) 6%, transparent);
+}
+#starlight__sidebar .chrome-products a:hover {
+  color: var(--chrome-products-current-ink);
+  background: color-mix(in oklab, var(--chrome-product-tint) 12%, transparent);
+}
+#starlight__sidebar .chrome-products a[aria-current="true"] {
+  font-weight: 600;
+  color: var(--chrome-products-current-ink);
+  border-color: color-mix(in oklab, var(--chrome-product-tint) 45%, var(--chrome-products-edge));
+  background: color-mix(in oklab, var(--chrome-product-tint) 16%, transparent);
+}
+
+.chrome-trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  margin-top: 1rem;
+  font-size: var(--sl-text-sm);
+  color: var(--chrome-trail-ink);
+}
+.chrome-trail a { color: var(--chrome-trail-link); text-decoration: none; }
+.chrome-trail a:hover {
+  color: var(--chrome-trail-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.chrome-trail + h1 { margin-top: 0.25rem; }
+
+:root:has(.chrome-trail) .sl-banner {
+  background-color: color-mix(in oklab, var(--chrome-ext-tint, var(--chrome-products-home-tint)) 14%, var(--chrome-ext-banner-ground));
+  color: var(--chrome-ext-banner-ink);
+  box-shadow: none;
+  border-bottom: 1px solid color-mix(in oklab, var(--chrome-ext-tint, var(--chrome-products-home-tint)) 30%, var(--chrome-ext-banner-edge));
+}
+:root:has(.chrome-trail) .sl-banner a {
+  color: var(--chrome-ext-banner-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

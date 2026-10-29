@@ -35,3 +35,10 @@
   --chrome-marker-shift: -1px;
   --chrome-marker-shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z'/%3E%3C/svg%3E");
 }
+
+/* Each extension section's tint, by id: a character colour from the family palette, so it follows the
+   theme in light and dark. The site picks it, so an extension's docs.json names none. It marks the
+   extension's entry in the sidebar's product switcher and its pages' banner (site-chrome's chrome.css
+   draws both). An extension gets its line here when it's added to extensions.json. */
+[data-extension="patterstage"],
+:root:has(.chrome-trail[data-extension="patterstage"]) .sl-banner { --chrome-ext-tint: var(--app-char-5); }

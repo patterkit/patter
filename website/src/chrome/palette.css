@@ -134,4 +134,15 @@
   --chrome-nl-hair: var(--app-line);
   --chrome-nl-hair-strong: var(--app-muted);
   --chrome-nl-accent: var(--app-accent);
+
+  --chrome-products-ink: var(--app-ink-read);
+  --chrome-products-current-ink: var(--app-ink);
+  --chrome-products-edge: var(--app-line);
+  --chrome-products-home-tint: var(--app-accent);
+  --chrome-trail-ink: var(--app-muted);
+  --chrome-trail-link: var(--app-ink-read);
+  --chrome-trail-hover: var(--app-accent);
+  --chrome-ext-banner-ink: var(--app-ink);
+  --chrome-ext-banner-ground: var(--app-card);
+  --chrome-ext-banner-edge: var(--app-line);
 }

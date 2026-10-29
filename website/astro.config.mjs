@@ -28,13 +28,16 @@ export default defineConfig({
     starlight({
       title: "Patter",
       tagline: "Write playable dialogue.",
-      customCss: ["./src/chrome/fonts.css", "./src/styles/patter.css", "./src/chrome/palette.css", "./src/chrome/chrome.css", "./src/styles/extensions.css"],
+      customCss: ["./src/chrome/fonts.css", "./src/styles/patter.css", "./src/chrome/palette.css", "./src/chrome/chrome.css"],
       // Every docs page ends with the mailing-list sign-up and the credit line naming the
       // licence and the author. Generated from patterkit/site-chrome, like the stylesheet
       // above; the landing page carries the same credit through its own footer, because it is
       // a standalone page outside Starlight's chrome.
-      // The page title takes a trail home on an extension's pages (PatterKit / Patterstage / Recipes).
-      components: { Footer: "./src/chrome/Footer.astro", PageTitle: "./src/components/PageTitle.astro" },
+      // With an extension synced, the sidebar opens with a product switcher (Patter, Patterstage) and
+      // holds only the current product's pages (the route middleware filters it), and an extension's
+      // page titles take a trail home. All from site-chrome; with nothing synced, all of it is idle.
+      components: { Footer: "./src/chrome/Footer.astro", Sidebar: "./src/chrome/Sidebar.astro", PageTitle: "./src/chrome/PageTitle.astro" },
+      routeMiddleware: "./src/chrome/route.mjs",
       // Code follows the theme: a light block on a light page and a dark one on a dark page, on the
       // chrome tier with a hairline and no shadow (the October 2026 UI review; until then a dark slab
       // in both themes, which on a white page was the heaviest thing on it).

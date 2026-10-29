@@ -1,5 +1,5 @@
 {
   "extensions": [
-    { "id": "patterstage", "repo": "patterkit/patter-extensions", "version": null }
+    { "id": "patterstage", "repo": "patterkit/patter-extensions", "version": null, "launched": false }
   ]
 }

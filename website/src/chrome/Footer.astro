@@ -9,7 +9,7 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 let credit = site.credit;
 const section = sectionOf(Astro.url.pathname, base);
 if (section) {
-  credit = site.extensionCredit
+  credit = (section.launched ? site.extensionCredit : site.extensionTestingCredit)
     .replaceAll("{name}", esc(section.name))
     .replaceAll("{licence}", esc(section.licence.name))
     .replaceAll("{page}", `${section.slug}/${section.licence.page}/`);

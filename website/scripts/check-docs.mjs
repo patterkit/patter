@@ -87,7 +87,7 @@ const blank = (m) => m.replace(/[^\n]/g, " ");
 
 const docsDir = join(root, "src/content/docs");
 const docs = walk(docsDir, [".md", ".mdx"]);
-const astro = [join(root, "src/pages/index.astro"), ...walk(join(root, "src/chrome"), [".astro"]), ...walk(join(root, "src/components"), [".astro"])];
+const astro = [join(root, "src/pages/index.astro"), ...walk(join(root, "src/chrome"), [".astro"])];
 
 // --- 0. the shared chrome is generated, not written here -----------------------
 // src/chrome/ is rendered into this repository by patterkit/site-chrome, which keeps one

@@ -1,0 +1,26 @@
+---
+// Generated from patterkit/site-chrome; do not edit here, edit the source and run sync
+import Default from "@astrojs/starlight/components/Sidebar.astro";
+import site from "./site.mjs";
+import { extensions, sectionOf } from "./extensions.mjs";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const section = sectionOf(Astro.url.pathname, base);
+const products = [
+  { id: undefined, name: site.product, href: `${base}${site.docsHome}`, current: !section },
+  ...extensions.map((e: { id: string; name: string; slug: string }) => ({ id: e.id, name: e.name, href: `${base}${e.slug}/overview/`, current: section === e })),
+];
+---
+
+{
+  extensions.length > 0 && (
+    <nav class="chrome-products" aria-label="Products">
+      {products.map((p) => (
+        <a href={p.href} data-extension={p.id} aria-current={p.current ? "true" : undefined}>
+          {p.name}
+        </a>
+      ))}
+    </nav>
+  )
+}
+<Default />
