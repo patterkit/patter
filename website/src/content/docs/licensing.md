@@ -63,7 +63,7 @@ Scale them freely. Please don't recolour or redraw them.
     <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-badge-dark.svg">SVG</a>, <a href="/badges/patter-badge-dark.png">PNG</a></figcaption>
   </figure>
   <figure style="margin:0;">
-    <img src="/badges/patter-badge-mono.svg" width="360" height="112" alt="Dialogue made with Patter badge, one-colour" style="display:block;border-radius:8px;" />
+    <img src="/badges/patter-badge-mono.svg" width="360" height="112" alt="Dialogue made with Patter badge, one-colour" style="display:block;background:#ffffff;border-radius:8px;" />
     <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-badge-mono.svg">SVG</a>, <a href="/badges/patter-badge-mono.png">PNG</a></figcaption>
   </figure>
 </div>
@@ -80,10 +80,13 @@ Scale them freely. Please don't recolour or redraw them.
     <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-line-dark.svg">SVG</a>, <a href="/badges/patter-line-dark.png">PNG</a></figcaption>
   </figure>
   <figure style="margin:0;">
-    <img src="/badges/patter-line-mono.svg" width="330" height="38" alt="Dialogue made with Patter line badge, one-colour" style="display:block;" />
+    <img src="/badges/patter-line-mono.svg" width="330" height="38" alt="Dialogue made with Patter line badge, one-colour" style="display:block;background:#ffffff;border-radius:6px;" />
     <figcaption style="font-size:0.8rem;margin-top:0.3rem;"><a href="/badges/patter-line-mono.svg">SVG</a>, <a href="/badges/patter-line-mono.png">PNG</a></figcaption>
   </figure>
 </div>
+
+The one-colour badge is a single dark ink on a clear ground, for one-colour print and light
+grounds; it's shown here on a white tile so it reads in the dark theme too.
 
 Or take the whole set: both shapes, all three colour ways, SVG and 2x PNG, plus this page's
 credit lines as a text file. **[Download the badge kit (zip)](/badges/patter-made-with-badges.zip)**
