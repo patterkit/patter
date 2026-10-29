@@ -158,6 +158,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **A jump into a scene you haven't opened yet lands on its line.** Edit in the clash resolver, a search result,
+  or a problem in a scene opened for the first time that session could stop part-way down the page, because
+  the blocks above hadn't been drawn yet. It now settles on the line.
 - **Status badges and Settings' buttons aren't cut off in a small window.** With Review ▸ Line Status on, the
   pills beside the lines were cut off at the editor's left edge in a narrow window; the margin now makes room
   for the widest one showing. A long status name in the inspector ends in an ellipsis instead of running past

@@ -14,7 +14,7 @@ dead content before a player does.
 
 **Review ▸ Coverage Test…** (`Shift+Cmd+C`) opens a window that stays open while you edit, so you can act
 on what it finds. Up top: **Runs**, **Max steps**, **Seed** (the same seed replays the same
-run, for repeatable checks), and a **Start** scene. Press **Run test** for a table of every
+run, for repeatable checks), and a **Start** scene. Press **Run coverage** for a table of every
 line, text, and game event beat, showing how often each one came up.
 
 The story needs a **start point** for the test (and for **Play ▸ Play from Start**); if you
@@ -27,7 +27,7 @@ Click any row to jump the editor straight to that beat. The window can **pin** i
 ## Reading the results
 
 <figure class="doc-shot">
-  <img src="/doc-images/Coverage.png" alt="The Coverage window after 5,000 runs of the interactive tour: Runs, Max steps, Seed and Start boxes with a Run test button; headline figures of 100% beats reached, 60 of 60 covered, 0 never reached and 0 rarely reached; a line reading 4,704 reached the end, 0 stalled at a choice, 296 hit the step limit; a switch set to Least reached first; and a table with Runs reached and Times played columns, led by Darkness at 9% and a card turns over at 16 to 17%." />
+  <img src="/doc-images/Coverage.png" alt="The Coverage window after 5,000 runs of the interactive tour: Runs, Max steps, Seed and Start boxes with a Run coverage button and a Game scopes button; headline figures of 100% beats reached, 60 of 60 covered, 0 never reached and 0 rarely reached; a line reading 4,704 reached the end, 296 hit the step limit; a switch set to Least reached first; and a table with Runs reached and Times played columns, led by Darkness at 9% and a card turns over at 16 to 17%." />
   <figcaption>The Coverage window after 5,000 runs of the tour. Everything is reached, so the table leads with the least-reached beats: a branch's fallback at 9%, and each tarot card at around 16%, which is by design, since the test draws one card of several at random.</figcaption>
 </figure>
 
@@ -36,7 +36,7 @@ least once, and **Covered** is the same as a count. **Never reached** counts the
 played, and **Rarely reached** the beats that did play, but in fewer than 5% of runs.
 
 **How the runs ended.** Under the numbers, one line says how many runs **reached the end**, how
-many **stalled at a choice** with nothing to pick, and how many **hit the step limit** (still going
+many **stalled at a choice** with nothing to pick (left out when there are none), and how many **hit the step limit** (still going
 at **Max steps**, usually because the test kept wandering round a hub the player can return to).
 Runs that hit the step limit aren't a fault in themselves; a story with a loop always has some.
 

@@ -56,7 +56,7 @@ Status** for a small **colour badge in the left gutter** beside each line, tinte
 optional overview: flip it off for a clean page again, and it hides itself in **Writing View**.
 
 <figure class="doc-shot">
-  <img src="/doc-images/StatusPills.png" alt="The writing surface with coloured status badges (stub, edited, final) in the left gutter beside each snippet, and the inspector on the right showing a Writing dropdown set to stub." />
+  <img src="/doc-images/StatusPills.png" alt="The writing surface with coloured status badges (stub, edited, final, draft 1) in the left gutter beside each line, and the inspector on the right showing a Writing dropdown set to stub." />
   <figcaption>Line status in the script. Coloured badges in the left gutter (<code>stub</code>, <code>edited</code>, <code>final</code>) tint each line by its stage, while the inspector's <strong>Writing</strong> dropdown (top right) sets the status for the selected beat.</figcaption>
 </figure>
 

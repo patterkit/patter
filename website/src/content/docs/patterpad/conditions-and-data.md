@@ -24,7 +24,7 @@ tag. With no condition, the content always shows.
 
 <figure class="doc-shot">
   <img src="/doc-images/ConditionEditor.png" alt="The visual condition editor: one pill clause, visits(The Crossroads) is 1, with a NOT toggle beside it, and beneath it the Add a condition menu listing check flags, property comparison, property is true, node seen, visit count, and random chance." />
-  <figcaption>The visual expression editor. Each test is built from <strong>pills</strong> (a function or property, its values, a comparison) and combined with an and / or tree. <strong>Add a clause</strong> offers ready-made shapes, property comparison, node seen, visit count, random chance, so you never have to remember the syntax. Node names show as their titles (here <code>The Crossroads</code>).</figcaption>
+  <figcaption>The visual expression editor. Each test is built from <strong>pills</strong> (a function or property, its values, a comparison) and combined with an and / or tree. <strong>+ Add condition</strong> offers ready-made shapes, property comparison, node seen, visit count, random chance, so you never have to remember the syntax. Node names show as their titles (here <code>The Crossroads</code>).</figcaption>
 </figure>
 
 Conditions read the **properties** you've set up (below) and built-ins like `seen()`

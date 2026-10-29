@@ -36,6 +36,7 @@ import { multiSelectState, multiSelectPositions } from "../src/multiselect.js";
 import { setSnippetJump, commitSlashJump } from "../src/special.js";
 import { openTargetPicker, closeTargetPicker, isTargetPickerOpen, type JumpData } from "./targetpicker.js";
 import { setPlayBlockHandler } from "./actionmenu.js";
+import { settleReveal } from "./settle-reveal.js";
 import { confirmDeleteBlock, confirmDeleteChunk, confirmDeleteSet } from "./confirm.js";
 import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, optionPromptId, sayText as sayTextOf, sayStartOf, offCue, isBlankBeat, rawAttr, isZoneBeat } from "../src/zoneutil.js";
 import { patterSchema } from "../src/schema.js";
@@ -1319,7 +1320,13 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       view.dispatch(view.state.tr.setSelection(sel));
       view.focus();
       const dom = view.nodeDOM(at);
-      if (dom instanceof HTMLElement) dom.scrollIntoView({ block: "center", behavior: opts?.instant ? "auto" : "smooth" });
+      if (dom instanceof HTMLElement) {
+        dom.scrollIntoView({ block: "center", behavior: opts?.instant ? "auto" : "smooth" });
+        // On a scene's first load the blocks above are still estimated heights: re-centre once they've drawn,
+        // for as long as the caret is still on what was revealed (settle-reveal.ts).
+        const wanted = view.state.selection;
+        settleReveal(dom, () => !destroyed && view.state.selection.eq(wanted));
+      }
       return true;
     },
     selectionContext: () => inspect(view.state),
