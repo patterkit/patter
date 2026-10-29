@@ -38,9 +38,10 @@ The plugin icons badge the four engines for Patterplay, and the document icons c
 | Parchment | `#F1EBE0` | the PatterKit icon's ground |
 
 **On a dark ground** the teal lightens to `#6FA39C` and ember stays `#D2603E`; the wordmark's text becomes
-cream. That's the only dark-ground teal: `patterkit-wordmark-dark.svg` on the docs site and Patterpad's
-About box in its dark themes both use it. The document icons use darker and lighter teals for depth, and
-those stay inside the icons.
+cream. That's the only dark-ground teal: `patterkit-wordmark-dark.svg` on the docs site, Patterpad's About
+box in its dark themes, and the dark "made with" badges all use it. The document icons use darker and lighter
+teals for depth, and those stay inside the icons. (The older stage and paper badges on the website are kept,
+unlisted, for links that already point at them.)
 
 The brand colours are for the brand: the marks, the wordmarks, and the icons. The website and the apps take
 their interface colours from the family palette in app-shell (blue pencil for links and actions), and never
@@ -48,13 +49,15 @@ draw the mark in the interface accent.
 
 ## Wordmarks
 
-The mark, then the name in Newsreader 500 at 120 px, `letter-spacing: -2`, on an 820×220 canvas: the
-mark at `translate(40,30) scale(0.98)`, text from `x=232`, baseline `y=150`. The name is ink; in
-"PatterKit", "Kit" is teal.
+The mark, then the name in Newsreader Medium at 120 px, `letter-spacing: -2`: a single glyph at
+`translate(34,32) scale(1.52)`, or the two-drop mark at `translate(40,30) scale(0.98)`, and the name from
+`x=232` on baseline `y=150`. The name is ink; in "PatterKit", "Kit" is teal.
 
-The wordmarks here are still live `<text>`, so they render in Newsreader only where it's installed or
-loaded (the website and the apps load it). Storylet Studio's are converted to curves, and these should be
-too before they're offered as downloads.
+Every label is converted to curves, so no SVG here depends on a font being installed, which matters most
+where an SVG is shown as an image (the docs site's header logo is one). The outlines are Newsreader's 72pt
+optical size, the one a browser picks for Newsreader at 120 px, set without kerning, exactly as Storylet
+Studio's wordmarks are cut (`storylets/branding/fonts/README.md`). The website's
+`src/assets/patterkit-wordmark*.svg` are the same outlines.
 
 ## Where they're used
 
