@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-29
+
 The runtime foundations before 1.0, from the hands-on review of October 2026, the same on all four runtimes.
 Changes marked **Breaking (1.0)** change what an existing game sees. The conformance corpus is version 8.
 

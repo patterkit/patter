@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-29
+
 The runtime foundations before 1.0, from the hands-on review of October 2026. Changes marked **Breaking
 (1.0)** change what an existing game sees. The conformance corpus is version 8.
 

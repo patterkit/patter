@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-29
+
 The runtime foundations before 1.0, from the hands-on review of October 2026, as the JS reference has them.
 Changes marked **Breaking (1.0)** change what an existing game sees. Pinned by the conformance corpus
 (version 8).
