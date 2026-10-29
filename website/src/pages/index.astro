@@ -59,7 +59,7 @@ const engines = [
         <!-- HERO: one sentence, one paragraph, one button, then the script itself -->
         <section class="pt-wrap pt-hero">
           <div class="pt-hero-copy">
-            <h1 class="pt-h1">Write dialogue as a screenplay your game can play.</h1>
+            <h1 class="pt-h1">Write playable dialogue.</h1>
             <p class="pt-lead">Patter is an open toolkit for dialogue and branching narrative in games. Writers work in Patterpad, a desktop editor that reads like a script. Your game plays the result through one small file, in Unity, Unreal, Godot, or on the web.</p>
             <div class="pt-actions">
               <a class="chrome-btn pt-btn-primary" href={`${base}getting-started/`}>Get started</a>
@@ -96,11 +96,11 @@ const engines = [
 
         <!-- FOR WRITERS -->
         <section class="pt-wrap pt-section">
-          <h2 class="pt-h2">Built for the people who write it</h2>
+          <h2 class="pt-h2">Made for writers</h2>
           <div class="pt-prose">
             <p>Patterpad is a desktop editor with a scene laid out the way a script is, in character cues, lines, and directions. There's no markup to learn and no node graph to untangle, so a writer is productive on the first morning.</p>
             <p>Conditions and variables are edited in a side panel with a guided editor, which keeps the logic out of the prose. A play window walks the real story as you write, so you can pick choices and watch it branch without a compile step.</p>
-            <p>Review comments, draft status, translation, and voice-recording scripts are built in. Everything lives in plain files on disk that you own, in git or Perforce. Patter is free, MIT-licensed, and needs no server or account.</p>
+            <p>Review comments, draft status, translation, and voice-recording scripts are built in. Everything lives in plain files on disk that you own, in your game repo. Patter is free, MIT-licensed, and needs no server or account.</p>
           </div>
           <figure class="pt-shot">
             <img src={`${base}doc-images/ThreeColumns.png`} width="2936" height="1634" alt="Patterpad with the scene list on the left, a scene of the interactive tour in the middle, and the inspector on the right" loading="lazy" />
@@ -109,9 +109,9 @@ const engines = [
 
         <!-- THE RUNTIMES -->
         <section class="pt-wrap pt-section">
-          <h2 class="pt-h2">Plays in your engine the way it played in Patterpad</h2>
+          <h2 class="pt-h2">Test it in the editor</h2>
           <div class="pt-prose">
-            <p>Patterpad plays your story on the same runtime your game will use, so what you test at the desk is what ships: the choices, the conditions, saving and loading, even the random draws. There’s a runtime for your engine, whether that’s Unity, Unreal, Godot, or the web, and it loads the one bundle Patterpad publishes.</p>
+            <p>Patterpad plays your story on the same runtime your game will use, so what you test in the editor is what ships: the choices, the conditions, saving and loading, even the random draws. There’s a runtime for your engine, whether that’s Unity, Unreal, Godot, or the web, and it loads the one bundle Patterpad publishes.</p>
           </div>
           <ul class="pt-engines">
             {engines.map((e) => (
@@ -122,7 +122,7 @@ const engines = [
 
         <!-- WHY TEAMS REACH FOR IT -->
         <section class="pt-wrap pt-section">
-          <h2 class="pt-h2">Why teams reach for it</h2>
+          <h2 class="pt-h2">Designed for game teams</h2>
           <ul class="pt-reasons">
             <li>Scenes are plain text in your own repository, so a team's edits merge by structure instead of colliding.</li>
             <li>Coverage testing walks the story thousands of times and flags every beat a player can never reach, and the CLI can fail a build on it.</li>
