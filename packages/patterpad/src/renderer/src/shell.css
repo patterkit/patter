@@ -264,6 +264,9 @@
 .insp-add:hover { color: var(--accent); }
 /* Jump row: the target chip and its go/call mode toggle stack in the value column. */
 .insp-jumpval { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-width: 0; }
+/* The chip is sized by its target's name (not `.insp-cond`'s zero basis), so in a narrow inspector the toggle
+   wraps under it instead of the name running over the toggle; a name wider than the column breaks inside it. */
+.insp-jumpval > .insp-jump { flex: 1 1 auto; overflow-wrap: anywhere; }
 /* The go/call mode toggle is the shell's `.seg` (controls.css). */
 
 /* The panel CHROME (position, border, shadow, header, body, enter/exit motion) is
@@ -605,18 +608,19 @@ input::placeholder, textarea::placeholder {
 .report-host { display: flex; flex-direction: column; gap: 17.5px; overflow: auto; max-height: 70vh; padding-right: 6.5px; }
 /* Scroll affordance: the report body almost always overflows, and the thin app scrollbar alone is too
    quiet to say so. The wrapper fades the clipped edge (a scrim per side, shown only while content
-   remains that way) and floats a "More below" pill that pages the report and vanishes at the end. */
-.report-scroll { position: relative; min-height: 0; }
+   remains that way) and floats a "More below" pill that pages the report and vanishes at the end. The pill
+   has its own strip under the report, so it never sits over a line of it (it hid a table's headings). */
+.report-scroll { position: relative; min-height: 0; --more-room: 34px; padding-bottom: var(--more-room); }
 .report-scroll::before, .report-scroll::after {
   content: ""; position: absolute; left: 0; right: 0; height: 41.5px; z-index: 1;
   pointer-events: none; opacity: 0; transition: opacity var(--dur-settle) var(--ease-standard, ease);
 }
 .report-scroll::before { top: 0; background: linear-gradient(var(--surface), transparent); }
-.report-scroll::after { bottom: 0; background: linear-gradient(transparent, var(--surface)); }
+.report-scroll::after { bottom: var(--more-room); background: linear-gradient(transparent, var(--surface)); }
 .report-scroll.has-above::before { opacity: 1; }
 .report-scroll.has-below::after { opacity: 1; }
 .report-more {
-  position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); z-index: 2;
+  position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); z-index: 2;
   display: grid; place-items: center; width: 27px; height: 27px;
   color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line);
   border-radius: 50%; padding: 0; cursor: pointer; box-shadow: var(--shadow-1);

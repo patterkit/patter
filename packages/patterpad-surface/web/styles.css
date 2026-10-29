@@ -125,8 +125,8 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* a snippet = a bubble. Chrome collapsed: no permanent top header / bottom foot; the ⋯
    menu rides over the first text line on a plate, the drag grip sits OUTSIDE the card in the
    editor's gutter, and the read-only condition / jump tags appear only when set. The card
-   reserves no room for its chrome, so the script gets the width (the October 2026 UI review,
-   3-composition.md proposal 3). */
+   reserves no room for its chrome but the ⋯'s on the first line, so the script gets the width
+   (the October 2026 UI review, 3-composition.md proposal 3). */
 .bubble {
   padding: 0.35rem 0;
   margin: 0 0 1rem;
@@ -175,6 +175,12 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* the ⋯ action control sits at the right of the snippet's first line, on a plate of the page's colour so it
    reads over whatever line runs under it. */
 .bubble-menu { position: absolute; top: 0.3rem; right: 0; background: var(--card); border-radius: var(--radius-sm); }
+/* ...but the plate hid the end of a full first line, so that one line keeps the ⋯'s width free: a float the
+   height of a line, at the start of the first beat's text, which only that line wraps round. With a
+   condition or an On begin line on top, the ⋯ sits beside those instead and the text keeps its width. */
+.bubble:not(.has-cond):not(.has-fx-begin) > .beats > .beat:first-child > .zone.say::before {
+  content: ""; float: right; width: 24px; height: 1lh;
+}
 /* read-only condition tag (top, only when a condition is set) */
 .bubble-cond {
   font: 600 0.66rem var(--font-ui); letter-spacing: 0.03em;

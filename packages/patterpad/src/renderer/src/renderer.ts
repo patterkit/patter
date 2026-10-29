@@ -340,6 +340,14 @@ async function ensureProjectStart(): Promise<{ scene: string; block?: string } |
   return { scene: chosen };
 }
 let project: OpenedProject | null = null;
+/** A project opens landing scene first (#171): until `hydrateProject` has the rest, `project.scenes` lacks
+ *  scenes that exist, so a jump to one of them isn't missing, only not loaded yet. */
+let scenesPending = false;
+/** Every scene and its blocks, as the surface's cross-scene jump targets. */
+const jumpTargetsOf = (p: OpenedProject): Array<{ id: string; label: string; blocks: Array<{ id: string; label: string }> }> =>
+  p.scenes.map((s) => ({ id: s.id, label: s.name, blocks: s.blocks.map((b) => ({ id: b.id, label: b.name })) }));
+/** Hand the surface the project's jump targets again, saying whether more are still to come. */
+const pushJumpTargets = (): void => { if (project) surface?.setJumpTargets(jumpTargetsOf(project), scenesPending); };
 let currentSceneId: string | null = null;
 let surface: SurfaceHandle | null = null;
 /** The scene the mounted surface holds. Usually `currentSceneId`, but the Properties page clears that and
@@ -752,7 +760,7 @@ async function createJumpTarget(req: { kind: "scene" | "block"; name: string; sc
   if (!landed(res, "Couldn't add the scene") || !res.project || !res.sceneId) return null;
   project = res.project;
   renderNav();
-  surface?.setJumpTargets(project.scenes.map((sc) => ({ id: sc.id, label: sc.name, blocks: sc.blocks.map((b) => ({ id: b.id, label: b.name })) })));
+  pushJumpTargets();
   return { scene: res.sceneId };
 }
 
@@ -1524,7 +1532,7 @@ async function afterProjectHistory(r: ProjectHistoryOutcome): Promise<void> {
   pushWritingStatus();
   pushCast(); // an undone add, or a rename taken back, leaves the speaker picker and the cue colours
   surface?.setQualifiers(project.qualifiers ?? []);
-  surface?.setJumpTargets(project.scenes.map((sc) => ({ id: sc.id, label: sc.name, blocks: sc.blocks.map((b) => ({ id: b.id, label: b.name })) })));
+  pushJumpTargets();
   await refreshPatterProps();
   if (!propsDocEl.hidden) mountPropsDoc();
   if (!overviewEl.hidden) renderOverview();
@@ -2355,7 +2363,7 @@ function showInspector(ctx: InspectorContext): void {
   if (sig === lastInspectorSig) return;
   lastInspectorSig = sig;
   // A seen() / visits() naming a scene or block that's gone reads "Missing scene" / "Missing block", as on the page.
-  const nodeLabel = (nid: string): string => surface?.jumpTargets().find((t) => t.id === nid)?.label ?? missingLabel(nid);
+  const nodeLabel = (nid: string): string => surface?.jumpLabel(nid) ?? missingLabel(nid);
   renderInspector(inspectorStackEl, ctx, {
     reveal: (id) => { surface?.revealNode(id); },
     levelOpen: (key) => panes.inspectorOpen?.[key],
@@ -2391,7 +2399,7 @@ function showInspector(ctx: InspectorContext): void {
 // the filter is a no-op at runtime and the types stop lying about it.
 onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e.kind === "set")); },
 onCreateProperty: (name) => createPatterProperty(name) }),
-    jumpLabel: (id) => surface?.jumpTargets().find((t) => t.id === id)?.label ?? null, // null: drawn as a missing target
+    jumpLabel: (id) => surface?.jumpLabel(id) ?? null, // null: drawn as a missing target
     gameDataFields: (kind) => project?.gameDataFields[kind] ?? [],
     setGameData: (id, key, value) => { surface?.setGameData(id, key, value); },
     setTags: (id, tags) => { surface?.setTags(id, tags); }, // author tags (#215)
@@ -2900,7 +2908,8 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     qualifiers: project.qualifiers ?? [], // the cue's (O.S.), the keyboard cycle
     localiseDialogueText: project.localiseDialogueText, // off: a dialogue scene's text is drawn as action
     // Cross-scene jump targets: every scene + its blocks (the surface adds THIS scene with live blocks).
-    jumpTargets: project.scenes.map((s) => ({ id: s.id, label: s.name, blocks: s.blocks.map((b) => ({ id: b.id, label: b.name })) })),
+    jumpTargets: jumpTargetsOf(project),
+    jumpTargetsPending: scenesPending, // a lazy open's other scenes aren't in yet: a jump to one isn't missing
     showTitle: true,
     onChange: () => { if (!mountingScene) { saver.touch(); sceneEdited = true; refreshStaleBadge(); views.changed("all", { saved: false }); } scheduleValidate(); refreshNavBlocks(); syncSceneName(); },
     onSelect: showInspector, // drive the detail inspector off the caret's container stack
@@ -3053,6 +3062,7 @@ function openQualifierBrowse(): void {
 async function showProject(open: OpenResult): Promise<void> {
   views.closeAll(); // main closes their windows with the project they read
   project = open.project;
+  scenesPending = true; // main opens it landing scene first; hydrateProject brings the rest
   debugLink.setVisible(true); // the bottom-right live-debug-link control is available once a project is open
   projectNameEl.textContent = project.name;
   // Two projects can share a name; the disk path is what tells them apart. The topbar name carries it
@@ -3316,15 +3326,19 @@ async function openSceneFromOverview(sceneId: string): Promise<void> {
 async function hydrateProject(): Promise<void> {
   const full = await window.patter.hydrate();
   if (!full || !project || full.root !== project.root) return; // no project, or switched away meanwhile
-  if (full.scenes.length === project.scenes.length) return;    // already complete - nothing more to show
-  project = full;
-  renderNav();
-  if (currentSceneId) highlightNav(currentSceneId);
-  syncSceneName(); // a rename still inside the save debounce is newer than main's copy
+  const wasPending = scenesPending;
+  scenesPending = false; // every scene is known now: a target none of them has is genuinely missing
+  if (full.scenes.length === project.scenes.length && !wasPending) return; // already complete - nothing more to show
+  if (full.scenes.length !== project.scenes.length) {
+    project = full;
+    renderNav();
+    if (currentSceneId) highlightNav(currentSceneId);
+    syncSceneName(); // a rename still inside the save debounce is newer than main's copy
+  }
   // Refresh the surface's cross-scene jump targets so the divert picker now offers every scene + block.
-  surface?.setJumpTargets(project.scenes.map((s) => ({ id: s.id, label: s.name, blocks: s.blocks.map((b) => ({ id: b.id, label: b.name })) })));
+  pushJumpTargets();
   // The inspector painted before the other scenes arrived, so a cross-scene Jump row (and any condition
-  // pill naming another scene) still shows the raw target id. Its level signature hasn't changed, so force it.
+  // pill naming another scene) still reads as pending. Its level signature hasn't changed, so force it.
   lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
 }
 

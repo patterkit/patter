@@ -158,6 +158,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **The inspector's Jump row fits a narrow inspector.** A long target name used to run over the Jump and
+  Call toggle beside it. The toggle now moves under the name when there isn't room for both.
+- **A jump isn't called missing while a project is still opening.** Opening a project on a scene you'd left
+  it in, a jump to another scene could read "Missing scene" or "Missing block" for a moment, until the rest
+  of the project had loaded. It now reads "…" until then, and only a target that really has gone is missing.
+- **Status badges keep up with the inspector's divider.** Dragging the divider left the badges beside the
+  lines where they'd been until something else moved them. They now follow the lines as the page resizes.
+- **The ⋯ button doesn't hide the end of a line.** At some window widths the end of a snippet's first line
+  ran under its ⋯ button. That line now leaves the button room.
+- **Production Information's scroll button doesn't cover the report.** The button that pages the report
+  sat over it and could hide a table's headings, such as Written. It now has its own space under the report.
 - **A jump into a scene you haven't opened yet lands on its line.** Edit in the clash resolver, a search result,
   or a problem in a scene opened for the first time that session could stop part-way down the page, because
   the blocks above hadn't been drawn yet. It now settles on the line.

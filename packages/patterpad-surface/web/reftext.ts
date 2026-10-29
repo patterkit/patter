@@ -13,6 +13,9 @@ import { humanizeNodeRefs } from "@patterkit/core";
 
 export const MISSING_SCENE = "Missing scene";
 export const MISSING_BLOCK = "Missing block";
+/** What a target reads while the host's targets are still coming in (a lazy open, before the other scenes
+ *  load): nothing alarming, since it may well be there. Only a target absent from the whole list is missing. */
+export const PENDING_TARGET = "…";
 
 /** `@patter.gold` -> `@gold`: Patter's own scope is the default one, so the page drops its name. */
 export function shortRefs(src: string): string {

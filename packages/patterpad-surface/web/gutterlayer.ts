@@ -3,8 +3,8 @@
 // `.bubble{contain:layout}` / `.block{content-visibility:auto}` paint-clipping that hides in-doc widgets),
 // with content-space top math + an off-screen cull. A plugin supplies only how to enumerate + build its chips.
 //
-// PERF (#audit): a single per-view CONDUCTOR drives every lane. The lanes share ONE rAF, ONE scroll/resize
-// listener set, ONE read of the container rects per frame, and ONE per-frame cache of each node's top - so
+// PERF (#audit): a single per-view CONDUCTOR drives every lane. The lanes share ONE rAF, ONE scroll listener and
+// resize observer, ONE read of the container rects per frame, and ONE per-frame cache of each node's top - so
 // two lanes asking for the same beat's geometry read its `getBoundingClientRect` once, not twice. Relayout
 // is still SKIPPED for a pure caret move (gutter chips are keyed to beats, not the selection - the dominant
 // relayout trigger while typing); doc edits + meta pushes relayout every lane together through the one rAF.
@@ -106,7 +106,10 @@ function conductorFor(view: EditorView): Conductor {
 
   const schedule = (): void => { if (raf) return; raf = requestAnimationFrame(run); };
   scroller?.addEventListener("scroll", schedule, { passive: true });
-  window.addEventListener("resize", schedule);
+  // Watch the scroller's own size, not the window's: dragging a pane's divider (the inspector, the nav)
+  // moves the column with no window resize, and a window resize reaches the scroller anyway.
+  const resized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+  if (scroller) resized?.observe(scroller);
 
   const conductor: Conductor = {
     scroller,
@@ -118,7 +121,7 @@ function conductorFor(view: EditorView): Conductor {
       if (lanes.size === 0) { // last lane gone - tear the conductor down
         scroller?.style.removeProperty(GUTTER_LEFT_ROOM);
         scroller?.removeEventListener("scroll", schedule);
-        window.removeEventListener("resize", schedule);
+        resized?.disconnect();
         if (raf) cancelAnimationFrame(raf);
         conductors.delete(view);
       }

@@ -79,6 +79,7 @@ import { createCuePopup } from "./cuepopup.js";
 import { castColour, setCastColours } from "../src/colour.js";
 import { createSlashMenu } from "./slashmenu.js";
 import { createHintBar } from "./hintbar.js";
+import { PENDING_TARGET } from "./reftext.js";
 
 export interface MountOptions {
   /** The scroll container the editor renders into (needs the tall bottom padding for typewriter scroll). */
@@ -116,6 +117,10 @@ export interface MountOptions {
    *  (so you can jump to any scene OR any block); ids are the stable join keys stored on the jump,
    *  labels are shown. The app passes every other scene here. */
   jumpTargets?: Array<{ id: string; label: string; blocks?: Array<{ id: string; label: string }> }>;
+  /** The host hasn't got every scene yet (Patterpad's lazy open, before its hydrate), so `jumpTargets` may
+   *  lack targets that exist: until `setJumpTargets` says the list is whole, a target none of them has reads
+   *  as `PENDING_TARGET`, not "Missing scene" / "Missing block". */
+  jumpTargetsPending?: boolean;
   /** Prepend the scene-name title above the script (the harness / a single-scene view wants this). The
    *  scene's entry effects, when it has any, show in a quiet line under it. */
   showTitle?: boolean;
@@ -326,13 +331,17 @@ export interface SurfaceHandle {
   editJump(id: string, anchor: HTMLElement, afterPick?: () => void): void;
   /** The jump targets offered in this scene (FLAT: END + each scene + each block), for label lookup. */
   jumpTargets(): Array<{ id: string; label: string }>;
+  /** A target's label as the page draws it: its name, `PENDING_TARGET` while the host's targets are still
+   *  coming in, or null when nothing has that id (a deleted target, drawn as "Missing scene" / "Missing block"). */
+  jumpLabel(id: string): string | null;
   /** THIS scene's blocks, live from the doc (unsaved adds/renames included), in document order.
    *  Feeds the host's block navigation (Patterpad's nav sub-list). */
   blockList(): Array<{ id: string; label: string }>;
   /** Replace the CROSS-SCENE jump targets (every other scene + its blocks) after the host learns of more
    *  scenes - e.g. Patterpad's lazy open finishing its background hydrate. The current scene's own live
-   *  blocks are always derived from the doc, so they're untouched. */
-  setJumpTargets(targets: Array<{ id: string; label: string; blocks?: Array<{ id: string; label: string }> }>): void;
+   *  blocks are always derived from the doc, so they're untouched. `pending` as for `jumpTargetsPending`
+   *  (false, the default: the list is whole, so a target it lacks is missing). */
+  setJumpTargets(targets: Array<{ id: string; label: string; blocks?: Array<{ id: string; label: string }> }>, pending?: boolean): void;
   /** Open the shared scene/block picker for a flow-NODE reference (e.g. a condition's seen()/visits()
    *  arg), anchored to `anchor`, seeded with `current`. No END / clear rows - only real nodes. The
    *  chosen node id is handed to `onPick`. Reuses the same picker the jump affordances use. */
@@ -712,14 +721,16 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   // block + the host scenes) each time is wasteful. Memoize on `liveDoc` IDENTITY - PM reuses the same doc
   // node for selection-only transactions, so this rebuilds only on an actual edit - and look up via a map.
   let jumpLabels: { doc: PMNode; labels: Map<string, string> } | null = null;
-  // An id nothing has now answers null: the chip shows "Missing scene" / "Missing block" (reftext.ts).
+  // An id nothing has now answers null: the chip shows "Missing scene" / "Missing block" (reftext.ts). While
+  // the host's targets are still coming in, it may only not have arrived yet, so it reads as pending.
+  let targetsPending = opts.jumpTargetsPending ?? false;
   const jumpLabel = (id: string): string | null => {
     if (!jumpLabels || jumpLabels.doc !== liveDoc) {
       const labels = new Map<string, string>();
       for (const t of flatTargets()) labels.set(t.id, t.label);
       jumpLabels = { doc: liveDoc, labels };
     }
-    return jumpLabels.labels.get(id) ?? null;
+    return jumpLabels.labels.get(id) ?? (targetsPending ? PENDING_TARGET : null);
   };
   /** The pickers' create hook (Q13), or undefined when the host didn't give `onCreateTarget`. After the host
    *  makes the target, a new scene joins the cross-scene targets (so the chip can name it at once, before
@@ -1484,9 +1495,11 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       });
     },
     jumpTargets: () => flatTargets(),
+    jumpLabel,
     blockList: () => buildJumpData().scenes[0]?.blocks.slice() ?? [],
-    setJumpTargets(targets) {
+    setJumpTargets(targets, pending = false) {
       opts.jumpTargets = targets;
+      targetsPending = pending;
       jumpLabels = null; // labels are memoized by doc identity; force a rebuild against the new targets
       refreshJumpLabels(); // re-humanize already-painted jump chips + condition tags against the new targets
                            // (a lazy load paints them before the cross-scene targets arrive - #171)
