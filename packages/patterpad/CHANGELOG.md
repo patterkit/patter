@@ -8,7 +8,7 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
-- Patterplay 0.38.0 inside: the runtime's `EndReason` type is now `FlowEndReason`. Nothing changes in Patterpad itself.
+- **Patterplay 0.38.0 inside.** The runtime's `EndReason` type is now `FlowEndReason`; nothing changes in Patterpad itself.
 
 ## [0.41.1] - 2026-10-30
 
