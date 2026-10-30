@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.41.1] - 2026-10-30
+
 ### Fixed
 
 - **Play's "Follow in the editor" shows the scene when the project overview is up.** The editor took the scene being
