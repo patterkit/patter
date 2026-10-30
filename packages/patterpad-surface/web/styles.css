@@ -717,6 +717,11 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   justify-content: center; font-size: 0.78rem;
 }
 .group-rail.is-option > .group-rail-body > .option-prompt { padding-right: calc(var(--option-head-w, 1.4rem) + 0.6rem); }
+/* A head too wide to share the prompt's line (a long condition; the view decides) takes a row of its own above
+   it, and the prompt has the whole line. The head stays the grip's box, so the grip sits beside its row. */
+.group-rail.is-option.head-own-row > .group-rail-head { position: relative; left: 0; height: auto; flex-wrap: wrap; row-gap: 2px; padding: 0 0 3px; justify-content: flex-start; align-items: baseline; }
+.group-rail.is-option.head-own-row > .group-rail-head > .group-menu { margin-left: auto; }
+.group-rail.is-option.head-own-row > .group-rail-body > .option-prompt { padding-right: 0; }
 /* a choice option's PROMPT (groups §13.10): the tied choice-text line at the top of the option - the
    option's ANCHOR, the confident label its contained content hangs off. Unboxed since the October 2026
    UI review: its weight and the diamond on the rail mark it, not a tinted cell. */

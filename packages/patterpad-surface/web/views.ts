@@ -573,15 +573,29 @@ const groupView: NodeViewConstructor = (node, view, getPos) => {
   paint(node);
   // An option's head sits ON its prompt line (CSS), its tags and ⋯ at the right, so the prompt keeps clear of
   // however wide they are: the room is measured, as a condition tag's width depends on its words.
+  // A head too wide to share the line (a long condition) would squeeze the prompt into a column a few letters
+  // wide, so past two fifths of the line it takes a row of its own above the prompt, as any other group's head
+  // does, and the prompt has the whole line.
   const roomForHead = (): void => {
-    if (!dom.classList.contains("is-option")) { dom.style.removeProperty("--option-head-w"); return; }
+    if (!dom.classList.contains("is-option")) { dom.style.removeProperty("--option-head-w"); dom.classList.remove("head-own-row"); return; }
     const parts = [label, cond, dots].filter((el) => el.getBoundingClientRect().width > 0);
     if (!parts.length) return;
-    const w = head.getBoundingClientRect().right - Math.min(...parts.map((el) => el.getBoundingClientRect().left));
+    // Each part's natural width, so the answer is the same whichever way the head is laid out just now (on its
+    // own row a long condition wraps, and the menu sits at the far right).
+    const natural = (el: HTMLElement): number => {
+      const { width, flexShrink } = el.style;
+      el.style.width = "max-content"; el.style.flexShrink = "0";
+      const w = el.getBoundingClientRect().width;
+      el.style.width = width; el.style.flexShrink = flexShrink;
+      return w;
+    };
+    const gap = parseFloat(getComputedStyle(head).columnGap) || 0;
+    const w = parts.reduce((sum, el) => sum + natural(el), 0) + gap * (parts.length - 1);
     dom.style.setProperty("--option-head-w", `${Math.ceil(w)}px`);
+    dom.classList.toggle("head-own-row", w > dom.getBoundingClientRect().width * 0.4);
   };
   const headObserver = typeof ResizeObserver === "function" ? new ResizeObserver(roomForHead) : null;
-  for (const el of [label, cond, dots]) headObserver?.observe(el);
+  for (const el of [label, cond, dots, dom]) headObserver?.observe(el);
   // A group's condition tag humanizes `visits(id)` too, so it must re-resolve when the target list changes
   // (refreshJumpLabels) - otherwise a block ref painted before the targets were ready sticks on its raw id.
   let curNode = node;
