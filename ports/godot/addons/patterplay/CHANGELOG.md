@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-10-30
+
 ### Changed
 
 - Nothing to change here: Godot reports why a flow ended as a string (`"ended"` or `"ran-dry"`), so the other

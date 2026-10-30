@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-10-30
+
 ### Changed
 
 - **`EndReason` is now `FlowEndReason`**, in all four runtimes: the type of an `end` step's `reason` (`"ended"` or

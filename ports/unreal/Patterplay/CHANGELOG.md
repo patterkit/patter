@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-10-30
+
 ### Changed
 
 - **`EPatterEndReason` is now `EPatterFlowEndReason`, and `patter::EndReason` is `patter::FlowEndReason`**, matching

@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-10-30
+
 ### Changed
 
 - **`EndReason` is now `FlowEndReason`.** In C# the old name clashed (CS0104, "ambiguous reference") with a game's
