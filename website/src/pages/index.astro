@@ -3,8 +3,8 @@
 // deliberately outside the Starlight docs chrome. Brand tokens come from src/styles/patter.css;
 // the landing's own classes live in src/styles/landing.css.
 //
-// Shape, top to bottom: the shared header; one sentence, one paragraph, one button, and the
-// hand-drawn screenplay surface; a few paragraphs for writers with the real Patterpad screenshot;
+// Shape, top to bottom: the shared header; one sentence, one paragraph, one button, and a clip of
+// Patterpad writing a scene and playing it; a few paragraphs for writers with the real Patterpad screenshot;
 // the four runtimes as a sentence; five reasons as a plain list; the Patterpad downloads as a
 // plain list; the shared footer. The header, the footer and the downloads list come from
 // src/chrome, which is generated from patterkit/site-chrome and is never edited here; the
@@ -68,30 +68,13 @@ const engines = [
             <p class="pt-note">It’s free and MIT-licensed, and there’s no server to run.</p>
           </div>
 
-          <!-- The screenplay surface, recreated by hand from the interactive tour. -->
-          <div class="pt-screen" aria-label="A scene as it looks in Patterpad">
-            <div class="pt-screen-head">
-              <span class="pt-screen-title">The Crossroads</span>
-              <span class="pt-screen-meta">3 blocks</span>
-            </div>
-            <div class="pt-screen-body">
-              <p class="pt-action-text">A soft chime. A warm, paper-coloured room assembles itself around you.</p>
-              <div class="pt-lines">
-                <span class="pt-cue">Guide</span><span class="pt-line">Hello! Welcome to Patter. I'm your guide for this little tour.</span>
-                <span class="pt-cue">Guide</span><span class="pt-line">So, where would you like to start?</span>
-              </div>
-              <div class="pt-cond">
-                <span class="pt-cond-expr">if visits(The Crossroads) == 1</span>
-                <div class="pt-cond-lines">
-                  <span class="pt-cue">Guide</span><span class="pt-line">Pick anything; I'll bring you right back here afterwards.</span>
-                </div>
-              </div>
-              <div class="pt-choice">
-                <svg viewBox="0 0 14 14" width="13" height="13" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7 1 L13 7 L7 13 L1 7 Z" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
-                <span class="pt-choice-label">Lines, text, and directions</span>
-              </div>
-            </div>
-          </div>
+          <!-- Writing a scene in Patterpad and playing it, recorded from the app itself (patterkit's recorder,
+               takes/patterpad-hero.mjs). Muted and looping; the poster stands in until it plays. -->
+          <figure class="pt-clip pt-clip-hero">
+            <video src={`${base}clips/patterpad-hero.mp4`} poster={`${base}clips/patterpad-hero.jpg`} width="960" height="532"
+              autoplay muted loop playsinline preload="metadata"
+              aria-label="Writing a short scene in Patterpad, a stage direction and two characters' lines, then playing it in the Play window beside the editor"></video>
+          </figure>
         </section>
 
         <!-- FOR WRITERS -->
@@ -108,11 +91,16 @@ const engines = [
         </section>
 
         <!-- THE RUNTIMES -->
-        <section class="pt-wrap pt-section">
+        <section class="pt-wrap pt-section pt-side">
           <h2 class="pt-h2">Test it in the editor</h2>
           <div class="pt-prose">
             <p>Patterpad plays your story on the same runtime your game will use, so what you test in the editor is what ships: the choices, the conditions, saving and loading, even the random draws. There’s a runtime for your engine, whether that’s Unity, Unreal, Godot, or the web, and it loads the one bundle Patterpad publishes.</p>
           </div>
+          <figure class="pt-clip">
+            <video src={`${base}clips/patterpad-play.mp4`} poster={`${base}clips/patterpad-play.jpg`} width="960" height="524"
+              autoplay muted loop playsinline preload="metadata"
+              aria-label="Playing The Night Ferry in Patterpad: the Play window takes a choice, and the editor beside it follows each line from scene to scene"></video>
+          </figure>
           <ul class="pt-engines">
             {engines.map((e) => (
               <li><img src={`${base}${e.icon}`} alt="" width="30" height="30" /><span>{e.name}</span></li>
@@ -145,5 +133,11 @@ const engines = [
 
       <LandingFooter />
     </div>
+    <script is:inline>
+      // A visitor who asks for less motion gets the clips paused on their poster, with controls to play them.
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        for (const v of document.querySelectorAll(".pt-clip video")) { v.removeAttribute("autoplay"); v.pause(); v.controls = true; }
+      }
+    </script>
   </body>
 </html>

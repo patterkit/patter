@@ -176,16 +176,6 @@ first step after `choose()`, carrying the same `padAfter`. A choice is only offe
 when at least one option can be taken: if every remaining option is greyed out, the choice runs dry,
 as one with no options does, so its fallback plays if it has one and otherwise the flow moves on.
 
-#### Why a flow ended
-
-Falling off the end of a block is a normal ending, the same as `END`, and the `end` step's `reason` is
-`"ended"`. The one exception is a choice that ran dry with nothing after it: the flow stops there because
-the choice had nothing left to offer, not because the story finished, so the reason is `"ran-dry"` and
-`onError` hears a [`dry-choice`](#when-something-goes-wrong) problem. An `END` straight after the dry choice
-still counts as running dry; your own `goto("END")` is a plain `"ended"`. The reason survives a save and
-load. Unity's step has `Reason` (`EndReason.Ended` or `EndReason.RanDry`), and Godot's end Dictionary has
-`"reason"`. To mark a choice as allowed to run out, give it a fallback that says what happens then.
-
 An option's prompt is built each time the choice is delivered, in the language in use and with the
 current values filled in, so a pending choice follows [`setLocale`](/play/localisation/), and a choice
 in a loaded save shows in the language of the engine that loaded it. The one exception is the replayed
@@ -199,6 +189,17 @@ see [Tags at runtime](/play/tags/).
 flags lists included, so changing it changes nothing the engine hands out next. **`extensions`** is
 different: it's the bundle's own data, handed over as it is, since an extension's data can be large and
 is its runtime's to read. Treat it as read-only.
+
+#### Why a flow ended
+
+Falling off the end of a block is a normal ending, the same as `END`, and the `end` step's `reason` is
+`"ended"`. The one exception is a choice that ran dry with nothing after it: the flow stops there because
+the choice had nothing left to offer, not because the story finished, so the reason is `"ran-dry"` and
+`onError` hears a [`dry-choice`](#when-something-goes-wrong) problem. An `END` straight after the dry choice
+still counts as running dry; your own `goto("END")` is a plain `"ended"`. The reason survives a save and
+load. Unity's step has `Reason` (`EndReason.Ended` or `EndReason.RanDry`), Unreal's `FPatterStep` has
+`EndReason` (`EPatterEndReason::RanDry`; `StepResult::reason` in C++), and Godot's end Dictionary has `"reason"`.
+To mark a choice as allowed to run out, give it a fallback that says what happens then.
 
 ## Properties
 

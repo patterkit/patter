@@ -51,25 +51,31 @@
 .pt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; margin-top: 26px; }
 .pt-actions .pt-link { font-size: 15px; font-weight: 500; }
 
-/* The screenplay surface, recreated by hand. Sits under the hero copy at the page's left edge,
-   a page of script rather than a window: no title bar, no dots, no tilt. */
-.pt-screen { position: relative; max-width: 880px; margin-top: 52px; background: var(--l-paper-2); border: 1px solid var(--l-hair); border-radius: 8px; }
-.pt-screen-head { padding: 14px 24px; border-bottom: 1px solid var(--l-hair-soft); display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.pt-screen-title { font-size: 14px; font-weight: 600; color: var(--l-ink); }
-.pt-screen-meta { font-size: 13px; color: var(--l-muted); }
-.pt-screen-body { padding: 26px 28px 30px; font-family: var(--pt-read, "Newsreader", Georgia, serif); }
-/* A text line in a scene where characters speak is action, drawn in italic as Patterpad draws it. */
-.pt-action-text { margin: 0; font-size: 16.5px; line-height: 1.55; color: var(--l-body); font-style: italic; }
-.pt-lines { margin-top: 20px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: baseline; }
-/* The character cue: uppercase because a screenplay's cues are, in the UI face like the app's own. */
-.pt-cue { font-family: var(--sl-font, "Inter", sans-serif); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--l-cue); }
-.pt-line { font-size: 17px; line-height: 1.5; color: var(--l-ink-2); }
-.pt-cond { margin-top: 24px; border-left: 2px solid var(--l-hair); padding-left: 18px; }
-.pt-cond-expr { display: inline-block; background: var(--l-wash); border-radius: 5px; padding: 4px 9px; font-family: var(--sl-font-mono, "IBM Plex Mono", monospace); font-size: 12.5px; color: var(--l-ink); }
-.pt-cond-lines { margin-top: 12px; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: baseline; }
-.pt-choice { margin-top: 22px; display: flex; align-items: center; gap: 11px; background: var(--l-wash); border: 1px solid var(--l-hair); border-radius: 6px; padding: 12px 15px; }
-.pt-choice svg { flex: 0 0 auto; display: block; color: var(--l-accent); }
-.pt-choice-label { font-size: 16px; color: var(--l-ink); }
+/* A clip of the app, recorded from Patterpad itself: under the hero copy, and in a section. The video carries its own
+   size, so the space is held before it loads. */
+.pt-clip { max-width: 960px; margin: 52px 0 0; }
+/* A section's clip, recorded 960 wide like the hero's: at most 640, so it stays sharp. */
+.pt-section .pt-clip { margin-top: 32px; max-width: 640px; }
+/* A section with its clip beside the words on a wide screen (the heading and the prose on the left), as the hero has;
+   anything after them (the engines) runs the full width on a row of its own. Narrower, it stacks as the others do. */
+@media (min-width: 960px) {
+  .pt-side { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr); column-gap: 48px;
+    grid-template-areas: "head clip" "prose clip" "rest rest"; grid-template-rows: auto 1fr auto; }
+  .pt-side > .pt-h2 { grid-area: head; }
+  .pt-side > .pt-prose { grid-area: prose; }
+  .pt-side > .pt-clip { grid-area: clip; margin: 0; max-width: none; align-self: center; }
+  .pt-side > :not(.pt-h2):not(.pt-prose):not(.pt-clip) { grid-area: rest; }
+  /* The engines, on their own row under the words and the clip: centred, spread evenly across it. */
+  .pt-side > .pt-engines { justify-content: space-evenly; margin-top: 48px; }
+}
+/* The hero clip is recorded 960 wide: shown at 640 or less it stays sharp on a high-density screen. On a wide
+   screen it sits to the right of the hero copy; narrower, it follows the copy. */
+.pt-clip-hero { max-width: 640px; }
+@media (min-width: 960px) {
+  .pt-hero { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+  .pt-hero .pt-clip-hero { margin: 0; max-width: none; }
+}
+.pt-clip video { display: block; width: 100%; height: auto; border: 1px solid var(--l-hair); border-radius: 8px; background: var(--l-paper-2); }
 
 /* ---- Sections ----------------------------------------------------------------- */
 .pt-section { padding-top: 96px; }
@@ -86,7 +92,7 @@
 .pt-shot img { display: block; width: 100%; height: auto; border: 1px solid var(--l-hair); }
 
 /* The four runtimes, as a sentence and a row of icons with their names. */
-.pt-engines { list-style: none; margin: 22px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 14px 36px; }
+.pt-engines { list-style: none; margin: 28px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 16px 40px; }
 .pt-engines li { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 400; color: var(--l-ink); }
 .pt-engines img { display: block; width: 30px; height: 30px; border-radius: 6px; }
 
@@ -103,8 +109,7 @@
 @media (max-width: 560px) {
   .pt-wrap { padding-left: 20px; padding-right: 20px; }
   .pt-hero { padding-top: 40px; }
-  .pt-screen-body { padding: 20px 18px 22px; }
-  .pt-lines, .pt-cond-lines { grid-template-columns: 1fr; gap: 2px; }
+  .pt-clip { margin-top: 36px; }
   .pt-section { padding-top: 56px; }
 }
 /* The note under the hero actions; the selector outranks the landing-wide paragraph reset. */

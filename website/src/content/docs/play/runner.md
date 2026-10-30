@@ -117,7 +117,8 @@ pending) prints the error and keeps it for `runner.last_error()`, as the flow's 
 ## Unreal
 
 Add a **Patter Runner** component (`UPatterRunnerComponent`) to an actor, give it your engine with
-`SetEngine`, and bind its events: **On Line**, **On Text**, **On Game Event**, **On Choice**, and **On Ended**.
+`SetEngine`, and bind its events: **On Line**, **On Text**, **On Game Event**, **On Choice**, and **On Ended**
+(its **Reason** pin is `Ended`, or `RanDry` when a choice had nothing left).
 Your Continue button calls **Next**, a choice button calls **Choose** with its option id, and **Begin** starts the
 conversation (leave **Scene** empty for the project's start scene).
 
