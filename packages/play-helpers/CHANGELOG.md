@@ -1,5 +1,18 @@
 # @patterkit/play-helpers
 
+## 0.11.0
+
+### Minor Changes
+
+- 50b18ba: The runner's `ended` event hands its handler the reason the flow ended, as the `end` step says: `"ended"`, or `"ran-dry"` when a choice had nothing left to offer and nothing came after it. A handler that takes no argument works as before. The same in the Unity, Unreal, and Godot runners.
+
+### Patch Changes
+
+- 32e1ae3: Uses `@patterkit/runtime` 0.37.0, the Patterplay 0.37.0 release.
+- Updated dependencies [e1c5d38]
+- Updated dependencies [3545cbe]
+  - @patterkit/model@0.23.0
+
 ## 0.10.1
 
 ### Patch Changes
