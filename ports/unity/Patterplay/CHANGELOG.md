@@ -6,6 +6,18 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A choice that runs dry and ends the flow says so.** A choice with no option left to take and no
+  fallback still gathers and never throws. When the flow then ends with nothing played since, the `End` step's
+  new `Reason` is `EndReason.RanDry` (otherwise `EndReason.Ended`), and the engine reports it once through
+  `EngineOptions.OnError` as a `PlayError` of kind `"dry-choice"`, naming the choice group. An `END` reached
+  straight after the dry choice still counts; a dry choice that play carries on past stays silent. Asking
+  `Advance` again gives the same end without a second report. The reason survives a save and load (the save's
+  cursor carries `ranDry`, written only when set) and a checkpoint's rollback; a load doesn't report it again.
+  The host's `Goto("END")` ends it plainly, and `Goto` to a scene or `Reset` clears it. `OnDryChoice` is
+  unchanged. The conformance corpus is version 10.
+
 ## [0.36.0] - 2026-10-29
 
 ### Added

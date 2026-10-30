@@ -57,13 +57,13 @@ describe("choice text is the option's prompt (spec §5)", () => {
     // default off: choosing plays only the option's content (here, straight to END)
     const off = new Engine(exportBundle({ project, scenes: [scene], locales })).openFlow("f", { scene: "s" });
     off.advance(); off.choose("label");
-    expect(off.advance()).toEqual({ type: "end" }); // the prompt is NOT replayed
+    expect(off.advance()).toEqual({ type: "end", reason: "ended" }); // the prompt is NOT replayed
 
     const on = new Engine(exportBundle({ project, scenes: [scene], locales }), { replayPromptOnChoose: true })
       .openFlow("f", { scene: "s" });
     on.advance(); on.choose("label");
     expect(on.advance()).toMatchObject({ type: "text", id: "C_label", text: "Explicit" }); // prompt replayed first
-    expect(on.advance()).toEqual({ type: "end" });
+    expect(on.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("still replays the prompt when a save is taken BETWEEN choose() and the next advance()", () => {
@@ -80,6 +80,6 @@ describe("choice text is the option's prompt (spec §5)", () => {
     b.loadGame(blob);
     const fb = b.getFlow("f")!;
     expect(fb.advance()).toMatchObject({ type: "text", id: "C_label", text: "Explicit" }); // prompt survived the round-trip
-    expect(fb.advance()).toEqual({ type: "end" });
+    expect(fb.advance()).toEqual({ type: "end", reason: "ended" });
   });
 });

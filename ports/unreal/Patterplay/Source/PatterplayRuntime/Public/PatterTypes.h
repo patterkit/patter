@@ -22,6 +22,17 @@ enum class EPatterStepType : uint8
 	End
 };
 
+/** Why a flow ended: an End step's EndReason (the JS runtime's EndReason, "ended" | "ran-dry"). */
+UENUM(BlueprintType)
+enum class EPatterEndReason : uint8
+{
+	/** It ran out: the end of a block, an END, or the host's Goto("END"). Also every step that isn't an End. */
+	Ended,
+	/** A choice ran dry (no option left to take, and no fallback) with nothing delivered after it, so the flow
+	 *  ended there: a hub whose options were all used, say. Reported once through OnError too (DryChoice). */
+	RanDry
+};
+
 /** What a choice option's prompt is: a line someone speaks, plain text, or none at all. */
 UENUM(BlueprintType)
 enum class EPatterPromptKind : uint8
@@ -67,7 +78,11 @@ enum class EPatterPlayErrorKind : uint8
 	Setup,
 	/** A load whose saved place has gone from this build: the flow resumed at the nearest safe point. Node
 	 *  is the saved snippet, or the pending choice's group. */
-	Save
+	Save,
+	/** A choice that ran dry (no option left to take, and no fallback) with nothing delivered after it, so
+	 *  the flow ended there. Node is the choice's group; the End step's EndReason is RanDry. Reported once,
+	 *  when the flow first ends; a load doesn't report it again. */
+	DryChoice
 };
 
 /** A Patter value crossing the Blueprint boundary: what a UPatterWorld holds and reports. Shaped
@@ -385,7 +400,7 @@ struct FPatterLogEntry
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bHasPrev = false;
 
-	/** A diagnostic's kind: condition | effect | best-match | setup | save. */
+	/** A diagnostic's kind: condition | effect | best-match | setup | save | dry-choice. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Kind;
 
@@ -405,8 +420,9 @@ struct FPatterLogEntry
  *  write to a read-only @world value. The story never stops for one: a condition that fails counts as
  *  false, an effect that fails is skipped and the rest of its list still runs, and a part of a Best-match
  *  condition that fails scores as false. The engine also reports how it was set up (Setup: a locale the
- *  bundle doesn't have, a host scope it doesn't declare) and a load whose place has gone from the build
- *  (Save). The same rule holds on every Patterplay runtime. */
+ *  bundle doesn't have, a host scope it doesn't declare), a load whose place has gone from the build
+ *  (Save), and a choice that ran dry and so ended the flow (DryChoice). The same rule holds on every
+ *  Patterplay runtime. */
 USTRUCT(BlueprintType)
 struct FPatterPlayError
 {
@@ -421,7 +437,7 @@ struct FPatterPlayError
 
 	/** The snippet, group, or option whose condition failed, or that owns the effect (a scene, for its
 	 *  on-entry effects). For Setup, the locale or host-scope token at fault; for Save, the saved snippet
-	 *  (or the pending choice's group) that has gone. */
+	 *  (or the pending choice's group) that has gone; for DryChoice, the choice's group. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Node;
 
@@ -555,6 +571,12 @@ struct FPatterStep
 	/** A Choice step's choice group id (empty on every other step). */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString GroupId;
+
+	/** An End step's reason: RanDry when a choice ran dry with nothing delivered after it, so the flow ended
+	 *  there (reported once through OnError as well), else Ended. Asked again, an ended flow gives the same
+	 *  reason, and a save keeps it. Ended on every other step. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	EPatterEndReason EndReason = EPatterEndReason::Ended;
 
 	// The beat's author Game Data (raw overrides). Host events ride on this: a game-event beat's
 	// cue lives here for your game to act on. Read a field's full effective value (override merged

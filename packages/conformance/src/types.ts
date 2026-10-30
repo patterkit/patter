@@ -45,7 +45,8 @@ export type TranscriptStep =
   | { type: "text"; id: string; text: string; padAfter?: number; action?: true; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "choice"; groupId: string; options: TranscriptOption[] }
-  | { type: "end" };
+  /** `reason` is recorded only when the flow ended because a choice ran dry (corpus 10); absent = "ended". */
+  | { type: "end"; reason?: "ran-dry" };
 
 /** One option of a transcript `choice`: the runtime's ChoiceOption, keys absent when unset. */
 export interface TranscriptOption {

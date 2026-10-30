@@ -31,6 +31,11 @@ namespace Patterkit.Patterplay
 
         private bool _started;
         private bool _flowEnded;
+        // The choice that last ran dry, while nothing has been delivered since: if the flow ends with it set, it
+        // ended because that choice ran dry.
+        private string _dryChoice;
+        // The choice whose running dry ended this flow, once it has (the End step's RanDry); saved.
+        private string _ranDry;
         // Closed by the engine (see Close()). Terminal, and distinct from _flowEnded: an ENDED flow is
         // merely out of content and Goto revives it; a CLOSED one is finished for good.
         private bool _closed;
@@ -185,6 +190,7 @@ namespace Patterkit.Patterplay
                 _started = true; ClearPending();
                 _activeSnippet = null; _beatIndex = 0;
                 _flowEnded = true; _stack = new List<StackFrame>();
+                _dryChoice = null; _ranDry = null; // the host ended it: "ended", whatever ran dry before
                 return true;
             }
             // Resolve BOTH addresses before touching state, so a bad one is a no-op rather than a half-move.
@@ -201,6 +207,7 @@ namespace Patterkit.Patterplay
             ClearPending();
             _activeSnippet = null; _beatIndex = 0; // abandon the rest of the snippet being delivered
             _flowEnded = false;                    // an ended flow resumes at the target
+            _dryChoice = null; _ranDry = null;
             EnterTarget(blockId ?? sceneId, "jump"); // "jump" = replace the stack, exactly like an authored goto
             Settle();
             return true;
@@ -242,12 +249,14 @@ namespace Patterkit.Patterplay
             if (journal == null || journal.Flows.Contains(this)) return;
             journal.Flows.Add(this);
             var rngState = _rngState; var started = _started; var flowEnded = _flowEnded;
+            var dryChoice = _dryChoice; var ranDry = _ranDry;
             var currentSceneId = _currentSceneId; var activeSnippet = _activeSnippet; var beatIndex = _beatIndex;
             var pendingChoice = _pendingChoice; var pendingPromptBeat = _pendingPromptBeat; var pendingPromptShown = _pendingPromptShown; var pendingPromptOwnerId = _pendingPromptOwnerId;
             var stack = _stack.Select(f => f.Clone()).ToList(); // frames advance in place, so copy them
             journal.Undo.Add(() =>
             {
                 _rngState = rngState; _started = started; _flowEnded = flowEnded;
+                _dryChoice = dryChoice; _ranDry = ranDry;
                 _currentSceneId = currentSceneId; _activeSnippet = activeSnippet; _beatIndex = beatIndex;
                 _pendingChoice = pendingChoice; _pendingPromptBeat = pendingPromptBeat; _pendingPromptShown = pendingPromptShown; _pendingPromptOwnerId = pendingPromptOwnerId;
                 _stack = stack;
@@ -333,6 +342,7 @@ namespace Patterkit.Patterplay
             _stack = new List<StackFrame>();
             _currentSceneId = null;
             _flowEnded = false;
+            _dryChoice = null; _ranDry = null;
             _activeSnippet = null;
             _beatIndex = 0;
             ClearPending();
@@ -365,7 +375,7 @@ namespace Patterkit.Patterplay
 
         public StepResult Advance()
         {
-            if (_closed) return new StepResult { Type = StepType.End }; // a stale reference drives nothing
+            if (_closed) return StepResult.End(); // a stale reference drives nothing
             if (!_started) throw new Exception("flow has not been started");
             Touch();
             if (_pendingPromptBeat != null)
@@ -375,10 +385,28 @@ namespace Patterkit.Patterplay
                 return shown != null ? PromptResult(b, shown) : BeatResult(b);
             }
             Settle();
-            if (_flowEnded) return StepResult.End();
+            if (!_flowEnded && _activeSnippet == null && _pendingChoice == null) _flowEnded = true;
+            if (_flowEnded) return EndResult();
+            _dryChoice = null; // a choice or a beat comes after it: play carried on past the dry choice
             if (_pendingChoice != null) return new StepResult { Type = StepType.Choice, GroupId = _pendingChoice.GroupId, Options = Offer(_pendingChoice) };
-            if (_activeSnippet == null) { _flowEnded = true; return StepResult.End(); }
             return BeatResult(_activeSnippet.Beats[_beatIndex++]);
+        }
+
+        /// <summary>The End step. The first time a flow reports its end straight after a choice ran dry, that
+        /// choice is why it ended: say so through OnError, once (Ian's rulings on choices that run dry,
+        /// 2026-10-30). An explicit `END` reached after it still counts; a block simply ending, with nothing dry,
+        /// is just the end.</summary>
+        private StepResult EndResult()
+        {
+            if (_dryChoice != null)
+            {
+                var group = _dryChoice;
+                _dryChoice = null;
+                _ranDry = group;
+                Report(new PlayError { Flow = Id, Kind = "dry-choice", Node = group,
+                    Message = $"choice '{group}' ran dry (no option left to take, and no fallback) with nothing after it, so the flow ended there" });
+            }
+            return StepResult.End(_ranDry != null ? EndReason.RanDry : EndReason.Ended);
         }
 
         /// <summary>
@@ -690,6 +718,7 @@ namespace Patterkit.Patterplay
             // past it. The behaviour is unchanged; this makes the silent fall-through observable.
             if (_host.Tracing) Emit(new LogEntry { Type = "dry", Group = group.Id });
             _host.OnDryChoice?.Invoke(group.Id);
+            _dryChoice = group.Id; // if the flow ends before anything else plays, this is why
         }
 
         // -- jumps --------------------------------------------------------------
@@ -1252,6 +1281,7 @@ namespace Patterkit.Patterplay
             snap.RngState = _rngState;
             snap.Visits = new Dictionary<string, int>(_visitCounts);
             snap.FlowEnded = _flowEnded;
+            snap.RanDry = _ranDry; // why it ended, when a choice running dry ended it: a loaded game ends the same way
             snap.CurrentSceneId = _currentSceneId;
             // Stamp each frame with the id of the child it would run next, so a restore against an EDITED bundle
             // re-finds the position by id instead of trusting the raw index (§9.8). A frame saved at its
@@ -1317,6 +1347,8 @@ namespace Patterkit.Patterplay
             _visitCounts = new Dictionary<string, int>(snap.Visits ?? new Dictionary<string, int>());
             _started = true;
             _flowEnded = snap.FlowEnded;
+            _dryChoice = null;
+            _ranDry = snap.FlowEnded ? snap.RanDry : null; // honoured only on an ended flow; a load never re-reports
             _currentSceneId = snap.CurrentSceneId;
             Drift drift = null;
             // Re-bind each frame to the CURRENT bundle: prefer the saved next-child id (survives siblings

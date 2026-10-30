@@ -80,7 +80,7 @@ describe("multi-flow", () => {
     expect(restored.getFlow("bob")!.getProperty("@patter.turns")).toBe(1);
 
     // both flows resume from their saved cursor straight to END
-    expect(restored.getFlow("alice")!.advance()).toEqual({ type: "end" });
-    expect(restored.getFlow("bob")!.advance()).toEqual({ type: "end" });
+    expect(restored.getFlow("alice")!.advance()).toEqual({ type: "end", reason: "ended" });
+    expect(restored.getFlow("bob")!.advance()).toEqual({ type: "end", reason: "ended" });
   });
 });

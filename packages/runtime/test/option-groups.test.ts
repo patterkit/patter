@@ -61,7 +61,7 @@ describe("choice options as Option groups", () => {
     expect(flow.advance()).toMatchObject({ type: "line", id: "La", text: "first" });        // option content
     expect(flow.advance()).toMatchObject({ type: "line", id: "Lc", text: "branch-false" }); // nested branch branch
     expect(flow.advance()).toMatchObject({ type: "line", id: "Lg", text: "gathered" });      // gathered back past the choice
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("the branch follows the variable (flag true -> the other branch)", () => {
@@ -79,6 +79,6 @@ describe("choice options as Option groups", () => {
     expect(flow.advance().type).toBe("choice");
     flow.choose("opt2");
     expect(flow.advance()).toMatchObject({ type: "line", id: "Ld", text: "second option" });
-    expect(flow.advance()).toEqual({ type: "end" }); // o2 jumps END; no gather to `after`
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" }); // o2 jumps END; no gather to `after`
   });
 });

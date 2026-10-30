@@ -65,14 +65,16 @@ says the story starts, or at the first scene when it doesn't say.
 GDScript has no exceptions, so a call the engine refuses tells you in its own way, and always with a
 `push_error` too. `flow.advance()` and `flow.choose(id)` keep the reason for `flow.last_error()` (a flow
 that hasn't started, no choice pending, an option that's unknown or greyed out), and the next of those
-calls that succeeds clears it; a refused `advance()` returns `{"type": "end"}`. `set_property` returns
+calls that succeeds clears it; a refused `advance()` returns `{"type": "end", "reason": "ended"}`. `set_property` returns
 the reason, as below.
 
 Problems the engine plays past go to your `on_error` option, a Callable taking `{flow, kind, node,
 message}` (`push_warning` when you set none). Beside a content error (`"condition"`, `"effect"`,
 `"best-match"`), it reports how the engine was set up (`"setup"`, with `flow` empty: an option key it
 doesn't take, a locale the bundle doesn't have, a host scope it doesn't declare), as the engine finishes
-building, and a load whose place has gone from an edited build (`"save"`).
+building, a load whose place has gone from an edited build (`"save"`), and a choice that ran dry with
+nothing after it, so the flow ended there (`"dry-choice"`; the end Dictionary's `"reason"` is then
+`"ran-dry"`, otherwise `"ended"`).
 
 The `locale` option and `engine.set_locale(locale)` resolve a locale by
 [one rule](/play/localisation/) (`"fr_FR"` finds `"fr-FR"`, then `"fr"`, then the default);

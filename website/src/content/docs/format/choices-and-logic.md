@@ -148,8 +148,18 @@ the runtime won't let them pick it. Reach for `secretUntilEligible` only when an
 option has to stay truly invisible, so it can't even leak through a save.
 
 If no normal option survives and there's no eligible fallback, the choice
-**gathers**: the flow carries on past it. A re-enterable choice with no sticky option
-and no fallback gets a `choice-can-empty` warning from the validator.
+**gathers**: the flow carries on past it. When nothing comes after it, the dialogue ends
+there, and the runtime says so: the `end` step's `reason` is `"ran-dry"` and the game's
+`onError` hears a `dry-choice` problem. A block that ends, with or without `END`,
+is a normal ending.
+
+The validator looks for choices that can run dry: one whose every option (and fallback)
+is conditional, and one that can be played again (its options, or what follows it, lead
+back to it, round any number of blocks) with no sticky option and no fallback. Where
+nothing follows such a choice, so running dry would end the dialogue, it's a
+`choice-ends-dry` warning. Where play carries on after it, it's a `choice-can-empty`
+note, since asking until there's nothing left and then moving on is often what you mean.
+A fallback is how you say what happens when the choice runs out.
 
 ## Conditions and effects
 

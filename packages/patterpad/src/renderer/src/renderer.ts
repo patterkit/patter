@@ -1209,6 +1209,7 @@ function fixLabel(fix: NonNullable<Problem["fix"]>): string {
   if (fix.kind === "declare-property") return `Set up “${fix.name}” (${fix.propType})`;
   if (fix.kind === "retarget-jump") return "Choose where it goes…";
   if (fix.kind === "add-prompt") return "Add a label";
+  if (fix.kind === "add-fallback") return "Add a fallback";
   if (fix.kind === "pick-enum-value") return `Pick a valid value…`;
   if (fix.kind === "pick-qualifier") return "Pick a qualifier…";
   if (fix.kind === "pick-gamedata-stage") return "Choose a stage…";
@@ -1278,7 +1279,7 @@ function paintProblems(): void {
     at: problemAt,
     // The tone follows the CURRENT problem, not the worst one, which is what the old `.warning` class on
     // the host did: an advisory issue reads softer than a hard error while you are standing on it.
-    tone: cur?.severity === "warning" ? "warn" : "danger", // an error in the danger colour, count and tag alike, as Storyletter shows it
+    tone: cur?.severity === "error" ? "danger" : "warn", // an error in the danger colour, count and tag alike, as Storyletter shows it; a warning or a note softer
     tips: { prev: "Previous problem", next: "Next problem", go: "Go to issue" },
     onStep: (next) => {
       problemAt = next;
@@ -1587,6 +1588,14 @@ async function applyCurrentFix(): Promise<void> {
     if (surface?.addPrompt(fix.optionId)) { surface.revealNode(fix.optionId); await save(); await refreshProblems(); }
     return;
   }
+  if (fix.kind === "add-fallback") {
+    // Surface edit: append a fallback option to the choice (the caret lands in it), save, re-validate. The
+    // choice may be in another scene: open it first, as Go to issue would.
+    const p = problems[problemAt];
+    if (p?.sceneId && p.sceneId !== currentSceneId) await loadScene(p.sceneId);
+    if (surface?.addFallback(fix.choiceId)) { await save(); await refreshProblems(); }
+    return;
+  }
   if (fix.kind === "pick-enum-value") {
     // Surface edit: pick a valid value, rewrite the condition, save, re-validate. Uses the problem's node
     // id (the snippet / group / option).
@@ -1683,8 +1692,9 @@ async function registerCharacter(name: string): Promise<void> {
 /** Push the current problems to the surface as inline squiggles (ids not in the open scene are ignored).
  *  Spelling is EXCLUDED - it already has its own wavy underline from the spell-check plugin (#177). */
 function applyProblemMarks(): void {
+  // A note (info: a choice that can run dry and then carry on) stays in the bar: it isn't a fault to mark.
   surface?.markProblems(problems
-    .filter((p) => p.nodeId && p.category !== "spelling")
+    .filter((p) => p.nodeId && p.category !== "spelling" && p.severity !== "info")
     .map((p) => ({ id: p.nodeId!, severity: p.severity as "error" | "warning" })));
 }
 

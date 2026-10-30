@@ -31,6 +31,8 @@
     <!-- Content errors play through and are reported (OnError, the log's diagnostic entry); a bare
          snapshot and a save with no flows are refused before anything changes. -->
     <Compile Include="PlayErrorChecks.cs" />
+    <!-- A choice that runs dry and ends the flow: reported once, ends ran-dry, through a save and a rollback (a port of the JS tests). -->
+    <Compile Include="DryChoiceChecks.cs" />
     <!-- The corpus's decision-log cases, and OnTrace held to them. -->
     <Compile Include="LogChecks.cs" />
     <!-- The corpus's describe cases. -->

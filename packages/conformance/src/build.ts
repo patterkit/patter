@@ -45,8 +45,11 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  envelope. `scriptedHotSwapDeleteActive` and `scriptedHotSwapEmptiedBlock` now also expect a `save` report.
  *  9: the section `durations`: how long a line with no recording lasts (`estimateLineDuration`), the one rule every
  *  Patter tool and runtime times a line by. No earlier expectation changed.
+ *  10: a choice that runs dry and ends the flow (Ian's rulings, 2026-10-30). The end step's `reason: "ran-dry"`
+ *  (recorded only then), the onError kind `dry-choice`, and a save cursor's `ranDry`, so a loaded flow ends the
+ *  same way. The cases `scriptedDryChoiceEnds` and `scriptedDryChoiceCarriesOn`. No earlier expectation changed.
  */
-export const CORPUS_VERSION = 9;
+export const CORPUS_VERSION = 10;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at

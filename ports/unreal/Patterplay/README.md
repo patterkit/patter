@@ -105,6 +105,14 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   report (a load whose place has gone from this build). A `Setup` problem found while the engine is made
   is logged and recorded at once and reaches `OnError` on the first `OpenFlow`, since the event can only
   be bound once `Create` has returned.
+- **A choice that runs dry**: a choice with no option left to take and no fallback never stops the story.
+  It falls through to whatever follows it, and `OnDryChoice` hears its group id. When the flow then ends
+  with nothing delivered since (a hub whose options have all been used, say), `OnError` hears it once as
+  `DryChoice`, naming the group, and the `End` step's `EndReason` is `RanDry` rather than `Ended`. An `END`
+  straight after the choice still counts. Asking `Advance` again gives the same reason without a second
+  report, a save keeps it (a load doesn't report it again), and `Goto("END")` ends the flow plainly. In
+  C++, the core's `patter::StepResult::reason` is `patter::EndReason::RanDry` and the report's kind is
+  `"dry-choice"`. A dry choice that play carries on past stays silent.
 - **Locales**: `Locale()` is the locale in use and `Locales()` the bundle's default and included locales.
   `SetLocale` (and the `Locale` option) resolves by one rule on every runtime: case and `_` / `-` don't
   matter, then the language alone (`fr` for `fr-FR`), then the default, each fallback reported. A pending

@@ -104,8 +104,8 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
   const extensions = [...extensionIssues(loaded), ...gitattributesHint(loaded)];
   // Only worth asking of a project that compiles: over a broken bundle the answer would be about the
   // breakage, and the real errors are already being told. A structural WARNING (a choice that can run
-  // dry) compiles, and once switched this off, hiding real latch faults behind an advisory.
-  const structuralErrors = structural.filter((i) => i.severity !== "warning");
+  // dry) compiles, and once switched this off, hiding real latch faults behind an advisory. Nor does a note.
+  const structuralErrors = structural.filter((i) => i.severity === undefined);
   const reachability = compiled && structuralErrors.length === 0 && !conditions.some(isError) ? reachabilityIssues(loaded, compiled) : [];
   return {
     structural,
@@ -136,7 +136,7 @@ export function exportBlockers(loaded: LoadedProject): string[] {
   const { project, scenes, locales } = loaded;
   const merged = loaded.gameScopes?.merged;
   const foreignScopes = hostScopesToSpec(projectScopes(project, merged).host);
-  const structural = validateProject({ project, scenes, authoring: loaded.authoring }).filter((i) => i.severity !== "warning");
+  const structural = validateProject({ project, scenes, authoring: loaded.authoring }).filter((i) => i.severity === undefined);
   const conditions = validateConditions({ project, scenes }, { foreignScopes, gameScopes: merged }).filter(isError);
   const interpolation = validateInterpolation({ project, scenes, locales }, { foreignScopes, gameScopes: merged }).filter(isError);
   return [

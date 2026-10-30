@@ -183,7 +183,7 @@ describe("dropping a flow finishes it (a stale reference cannot drive the world)
     expect(engine.getFlow("npc")).toBe(fresh);
 
     // The orphan drives nothing: no beats, and goto refuses rather than reviving it.
-    expect(orphan.advance()).toMatchObject({ type: "end" });
+    expect(orphan.advance()).toMatchObject({ type: "end", reason: "ended" });
     expect(orphan.goto("side-room")).toBe(false);
 
     // ...so the shared counter is still 2 - the orphan never re-ran the scene's onEntry.
@@ -200,7 +200,7 @@ describe("dropping a flow finishes it (a stale reference cannot drive the world)
     const b = engine.openFlow("b", { scene: "side-room" });
     engine.reset();
     expect(b.isClosed).toBe(true);
-    expect(b.advance()).toMatchObject({ type: "end" });
+    expect(b.advance()).toMatchObject({ type: "end", reason: "ended" });
   });
 
   it("runFlow REUSES a name (it never replaces), which is what preserves variation", () => {
@@ -281,7 +281,7 @@ describe("Flow.goto", () => {
     const flow = open();
     expect(flow.goto("END")).toBe(true);
     expect(flow.isEnded()).toBe(true);
-    expect(flow.advance()).toMatchObject({ type: "end" });
+    expect(flow.advance()).toMatchObject({ type: "end", reason: "ended" });
   });
 
   it("MOVES without resetting: visit counts keep accumulating across a goto", () => {

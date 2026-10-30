@@ -6,6 +6,16 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **A choice that can run dry and end the dialogue is a warning, marked on the choice.** Patterpad now finds a
+  choice that comes round again through other blocks or scenes, not only one that jumps straight back to its
+  own block. Where nothing comes after it, it warns, and **Add a fallback** in the Problems bar adds one. Where
+  play carries on after it, it's a quieter note, since asking until nothing's left and then moving on is often
+  what you mean.
+- **Play says when a run ended because a choice ran dry**, in place of "The End", and moves the editor to the
+  choice.
+
 ## [0.40.0] - 2026-10-29
 
 ### Added

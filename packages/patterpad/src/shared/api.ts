@@ -872,6 +872,9 @@ export interface PlayBatch {
   /** Conditions or effects that failed since the last batch. The engine plays through them (a failing
    *  condition counts as false, a failing effect is skipped), so the play window shows each as a warning. */
   warnings?: string[];
+  /** On an `end` stop: the run ended because this choice ran dry (every option used, no fallback), not because
+   *  the story finished. The play window says so, and moves the editor's playhead onto the choice. */
+  ranDry?: { choiceId: string; scene?: string };
 }
 
 /** The play WINDOW's bridge (window.patterPlay) - the interactive walk + the editor step-marker. */
@@ -1176,6 +1179,9 @@ export type QuickFix =
   /** A line's speaker qualifier is not in the project's list (one removed): pick one that is, or none,
    *  for the line `lineId`. `bad` is the gameId it carries. */
   | { kind: "pick-qualifier"; lineId: string; bad: string }
+  /** A choice can run dry with nothing after it, so the dialogue would end there: add a fallback option to the
+   *  choice `choiceId` (offered only when it has none). */
+  | { kind: "add-fallback"; choiceId: string }
   /** A quality game-data value names no stage of its field (a deleted one, most often): pick one of
    *  `options` (the stages, in ladder order) for node `nodeId`'s field `field`. `bad` is what it holds. */
   | { kind: "pick-gamedata-stage"; nodeId: string; field: string; bad: string; options: string[] };

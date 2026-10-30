@@ -117,6 +117,6 @@ describe("save-game: resume at a pending choice", () => {
     expect(fb.getChoices().map((o) => o.id)).toEqual(["yes", "no"]); // rebuilt from the saved group
     fb.choose("yes");
     expect(fb.advance()).toMatchObject({ type: "line", id: "L_yes", text: "you have 1 gold" });
-    expect(fb.advance()).toEqual({ type: "end" });
+    expect(fb.advance()).toEqual({ type: "end", reason: "ended" });
   });
 });

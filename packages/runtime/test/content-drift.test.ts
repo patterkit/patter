@@ -43,7 +43,7 @@ describe("content drift on load", () => {
 
     expect(() => b.loadGame(save)).not.toThrow();
     // missing active snippet -> dropped; drifted block frame -> skipped -> the flow ends cleanly.
-    expect(b.getFlow("f")!.advance()).toEqual({ type: "end" });
+    expect(b.getFlow("f")!.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("a save mid-call whose CALLEE was deleted pops the drifted frame and resumes in the caller", () => {

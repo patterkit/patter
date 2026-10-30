@@ -133,7 +133,7 @@ describe("cross-engine: runtime evaluation through a host resolver", () => {
 
     // Advancing past the line runs onExit, writing @world.gold + 1 back into the
     // host's world state through the resolver.
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
     expect(world.gold).toBe(43);
     expect(engine.getProperty("@world.gold")).toBe(43);
   });
@@ -141,7 +141,7 @@ describe("cross-engine: runtime evaluation through a host resolver", () => {
   it("a foreign-gated snippet is skipped when the foreign condition fails", () => {
     const engine = engineFor({ gold: 5, locked: 1 }); // gold(5) > hp(10) is false
     const flow = engine.openFlow("main", { scene: "play" });
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("a declared writable:false foreign property still takes the GAME's write", () => {

@@ -137,6 +137,7 @@ namespace
 			: Err.kind == "best-match" ? EPatterPlayErrorKind::BestMatch
 			: Err.kind == "setup" ? EPatterPlayErrorKind::Setup
 			: Err.kind == "save" ? EPatterPlayErrorKind::Save
+			: Err.kind == "dry-choice" ? EPatterPlayErrorKind::DryChoice
 			: EPatterPlayErrorKind::Condition;
 		Out.Node = Ue(Err.node);
 		Out.Source = Ue(Err.source);
@@ -177,6 +178,7 @@ namespace
 		Out.Extensions = ToUeExtensions(S.extensions);   // Patter extension values, raw, as JSON text
 		if (S.hasTags) for (const std::string& T : S.tags) Out.Tags.Add(Ue(T));
 		if (S.type == patter::StepType::Choice) Out.GroupId = Ue(S.groupId);
+		if (S.type == patter::StepType::End && S.reason == patter::EndReason::RanDry) Out.EndReason = EPatterEndReason::RanDry;
 		for (const patter::ChoiceOption& O : S.options) Out.Options.Add(ConvertOption(O));
 		return Out;
 	}
@@ -422,7 +424,7 @@ UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, const TMap<FString, U
 		{
 			UE_LOG(LogPatterplay, Warning, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Err.message.c_str()));
 		}
-		else if (Err.kind == "save")
+		else if (Err.kind == "save" || Err.kind == "dry-choice")
 		{
 			UE_LOG(LogPatterplay, Warning, TEXT("Patterplay: flow '%s': %s"), UTF8_TO_TCHAR(Err.flow.c_str()), UTF8_TO_TCHAR(Err.message.c_str()));
 		}

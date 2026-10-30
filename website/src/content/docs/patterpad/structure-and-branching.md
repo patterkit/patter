@@ -123,14 +123,19 @@ part is up to your UI). It lets you show "the path you couldn't take." Reach for
 
 :::caution[A choice can run dry]
 If a choice ends up with nothing the player can take and no fallback, it steps past itself and the
-story carries on, rather than dead-ending the game at runtime. That runtime softness is deliberate (a
-shipped game should never hard-lock on a choice), but a silent fall-through is usually an accident, so
-the editor does not let it hide:
+story carries on, rather than dead-ending the game at runtime. That's deliberate (a shipped game should
+never hard-lock on a choice), and "ask until there's nothing left, then move on" is a real pattern. But
+when nothing comes after the choice, running dry ends the dialogue, which is usually an accident, so it
+doesn't hide:
 
-- Patterpad **warns** when a choice has no fallback and no unconditional option, since it can run dry if
-  every condition happens to fail.
+- Patterpad **warns**, on the choice itself, when a choice can run dry with nothing after it: every
+  option is conditional, or the choice comes round again (directly or through other blocks) and every
+  option is once-only. **Add a fallback** in the Problems bar adds one for you. Where play carries on
+  after the choice, it's a quieter note instead.
+- **Play** says so when a playtest ends because a choice ran dry, and points at the choice.
 - A **Coverage Test** (Review ▸ Coverage Test…) **flags any choice it actually saw run dry**, with a
   click-through to the offending choice.
+- A game hears about it too: the dialogue ends with the reason "ran-dry".
 
 Give such a choice a fallback option, or one unconditional option, to guarantee the player a way through.
 :::

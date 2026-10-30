@@ -229,7 +229,11 @@ static JsonValue normalize(const StepResult& s, bool idsOnly = false)
             o.set("options", std::move(opts));
             break;
         }
-        case StepType::End: o.set("type", JsonValue::Str("end")); break;
+        case StepType::End:
+            o.set("type", JsonValue::Str("end"));
+            // Recorded only when it ran dry (corpus 10); absent = "ended".
+            if (s.reason == EndReason::RanDry) o.set("reason", JsonValue::Str("ran-dry"));
+            break;
     }
     return o;
 }
@@ -3066,6 +3070,141 @@ static void runPlayErrorCases()
     std::cout << "  [play-errors] content errors played through and reported: " << g_playErrPass << "/" << g_playErrTotal << "\n";
 }
 
+// A choice that runs dry and ENDS the flow is reported, never thrown (Ian's rulings on choices that run dry,
+// 2026-10-30): onError gets a `dry-choice` naming the group, once, and the End step's reason is RanDry. The
+// corpus pins the transcript and the report; these mirror the JS tests (sticky-fallback.test.ts) and add the
+// checkpoint rollback, which no corpus case reaches.
+static int g_dryPass = 0, g_dryTotal = 0;
+
+static void dryCase(const std::string& name, const std::function<void()>& body)
+{
+    ++g_dryTotal;
+    try { body(); ++g_dryPass; }
+    catch (const std::exception& ex) { fail("dry-choice", name, ex.what()); }
+}
+
+static void runDryChoiceCases()
+{
+    // The hub: one once-only option that comes back. `after` follows the choice in the hub block.
+    const auto hub = [](const std::string& after)
+    {
+        return parseBundle(parseJ(std::string(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},
+      "strings":{"en":{"P":"Ask","ANS":"answered","ON":"carried on"}},
+      "scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","blocks":[{"id":"hub","type":"block","name":"Hub","gameId":"hub","children":[
+        {"id":"g","type":"group","selector":"choice","children":[
+          {"id":"ask","type":"group","prompt":{"id":"P","kind":"text"},"children":[
+            {"id":"sn_ans","type":"snippet","beats":[{"id":"ANS","kind":"text"}],"jump":{"to":"hub"}}]}]})JSON") + after + "]}]}}}"));
+    };
+    static const Bundle plain = hub("");
+    static const Bundle toEnd = hub(R"(,{"id":"fin","type":"snippet","jump":{"to":"END"}})");
+    static const Bundle carriesOn = hub(R"(,{"id":"on","type":"snippet","beats":[{"id":"ON","kind":"text"}]})");
+
+    struct Played { std::unique_ptr<Engine> engine; Flow* flow; std::shared_ptr<std::vector<PlayError>> errors; };
+    // Offered the choice, take the option, hear the answer: back at the hub, the option used.
+    const auto play = [](const Bundle& bundle)
+    {
+        Played p;
+        p.errors = std::make_shared<std::vector<PlayError>>();
+        EngineOptions opts; auto errors = p.errors;
+        opts.onError = [errors](const PlayError& e) { errors->push_back(e); };
+        p.engine = std::make_unique<Engine>(bundle, opts);
+        p.flow = p.engine->openFlow("f", "s");
+        need(p.flow->advance().type == StepType::Choice, "the hub was not offered");
+        p.flow->choose("ask");
+        need(p.flow->advance().id == "ANS", "the answer did not play");
+        return p;
+    };
+    const auto kinds = [](const std::vector<PlayError>& errors)
+    {
+        std::string out;
+        for (const auto& e : errors) out += (out.empty() ? "" : ",") + e.kind + "/" + e.node + "/" + e.flow;
+        return out;
+    };
+    const auto isEnd = [](const StepResult& r, EndReason why) { return r.type == StepType::End && r.reason == why; };
+
+    dryCase("reports it through onError once, and ends with reason RanDry", [&]
+    {
+        Played p = play(plain);
+        need(isEnd(p.flow->advance(), EndReason::RanDry), "the end did not say it ran dry");
+        need(kinds(*p.errors) == "dry-choice/g/f", "reports: " + kinds(*p.errors));
+        need(p.errors->front().message == "choice 'g' ran dry (no option left to take, and no fallback) with nothing after it, so the flow ended there",
+             "message: " + p.errors->front().message);
+        need(isEnd(p.flow->advance(), EndReason::RanDry), "asked again, the end changed");
+        need(p.errors->size() == 1, "asked again, it was reported again: " + kinds(*p.errors));
+    });
+    dryCase("an END straight after the dry choice still ends because it ran dry", [&]
+    {
+        Played p = play(toEnd);
+        need(isEnd(p.flow->advance(), EndReason::RanDry), "the end did not say it ran dry");
+        need(kinds(*p.errors) == "dry-choice/g/f", "reports: " + kinds(*p.errors));
+    });
+    dryCase("is silent when play carries on after it: the gather idiom", [&]
+    {
+        Played p = play(carriesOn);
+        need(p.flow->advance().id == "ON", "play did not carry on");
+        need(isEnd(p.flow->advance(), EndReason::Ended), "the end was not plain");
+        need(p.errors->empty(), "reports: " + kinds(*p.errors));
+    });
+    dryCase("keeps the reason across a save and load, without reporting it again", [&]
+    {
+        Played p = play(plain);
+        p.flow->advance();
+        const std::string json = serializeState(*p.engine);
+        need(json.find("\"ranDry\":\"g\"") != std::string::npos, "the save has no ranDry: " + json);
+        std::vector<PlayError> errors;
+        EngineOptions opts; opts.onError = [&errors](const PlayError& e) { errors.push_back(e); };
+        Engine again(plain, opts);
+        deserializeState(again, json);
+        need(isEnd(again.getFlow("f")->advance(), EndReason::RanDry), "the loaded flow's end did not say it ran dry");
+        need(errors.empty(), "the load reported: " + kinds(errors));
+        // Written only when set: a plain end's save has none.
+        Played q = play(carriesOn);
+        q.flow->advance(); q.flow->advance();
+        need(serializeState(*q.engine).find("ranDry") == std::string::npos, "a plain end's save carries ranDry");
+    });
+    dryCase("is plain Ended once the host ends it, and a goto that revives it runs dry again", [&]
+    {
+        Played p = play(plain);
+        p.flow->advance();
+        p.flow->gotoAddress("END");
+        need(isEnd(p.flow->advance(), EndReason::Ended), "goto END did not make it a plain end");
+        Played b = play(plain);
+        b.flow->advance();
+        b.flow->gotoAddress("s"); // an ended flow resumes; the choice is dry again, so it ends the same way, reported again
+        need(isEnd(b.flow->advance(), EndReason::RanDry), "the revived flow's end did not say it ran dry");
+        need(kinds(*b.errors) == "dry-choice/g/f,dry-choice/g/f", "reports: " + kinds(*b.errors));
+        Played c = play(plain);
+        c.flow->advance();
+        c.flow->reset();
+        need(c.flow->advance().type == StepType::Choice, "the reset flow was not offered the hub");
+    });
+    dryCase("a closed flow's advance is a plain end", [&]
+    {
+        Played p = play(plain);
+        p.flow->advance();
+        std::shared_ptr<Flow> held = p.engine->flowPtr("f"); // a stale reference the game kept
+        p.engine->closeFlow("f");
+        need(isEnd(held->advance(), EndReason::Ended), "a closed flow's end was not plain");
+    });
+    dryCase("a rollback puts the dry choice and the reason back with the rest of the cursor", [&]
+    {
+        Played p = play(plain);
+        Checkpoint cp = p.engine->checkpoint();
+        need(isEnd(p.flow->advance(), EndReason::RanDry), "the end did not say it ran dry");
+        p.engine->rollback(cp);
+        // Back before the end: the dry choice hasn't been met, so the end is met and reported again.
+        need(isEnd(p.flow->advance(), EndReason::RanDry), "after the rollback, the end did not say it ran dry");
+        need(p.errors->size() == 2, "reports: " + kinds(*p.errors));
+        Checkpoint cp2 = p.engine->checkpoint();
+        p.flow->gotoAddress("END");
+        need(isEnd(p.flow->advance(), EndReason::Ended), "goto END did not make it a plain end");
+        p.engine->rollback(cp2);
+        need(isEnd(p.flow->advance(), EndReason::RanDry), "the rollback did not put the reason back");
+        need(p.errors->size() == 2, "the restored reason was reported again: " + kinds(*p.errors));
+    });
+    std::cout << "  [dry-choice] a choice that runs dry and ends the flow, reported once, its end RanDry: " << g_dryPass << "/" << g_dryTotal << "\n";
+}
+
 // The one address rule, on the engine's lookups: a block address given with a scene resolves WITHIN that
 // scene only (its gameId there, then the internal id of a block in it), so a real block of another scene
 // gives nothing; with no scene, a block resolves by internal id. The corpus pins openFlow and goto; these
@@ -3680,6 +3819,7 @@ int main(int argc, char** argv)
     runFoundationsCheck();
     runHostScopeWritableSmoke();
     runPlayErrorCases();
+    runDryChoiceCases();
     runAddressLookupCases();
     runTraceLogSmoke();
     runOutlineSmoke();

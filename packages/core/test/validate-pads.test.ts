@@ -13,7 +13,7 @@ const project = (extra: Partial<ProjectFile> = {}): ProjectFile =>
 const scene = (beats: Beat[], padAfterDefault?: number): Scene => ({ id: "s", type: "scene", name: "S", blocks: [
   { id: "b", type: "block", name: "B", children: [{ id: "sn", type: "snippet", beats, ...(padAfterDefault !== undefined ? { padAfterDefault } : {}) }] },
 ] });
-const codes = (p: ProjectFile, s: Scene): Array<[string, string | undefined, "warning" | undefined]> =>
+const codes = (p: ProjectFile, s: Scene): Array<[string, string | undefined, "warning" | "info" | undefined]> =>
   validateProject({ project: p, scenes: [s] }).filter((i) => i.code.includes("pad")).map((i) => [i.code, i.id, i.severity]);
 
 describe("line padding validation", () => {
@@ -47,7 +47,7 @@ describe("a negative pause on an option's prompt", () => {
       { id: "o", type: "group", prompt: { id: "P", kind: "line", character: "TAM", padAfter: -0.5 }, children: [], ...option },
     ] }] },
   ] } as unknown as Scene);
-  const warned = (s: Scene): Array<[string, string | undefined, "warning" | undefined]> =>
+  const warned = (s: Scene): Array<[string, string | undefined, "warning" | "info" | undefined]> =>
     validateProject({ project: project(), scenes: [s] }).filter((i) => i.code === "prompt-pad-without-beat").map((i) => [i.code, i.id, i.severity]);
 
   it("is fine when the option starts with a beat: a line, a text beat, or a game event", () => {

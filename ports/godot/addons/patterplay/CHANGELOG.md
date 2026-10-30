@@ -6,6 +6,19 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A choice that runs dry and ends the flow is reported.** A choice with no option left to take and no
+  eligible fallback still gathers and never stops the story. When the flow then ends with nothing delivered
+  since, `on_error` gets it once, with kind `"dry-choice"`, `node` the choice group, and `flow` the flow. An
+  `END` reached straight after it still counts. Asking `advance()` again gives the same end without a second
+  report. A dry choice that play carries on past stays silent. `on_dry_choice` is unchanged.
+- **Every `"end"` step has a `"reason"`.** It's `"ran-dry"` when the flow ended that way, else `"ended"`
+  (the end of a block, an `END`, the host's `goto("END")`, or a closed flow). A save's flow cursor carries
+  `ranDry` (the group) only when it's set, so a loaded flow ends the same way without reporting it again.
+  `goto` to a scene, `reset`, and a checkpoint's rollback put it back as they do the rest of the cursor. The
+  conformance corpus is version 10.
+
 ## [0.36.0] - 2026-10-29
 
 ### Added

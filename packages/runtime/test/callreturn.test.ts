@@ -105,7 +105,7 @@ describe("sequential blocks + call-return", () => {
     e2.loadGame(save);
     const f2 = e2.getFlow("f")!;
     expect(f2.advance()).toMatchObject({ type: "line", text: "after" }); // popped back to main
-    expect(f2.advance()).toEqual({ type: "end" });
+    expect(f2.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("a run-group plays its children in order, then the block gathers", () => {

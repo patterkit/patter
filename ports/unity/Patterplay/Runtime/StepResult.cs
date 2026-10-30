@@ -9,6 +9,17 @@ namespace Patterkit.Patterplay
 {
     public enum StepType { Line, Text, GameEvent, Choice, End }
 
+    /// <summary>Why a flow ended (an End step's <see cref="StepResult.Reason"/>): the JS runtime's EndReason,
+    /// "ended" | "ran-dry".</summary>
+    public enum EndReason
+    {
+        /// <summary>Falling off the end of a block, an `END`, or the host's Goto("END").</summary>
+        Ended,
+        /// <summary>A choice ran dry (no option left to take, and no fallback) with nothing delivered after it,
+        /// so the flow ended there. Reported through EngineOptions.OnError too (a "dry-choice" problem).</summary>
+        RanDry,
+    }
+
     public sealed class ChoicePrompt
     {
         public string Kind;            // line | text
@@ -77,7 +88,10 @@ namespace Patterkit.Patterplay
         public List<string> Tags;            // author tags (#215); null when none
         public List<ChoiceOption> Options;   // choice only
         public string GroupId;               // choice only
+        /// <summary>End only: why the flow ended. <see cref="EndReason.RanDry"/> when a choice ran dry with nothing
+        /// delivered after it (a hub that ran out), else <see cref="EndReason.Ended"/>.</summary>
+        public EndReason Reason;
 
-        public static StepResult End() => new StepResult { Type = StepType.End };
+        public static StepResult End(EndReason reason = EndReason.Ended) => new StepResult { Type = StepType.End, Reason = reason };
     }
 }

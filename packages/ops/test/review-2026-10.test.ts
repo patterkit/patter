@@ -55,10 +55,19 @@ describe("a choice that can run dry is a warning (ruling B)", () => {
   it("passes validate, and leaves reachability on", () => {
     const loaded = loadProject(makeProject({ extra: [dry], strings: { P1: "Go", L2: "Gone." } }));
     const r = runValidate(loaded);
-    expect(r.structural.map((i) => [i.code, i.severity])).toContainEqual(["choice-can-empty", "warning"]);
-    expect(r.structural.filter((i) => i.severity !== "warning")).toEqual([]);
+    // Nothing follows it, so running dry would end the dialogue: the louder of the two (Ian's rulings, 2026-10-30).
+    expect(r.structural.map((i) => [i.code, i.severity])).toContainEqual(["choice-ends-dry", "warning"]);
+    expect(r.structural.filter((i) => i.severity === undefined)).toEqual([]);
     expect(r.ok).toBe(true);
     expect(() => runExport(loaded)).not.toThrow();
+  });
+  it("a note (a dry choice that carries on) is no error either", () => {
+    const after = { id: "nAfter", type: "snippet", beats: [{ id: "L9", kind: "text" }] };
+    const loaded = loadProject(makeProject({ extra: [dry, after], strings: { P1: "Go", L2: "Gone.", L9: "On." } }));
+    const r = runValidate(loaded);
+    expect(r.structural.map((i) => [i.code, i.severity])).toContainEqual(["choice-can-empty", "info"]);
+    expect(r.ok).toBe(true);
+    expect(exportBlockers(loaded)).toEqual([]);
   });
 });
 

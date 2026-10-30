@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   newId, slug, hash4, parseSource, canonicalStringify, validateProject,
 } from "@patterkit/core";
-import type { ProjectFile, Scene, AuthoringFile } from "@patterkit/model";
+import type { ProjectFile, Scene, AuthoringFile, Group, Snippet } from "@patterkit/model";
 
 // --- fixtures ---------------------------------------------------------------
 
@@ -23,7 +23,8 @@ function scene(): Scene {
       { id: "blk_intro", type: "block", name: "Intro", children: [
         { id: "sn_hello", type: "snippet", beats: [{ id: "L_1", kind: "line", character: "BARKEEP" }] },
         { id: "grp_choice", type: "group", selector: "choice", children: [
-          { id: "opt_a", type: "snippet", beats: [{ id: "L_2", kind: "line", character: "PLAYER" }], jump: { to: "blk_job" } },
+          // Sticky: the Job block jumps back here, so a once-only option would leave the choice to run dry.
+          { id: "opt_a", type: "snippet", sticky: true, beats: [{ id: "L_2", kind: "line", character: "PLAYER" }], jump: { to: "blk_job" } },
         ] },
       ] },
       { id: "blk_job", type: "block", name: "Job", children: [
@@ -201,48 +202,142 @@ describe("validateProject", () => {
     ],
   });
 
-  it("warns (choice-can-empty) when a re-enterable choice is all once-only with no fallback", () => {
-    expect(codes(hub([{}, {}]))).toContain("choice-can-empty");
+  /** The dry-choice issue for choice `g`, as [code, severity], or undefined when there is none. */
+  const dry = (...scenes: Scene[]): [string, string | undefined] | undefined => {
+    const i = validateProject({ project: project(), scenes }).find((x) => x.id === "g" && (x.code === "choice-ends-dry" || x.code === "choice-can-empty"));
+    return i ? [i.code, i.severity] : undefined;
+  };
+
+  it("warns (choice-ends-dry) when a re-enterable choice is all once-only with no fallback, and nothing follows it", () => {
+    expect(dry(hub([{}, {}]))).toEqual(["choice-ends-dry", "warning"]);
   });
   it("does NOT warn when a sticky option keeps the loop alive", () => {
-    expect(codes(hub([{}, { sticky: true }]))).not.toContain("choice-can-empty");
+    expect(dry(hub([{}, { sticky: true }]))).toBeUndefined();
   });
   it("does NOT warn when a fallback covers the loop", () => {
-    expect(codes(hub([{}, { fallback: true }]))).not.toContain("choice-can-empty");
+    expect(dry(hub([{}, { fallback: true }]))).toBeUndefined();
   });
   it("does NOT warn when the choice jumps AWAY (not re-enterable)", () => {
-    // The base scene's choice option jumps to blk_job, never back to its own block.
-    expect(codes(scene())).not.toContain("choice-can-empty");
+    // The base scene's choice option jumps to blk_job, which here ends rather than coming back.
+    const s = scene();
+    delete (s.blocks[0]!.children[1] as Group).children![0]!.sticky;
+    s.blocks[1]!.children[1] = { id: "dv_back", type: "snippet", jump: { to: "END" } };
+    expect(dry(s)).toBeUndefined();
   });
   it("errors (multiple-fallbacks) on more than one fallback in a choice", () => {
     expect(codes(hub([{ fallback: true }, { fallback: true }]))).toContain("multiple-fallbacks");
   });
 
+  // --- re-entry round other blocks, and what follows a dry choice (Ian's rulings, 2026-10-30) ------------
+  /** A hub whose options jump to a hall, and a hall that jumps back to the hub: re-entered, but not directly. */
+  const roundTheHall = (after: Array<Group | Snippet> = []): Scene => ({
+    id: "scn", type: "scene", name: "Hub", blocks: [
+      { id: "hub", type: "block", name: "Hub", children: [
+        { id: "g", type: "group", selector: "choice", children: [0, 1].map((i) => ({
+          id: `o${i}`, type: "group", prompt: { id: `C${i}`, kind: "text" },
+          children: [{ id: `o${i}c`, type: "snippet", jump: { to: "hall" } }],
+        })) },
+        ...after,
+      ] },
+      { id: "hall", type: "block", name: "Hall", children: [
+        { id: "h1", type: "snippet", beats: [{ id: "H1", kind: "text" }], jump: { to: "hub" } },
+      ] },
+    ],
+  });
+  it("finds a hub re-entered round another block (options jump to a hall, the hall jumps back)", () => {
+    expect(dry(roundTheHall())).toEqual(["choice-ends-dry", "warning"]);
+  });
+  it("finds a hub re-entered round another scene's first block", () => {
+    const s = roundTheHall();
+    s.blocks[1]!.children[0] = { id: "h1", type: "snippet", jump: { to: "scn2" } };
+    const other: Scene = { id: "scn2", type: "scene", name: "Other", blocks: [
+      { id: "far", type: "block", name: "Far", children: [{ id: "f1", type: "snippet", beats: [{ id: "F1", kind: "text" }], jump: { to: "hub" } }] },
+    ] };
+    expect(dry(s, other)).toEqual(["choice-ends-dry", "warning"]);
+  });
+  it("finds a hub whose options carry on and the block jumps back to itself after the choice", () => {
+    const s: Scene = { id: "scn", type: "scene", name: "Hub", blocks: [
+      { id: "hub", type: "block", name: "Hub", children: [
+        { id: "g", type: "group", selector: "choice", children: [0, 1].map((i) => ({
+          id: `o${i}`, type: "group", prompt: { id: `C${i}`, kind: "text" },
+          children: [{ id: `o${i}c`, type: "snippet", beats: [{ id: `B${i}`, kind: "text" }] }],
+        })) },
+        { id: "back", type: "snippet", beats: [{ id: "BK", kind: "text" }], jump: { to: "hub" } },
+      ] },
+    ] };
+    // Something follows the choice, so running dry carries on: a note, not a warning.
+    expect(dry(s)).toEqual(["choice-can-empty", "info"]);
+  });
+  it("notes (choice-can-empty, info) a dry choice with something after it in the block", () => {
+    expect(dry(roundTheHall([{ id: "next", type: "snippet", beats: [{ id: "N", kind: "text" }] }]))).toEqual(["choice-can-empty", "info"]);
+  });
+  it("still warns when all that follows is a bare jump to END: the dialogue ends because the choice ran dry", () => {
+    expect(dry(roundTheHall([{ id: "end", type: "snippet", jump: { to: "END" } }]))).toEqual(["choice-ends-dry", "warning"]);
+  });
+  it("notes, rather than warns, where the block is only ever called: it returns to its caller", () => {
+    const s = roundTheHall();
+    const caller: Scene = { id: "scn0", type: "scene", name: "Start", blocks: [
+      { id: "start", type: "block", name: "Start", children: [
+        { id: "c", type: "snippet", jump: { to: "hub", mode: "call" } },
+        { id: "after", type: "snippet", beats: [{ id: "A", kind: "text" }] },
+      ] },
+    ] };
+    s.blocks[1]!.children[0] = { id: "h1", type: "snippet", beats: [{ id: "H1", kind: "text" }], jump: { to: "hub", mode: "call" } };
+    expect(dry(caller, s)).toEqual(["choice-can-empty", "info"]);
+  });
+  it("leaves out a choice inside a once-only option of another choice: it plays at most once", () => {
+    const s = roundTheHall();
+    const inner = s.blocks[0]!.children[0] as Group;
+    s.blocks[0]!.children[0] = { id: "outer", type: "group", selector: "choice", children: [
+      { id: "oo", type: "group", prompt: { id: "OO", kind: "text" }, children: [inner, { id: "oj", type: "snippet", jump: { to: "hub" } }] },
+      { id: "os", type: "group", sticky: true, prompt: { id: "OS", kind: "text" }, children: [{ id: "osj", type: "snippet", jump: { to: "hub" } }] },
+    ] } as Group;
+    expect(dry(s)).toBeUndefined();
+    // Made sticky, the outer option can bring play back to the inner choice, which then empties.
+    (s.blocks[0]!.children[0] as Group).children![0]!.sticky = true;
+    expect(dry(s)).toEqual(["choice-can-empty", "info"]);
+  });
+  it("does not count a sibling beside an option, or beside a branch, as following the choice", () => {
+    const s = roundTheHall();
+    // Wrap the choice in a branch with a second branch child: that child never plays after the choice.
+    const choice = s.blocks[0]!.children[0]!;
+    s.blocks[0]!.children[0] = { id: "br", type: "group", selector: "branch", children: [
+      { id: "br1", type: "group", condition: "@world.a", children: [choice] },
+      { id: "br2", type: "snippet", beats: [{ id: "X", kind: "text" }] },
+    ] } as Group;
+    expect(dry(s)).toEqual(["choice-ends-dry", "warning"]);
+  });
+
   // --- dry choice: no guaranteed path (every option conditional, no unconditional fallback) --------------
   /** A NON-re-enterable choice (options jump to END) with per-option {condition, fallback}. Isolates the
    *  "all conditions fail" dry path from the re-entrant-exhaustion one (the options never loop back). */
-  const gated = (opts: Array<Partial<{ condition: string; fallback: boolean }>>): Scene => ({
+  const gated = (opts: Array<Partial<{ condition: string; fallback: boolean }>>, after: Array<Group | Snippet> = []): Scene => ({
     id: "scn", type: "scene", name: "Gate", blocks: [
       { id: "blk", type: "block", name: "B", children: [
         { id: "g", type: "group", selector: "choice", children: opts.map((o, i) => ({
           id: `o${i}`, type: "group", prompt: { id: `C${i}`, kind: "text" }, condition: o.condition, fallback: o.fallback,
           children: [{ id: `o${i}c`, type: "snippet", jump: { to: "END" } }],
         })) },
+        ...after,
       ] },
     ],
   });
 
-  it("warns (choice-can-empty) when every option is conditional and there is no fallback", () => {
-    expect(codes(gated([{ condition: "@world.a" }, { condition: "@world.b" }]))).toContain("choice-can-empty");
+  it("warns (choice-ends-dry) when every option is conditional, there is no fallback, and nothing follows", () => {
+    expect(dry(gated([{ condition: "@world.a" }, { condition: "@world.b" }]))).toEqual(["choice-ends-dry", "warning"]);
+  });
+  it("notes (choice-can-empty) the same choice with something after it", () => {
+    expect(dry(gated([{ condition: "@world.a" }, { condition: "@world.b" }], [{ id: "n", type: "snippet", beats: [{ id: "N", kind: "text" }] }])))
+      .toEqual(["choice-can-empty", "info"]);
   });
   it("does NOT warn when at least one option is unconditional", () => {
-    expect(codes(gated([{ condition: "@world.a" }, {}]))).not.toContain("choice-can-empty");
+    expect(dry(gated([{ condition: "@world.a" }, {}]))).toBeUndefined();
   });
   it("still warns when the only fallback is ITSELF conditional (it can fail too)", () => {
-    expect(codes(gated([{ condition: "@world.a" }, { condition: "@world.b", fallback: true }]))).toContain("choice-can-empty");
+    expect(dry(gated([{ condition: "@world.a" }, { condition: "@world.b", fallback: true }]))).toEqual(["choice-ends-dry", "warning"]);
   });
   it("does NOT warn when an unconditional fallback guarantees an escape", () => {
-    expect(codes(gated([{ condition: "@world.a" }, { fallback: true }]))).not.toContain("choice-can-empty");
+    expect(dry(gated([{ condition: "@world.a" }, { fallback: true }]))).toBeUndefined();
   });
 
   it("flags a speaker not in the cast", () => {

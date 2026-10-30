@@ -207,7 +207,8 @@ namespace Patterkit.Patterplay
     /// value. The story never stops for one. A condition that fails counts as false; an effect that fails is
     /// skipped and the rest of its list still runs; a part of a Best-match condition that fails scores as
     /// false. The engine also reports how it was set up ("setup": a locale the bundle doesn't have, a host
-    /// scope it doesn't declare) and a load whose place has gone from the build ("save"). Each is reported,
+    /// scope it doesn't declare), a load whose place has gone from the build ("save"), and a choice that ran dry
+    /// and so ended the flow ("dry-choice": a hub whose options were all used, say). Each is reported,
     /// through <see cref="EngineOptions.OnError"/> and as a `diagnostic` entry in the decision log; a report
     /// made while the engine is being built reaches them as the constructor ends. The same rule holds on all
     /// four runtimes. Parity with the JS runtime's PlayError.
@@ -217,8 +218,9 @@ namespace Patterkit.Patterplay
         /// <summary>The flow it happened in; "" for a "setup" report, which belongs to no flow.</summary>
         public string Flow;
         /// <summary>What it was: "condition", "effect", or "best-match" (a part of a condition being scored
-        /// for Best match) that failed; "setup", how the engine was set up; or "save", a load whose saved place
-        /// has gone.</summary>
+        /// for Best match) that failed; "setup", how the engine was set up; "save", a load whose saved place
+        /// has gone; or "dry-choice", a choice that ran dry with nothing delivered after it, so the flow ended
+        /// there (its Node is the choice group).</summary>
         public string Kind;
         /// <summary>The snippet, group, or option whose condition failed, or that owns the effect (a scene,
         /// for its onEntry). For "setup", the locale or host-scope token at fault. For "save", the saved
@@ -231,7 +233,7 @@ namespace Patterkit.Patterplay
         /// <summary>One line for a console: what it was, where, and why.</summary>
         public override string ToString()
             => Kind == "setup" ? Message
-            : Kind == "save" ? $"flow '{Flow}': {Message}"
+            : Kind == "save" || Kind == "dry-choice" ? $"flow '{Flow}': {Message}"
             : $"{Kind} on {Node} in flow '{Flow}' failed, played through: {Message}";
     }
 
@@ -1989,6 +1991,9 @@ namespace Patterkit.Patterplay
         public uint RngState;
         public Dictionary<string, int> Visits;
         public bool FlowEnded;
+        /// <summary>The choice group whose running dry ended the flow (its End step's EndReason.RanDry); null
+        /// otherwise. Written to a save only when set, and honoured on a load only when FlowEnded.</summary>
+        public string RanDry;
         public string CurrentSceneId;
         public List<StackFrame> Stack;
         public string ActiveSnippetId;

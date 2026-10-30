@@ -619,6 +619,8 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
       seed: Math.floor(rng() * 0x100000000),
       onDryChoice: (groupId) => dryThisRun.add(groupId),
       onError: (e) => {
+        // A choice that ran dry and ended the run is already counted by onDryChoice: listed once, as a dry choice.
+        if (e.kind === "dry-choice") return;
         const key = `${e.kind}|${e.node}|${e.message}`;
         if (!errorsThisRun.has(key)) errorsThisRun.set(key, { kind: e.kind, node: e.node, ...(e.source ? { source: e.source } : {}), message: e.message });
       },

@@ -140,10 +140,12 @@ namespace Patterkit.Patterplay
             var cursor = new JObject
             {
                 ["flowEnded"] = f.FlowEnded,
-                ["currentSceneId"] = Str(f.CurrentSceneId),
-                ["stack"] = stack,
-                ["activeSnippetId"] = Str(f.ActiveSnippetId),
             };
+            // Why it ended, when a choice running dry ended it: written only then.
+            if (f.RanDry != null) cursor["ranDry"] = f.RanDry;
+            cursor["currentSceneId"] = Str(f.CurrentSceneId);
+            cursor["stack"] = stack;
+            cursor["activeSnippetId"] = Str(f.ActiveSnippetId);
             // The next beat by id; absent when no snippet is active or every beat is delivered.
             if (f.BeatId != null) cursor["beatId"] = f.BeatId;
             cursor["pendingChoice"] = pending;
@@ -345,6 +347,7 @@ namespace Patterkit.Patterplay
             snapshot.RngState = Mulberry32.ToUint32((double?)Get(f, "rngState") ?? 0);
             snapshot.Visits = ReadIntMap(Obj(f, "visits"));
             snapshot.FlowEnded = (bool?)Get(c, "flowEnded") ?? false;
+            snapshot.RanDry = Get(c, "ranDry") is JToken rd && rd.Type == JTokenType.String ? (string)rd : null;
             snapshot.CurrentSceneId = StrOrNull(c, "currentSceneId");
             snapshot.Stack = stack;
             snapshot.ActiveSnippetId = StrOrNull(c, "activeSnippetId");

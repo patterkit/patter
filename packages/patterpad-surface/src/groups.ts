@@ -536,6 +536,25 @@ export function insertOption(state: EditorState, choicePos: number): Transaction
   return insertFreshOption(state, choicePos, choicePos + node.nodeSize - 1); // just inside the choice's end
 }
 
+/** Append a fresh option marked as the choice's fallback: the quick fix for a choice that can run dry and end
+ *  the dialogue (`choice-ends-dry`, Ian's rulings 2026-10-30). Its content is what happens once nothing else
+ *  is left. Null when the choice already has a fallback: there's at most one, and that one wants its condition
+ *  looked at, not a second beside it. */
+export function insertFallbackOption(state: EditorState, choicePos: number): Transaction | null {
+  const node = state.doc.nodeAt(choicePos);
+  if (!node || !isChoiceGroup(node)) return null;
+  let has = false;
+  node.forEach((c) => { if (c.type.name === "group" && (JSON.parse(c.attrs.raw as string) as { fallback?: boolean }).fallback === true) has = true; });
+  if (has) return null;
+  const at = choicePos + node.nodeSize - 1;
+  const tr = insertFreshOption(state, choicePos, at);
+  const option = tr.doc.nodeAt(at);
+  if (!option || option.type.name !== "group") return null;
+  const raw = JSON.parse(option.attrs.raw as string) as Record<string, unknown>;
+  raw.fallback = true;
+  return tr.setNodeMarkup(at, undefined, { ...option.attrs, raw: JSON.stringify(raw) });
+}
+
 /** Insert a fresh Option group right AFTER the given option (the per-option "+ option",
  *  mirroring how "+ block" adds after a block). Only valid on a choice's direct child. */
 export function insertOptionAfter(state: EditorState, optionPos: number): Transaction | null {

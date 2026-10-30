@@ -7,6 +7,19 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A flow that ends because a choice ran dry says so.** When a choice with no option left to take and no
+  fallback is followed by the flow ending, with nothing delivered in between (a hub whose options have all
+  been used, say), the engine reports it once through `OnError` as `EPatterPlayErrorKind::DryChoice`, naming
+  the choice's group, and the `End` step's new `EndReason` (`EPatterEndReason`) is `RanDry`. Every other end
+  is `Ended`, as is the end after a host's `Goto("END")`. An `END` straight after the choice still counts.
+  Asking again gives the same end without a second report, and a save keeps it in the flow's cursor
+  (`ranDry`, written only when set), so a loaded game ends the same way without reporting it again. A
+  checkpoint's rollback puts it back with the rest of the cursor. In the C++ core it's
+  `patter::StepResult::reason` (`patter::EndReason`) and the `"dry-choice"` `PlayError`. A dry choice that
+  play carries on past stays silent, and `OnDryChoice` is unchanged. The conformance corpus is version 10.
+
 ## [0.36.0] - 2026-10-29
 
 ### Added

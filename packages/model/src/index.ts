@@ -1532,6 +1532,8 @@ export interface SavedChoice {
 /** The flow's execution position: where it is, and what it is waiting on. */
 export interface FlowCursor {
   flowEnded: boolean;
+  /** The choice group whose running dry ended the flow (its `end` step's reason "ran-dry"). Present only then. */
+  ranDry?: string;
   currentSceneId: string | null;
   /** The continuation stack (call frames + the active block run), root first. */
   stack: StackFrame[];

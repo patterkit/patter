@@ -97,9 +97,11 @@ too.
 
 The engine's **`OnError`** event hears every problem it carried on past (an `FPatterPlayError`): a content
 error, a `Setup` problem (a locale the bundle doesn't have, a host scope it doesn't declare), or a `Save`
-report (a load whose place has gone from this build). `OnError` can only be bound once `Create` has
-returned, so a `Setup` problem found while the engine is made is logged and put in the decision log at
-once, and reaches `OnError` on the first `OpenFlow`.
+report (a load whose place has gone from this build), or a `DryChoice` (a choice that ran dry with nothing
+after it, so the flow ended there). `OnError` can only be bound once `Create` has returned, so a `Setup`
+problem found while the engine is made is logged and put in the decision log at once, and reaches `OnError`
+on the first `OpenFlow`. An end step's **`EndReason`** is `RanDry` in that last case and `Ended` otherwise
+(see [Why a flow ended](/play/engine/#why-a-flow-ended)).
 
 The **PatterplayDemo** sample project (the second folder in the release zip) holds two working
 references. Press **Play** in it and **`ATourDemoActor`** runs the complete interactive Patter

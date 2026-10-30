@@ -26,6 +26,12 @@ var _prng := PatterMulberry32.new(0)  # the seeded PRNG; its `a` is the saved rn
 
 var _started := false
 var _flow_ended := false
+## The choice that last ran dry, while nothing has been delivered since: if the flow ends with it set,
+## it ended because that choice ran dry. "" = none.
+var _dry_choice := ""
+## The choice whose running dry ended this flow, once it has (the end step's reason "ran-dry"); saved.
+## "" = none.
+var _ran_dry := ""
 # Closed by the engine (see close()). Terminal, and distinct from _flow_ended: an ENDED flow is
 # merely out of content and goto() revives it; a CLOSED one is finished for good.
 var _closed := false
@@ -162,7 +168,7 @@ func advance_to_stop() -> Dictionary:
 		if t == "choice" or t == "end":
 			return {"played": played, "stop": r}
 		played.append(r)
-	return {"played": played, "stop": {"type": "end"}}
+	return {"played": played, "stop": {"type": "end", "reason": "ended"}}
 
 
 # Send this flow's cursor to an ADDRESS, exactly as an authored `go` jump would: the target scene's
@@ -182,6 +188,8 @@ func goto(scene: String, block: String = "") -> bool:
 		_beat_index = 0
 		_flow_ended = true
 		_stack = []
+		_dry_choice = ""
+		_ran_dry = ""   # the host ended it: "ended", whatever ran dry before
 		return true
 	# Resolve BOTH addresses before touching state, so a bad one is a no-op rather than a half-move.
 	var scene_id := resolve_scene(_host, scene)
@@ -202,6 +210,8 @@ func goto(scene: String, block: String = "") -> bool:
 	_active_snippet = null
 	_beat_index = 0        # abandon the rest of the snippet being delivered
 	_flow_ended = false    # an ended flow resumes at the target
+	_dry_choice = ""
+	_ran_dry = ""
 	_enter_target(block_id if block_id != "" else scene_id, "jump")  # replace the stack, like an authored goto
 	_settle()
 	return true
@@ -249,7 +259,8 @@ func _touch() -> void:
 	for f in _stack:
 		frames.append((f as Dictionary).duplicate())   # frames advance in place (index += 1), so copy them
 	journal["undo"].append(_put_cursor_back.bind([_prng.a, _started, _flow_ended, _current_scene_id,
-		_active_snippet, _beat_index, _pending, _pending_prompt_beat, _pending_prompt_owner, frames, _pending_prompt_shown]))
+		_active_snippet, _beat_index, _pending, _pending_prompt_beat, _pending_prompt_owner, frames, _pending_prompt_shown,
+		_dry_choice, _ran_dry]))
 
 
 ## The undo of _touch(): the cursor fields and the stack as they were when the checkpoint first saw this flow.
@@ -265,6 +276,8 @@ func _put_cursor_back(c: Array) -> void:
 	_pending_prompt_owner = c[8]
 	_stack = c[9]
 	_pending_prompt_shown = c[10]
+	_dry_choice = c[11]
+	_ran_dry = c[12]
 
 
 ## Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
@@ -343,7 +356,7 @@ func get_choices() -> Array:
 ## Why the last advance() or choose() was refused (also push_error'd), or "" when it wasn't: a flow that
 ## hasn't started, no choice pending, an unknown or greyed option, a jump to nowhere, or a jump cycle
 ## that never settles. Set on a refusal and cleared by the next of those calls that succeeds. GDScript
-## can't throw, so a refused advance() returns {"type": "end"} and says why here.
+## can't throw, so a refused advance() returns {"type": "end", "reason": "ended"} and says why here.
 func last_error() -> String:
 	return _last_error
 
@@ -410,6 +423,8 @@ func _begin(scene_id: String = "", block_id: String = "") -> void:
 	_stack = []
 	_current_scene_id = ""
 	_flow_ended = false
+	_dry_choice = ""
+	_ran_dry = ""
 	_active_snippet = null
 	_beat_index = 0
 	_clear_pending()
@@ -442,10 +457,10 @@ func _begin(scene_id: String = "", block_id: String = "") -> void:
 func advance() -> Dictionary:
 	_last_error = ""
 	if _closed:
-		return {"type": "end"}  # a stale reference to a closed flow drives nothing
+		return {"type": "end", "reason": "ended"}  # a stale reference to a closed flow drives nothing
 	if not _started:
 		_refuse("flow has not been started")
-		return {"type": "end"}
+		return {"type": "end", "reason": "ended"}
 	_touch()
 	if _pending_prompt_beat != null:
 		var b = _pending_prompt_beat
@@ -456,17 +471,30 @@ func advance() -> Dictionary:
 		return _prompt_result(b, shown) if shown != null else _beat_result(b)
 	_settle()
 	if _last_error != "":
-		return {"type": "end"}   # refused part way: last_error() says why
+		return {"type": "end", "reason": "ended"}   # refused part way: last_error() says why
+	if not _flow_ended and _active_snippet == null and _pending == null:
+		_flow_ended = true
 	if _flow_ended:
-		return {"type": "end"}
+		return _end_result()
+	_dry_choice = ""   # a choice or a beat comes after it: play carried on past the dry choice
 	if _pending != null:
 		return {"type": "choice", "groupId": _pending["group_id"], "options": _offer()}
-	if _active_snippet == null:
-		_flow_ended = true
-		return {"type": "end"}
 	var beat = _active_snippet.get("beats", [])[_beat_index]
 	_beat_index += 1
 	return _beat_result(beat)
+
+
+## The end step. The first time a flow reports its end straight after a choice ran dry, that choice is
+## why it ended: say so through on_error, once (kind "dry-choice"). An explicit END reached after it still
+## counts; a block simply ending, with nothing dry, is just the end. Its "reason" is "ran-dry" or "ended".
+func _end_result() -> Dictionary:
+	if _dry_choice != "":
+		var group := _dry_choice
+		_dry_choice = ""
+		_ran_dry = group
+		_report({"flow": id, "kind": "dry-choice", "node": group,
+			"message": "choice '%s' ran dry (no option left to take, and no fallback) with nothing after it, so the flow ended there" % group})
+	return {"type": "end", "reason": "ran-dry" if _ran_dry != "" else "ended"}
 
 
 ## Pick an eligible option by id; the next advance() runs it. A refusal (no choice pending, an unknown
@@ -822,6 +850,7 @@ func _setup_choice(group: Dictionary) -> void:
 	var on_dry = _host.on_dry_choice
 	if on_dry is Callable and (on_dry as Callable).is_valid():
 		(on_dry as Callable).call(group["id"])
+	_dry_choice = str(group["id"])   # if the flow ends before anything else plays, this is why
 
 
 # -- jumps ---------------------------------------------------------------------
@@ -1846,6 +1875,9 @@ func snapshot() -> Dictionary:
 		"pendingPromptOwnerId": _pending_prompt_owner if _pending_prompt_owner != "" else null,
 		"selectors": _save_selectors(_selectors),
 	}
+	# Why it ended, when a choice running dry ended it: so a loaded game reports the same end.
+	if _ran_dry != "":
+		cursor["ranDry"] = _ran_dry
 	# The next beat by id, so an edit to the snippet can't move it; none once every beat is delivered.
 	if _active_snippet != null:
 		var beats: Array = _active_snippet.get("beats", [])
@@ -1907,6 +1939,9 @@ func _restore_cursor(snap: Dictionary) -> Dictionary:
 	_visit_counts = (snap.get("visits", {}) as Dictionary).duplicate(true)
 	_started = true
 	_flow_ended = bool(c.get("flowEnded", false))
+	_dry_choice = ""
+	var rd = c.get("ranDry")
+	_ran_dry = str(rd) if _flow_ended and rd is String else ""
 	var csid = c.get("currentSceneId")
 	_current_scene_id = str(csid) if csid != null else ""
 	var asid = c.get("activeSnippetId")

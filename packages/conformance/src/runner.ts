@@ -480,7 +480,7 @@ export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
         return opt;
       }) };
     case "end":
-      return { type: "end" };
+      return r.reason === "ran-dry" ? { type: "end", reason: "ran-dry" } : { type: "end" };
   }
 }
 

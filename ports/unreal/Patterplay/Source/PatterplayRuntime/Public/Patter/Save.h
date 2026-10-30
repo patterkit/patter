@@ -134,6 +134,9 @@ namespace patter
             // is null, not "" (this core keeps "" for none).
             out += ",\"cursor\":{";
             out += std::string("\"flowEnded\":") + (f.flowEnded ? "true" : "false");
+            // Why it ended, when a choice running dry ended it (its group), so a loaded game ends the same way.
+            // Written only then, as the JS reference writes it.
+            if (!f.ranDry.empty()) out += ",\"ranDry\":" + jsonQuote(f.ranDry);
             out += ",\"currentSceneId\":" + nullableJson(f.currentSceneId);
             out += ",\"stack\":[";
             for (size_t i = 0; i < f.stack.size(); ++i)
@@ -432,6 +435,7 @@ namespace patter
             if (!cursor || cursor->t != JV::T::Obj) throw std::runtime_error("malformed save: a flow has no cursor");
             const JV& c = *cursor;
             f.flowEnded = c.boolean("flowEnded");
+            f.ranDry = c.str("ranDry");                    // absent (any save before it) -> "": it didn't run dry
             f.currentSceneId = c.str("currentSceneId");   // null -> "" (this core's "none")
             if (const JV* stack = c.get("stack"))
                 for (const auto& e : stack->arr)

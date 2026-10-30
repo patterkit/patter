@@ -2067,6 +2067,11 @@ let playError: string | null = null;
 let playWarnings: string[] = [];
 /** Hand a batch over with any content errors gathered since the last one. */
 const withWarnings = (b: PlayBatch): PlayBatch => (playWarnings.length ? { ...b, warnings: playWarnings.splice(0) } : b);
+// The choice whose running dry ended the run, as the engine reported it (null until one does).
+let playDryChoice: string | null = null;
+/** The `end` stop, saying when the run ended because a choice ran dry (Ian's rulings, 2026-10-30). */
+const endBatch = (steps: PlayStep[], r: { reason: string }): PlayBatch =>
+  withWarnings({ steps, stop: "end", ...(r.reason === "ran-dry" && playDryChoice ? { ranDry: { choiceId: playDryChoice, scene: flow?.currentScene ?? undefined } } : {}) });
 // The registry the run is built on when it stands other engines in (a game scopes folder, and a bundle
 // naming someone else's scope); null when the engine made its own, as it always did before.
 let playRegistry: ScopeRegistry | null = null;
@@ -2159,9 +2164,14 @@ export function startPlay(sceneId: string, blockId?: string): void {
     // Playing alone: a scope the story names that another tool owns is stood in from the game's scopes folder.
     playRegistry = previewRegistry(loaded.gameScopes, playBundle) ?? null;
     playWarnings = [];
+    playDryChoice = null;
     engine = new Engine(playBundle, {
       ...(locale ? { locale } : {}), closedCaptions: playCaptionsOn, ...(playRegistry ? { registry: playRegistry } : {}),
-      onError: (e) => { playWarnings.push(`${e.kind} on ${e.node}${e.source ? ` (${e.source})` : ""}: ${e.message}`); },
+      // A choice that ran dry and ended the run isn't something played through: the end says so instead.
+      onError: (e) => {
+        if (e.kind === "dry-choice") { playDryChoice = e.node; return; }
+        playWarnings.push(`${e.kind} on ${e.node}${e.source ? ` (${e.source})` : ""}: ${e.message}`);
+      },
     });
     flow = engine.openFlow("main", { scene: sceneId, ...(blockId ? { block: blockId } : {}) });
     playError = null;
@@ -2260,7 +2270,7 @@ export function playStep(): PlayBatch {
   try {
     const r = flow.advance();
     if (r.type === "choice") return withWarnings({ steps: [], stop: "choice", options: mapOptions(r.options), choiceId: r.groupId, choiceScene: flow.currentScene ?? undefined });
-    if (r.type === "end") return withWarnings({ steps: [], stop: "end" });
+    if (r.type === "end") return endBatch([], r);
     return withWarnings({ steps: [toStep(r, flow.currentScene)!], stop: "continue" });
   } catch (e) { return withWarnings(errBatch(e)); }
 }
@@ -2275,7 +2285,7 @@ export function playToStop(): PlayBatch {
     for (;;) {
       const r = flow.advance();
       if (r.type === "choice") return withWarnings({ steps, stop: "choice", options: mapOptions(r.options), choiceId: r.groupId, choiceScene: flow.currentScene ?? undefined });
-      if (r.type === "end") return withWarnings({ steps, stop: "end" });
+      if (r.type === "end") return endBatch(steps, r);
       const s = toStep(r, flow.currentScene);
       if (s) steps.push(s);
     }
@@ -2288,6 +2298,21 @@ export function playChoose(optionId: string): void {
 }
 
 /** The speaker of a dialogue beat by id (for the unknown-character quick-fix), or undefined. */
+/** Whether the choice group `choiceId` already has a fallback option (the add-fallback quick-fix adds one only
+ *  where there's none: a conditional fallback wants its condition looked at, not a second fallback). */
+function choiceHasFallback(p: LoadedProject, choiceId: string): boolean {
+  for (const scene of p.scenes) {
+    for (const block of scene.blocks) {
+      let found: boolean | undefined;
+      walkNodes<Group | Snippet>(block.children, (n) => {
+        if (n.type === "group" && n.id === choiceId) found = (n.children ?? []).some((c) => c.fallback === true);
+      });
+      if (found !== undefined) return found;
+    }
+  }
+  return false;
+}
+
 function beatCharacter(p: LoadedProject, beatId: string): string | undefined {
   for (const scene of p.scenes) {
     for (const block of scene.blocks) {
@@ -2390,6 +2415,8 @@ export function validate(live?: LiveSceneSource): ProblemsDto {
         base.fix = { kind: "retarget-jump", snippetId: i.id };
       } else if (i.code === "missing-prompt" && i.id) {
         base.fix = { kind: "add-prompt", optionId: i.id };
+      } else if (i.code === "choice-ends-dry" && i.id && !choiceHasFallback(fresh, i.id)) {
+        base.fix = { kind: "add-fallback", choiceId: i.id };
       } else if (i.code === "invalid-gamedata-value" && i.id && i.offLadder) {
         // A stage the field's ladder no longer has: only the writer knows where the value belongs now.
         base.fix = { kind: "pick-gamedata-stage", nodeId: i.id, field: i.offLadder.field, bad: i.offLadder.bad, options: i.offLadder.options };

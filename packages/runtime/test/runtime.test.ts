@@ -95,7 +95,7 @@ describe("Engine", () => {
     expect(flow.getProperty("@hp")).toBe(15);
 
     // Falling off the END jump ends the flow.
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
     expect(flow.isEnded()).toBe(true);
   });
 
@@ -227,7 +227,7 @@ describe("Engine", () => {
     // onEntry ran at entry, reading the scene-local default (7) + 1.
     expect(flow.getProperty("@flips")).toBe(8);
     expect(flow.advance()).toMatchObject({ type: "text", id: "T", text: "hi" });
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("mixes line, narration, and a choice in one scene (text-adventure shape)", () => {
@@ -286,7 +286,7 @@ describe("Engine", () => {
 
     flow.choose("north");
     expect(flow.advance()).toMatchObject({ type: "text", id: "O_north", text: "Go north" });
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("advances a sequence selector across re-entries", () => {
@@ -316,6 +316,6 @@ describe("Engine", () => {
     const flow = engine.openFlow("main", { scene: "s" });
     expect(flow.advance()).toMatchObject({ type: "line", id: "L1" });
     expect(flow.advance()).toMatchObject({ type: "line", id: "L2" });
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
   });
 });

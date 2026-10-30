@@ -33,6 +33,22 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **A choice that runs dry and ends the flow says so.** It still gathers and never throws, but when nothing is
+  delivered after it before the flow ends (a hub whose once-only options have all been used, with no fallback),
+  `onError` hears a `PlayError` of the new kind `dry-choice`, naming the choice, once. A dry choice that play
+  carries on past stays silent: that's the "ask until there's nothing left, then move on" idiom.
+- **Why a flow ended.** The `end` step carries `reason`: `"ran-dry"` in that case (an `END` straight after the
+  dry choice still counts), `"ended"` otherwise, including the host's `goto("END")`. The new type `EndReason`
+  names the two. The reason survives save and load (the flow cursor's optional `ranDry`), and a load doesn't
+  report it again. The conformance corpus is version 10, with two cases that hold all four runtimes to it.
+
+### Changed
+
+- Every `end` step now has `reason`, so code that compares one deeply with `{ type: "end" }` needs updating;
+  checking `step.type === "end"` is unaffected.
+
 ## [0.36.0] - 2026-10-29
 
 ### Added

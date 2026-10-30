@@ -55,6 +55,6 @@ describe("temporary scene props", () => {
     expect(flow.advance()).toMatchObject({ type: "text", text: "persist=1 temp=1" });
     // tunnels s1 -> s2 -> s1: temp reseeds to 0 then bumps to 1; persist stays 1 then bumps to 2
     expect(flow.advance()).toMatchObject({ type: "text", text: "persist=2 temp=1" });
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
   });
 });

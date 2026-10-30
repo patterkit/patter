@@ -27,7 +27,7 @@ import { toggleLineType, flipToFreeText, promoteToDialogue } from "../src/linety
 import { context } from "../src/context.js";
 import { inspect, inspectScene, type InspectorContext } from "../src/inspect.js";
 import { duplicateChunk, notifyDuplicated, setDuplicateHandler, DUPLICABLE_KINDS } from "../src/duplicate.js";
-import { STRUCTURAL_MOVE, insertBlock, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, deleteBlock, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining, seedBeatInSnippet } from "../src/groups.js";
+import { STRUCTURAL_MOVE, insertBlock, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, insertFallbackOption, addOptionPrompt, deleteChunk as deleteChunkCmd, deleteBlock, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining, seedBeatInSnippet } from "../src/groups.js";
 import { structureGuard, refusal } from "../src/guard.js";
 import { projectPad, keepTimingOnJoin } from "../src/pad.js";
 import { clipboardText, pasteParagraphs } from "../src/paste.js";
@@ -351,6 +351,9 @@ export interface SurfaceHandle {
   /** Insert an empty prompt cell into the OPTION with this id (the `missing-prompt` quick-fix). False
    *  if the id isn't a prompt-less option. */
   addPrompt(optionId: string): boolean;
+  /** Append a fallback option to the CHOICE with this id (the `choice-ends-dry` quick-fix). False if it isn't
+   *  a choice, or already has a fallback. */
+  addFallback(choiceId: string): boolean;
   /** Delete the chunk (snippet / group / option) with this id. */
   deleteChunk(id: string): boolean;
   /** Duplicate what's currently selected - the node-selected block / group / snippet, else the chunk
@@ -1523,6 +1526,14 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       const at = findNodePos(optionId);
       if (at == null) return false;
       const tr = addOptionPrompt(view.state, at);
+      if (!tr) return false;
+      view.dispatch(tr);
+      return true;
+    },
+    addFallback(choiceId) {
+      const at = findNodePos(choiceId);
+      if (at == null) return false;
+      const tr = insertFallbackOption(view.state, at);
       if (!tr) return false;
       view.dispatch(tr);
       return true;

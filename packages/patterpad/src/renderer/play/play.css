@@ -110,5 +110,8 @@ body.play {
 .play-stop:hover { border-color: var(--danger); color: var(--danger); }
 .pnote { color: var(--muted); font: var(--text-md) var(--font-ui); text-align: center; padding: 5px; }
 .pnote.error { color: var(--danger); } /* an error in the danger colour, as the problems bar shows one */
+/* A run that ended because a choice ran dry: a warning, in the problems bar's warning colour, not the plain end. */
+.pnote.dry { color: var(--warn); display: flex; flex-direction: column; gap: 2px; }
+.pnote.dry span { color: var(--muted); }
 /* `.pnote.stale` is gone: the stale session draws the shell's `staleBar` banner now (stale.css). */
 

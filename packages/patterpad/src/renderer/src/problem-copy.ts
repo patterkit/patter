@@ -62,9 +62,13 @@ export const PATTERPAD_PROBLEM_COPY: ProblemCopyTable = {
   "empty-container": () => ({ text: "This is empty.", next: "Add something inside it." }),
   "empty-scene": (p) => ({ text: `${p.title ? problemName(p) : "This scene"} has nothing in it yet.` }),
   "missing-name": (p) => ({ text: `${problemName(p)} needs a name.` }),
+  "choice-ends-dry": () => ({
+    text: "This choice can run dry, and the dialogue would end there.",
+    next: "Once its options are used up, nothing comes after it. Add a fallback to say what happens then.",
+  }),
   "choice-can-empty": () => ({
-    text: "This choice can run dry.",
-    next: "Once each option is used up and there's no fallback, it has nothing left to show.",
+    text: "This choice can run dry, and then the story carries on past it.",
+    next: "That's often what you want: ask until there's nothing left, then move on.",
   }),
   "multiple-fallbacks": () => ({ text: "A choice can have at most one fallback option." }),
   "jump-cycle": () => ({

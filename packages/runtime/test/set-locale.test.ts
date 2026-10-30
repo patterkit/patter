@@ -38,7 +38,7 @@ describe("Engine.setLocale - live language switch", () => {
     engine.setLocale("fr");
     // The flow CONTINUED to T2 (not restarted to T1), and T2 rendered in French.
     expect(flow.advance()).toMatchObject({ type: "text", id: "T2", text: "Au revoir" });
-    expect(flow.advance()).toMatchObject({ type: "end" });
+    expect(flow.advance()).toMatchObject({ type: "end", reason: "ended" });
   });
 
   it("reports the active locale and defaults to the source", () => {

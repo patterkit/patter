@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { EditorState, TextSelection } from "prosemirror-state";
 import type { Scene, Group } from "@patterkit/model";
 import { sceneToDoc, docToScene } from "../src/bridge.js";
-import { insertChunk, insertOption, insertOptionAfter, setGroupProps, addOptionPrompt, seedSnippet } from "../src/groups.js";
+import { insertChunk, insertOption, insertOptionAfter, insertFallbackOption, setGroupProps, addOptionPrompt, seedSnippet } from "../src/groups.js";
 import { context } from "../src/context.js";
 import { optionPromptId } from "../src/zoneutil.js";
 
@@ -50,6 +50,17 @@ describe("choice option editing", () => {
     expect((choice.children[1] as Group).type).toBe("group");          // the new option is an Option group
     expect((choice.children[1] as Group).children[0]!.type).toBe("snippet"); // ...with a bubble
     expect(caretInPromptOf(out, 1)).toBe(true);                        // the choice text first, as a new choice does
+  });
+
+  it("insertFallbackOption appends an option marked as the fallback, and only when there isn't one", () => {
+    const s0 = emptyBubbleState();
+    const s = s0.apply(insertChunk(s0, "choice")!);
+    const out = s.apply(insertFallbackOption(s, choicePos(s))!);
+    const choice = choiceOf(out);
+    expect(choice.children).toHaveLength(2);
+    expect((choice.children[0] as Group).fallback).toBeUndefined();
+    expect((choice.children[1] as Group).fallback).toBe(true);
+    expect(insertFallbackOption(out, choicePos(out))).toBeNull(); // at most one fallback per choice
   });
 
   it("setGroupProps edits an option's secret flag", () => {

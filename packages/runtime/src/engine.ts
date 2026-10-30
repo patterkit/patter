@@ -168,7 +168,13 @@ export type StepResult =
   | { type: "text"; id: string; text: string; padAfter: number; action?: true; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "choice"; groupId: string; options: ChoiceOption[] }
-  | { type: "end" };
+  /** The flow has finished. `reason` is `"ran-dry"` when it ended because a choice ran dry with nothing
+   *  delivered after it (a hub that ran out, reported through `onError` too), else `"ended"`: falling off
+   *  the end of a block, an `END`, or the host's `goto("END")`. */
+  | { type: "end"; reason: EndReason };
+
+/** Why a flow ended (see the `end` step). */
+export type EndReason = "ended" | "ran-dry";
 
 // --- Static structure introspection (editor / dev tooling) -------------------
 // A read-only view of the AUTHORED tree (scenes -> blocks -> groups/snippets -> beats), for dev
@@ -349,9 +355,10 @@ export type TraceEvent =
     }
   /** A choice the player answered. `option` is what they took. */
   | { type: "chose"; group: string; option: string }
-  /** A choice with no takeable option and no eligible fallback, which falls through
-   *  silently. Also reported through `onDryChoice`, which stays: a log is an audit read
-   *  afterwards, that callback is live feedback a host acts on. */
+  /** A choice with no takeable option and no eligible fallback, which falls through.
+   *  Also reported through `onDryChoice`, which stays: a log is an audit read afterwards,
+   *  that callback is live feedback a host acts on. One that ends the flow is reported
+   *  through `onError` as well (a `dry-choice` problem). */
   | { type: "dry"; group: string }
   | { type: "jump"; to: string; mode: "jump" | "call" }
   /** One landed effect; `prev` is the value it replaced, so a reader can say "0 -> 1". */
@@ -366,7 +373,8 @@ export type TraceEvent =
  * The story never stops for one. A condition that fails counts as false; an effect that fails is skipped
  * and the rest of its list still runs; a part of a Best-match condition that fails scores as false. The
  * engine also reports how it was set up (`setup`: a locale the bundle doesn't have, a host scope it doesn't
- * declare, an option it doesn't take) and a load whose place has gone from the build (`save`). Each is
+ * declare, an option it doesn't take), a load whose place has gone from the build (`save`), and a choice that
+ * ran dry and so ended the flow (`dry-choice`: a hub whose options were all used, say). Each is
  * reported, through `EngineOptions.onError` and as a `diagnostic` entry in the decision log; a report made
  * while the engine is being built reaches them as the constructor ends. The same rule holds on all four
  * runtimes, including the two whose languages cannot throw.
@@ -375,8 +383,9 @@ export interface PlayError {
   /** The flow it happened in; "" for a `setup` report, which belongs to no flow. */
   flow: string;
   /** What it was: a condition, an effect, or a part of a condition being scored for Best match that failed;
-   *  how the engine was set up (`setup`); or a load whose saved place has gone (`save`). */
-  kind: "condition" | "effect" | "best-match" | "setup" | "save";
+   *  how the engine was set up (`setup`); a load whose saved place has gone (`save`); or a choice that ran dry
+   *  with nothing delivered after it, so the flow ended there (`dry-choice`, whose `node` is the choice group). */
+  kind: "condition" | "effect" | "best-match" | "setup" | "save" | "dry-choice";
   /** The snippet, group, or option whose condition failed, or that owns the effect (a scene, for its onEntry).
    *  For `setup`, the locale, host-scope token, or option key at fault. For `save`, the saved snippet (or, at a
    *  pending choice, its group) that has gone. */
@@ -1671,6 +1680,11 @@ export class Flow {
   // `activeSnippet`/`beatIndex`.
   private started = false;
   private flowEnded = false;
+  /** The choice that last ran dry, while nothing has been delivered since: if the flow ends with it set, it
+   *  ended because that choice ran dry. */
+  private dryChoice: string | null = null;
+  /** The choice whose running dry ended this flow, once it has (the `end` step's "ran-dry"); saved. */
+  private ranDry: string | null = null;
   /** Closed by the engine (see `close()`). Terminal, and distinct from `flowEnded`: an ENDED flow is
    *  merely out of content and `goto` revives it; a CLOSED one is finished for good. */
   private closed = false;
@@ -1821,6 +1835,7 @@ export class Flow {
     this.stack = [];
     this.currentSceneId = null;
     this.flowEnded = false;
+    this.dryChoice = null; this.ranDry = null;
     this.activeSnippet = null;
     this.beatIndex = 0;
     this.clearPending();
@@ -1877,6 +1892,7 @@ export class Flow {
       this.started = true; this.clearPending();
       this.activeSnippet = null; this.beatIndex = 0;
       this.flowEnded = true; this.stack = [];
+      this.dryChoice = null; this.ranDry = null; // the host ended it: "ended", whatever ran dry before
       return true;
     }
     // Resolve BOTH addresses before touching any state, so a bad one is a no-op rather than a half-move.
@@ -1893,6 +1909,7 @@ export class Flow {
     this.clearPending();
     this.activeSnippet = null; this.beatIndex = 0; // abandon the rest of the snippet being delivered
     this.flowEnded = false;                        // an ended flow resumes at the target
+    this.dryChoice = null; this.ranDry = null;
     this.enterTarget(blockId ?? sceneId, "jump");  // "jump" = replace the stack, exactly like an authored goto
     this.settle();
     return true;
@@ -1937,10 +1954,10 @@ export class Flow {
     const journal = this.host.journal;
     if (!journal || journal.flows.has(this)) return;
     journal.flows.add(this);
-    const { rngState, started, flowEnded, currentSceneId, activeSnippet, beatIndex, pendingChoice, pendingPrompt, pendingPromptOwnerId } = this;
+    const { rngState, started, flowEnded, dryChoice, ranDry, currentSceneId, activeSnippet, beatIndex, pendingChoice, pendingPrompt, pendingPromptOwnerId } = this;
     const stack = this.stack.map((f) => ({ ...f })); // frames advance in place, so copy them
     journal.undo.push(() => {
-      Object.assign(this, { rngState, started, flowEnded, currentSceneId, activeSnippet, beatIndex, pendingChoice, pendingPrompt, pendingPromptOwnerId, stack });
+      Object.assign(this, { rngState, started, flowEnded, dryChoice, ranDry, currentSceneId, activeSnippet, beatIndex, pendingChoice, pendingPrompt, pendingPromptOwnerId, stack });
     });
   }
 
@@ -1954,16 +1971,31 @@ export class Flow {
 
   /** Run until the next line, game event, choice, or the end of the flow. */
   advance(): StepResult {
-    if (this.closed) return { type: "end" }; // a stale reference to a closed flow drives nothing
+    if (this.closed) return { type: "end", reason: "ended" }; // a stale reference to a closed flow drives nothing
     if (!this.started) throw new Error("flow has not been started");
     this.touch();
     // A replayed prompt (replayPromptOnChoose) is delivered first, before the option's content.
     if (this.pendingPrompt) { const p = this.pendingPrompt; this.pendingPrompt = null; this.pendingPromptOwnerId = null; return p.shown ? this.promptResult(p.beat, p.shown) : this.beatResult(p.beat); }
     this.settle();
-    if (this.flowEnded) return { type: "end" };
+    if (!this.flowEnded && !this.activeSnippet && !this.pendingChoice) this.flowEnded = true;
+    if (this.flowEnded) return this.endResult();
+    this.dryChoice = null; // a choice or a beat comes after it: play carried on past the dry choice
     if (this.pendingChoice) return { type: "choice", groupId: this.pendingChoice.groupId, options: this.offer(this.pendingChoice) };
-    if (!this.activeSnippet) { this.flowEnded = true; return { type: "end" }; }
-    return this.beatResult(this.activeSnippet.beats![this.beatIndex++]!);
+    return this.beatResult(this.activeSnippet!.beats![this.beatIndex++]!);
+  }
+
+  /** The `end` step. The first time a flow reports its end straight after a choice ran dry, that choice is
+   *  why it ended: say so through `onError`, once (Ian's rulings on choices that run dry, 2026-10-30). An
+   *  explicit `END` reached after it still counts; a block simply ending, with nothing dry, is just the end. */
+  private endResult(): StepResult {
+    if (this.dryChoice !== null) {
+      const group = this.dryChoice;
+      this.dryChoice = null;
+      this.ranDry = group;
+      this.report({ flow: this.id, kind: "dry-choice", node: group,
+        message: `choice '${group}' ran dry (no option left to take, and no fallback) with nothing after it, so the flow ended there` });
+    }
+    return { type: "end", reason: this.ranDry !== null ? "ran-dry" : "ended" };
   }
 
   /**
@@ -2222,6 +2254,8 @@ export class Flow {
       visits: Object.fromEntries(this.visitCounts),
       cursor: {
         flowEnded: this.flowEnded,
+        // Why it ended, when a choice running dry ended it: so a loaded game reports the same end.
+        ...(this.ranDry !== null ? { ranDry: this.ranDry } : {}),
         currentSceneId: this.currentSceneId,
         // Stamp each frame with the id of the child it would run next (nextId), so a restore against
         // an EDITED bundle re-finds the position by id instead of trusting the raw index (§9.8 /
@@ -2281,6 +2315,8 @@ export class Flow {
     const c = snap.cursor;
     this.started = true;
     this.flowEnded = c.flowEnded;
+    this.dryChoice = null;
+    this.ranDry = c.flowEnded && typeof c.ranDry === "string" ? c.ranDry : null;
     this.currentSceneId = c.currentSceneId;
     let drift: Drift | null = null;
     // Re-bind each frame to the CURRENT bundle: prefer the saved next-child id (survives siblings
@@ -2461,6 +2497,7 @@ export class Flow {
     // live feedback a host acts on the moment it happens, the log is read afterwards, and a
     // shipped game runs with the log off and this hook still wired.
     this.host.onDryChoice?.(group.id);
+    this.dryChoice = group.id; // if the flow ends before anything else plays, this is why
   }
 
   // -- Jumps (jump / call-return) ----------------------------------------

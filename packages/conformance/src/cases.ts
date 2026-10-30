@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import type { DescribeFixture, DurationCase, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
-import type { Bundle, CompiledGroup, CompiledSnippet, ProjectFile, LocaleFile, SaveGame, Scene } from "@patterkit/model";
+import type { Bundle, CompiledGroup, CompiledSnippet, Group, ProjectFile, LocaleFile, SaveGame, Scene, Snippet } from "@patterkit/model";
 import { castStringKey, qualifierStringKey, speakerLabelKey, SPEAKER_PATTERN_KEY } from "@patterkit/model";
 import type { ExtensionShard } from "@patterkit/model";
 import { readFileSync } from "node:fs";
@@ -1032,6 +1032,58 @@ const ruleAllGreyedRunsDry = {
   locales: [loc("s", { L1: "one", L2: "two", L3: "three", FB: "nothing for it", AFTER: "moving on" })],
   expectedTranscript: [{ type: "text", id: "FB", text: "nothing for it" }, { type: "text", id: "AFTER", text: "moving on" }, { type: "end" }],
 } satisfies RuntimeFixture;
+
+// A choice that runs dry and ENDS the flow is reported, never thrown (Ian's rulings, 2026-10-30): `onError` gets a
+// `dry-choice` naming the group, once, and the end step says `reason: "ran-dry"` (recorded here only when it isn't
+// the plain "ended"). An END reached straight after still counts. It survives a save and load, unreported; the
+// host's goto("END") is a plain end. A dry choice that play carries on past is the gather idiom: silent.
+const dryHub = (after: Array<Group | Snippet>): Scene[] => [{ id: "s", type: "scene", name: "S", blocks: [
+  { id: "hub", type: "block", name: "Hub", children: [
+    { id: "g_hub", type: "group", selector: "choice", children: [
+      { id: "o_ask", type: "group", prompt: { id: "P_ask", kind: "text" }, children: [
+        { id: "sn_ans", type: "snippet", beats: [{ id: "ANS", kind: "text" }], jump: { to: "hub" } },
+      ] },
+    ] },
+    ...after,
+  ] },
+] }];
+const dryHubChoice: TranscriptStep = { type: "choice", groupId: "g_hub", options: [{ id: "o_ask", eligible: true, prompt: { kind: "text", text: "Ask" } }] };
+const scriptedDryChoiceEnds = {
+  name: "dry choice: one that ends the flow is reported once, and the end says ran-dry, through a save",
+  project: project(),
+  scenes: dryHub([{ id: "sn_end", type: "snippet", jump: { to: "END" } }]),
+  locales: [loc("s", { P_ask: "Ask", ANS: "answered" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [dryHubChoice] },
+    { op: "choose", id: "o_ask" },
+    { op: "advance", expect: [{ type: "text", id: "ANS", text: "answered" }] },
+    { op: "advance", expect: [{ type: "end", reason: "ran-dry" }] }, // back at the hub, the option used: dry, then END
+    { op: "expectErrors", expectResult: [{ kind: "dry-choice", node: "g_hub", flow: "main" }] },
+    { op: "advance", expect: [{ type: "end", reason: "ran-dry" }] }, // asked again: the same end, not reported again
+    { op: "saveLoad" },
+    { op: "advance", expect: [{ type: "end", reason: "ran-dry" }] },
+    { op: "expectErrors", expectResult: [] },
+    { op: "goto", scene: "END" },
+    { op: "advance", expect: [{ type: "end" }] },
+    { op: "expectErrors", expectResult: [] },
+  ],
+} satisfies ScriptedFixture;
+const scriptedDryChoiceCarriesOn = {
+  name: "dry choice: one that play carries on past is silent, and the end is plain",
+  project: project(),
+  scenes: dryHub([{ id: "sn_on", type: "snippet", beats: [{ id: "ON", kind: "text" }] }]),
+  locales: [loc("s", { P_ask: "Ask", ANS: "answered", ON: "carried on" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [dryHubChoice] },
+    { op: "choose", id: "o_ask" },
+    { op: "advance", expect: [{ type: "text", id: "ANS", text: "answered" }] },
+    { op: "advance", expect: [{ type: "text", id: "ON", text: "carried on" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+    { op: "expectErrors", expectResult: [] },
+  ],
+} satisfies ScriptedFixture;
 
 // Flow.reset (an alias of start) on all four runtimes: it forgets the flow's own state and anything waiting
 // to be delivered, and begins again. Here the per-flow @mine counts entries to the opening, and a reset between
@@ -4294,7 +4346,8 @@ export const cases: Fixtures = {
     scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited,
     scriptedExtensions, scriptedExtensionsCompile, scriptedNoExtensions,
     scriptedLocaleRule, scriptedLocaleNoRegion, scriptedLocaleIds, scriptedHostScopeWrongCase, scriptedHostWrites, scriptedGameDataCopied,
-    scriptedChoiceFollowsLocale, scriptedSaveBeatInserted, scriptedSaveBeatDeleted, scriptedSaveOptionDeleted, scriptedSaveChoiceRewritten],
+    scriptedChoiceFollowsLocale, scriptedSaveBeatInserted, scriptedSaveBeatDeleted, scriptedSaveOptionDeleted, scriptedSaveChoiceRewritten,
+    scriptedDryChoiceEnds, scriptedDryChoiceCarriesOn],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults, gameDataQuality, gameDataQualityDefaults, gameDataOption, gameDataOptionDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),

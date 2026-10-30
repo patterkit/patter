@@ -109,6 +109,8 @@ developer to wire it in; it's a few lines, described in
 
 ## Testing every path, not just the one you took
 
-Playing walks *one* route at a time. To check that *every* line is reachable, and to catch
-choices that can silently run dry, use the **Coverage Test** (Review ▸ Coverage Test…). See
+Playing walks *one* route at a time. If a run ends because a choice ran dry (its options all
+used, no fallback, and nothing after it), the play window says so rather than "The End", and
+moves the editor to the choice. To check that *every* line is reachable, and to catch
+choices that can run dry on any route, use the **Coverage Test** (Review ▸ Coverage Test…). See
 [Coverage testing](/production/coverage-testing/).

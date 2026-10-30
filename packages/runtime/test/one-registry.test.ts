@@ -295,7 +295,7 @@ describe("other engines' scopes", () => {
     const registry = new ScopeRegistry().defineOwned("story", [{ name: "act", type: "number", default: 2 }], { owner: "Storylet Engine" });
     const flow = new Engine(gateBundle, { registry }).openFlow("f", { scene: "gate" });
     expect(flow.advance()).toMatchObject({ type: "text", text: "act 2" });
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
     expect(registry.get("story", "act")).toBe(3);
   });
 

@@ -131,7 +131,14 @@ scene** - import, open the scene, press Play, nothing to set up:
   (`Bundle.Start`), else at the first scene.
 - **Problems the engine carried on past** reach `EngineOptions.OnError` as a `PlayError`: content that
   failed at run time, a set-up problem (`"setup"`: a locale the bundle doesn't have, a host scope it
-  doesn't declare), and a moved save (`"save"`). Without a handler, each is a `[Patterplay]` warning.
+  doesn't declare), a moved save (`"save"`), and a choice that ran dry and so ended the flow
+  (`"dry-choice"`). Without a handler, each is a `[Patterplay]` warning.
+- **Why a flow ended**: an `End` step's `Reason` is `EndReason.Ended`, or `EndReason.RanDry` when a choice
+  ran dry (no option left to take, and no fallback) with nothing played after it, so the flow ended there:
+  a hub whose options were all used, say. That case is also reported once through `OnError`, its `Node`
+  the choice group. A dry choice that play carries on past is the gather idiom and stays silent (only
+  `EngineOptions.OnDryChoice` hears it). The reason survives a save and load; the host's `Goto("END")` is a
+  plain `Ended`.
 - **Set one flow aside**: `engine.CaptureFlow(id)` returns its part of a save as a `FlowState` (its
   position, PRNG, visits, selectors, and its own property values, without its id). Close the flow after
   capturing, keep the state as JSON with `PatterSave.SaveFlowState` / `ReadFlowState`, and

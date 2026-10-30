@@ -80,6 +80,7 @@ func _initialize() -> void:
 	_check_default_reporting()
 	_check_save_refusals()
 	_check_flow_state_refusals()
+	_check_dry_choice()
 	print("test_play_errors: ALL PASS" if _fails == 0 else "test_play_errors: %d FAILED" % _fails)
 	quit(1 if _fails > 0 else 0)
 
@@ -250,6 +251,117 @@ func _check_flow_state_refusals() -> void:
 ## Two plain-data Dictionaries, compared through JSON (key order aside, as a save is read).
 static func _same(a: Dictionary, b: Dictionary) -> bool:
 	return JSON.parse_string(JSON.stringify(a)) == JSON.parse_string(JSON.stringify(b))
+
+
+## The dry-choice hub: one option that plays once and comes back, then `after` in the same block.
+func _dry_bundle(after: Array) -> Dictionary:
+	var children: Array = [{"id": "g", "type": "group", "selector": "choice", "children": [
+		{"id": "o_ask", "type": "group", "prompt": {"id": "P_ask", "kind": "text"}, "children": [
+			{"id": "sn_ans", "type": "snippet", "beats": [{"id": "ANS", "kind": "text"}], "jump": {"to": "hub"}},
+		]},
+	]}]
+	children.append_array(after)
+	return {
+		"schema": "patter/bundle@0",
+		"locales": {"default": "en", "included": ["en"]},
+		"strings": {"en": {"P_ask": "Ask", "ANS": "answered", "ON": "carried on"}},
+		"scenes": {"s": {"id": "s", "gameId": "s", "type": "scene", "name": "S",
+			"blocks": [{"id": "hub", "type": "block", "name": "Hub", "children": children}]}},
+	}
+
+
+## Open the hub, take its one option, and play it: the next advance finds the choice dry.
+func _dry_play(after: Array, errors: Array) -> PatterEngine:
+	var engine := PatterEngine.new(_dry_bundle(after), {"seed": 1,
+		"on_error": func(e: Dictionary) -> void: errors.append(e)})
+	var flow := engine.open_flow("f", "s")
+	flow.advance()
+	flow.choose("o_ask")
+	flow.advance()
+	return engine
+
+
+func _kinds(errors: Array) -> Array:
+	var out: Array = []
+	for e in errors:
+		out.append(e["kind"])
+	return out
+
+
+## A choice that runs dry and then ends the flow: reported once through on_error (kind "dry-choice"), and
+## the end step's reason says "ran-dry". The corpus pins the transcript and the report; this pins what it
+## cannot: the message, rollback, restore's rule, reset, a host goto to a scene, and a closed flow.
+func _check_dry_choice() -> void:
+	var errors: Array = []
+	var engine := _dry_play([], errors)
+	var flow := engine.get_flow("f")
+	var end := flow.advance()
+	_expect(end == {"type": "end", "reason": "ran-dry"}, "dry: the end says it ran dry: " + str(end))
+	_expect(errors.size() == 1 and errors[0]["kind"] == "dry-choice" and errors[0]["node"] == "g"
+		and errors[0]["flow"] == "f" and str(errors[0]["message"]).contains("'g' ran dry"),
+		"dry: reported once, naming the group and the flow: " + str(errors))
+	_expect(flow.advance() == {"type": "end", "reason": "ran-dry"} and errors.size() == 1,
+		"dry: asked again, the same end and no second report")
+	var snap := flow.snapshot()
+	_expect(snap["cursor"].get("ranDry") == "g", "dry: the save cursor carries ranDry")
+
+	# A load keeps the reason and doesn't report it again; restore honours ranDry only on an ended flow.
+	var save := engine.save_game()
+	var errors2: Array = []
+	var again := PatterEngine.new(_dry_bundle([]), {"seed": 1,
+		"on_error": func(e: Dictionary) -> void: errors2.append(e)})
+	_expect(again.load_game(JSON.parse_string(JSON.stringify(save))), "dry: the save loads")
+	_expect(again.get_flow("f").advance() == {"type": "end", "reason": "ran-dry"} and errors2.is_empty(),
+		"dry: a loaded flow ends the same way, unreported: " + str(errors2))
+	var live := PatterEngine.new(_dry_bundle([]), {"seed": 1}).open_flow("f", "s")
+	var not_ended := live.snapshot()
+	not_ended["cursor"]["ranDry"] = "g"
+	live.restore(not_ended)
+	_expect(live.advance()["type"] == "choice", "dry: a stray ranDry on a flow that hasn't ended is ignored")
+
+	# A checkpoint rolled back puts the dry choice back, so the end is reported again when replayed.
+	errors.clear()
+	var e3 := _dry_play([], errors)
+	var cp := e3.checkpoint()
+	_expect(e3.get_flow("f").advance()["reason"] == "ran-dry", "dry: ends ran-dry inside a checkpoint")
+	e3.rollback(cp)
+	_expect(e3.get_flow("f").snapshot()["cursor"].get("ranDry") == null, "dry: rollback clears ranDry")
+	_expect(e3.get_flow("f").advance()["reason"] == "ran-dry" and _kinds(errors) == ["dry-choice", "dry-choice"],
+		"dry: after rollback the end is reported again: " + str(_kinds(errors)))
+
+	# An END straight after the dry choice still counts.
+	errors.clear()
+	var e4 := _dry_play([{"id": "sn_end", "type": "snippet", "jump": {"to": "END"}}], errors)
+	_expect(e4.get_flow("f").advance() == {"type": "end", "reason": "ran-dry"} and _kinds(errors) == ["dry-choice"],
+		"dry: an END straight after it still ran dry")
+
+	# Play that carries on past it is the gather idiom: silent, and a plain end.
+	errors.clear()
+	var e5 := _dry_play([{"id": "sn_on", "type": "snippet", "beats": [{"id": "ON", "kind": "text"}]}], errors)
+	var f5 := e5.get_flow("f")
+	_expect(f5.advance().get("text") == "carried on", "dry: play carries on past it")
+	_expect(f5.advance() == {"type": "end", "reason": "ended"} and errors.is_empty(),
+		"dry: carried on, the end is plain and nothing is reported: " + str(errors))
+	_expect(not f5.snapshot()["cursor"].has("ranDry"), "dry: ranDry is written only when set")
+
+	# The host's goto("END") is a plain end; goto to a scene revives it (dry again, reported again); reset clears.
+	errors.clear()
+	var e6 := _dry_play([], errors)
+	var f6 := e6.get_flow("f")
+	f6.advance()
+	f6.goto("END")
+	_expect(f6.advance() == {"type": "end", "reason": "ended"}, "dry: the host's goto(\"END\") is a plain end")
+	errors.clear()
+	var e7 := _dry_play([], errors)
+	var f7 := e7.get_flow("f")
+	f7.advance()
+	f7.goto("s")
+	_expect(f7.advance()["reason"] == "ran-dry" and _kinds(errors) == ["dry-choice", "dry-choice"],
+		"dry: goto a scene revives it, and it runs dry again: " + str(_kinds(errors)))
+	f7.reset("s")
+	_expect(f7.advance()["type"] == "choice", "dry: reset begins again")
+	e7.close_flow("f")
+	_expect(f7.advance() == {"type": "end", "reason": "ended"}, "dry: a closed flow's advance is a plain end")
 
 
 func _untouched(engine: PatterEngine, flow: PatterFlow, when: String) -> void:

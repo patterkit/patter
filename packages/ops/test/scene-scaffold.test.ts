@@ -57,14 +57,14 @@ describe("planScene", () => {
     ]);
     flow.choose(choice.options[1]!.id);
     expect(flow.advance()).toMatchObject({ type: "text", text: "What happens next." });
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("gives a card with one outcome no choice at all: the scene just ends", () => {
     const { dir } = withScene([{ gameId: "continue" }]);
     const flow = new Engine(runExport(loadProject(dir))).openFlow("f", { scene: "the-moneylenders-men" });
     expect(flow.advance()).toMatchObject({ type: "text", text: 'Write the scene for "The Moneylender\'s Men" here.' });
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("plans a new project another tool can create, which takes planned scenes and plays", () => {
@@ -78,7 +78,7 @@ describe("planScene", () => {
     expect(loaded.project.project.name).toBe("The Village");
     const flow = new Engine(runExport(loaded)).openFlow("f", { scene: "arrive" });
     expect(flow.advance()).toMatchObject({ type: "text" });
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("never overwrites a scene file already there", () => {

@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "expressions": [
     {
       "name": "number comparison",
@@ -26149,6 +26149,336 @@
               "type": "end"
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "dry choice: one that ends the flow is reported once, and the end says ran-dry, through a save",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1ysu4ct",
+          "structureHash": "11nblte"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "hub",
+                "type": "block",
+                "name": "Hub",
+                "children": [
+                  {
+                    "id": "g_hub",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_ans",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "ANS",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "hub"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_end",
+                    "type": "snippet",
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_ask": "Ask",
+            "ANS": "answered"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g_hub",
+              "options": [
+                {
+                  "id": "o_ask",
+                  "eligible": true,
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Ask"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_ask"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "ANS",
+              "text": "answered"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end",
+              "reason": "ran-dry"
+            }
+          ]
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": [
+            {
+              "kind": "dry-choice",
+              "node": "g_hub",
+              "flow": "main"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end",
+              "reason": "ran-dry"
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end",
+              "reason": "ran-dry"
+            }
+          ]
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": []
+        },
+        {
+          "op": "goto",
+          "scene": "END"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": []
+        }
+      ]
+    },
+    {
+      "name": "dry choice: one that play carries on past is silent, and the end is plain",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1j3zy27",
+          "structureHash": "1kqvjdm"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "hub",
+                "type": "block",
+                "name": "Hub",
+                "children": [
+                  {
+                    "id": "g_hub",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_ans",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "ANS",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "hub"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_on",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "ON",
+                        "kind": "text"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_ask": "Ask",
+            "ANS": "answered",
+            "ON": "carried on"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g_hub",
+              "options": [
+                {
+                  "id": "o_ask",
+                  "eligible": true,
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Ask"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_ask"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "ANS",
+              "text": "answered"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "ON",
+              "text": "carried on"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        },
+        {
+          "op": "expectErrors",
+          "expectResult": []
         }
       ]
     }

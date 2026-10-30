@@ -100,7 +100,9 @@ The engine never stops the story for a problem: it carries on and reports it to
 `EngineOptions.OnError` as a `PlayError` (or, with no handler, as a `[Patterplay]` warning). Its `Kind`
 says what it was: a `condition`, `effect`, or `best-match` that failed at run time; `setup`, how the engine
 was built (a locale the bundle doesn't have, a host scope it doesn't declare), reported as the constructor
-ends; or `save`, a load whose place has gone from the build. A locale resolves by one rule: the locale
+ends; `save`, a load whose place has gone from the build; or `dry-choice`, a choice that ran dry with nothing
+after it, so the flow ended there (the end step's `Reason` is then `EndReason.RanDry`, otherwise
+`EndReason.Ended`). A locale resolves by one rule: the locale
 itself, then its language (`fr` for `fr-FR`), then the bundle's default. `engine.Locale` is the one in use,
 and `engine.Locales` the bundle's `Default` and `Included`.
 

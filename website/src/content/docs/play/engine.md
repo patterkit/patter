@@ -120,7 +120,7 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 | `"text"` | `id`, `text`, `padAfter`, `action?`, `gameData?`, `tags?` |
 | `"gameEvent"` | `id`, `gameData?`, `tags?`: no text; the host-event beat |
 | `"choice"` | `groupId`, `options: ChoiceOption[]` |
-| `"end"` |: |
+| `"end"` | `reason`: `"ended"`, or `"ran-dry"` (see below) |
 
 `text` is interpolated for you (against current property values), except on voiced
 lines, which are static. `characterName` is the localised display name; if a character
@@ -175,6 +175,16 @@ the prompts itself; a line prompt adds `character`, `characterName`, `direction`
 first step after `choose()`, carrying the same `padAfter`. A choice is only offered
 when at least one option can be taken: if every remaining option is greyed out, the choice runs dry,
 as one with no options does, so its fallback plays if it has one and otherwise the flow moves on.
+
+#### Why a flow ended
+
+Falling off the end of a block is a normal ending, the same as `END`, and the `end` step's `reason` is
+`"ended"`. The one exception is a choice that ran dry with nothing after it: the flow stops there because
+the choice had nothing left to offer, not because the story finished, so the reason is `"ran-dry"` and
+`onError` hears a [`dry-choice`](#when-something-goes-wrong) problem. An `END` straight after the dry choice
+still counts as running dry; your own `goto("END")` is a plain `"ended"`. The reason survives a save and
+load. Unity's step has `Reason` (`EndReason.Ended` or `EndReason.RanDry`), and Godot's end Dictionary has
+`"reason"`. To mark a choice as allowed to run out, give it a fallback that says what happens then.
 
 An option's prompt is built each time the choice is delivered, in the language in use and with the
 current values filled in, so a pending choice follows [`setLocale`](/play/localisation/), and a choice
@@ -244,7 +254,7 @@ marks read-only. The story never stops for one. A failing condition counts as fa
 option, or branch is skipped, and a failing effect is skipped while the rest of its list still runs.
 Every runtime does the same.
 
-The engine also carries on past two other kinds of problem, and reports them the same way:
+The engine also carries on past three other kinds of problem, and reports them the same way:
 
 - **`setup`**: how the engine was set up. A locale the bundle doesn't have (it uses the
   [nearest one](/play/localisation/#which-locale-is-used)), a host scope bound under a token the bundle
@@ -256,9 +266,12 @@ The engine also carries on past two other kinds of problem, and reports them the
   player saved at. The flow resumes at the nearest safe point (see
   [Loading a save into an edited build](/play/integration/#loading-a-save-into-an-edited-build)), and `node`
   is the saved snippet, or the pending choice, that has gone.
+- **`dry-choice`**: a choice that [ran dry](#why-a-flow-ended) with nothing after it, so the flow ended
+  there: a hub whose options have all been used, say, with no fallback. `node` is the choice. A dry choice
+  that play carries on past is the usual "ask until there's nothing left, then move on", and isn't reported.
 
 Each is reported, so none is silent. Pass `onError` to hear about it: it receives the flow, the kind
-(`condition`, `effect`, `best-match`, `setup`, or `save`), the node, the expression's source when there
+(`condition`, `effect`, `best-match`, `setup`, `save`, or `dry-choice`), the node, the expression's source when there
 is one, and a message. With the decision log on, each is also a `diagnostic` entry in it.
 
 ```ts

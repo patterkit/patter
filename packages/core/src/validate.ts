@@ -54,6 +54,7 @@ export interface ValidationIssue {
     | "invalid-prompt"
     | "multiple-fallbacks"
     | "choice-can-empty"
+    | "choice-ends-dry"
     | "invalid-status-value"
     | "unknown-doc-class"
     | "invalid-tag"
@@ -67,8 +68,9 @@ export interface ValidationIssue {
   /** Id of the offending node/beat, where applicable. */
   id?: string;
   /** Absent means an error: the project should not be built. A warning still compiles and plays (a choice
-   *  that can run dry gathers or falls through at runtime), and every front end shows it as one. */
-  severity?: "warning";
+   *  that can run dry and end the dialogue), and every front end shows it as one. An `info` is a note, not a
+   *  problem (a choice that can run dry and then carry on, which is often meant): shown, never counted. */
+  severity?: "warning" | "info";
   /** A quality gameData value off its field's ladder (a deleted or renamed stage, most often): the field, the
    *  value, and the stages to offer in its place, in ladder order. An editor's quick fix reads it. */
   offLadder?: { field: string; bad: string; options: string[] };
@@ -83,14 +85,103 @@ export interface ProjectInput {
   authoring?: AuthoringFile[];
 }
 
-/** True when any option in a choice jumps back to its own block / scene - so the choice can be
- *  re-entered (a hub). Used only to scope the dry-choice warning to genuinely exhaustible choices:
- *  a choice whose every option jumps AWAY can be all-once-only with no fallback and never run dry. */
-function choiceLoopsBack(choice: Group, ...targets: Array<string | undefined>): boolean {
-  const back = new Set(targets.filter((s): s is string => typeof s === "string" && s.length > 0));
-  const hits = (n: Group | Snippet): boolean =>
-    n.type === "snippet" ? !!n.jump && back.has(n.jump.to) : (n.children ?? []).some(hits);
-  return (choice.children ?? []).some(hits);
+/**
+ * The jumps between blocks, for judging a choice that can run dry (spec section 5, amended 2026-10-30): for each
+ * block, the blocks its jumps and calls lead into (a jump to a scene enters its first block), and which blocks
+ * a plain jump or the start enters, as against only a call (a called block returns when it ends).
+ */
+interface JumpGraph {
+  next: Map<string, Set<string>>;
+  jumpedInto: Set<string>;
+  calledInto: Set<string>;
+  /** The block a jump target enters, if it names one. */
+  resolve(to: string): string | undefined;
+}
+
+function jumpGraph(scenes: Scene[], start: ProjectFile["start"]): JumpGraph {
+  const firstBlock = new Map<string, string>();
+  const blocks = new Set<string>();
+  const wellFormed = scenes.filter((sc) => typeof sc?.id === "string" && Array.isArray(sc.blocks));
+  for (const scene of wellFormed) {
+    const first = scene.blocks[0];
+    if (typeof first?.id === "string") firstBlock.set(scene.id, first.id);
+    for (const b of scene.blocks) if (typeof b?.id === "string") blocks.add(b.id);
+  }
+  const resolve = (to: string): string | undefined => (blocks.has(to) ? to : firstBlock.get(to));
+  const next = new Map<string, Set<string>>();
+  const jumpedInto = new Set<string>();
+  const calledInto = new Set<string>();
+  for (const scene of wellFormed) {
+    for (const block of scene.blocks) {
+      if (typeof block?.id !== "string" || !Array.isArray(block.children)) continue;
+      const out = new Set<string>();
+      for (const to of jumpTargets(block.children, resolve)) {
+        out.add(to.block);
+        (to.call ? calledInto : jumpedInto).add(to.block);
+      }
+      next.set(block.id, out);
+    }
+  }
+  // The game starts somewhere without a jump: the start block, or the first scene's first block.
+  const begin = start ? (start.block !== undefined && blocks.has(start.block) ? start.block : firstBlock.get(start.scene)) : undefined;
+  const fallbackBegin = wellFormed[0] ? firstBlock.get(wellFormed[0].id) : undefined;
+  if (begin ?? fallbackBegin) jumpedInto.add((begin ?? fallbackBegin)!);
+  return { next, jumpedInto, calledInto, resolve };
+}
+
+/** Every jump and call under these nodes that enters a block (not END, not a dangling target). */
+function jumpTargets(nodes: ReadonlyArray<Group | Snippet>, resolve: JumpGraph["resolve"]): Array<{ block: string; call: boolean }> {
+  const out: Array<{ block: string; call: boolean }> = [];
+  walkNodes<Group | Snippet>(nodes.filter((n) => n && typeof n === "object"), (n) => {
+    if (n.type !== "snippet" || !n.jump || typeof n.jump.to !== "string" || n.jump.to === "END") return;
+    const block = resolve(n.jump.to);
+    if (block !== undefined) out.push({ block, call: n.jump.mode === "call" });
+  });
+  return out;
+}
+
+/** True when play can come back to block `home` from these nodes, following jumps and calls through every block
+ *  they lead into. A choice whose options (or what follows it) lead back can be played again, so a choice of
+ *  once-only options can empty. Until 2026-10-30 only a jump straight back to the choice's own block or scene
+ *  counted, and a hub reached round another block (the options jump to a hall, the hall jumps back) was missed. */
+function leadsBack(graph: JumpGraph, nodes: ReadonlyArray<Group | Snippet>, home: string): boolean {
+  const queue = jumpTargets(nodes, graph.resolve).map((t) => t.block);
+  const seen = new Set<string>();
+  while (queue.length > 0) {
+    const b = queue.shift()!;
+    if (b === home) return true;
+    if (seen.has(b)) continue;
+    seen.add(b);
+    for (const n of graph.next.get(b) ?? []) queue.push(n);
+  }
+  return false;
+}
+
+/** For each choice in a block, what plays after it if it runs dry: the later siblings at every level that walks
+ *  its children in order (the block and plain groups). A choice, branch, or sequence plays one child, so what
+ *  sits beside an option or a branch never follows it; the walk carries on outward instead. `once` marks a
+ *  choice inside a once-only option of another choice: it plays at most once, so it can't be emptied by
+ *  coming back (the Night Ferry's question inside "Where are you headed?"). */
+function whatFollowsChoices(children: ReadonlyArray<Group | Snippet>): Map<string, { follows: Array<Group | Snippet>; once: boolean }> {
+  const out = new Map<string, { follows: Array<Group | Snippet>; once: boolean }>();
+  const visit = (nodes: ReadonlyArray<Group | Snippet>, inOrder: boolean, after: Array<Group | Snippet>, once: boolean, options: boolean): void => {
+    nodes.forEach((n, i) => {
+      if (!n || typeof n !== "object") return;
+      const inOnce = once || (options && n.sticky !== true);
+      if (n.type !== "group") return;
+      const follows = inOrder ? [...nodes.slice(i + 1), ...after] : after;
+      if (n.selector === "choice") out.set(n.id, { follows, once });
+      if (Array.isArray(n.children)) visit(n.children, (n.selector ?? "run") === "run", follows, inOnce, n.selector === "choice");
+    });
+  };
+  visit(children, true, [], false, false);
+  return out;
+}
+
+/** Whether these nodes deliver something or move play on. An empty bubble doesn't, and nor does a bare jump to
+ *  END: a dry choice followed only by END still ends the dialogue because it ran dry (Ian, 2026-10-30). */
+function carriesOn(nodes: ReadonlyArray<Group | Snippet>): boolean {
+  return nodes.some((n) => !isContentlessNode(n) && !(n.type === "snippet" && (n.beats?.length ?? 0) === 0 && n.jump?.to === "END"));
 }
 
 /** A node the author has left with no real content: an empty bubble (no beats, no jump), or a
@@ -177,6 +268,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
   const addressable = new Set<string>();         // scene + block ids (jump targets)
   const sceneGameIds = new Map<string, string>(); // effective gameId -> scene id (project-wide uniqueness)
   const jumps: Array<{ to: string; from: string }> = [];
+  const graph = jumpGraph(Array.isArray(scenes) ? scenes : [], project.start);
   const castNames = new Set((project.cast ?? []).map((c) => c.name));
   // A list that isn't one (or an entry that isn't a qualifier) is reported by validateProjectFile; read only
   // the well-formed entries here, and skip the per-line check when there is no list to check against.
@@ -351,6 +443,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
           message: `${n.type} '${n.id}' in block '${block.id}' never runs: snippet '${n.jumper}' before it always jumps ${where}` });
       }
 
+      const afterChoice = whatFollowsChoices(block.children);
       walkNodes<Group | Snippet>(block.children, (node) => {
         const inBlock = `block '${block.id}'`;
         checkTags(node.tags, `${node.type} '${node.id}'`, node.id);
@@ -404,13 +497,28 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
             //      this out (it is always eligible). A conditional fallback does NOT: it can fail too, which
             //      is why this is not gated on `fallbacks === 0`.
             //  (a) EXHAUSTION: it does have an unconditional path, but every option is once-only AND the
-            //      choice loops back to its own block / scene with no fallback and no sticky - a hub that
-            //      empties out on re-entry. (A choice whose options jump away is fine being all-once-only.)
+            //      choice can be played again (its options, or what follows it, lead back to its block, round
+            //      any number of other blocks) with no fallback and no sticky - a hub that empties out.
+            // Where it runs dry decides how loud: with nothing after it in the block (and a block a jump or the
+            // start enters, not one only ever called), the dialogue ends there and nothing says why, so it warns
+            // (choice-ends-dry). Where play carries on after it, that's often meant (ask until there's nothing
+            // left, then move on): a note (choice-can-empty, info).
             const hasUnconditionalEscape = (node.children ?? []).some((opt) => !opt.condition);
-            if ((node.children?.length ?? 0) > 0 && !hasUnconditionalEscape) {
-              issues.push({ code: "choice-can-empty", message: `choice '${node.id}' in ${inBlock} has no unconditional option or fallback - it runs dry (falls through) if every condition fails`, id: node.id, severity: "warning" });
-            } else if (!hasSticky && fallbacks === 0 && choiceLoopsBack(node, block.id, bgid, scene.id, sgid)) {
-              issues.push({ code: "choice-can-empty", message: `choice '${node.id}' in ${inBlock} can be re-entered but every option is once-only with no fallback - it will run dry`, id: node.id, severity: "warning" });
+            const { follows, once } = afterChoice.get(node.id) ?? { follows: [], once: false };
+            const noGuaranteedPath = (node.children?.length ?? 0) > 0 && !hasUnconditionalEscape;
+            const exhausts = !noGuaranteedPath && !once && !hasSticky && fallbacks === 0 && leadsBack(graph, [...(node.children ?? []), ...follows], block.id);
+            if (noGuaranteedPath || exhausts) {
+              const why = noGuaranteedPath
+                ? "has no unconditional option or fallback, so it runs dry if every condition fails"
+                : "can be played again but every option is once-only with no fallback, so it runs dry once they're used";
+              const returns = graph.calledInto.has(block.id) && !graph.jumpedInto.has(block.id);
+              if (carriesOn(follows) || returns) {
+                issues.push({ code: "choice-can-empty", severity: "info", id: node.id,
+                  message: `choice '${node.id}' in ${inBlock} ${why}; play then carries on ${returns && !carriesOn(follows) ? "where the block was called from" : "after it"}` });
+              } else {
+                issues.push({ code: "choice-ends-dry", severity: "warning", id: node.id,
+                  message: `choice '${node.id}' in ${inBlock} ${why}, and nothing follows it, so the dialogue would end there; add a fallback to say what happens then` });
+              }
             }
           }
           return;

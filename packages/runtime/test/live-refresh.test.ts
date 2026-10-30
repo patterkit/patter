@@ -60,7 +60,7 @@ describe("engine.replaceStrings (tier-1 hot swap)", () => {
     // The flow was not restarted: the NEXT beat plays (L2), in the new wording, with {@gold}
     // interpolated against untouched state.
     expect(flow.advance()).toMatchObject({ type: "line", text: "That's 7 gold in your purse." });
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("reaches every open flow at once", () => {
@@ -116,7 +116,7 @@ describe("engine.hotSwap (tier-2 full swap)", () => {
     expect(resumed.getChoices().map((o) => o.id)).toEqual(["opt_yes"]);
     resumed.choose("opt_yes");
     expect(resumed.advance()).toMatchObject({ text: "Deal." });
-    expect(resumed.advance()).toEqual({ type: "end" });
+    expect(resumed.advance()).toEqual({ type: "end", reason: "ended" });
   });
 
   it("keeps a pending choice's option set verbatim, minus options that drifted out", () => {

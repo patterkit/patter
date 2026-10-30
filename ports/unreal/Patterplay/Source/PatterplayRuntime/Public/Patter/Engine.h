@@ -353,6 +353,9 @@ namespace patter
         uint32_t rngState = 0;
         std::map<std::string, int> visits;
         bool flowEnded = false;
+        // The choice group whose running dry ended the flow (its End step's reason RanDry); "" = it didn't.
+        // Written only when set, and honoured on a load only when flowEnded.
+        std::string ranDry;
         std::string currentSceneId;                                                 // "" = none
         std::vector<StackFrame> stack;
         std::string activeSnippetId;                                                // "" = none
@@ -440,8 +443,9 @@ namespace patter
     /// read-only `@world` value. The story never stops for one. A condition that fails counts as false; an
     /// effect that fails is skipped and the rest of its list still runs; a part of a Best-match condition
     /// that fails scores as false. The engine also reports how it was set up (`setup`: a locale the bundle
-    /// doesn't have, a host scope it doesn't declare) and a load whose place has gone from the build
-    /// (`save`). Each is reported through EngineOptions::onError and, when the log or a trace handler is
+    /// doesn't have, a host scope it doesn't declare), a load whose place has gone from the build
+    /// (`save`), and a choice that ran dry and so ended the flow (`dry-choice`: a hub whose options were
+    /// all used, say). Each is reported through EngineOptions::onError and, when the log or a trace handler is
     /// on, as a `diagnostic` LogEntry; a report made while the engine is being built reaches them as the
     /// constructor ends. Parity with the JS runtime's PlayError.
     struct PlayError
@@ -449,7 +453,9 @@ namespace patter
         /// The flow it happened in; "" for a `setup` report, which belongs to no flow.
         std::string flow;
         /// What it was: "condition", "effect", or "best-match" (a part of a condition being scored) that
-        /// failed; "setup" (how the engine was set up); or "save" (a load whose saved place has gone).
+        /// failed; "setup" (how the engine was set up); "save" (a load whose saved place has gone); or
+        /// "dry-choice" (a choice that ran dry with nothing delivered after it, so the flow ended there,
+        /// whose `node` is the choice group).
         std::string kind;
         /// The snippet, group, or option whose condition failed, or that owns the effect (a scene, for
         /// its onEntry). For `setup`, the locale or host-scope token at fault. For `save`, the saved
@@ -494,7 +500,7 @@ namespace patter
         PatterValue value;
         bool hasPrev = false;
         PatterValue prev;
-        /// A diagnostic's PlayError kind: condition | effect | best-match | setup | save.
+        /// A diagnostic's PlayError kind: condition | effect | best-match | setup | save | dry-choice.
         std::string kind;
         std::string node;
         /// A diagnostic's expression source text, when the bundle carries it.
@@ -999,6 +1005,7 @@ namespace patter
                 started_ = true; clearPending();
                 activeSnippet_ = nullptr; beatIndex_ = 0;
                 flowEnded_ = true; stack_.clear();
+                dryChoice_.clear(); ranDry_.clear(); // the host ended it: Ended, whatever ran dry before
                 return true;
             }
             // Resolve BOTH addresses before touching state, so a bad one is a no-op, not a half-move.
@@ -1016,6 +1023,7 @@ namespace patter
             clearPending();
             activeSnippet_ = nullptr; beatIndex_ = 0; // abandon the rest of the snippet being delivered
             flowEnded_ = false;                       // an ended flow resumes at the target
+            dryChoice_.clear(); ranDry_.clear();
             enterTarget(blockId.empty() ? sceneId : blockId, "jump"); // replace the stack, like an authored goto
             settle();
             return true;
@@ -1080,6 +1088,7 @@ namespace patter
             stack_.clear();
             currentSceneId_.clear();
             flowEnded_ = false;
+            dryChoice_.clear(); ranDry_.clear();
             activeSnippet_ = nullptr;
             beatIndex_ = 0;
             clearPending();
@@ -1134,7 +1143,7 @@ namespace patter
 
         StepResult advance()
         {
-            if (closed_) { StepResult r; r.type = StepType::End; return r; } // a stale reference drives nothing
+            if (closed_) return StepResult::End(); // a stale reference drives nothing: plain Ended
             if (!started_) throw std::runtime_error("flow has not been started");
             touch();
             if (pendingPromptBeat_)
@@ -1144,14 +1153,36 @@ namespace patter
                 return shown ? promptResult(*b, *shown) : beatResult(*b);
             }
             settle();
-            if (flowEnded_) return StepResult::End();
+            if (!flowEnded_ && !activeSnippet_ && !hasPendingChoice_) flowEnded_ = true;
+            if (flowEnded_) return endResult();
+            dryChoice_.clear(); // a choice or a beat comes after it: play carried on past the dry choice
             if (hasPendingChoice_)
             {
                 StepResult r; r.type = StepType::Choice; r.groupId = pendingGroupId_; r.options = offer(); return r;
             }
-            if (!activeSnippet_) { flowEnded_ = true; return StepResult::End(); }
             return beatResult(activeSnippet_->beats[beatIndex_++]);
         }
+
+    private:
+        /** The End step. The first time a flow reports its end straight after a choice ran dry, that choice is
+         *  why it ended: say so through onError, once (Ian's rulings on choices that run dry, 2026-10-30). An
+         *  explicit END reached after it still counts; a block simply ending, with nothing dry, is just the end. */
+        StepResult endResult()
+        {
+            if (!dryChoice_.empty())
+            {
+                const std::string group = dryChoice_;
+                dryChoice_.clear();
+                ranDry_ = group;
+                PlayError err;
+                err.flow = id_; err.kind = "dry-choice"; err.node = group;
+                err.message = "choice '" + group + "' ran dry (no option left to take, and no fallback) with nothing after it, so the flow ended there";
+                report(err);
+            }
+            return StepResult::End(ranDry_.empty() ? EndReason::Ended : EndReason::RanDry);
+        }
+
+    public:
 
         /// This flow's decisions, in order. Empty unless the run was opened with
         /// EngineOptions::log. The engine's log carries the same events tagged with the flow.
@@ -1353,6 +1384,7 @@ namespace patter
             s.rngState = rngState_;
             s.visits = visitCounts_;
             s.flowEnded = flowEnded_;
+            s.ranDry = ranDry_;   // why it ended, when a choice running dry ended it: a loaded game ends the same way
             s.currentSceneId = currentSceneId_;
             // Stamp each frame with the id of the child it would run next, so a restore against an
             // EDITED bundle re-finds the position by id instead of trusting the raw index (spec 9.8). A frame
@@ -1442,6 +1474,8 @@ namespace patter
             visitCounts_ = snap.visits;
             started_ = true;
             flowEnded_ = snap.flowEnded;
+            dryChoice_.clear();
+            ranDry_ = snap.flowEnded ? snap.ranDry : std::string(); // honoured only on an ended flow; never re-reported
             currentSceneId_ = snap.currentSceneId;
             Drift drift;
             // Re-bind each frame to the CURRENT bundle: prefer the saved next-child id (survives
@@ -1576,14 +1610,14 @@ namespace patter
             journal->flows.insert(this);
             struct Cursor
             {
-                uint32_t rngState; bool started, flowEnded; std::string currentSceneId;
+                uint32_t rngState; bool started, flowEnded; std::string dryChoice, ranDry, currentSceneId;
                 const Node* activeSnippet; int beatIndex;
                 bool hasPendingChoice; std::string pendingGroupId; std::vector<PendingOption> pendingOptions;
                 std::map<std::string, const Node*> pendingById; std::map<std::string, std::shared_ptr<ChoicePrompt>> pendingShown;
                 const Beat* pendingPromptBeat; std::shared_ptr<ChoicePrompt> pendingPromptShown; std::string pendingPromptOwnerId;
                 std::vector<StackFrame> stack;   // a copy of the frames: they advance in place (index++)
             };
-            Cursor c{ rngState_, started_, flowEnded_, currentSceneId_, activeSnippet_, beatIndex_,
+            Cursor c{ rngState_, started_, flowEnded_, dryChoice_, ranDry_, currentSceneId_, activeSnippet_, beatIndex_,
                       hasPendingChoice_, pendingGroupId_, pendingOptions_, pendingById_, pendingShown_,
                       pendingPromptBeat_, pendingPromptShown_, pendingPromptOwnerId_, stack_ };
             std::shared_ptr<Flow> self = shared_from_this();
@@ -1591,6 +1625,7 @@ namespace patter
             {
                 Flow& f = *self;
                 f.rngState_ = c.rngState; f.started_ = c.started; f.flowEnded_ = c.flowEnded;
+                f.dryChoice_ = c.dryChoice; f.ranDry_ = c.ranDry;
                 f.currentSceneId_ = c.currentSceneId; f.activeSnippet_ = c.activeSnippet; f.beatIndex_ = c.beatIndex;
                 f.hasPendingChoice_ = c.hasPendingChoice; f.pendingGroupId_ = c.pendingGroupId;
                 f.pendingOptions_ = c.pendingOptions; f.pendingById_ = c.pendingById; f.pendingShown_ = c.pendingShown;
@@ -1630,6 +1665,11 @@ namespace patter
         std::function<const std::vector<std::string>*(const std::string&, const std::string&)> registryQualities_;
         uint32_t rngState_ = 0;
         bool started_ = false, flowEnded_ = false;
+        // The choice that last ran dry, while nothing has been delivered since: if the flow ends with it set,
+        // it ended because that choice ran dry. "" = none.
+        std::string dryChoice_;
+        // The choice whose running dry ended this flow, once it has (the End step's RanDry); saved. "" = none.
+        std::string ranDry_;
         // Closed by the engine (see close()). Terminal, and distinct from flowEnded_: an ENDED flow is
         // merely out of content and goto revives it; a CLOSED one is finished for good.
         bool closed_ = false;
@@ -1983,6 +2023,7 @@ namespace patter
             // Beside the log, not instead of it: live feedback a host acts on, against an audit
             // read afterwards. A shipped game runs with the log off and this still wired.
             if (host_->onDryChoice) host_->onDryChoice(group->id);
+            dryChoice_ = group->id; // if the flow ends before anything else plays, this is why
         }
 
         // -- jumps --

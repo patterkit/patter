@@ -101,7 +101,7 @@ describe("combined game: one registry, one save", () => {
     expect(patter.getProperty("@story.act")).toBe("act-1");
     expect(patter.compareStages("@story.act", "act-1", "arrival")).toBe(1); // Patter orders the other engine's ladder
     expect(flow.advance()).toMatchObject({ type: "line", id: "L", character: "MERCHANT" });
-    expect(flow.advance()).toEqual({ type: "end" }); // onExit: spends gold, bumps visits
+    expect(flow.advance()).toEqual({ type: "end", reason: "ended" }); // onExit: spends gold, bumps visits
 
     expect(registry.get("world", "gold")).toBe(15);
     expect(registry.get("patter", "visits")).toBe(1);
@@ -144,7 +144,7 @@ describe("combined game: one registry, one save", () => {
       // gold(15) >= 10 and at act-1: a second purchase proceeds on the restored state.
       const f2 = g2.patter.getFlow("main")!;
       expect(f2.advance()).toMatchObject({ type: "line", id: "L" });
-      expect(f2.advance()).toEqual({ type: "end" });
+      expect(f2.advance()).toEqual({ type: "end", reason: "ended" });
       expect(g2.registry.get("world", "gold")).toBe(5);
       expect(g2.registry.get("patter", "visits")).toBe(2);
     }

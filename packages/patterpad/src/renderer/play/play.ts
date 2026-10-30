@@ -331,11 +331,21 @@ function showChoices(options: PlayChoiceOption[]): void {
   });
 }
 
-function showEnd(error?: string): void {
+function showEnd(error?: string, ranDry?: PlayBatch["ranDry"]): void {
   trayShown = false;
   const note = document.createElement("div");
-  note.className = `pnote${error ? " error" : ""}`;
-  note.textContent = error ? `Error: ${error}` : "The End";
+  note.className = `pnote${error ? " error" : ranDry ? " dry" : ""}`;
+  if (error) note.textContent = `Error: ${error}`;
+  else if (ranDry) {
+    // Not the story's end: a choice had nothing left to offer, and nothing came after it (a game sees the
+    // same end, with the reason "ran-dry"). Say so, and put the editor's playhead on the choice.
+    const head = document.createElement("strong");
+    head.textContent = "The dialogue ended because a choice ran dry";
+    const why = document.createElement("span");
+    why.textContent = "Every option was used up and it has no fallback. Give it a fallback to say what happens then.";
+    note.append(head, why);
+    play.mark(ranDry.choiceId, ranDry.scene);
+  } else note.textContent = "The End";
   controlsEl.replaceChildren(note, button("Restart", "pchoice restart", () => void startRun(), "restart"));
 }
 
@@ -457,7 +467,7 @@ function showTerminal(batch: PlayBatch): void {
     if (batch.choiceId) play.mark(batch.choiceId, batch.choiceScene); // move the editor playhead onto the choice while we wait for a pick
     showChoices(batch.options ?? []);
   }
-  else if (batch.stop === "end") showEnd();
+  else if (batch.stop === "end") showEnd(undefined, batch.ranDry);
   else if (batch.stop === "error") showEnd(batch.error);
   else showAdvance(); // "continue" - more to play
   scrollToEnd(); // now the controls are in the footer, settle the last line just above them

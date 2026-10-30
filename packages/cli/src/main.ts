@@ -430,7 +430,7 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       const { structural, conditions, interpolation, hygiene, staleBundles, unresolvedMerges, orphans, reachability, gameScopes, localisation, extensions, ok } = runValidate(loaded);
       // A warning (another tool's scope, say) is printed as one and never fails the run.
       const warn = (i: { severity: "error" | "warning" }): string => (i.severity === "warning" ? "warning: " : "");
-      for (const i of structural) console.error(`  [${i.code}] ${i.severity === "warning" ? "warning: " : ""}${i.message}`);
+      for (const i of structural) console.error(`  [${i.code}] ${i.severity ? `${i.severity === "info" ? "note" : "warning"}: ` : ""}${i.message}`);
       for (const i of conditions) console.error(`  [${i.field}] ${i.nodeId}: ${warn(i)}${i.message}  (${i.src})`);
       for (const i of interpolation) console.error(`  [${i.field}] ${i.nodeId}: ${warn(i)}${i.message}  (${i.src})`);
       for (const i of hygiene) console.error(`  [hygiene] ${i.file}: ${i.message}`);
@@ -444,9 +444,10 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       // state mid-work, and must never fail a build.
       for (const i of reachability) console.error(`  [unreachable] ${i.nodeId}: ${i.message}  (${i.src})`);
       const isError = (i: { severity: "error" | "warning" }): boolean => i.severity === "error";
+      // A note (a choice that can run dry and then carry on) is printed but counts as neither.
       const structuralWarnings = structural.filter((i) => i.severity === "warning").length;
       const warnings = reachability.length + structuralWarnings + [...conditions, ...interpolation, ...gameScopes, ...localisation, ...extensions].filter((i) => !isError(i)).length;
-      const count = structural.length - structuralWarnings + [...conditions, ...interpolation, ...gameScopes, ...localisation, ...extensions].filter(isError).length
+      const count = structural.filter((i) => i.severity === undefined).length + [...conditions, ...interpolation, ...gameScopes, ...localisation, ...extensions].filter(isError).length
         + hygiene.length + staleBundles.length + unresolvedMerges.length + orphans.length;
       // A warning is not an issue, but "no issues" printed directly under one reads as a contradiction,
       // so say what was said.

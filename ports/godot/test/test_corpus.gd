@@ -526,6 +526,13 @@ func _run_runtime(arr: Array) -> int:
 # `ids_only`: the bundle's strings are IDs-only, so names (the label among them) are the game's.
 func _transcript_step(step: Dictionary, ids_only := false) -> Dictionary:
 	var kind = step.get("type", "")
+	if kind == "end":
+		# Every end carries its reason; a transcript records it only when the flow ran dry (corpus 10). One
+		# missing it is marked, so a runtime that drops it fails.
+		var reason = step.get("reason")
+		if reason == "ran-dry":
+			return {"type": "end", "reason": "ran-dry"}
+		return {"type": "end"} if reason == "ended" else {"type": "end", "reason": "<missing>"}
 	if kind == "choice":
 		var out := step.duplicate()
 		var options: Array = []

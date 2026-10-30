@@ -44,6 +44,9 @@ for (;;) {
 }
 ```
 
+An `end` step carries `reason`: `"ended"`, or `"ran-dry"` when the flow ended because a choice ran dry with
+nothing after it (its options all used, no fallback), which `onError` also hears as a `dry-choice` problem.
+
 A `line` step carries `id`, `text`, `character`, `characterName`, `direction`, and, when the line has a
 speaker qualifier, `qualifier` (its `gameId`, `os`) and `qualifierName` (its shown name, `O.S.`). Line and
 text steps both carry `padAfter`, the writer's pause after the beat in seconds, already resolved; a negative
