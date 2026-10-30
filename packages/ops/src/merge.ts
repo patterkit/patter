@@ -367,7 +367,15 @@ function mergeDecls(strategy: Strategy, base: unknown, ours: unknown, theirs: un
 // --- Project (`.patterproj`) -------------------------------------------------
 
 /** Every project key with a strategy of its own in `mergeProject`; anything else merges as a plain 3-way. */
-export const PROJECT_HANDLED = new Set(["properties", "cast", "gameDataFields", "qualifiers", "locales", "extensions"]);
+export const PROJECT_HANDLED = new Set(["properties", "cast", "gameDataFields", "qualifiers", "locales", "extensions", "sceneOrder", "sceneFolders", "sceneFolder"]);
+
+/** Scene folders (design/proposals/scene-folders.md): keyed by id and merged field by field, so one side's
+ *  rename and the other's move both land. Their order means nothing (`sceneOrder` places them); preserve
+ *  keeps the file steady. */
+const SCENE_FOLDERS = keyedBy("id", objectOf({}), { order: "preserve" });
+
+/** Where each scene is filed: key by key, so only one scene filed two ways clashes. */
+const SCENE_FOLDER = mapOf(ATOMIC);
 
 function mergeProject(base: Obj, ours: Obj, theirs: Obj): MergeResult {
   const conflicts: Conflict[] = [];
@@ -386,6 +394,15 @@ function mergeProject(base: Obj, ours: Obj, theirs: Obj): MergeResult {
     } else if (k === "qualifiers") {
       const v = mergeQualifiers(base[k], ours[k], theirs[k], conflicts);
       if (v !== undefined) merged[k] = v;
+    } else if (k === "sceneOrder") {
+      const v = mergeOrder(asArr(base[k]), asArr(ours[k]), asArr(theirs[k]), k, conflicts);
+      if (v.length > 0) merged[k] = v;
+    } else if (k === "sceneFolders") {
+      const v = shared(SCENE_FOLDERS, asArr(base[k]), asArr(ours[k]), asArr(theirs[k]), "", k, conflicts) as unknown[];
+      if (v.length > 0) merged[k] = v;
+    } else if (k === "sceneFolder") {
+      const v = shared(SCENE_FOLDER, asMap(base[k]), asMap(ours[k]), asMap(theirs[k]), "", k, conflicts) as Obj;
+      if (Object.keys(v).length > 0) merged[k] = v;
     } else if (k === "locales") {
       merged.locales = mergeLocales(asMap(base.locales), asMap(ours.locales), asMap(theirs.locales), conflicts);
     } else if (k === "extensions" && [base[k], ours[k], theirs[k]].every((x) => x === undefined || isObj(x))) {
@@ -397,6 +414,62 @@ function mergeProject(base: Obj, ours: Obj, theirs: Obj): MergeResult {
     }
   }
   return { type: "project", merged, conflicts, warnings: [] };
+}
+
+/**
+ * An order of unique ids (`sceneOrder`), merged three ways by moves rather than as one value, so two people
+ * moving different scenes both land. Starting from ours: what theirs removed goes, and what theirs moved or
+ * added goes after the entry it follows there. An entry is moved by a side when it falls outside the longest
+ * run that side kept in base's order. One entry moved by both sides to different places is a clash that
+ * keeps ours, reported over the whole list (so Take theirs takes their order).
+ */
+function mergeOrder(base: unknown[], ours: unknown[], theirs: unknown[], path: string, conflicts: Conflict[]): string[] {
+  const b = base.filter((x): x is string => typeof x === "string");
+  const o = ours.filter((x): x is string => typeof x === "string");
+  const t = theirs.filter((x): x is string => typeof x === "string");
+  if (eq(o, t) || eq(b, t)) return o;
+  if (eq(b, o)) return t;
+  const moved = (side: string[]): Set<string> => {
+    const at = new Map(b.map((id, i) => [id, i]));
+    const kept = side.filter((id) => at.has(id));
+    const run = longestRun(kept.map((id) => at.get(id)!));
+    const keep = new Set(run.map((i) => b[i]!));
+    return new Set(kept.filter((id) => !keep.has(id)));
+  };
+  const movedO = moved(o), movedT = moved(t);
+  const inB = new Set(b), inO = new Set(o), inT = new Set(t);
+  const before = (side: string[], id: string): string | undefined => side[side.indexOf(id) - 1];
+  let clash = false;
+  for (const id of movedT) if (movedO.has(id) && before(o, id) !== before(t, id)) clash = true;
+  // Ours, less what theirs removed.
+  const out = o.filter((id) => !(inB.has(id) && !inT.has(id)));
+  // Theirs' moves and additions, in their order, each after the nearest entry before it there that is placed.
+  for (let i = 0; i < t.length; i++) {
+    const id = t[i]!;
+    const added = !inB.has(id) && !inO.has(id);
+    if (!added && !(movedT.has(id) && !movedO.has(id))) continue;
+    const from = out.indexOf(id);
+    if (from >= 0) out.splice(from, 1);
+    let after = -1;
+    for (let j = i - 1; j >= 0 && after < 0; j--) after = out.indexOf(t[j]!);
+    out.splice(after + 1, 0, id);
+  }
+  if (clash) conflicts.push({ id: "", path, base: b, ours: o, theirs: t, kind: "moved" });
+  return out;
+}
+
+/** The indexes of a longest strictly increasing run in `xs` (patience sorting), in order. */
+function longestRun(xs: number[]): number[] {
+  const tails: number[] = [], prev: number[] = new Array(xs.length).fill(-1), tailAt: number[] = [];
+  xs.forEach((x, i) => {
+    let lo = 0, hi = tails.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (tails[mid]! < x) lo = mid + 1; else hi = mid; }
+    tails[lo] = x; tailAt[lo] = i;
+    prev[i] = lo > 0 ? tailAt[lo - 1]! : -1;
+  });
+  const run: number[] = [];
+  for (let i = tailAt[tails.length - 1] ?? -1; i >= 0; i = prev[i]!) run.unshift(xs[i]!);
+  return run;
 }
 
 /** The extensions the project takes, per id: each key of an extension's pin merges on its own, so two people

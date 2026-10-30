@@ -11,7 +11,9 @@ export async function voiceScriptToXlsx(data: VoiceScript): Promise<Buffer> {
   wb.creator = "patter";
 
   const ws = wb.addWorksheet("Voice Script");
+  const filed = data.lines.some((l) => l.folder); // scene folders: the column only when there are any
   ws.columns = [
+    ...(filed ? [{ header: "Folder", key: "folder", width: 22 }] : []),
     { header: "Scope", key: "scope", width: 28 },
     { header: "Line ID", key: "id", width: 18 },
     { header: "Character", key: "character", width: 16 },
@@ -30,7 +32,7 @@ export async function voiceScriptToXlsx(data: VoiceScript): Promise<Buffer> {
 
   for (const l of data.lines) {
     const row = ws.addRow({
-      scope: l.scope, id: l.id, character: l.character, qualifier: l.qualifier ?? "", actor: l.actor ?? "",
+      folder: l.folder ?? "", scope: l.scope, id: l.id, character: l.character, qualifier: l.qualifier ?? "", actor: l.actor ?? "",
       direction: l.direction ?? "", text: l.text, comments: l.comments.join("\n"), status: l.recordingStatus,
     });
     row.getCell("direction").alignment = { wrapText: true, vertical: "top" };

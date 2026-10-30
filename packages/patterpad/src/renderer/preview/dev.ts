@@ -15,7 +15,9 @@ import { createFlowFollower } from "../../shared/debug-follow.js";
 import probeManifestText from "../../../../conformance/fixtures/probe.extension.json?raw";
 import { parseManifest } from "@wildwinter/toolkit/extensions";
 import { extensionDtos } from "../../shared/extensions.js";
-import type { ProjectFile } from "@patterkit/model";
+import type { ProjectFile, SceneNavRow } from "@patterkit/model";
+import { sceneFolderLayout } from "@patterkit/model";
+import { addNavFolder, dropNavScene, insertNavScene, moveNavRowBy, orderNavScenes, placeNavRow, removeNavFolder, renameNavFolder, untitledFolderName, withNav, type SceneNavFields } from "../../main/scene-nav.js";
 const DICT_BYTES: Record<string, { aff: string; dic: string }> = {
   "en-GB": { aff: enGbAff, dic: enGbDic },
   "en-US": { aff: enUsAff, dic: enUsDic },
@@ -111,6 +113,8 @@ const project = {
     { id: "scn_street", name: "Street", blocks: [] },
   ],
   sceneIds: ["scn_tavern", "scn_street"],
+  navRows: [] as SceneNavRow[],
+  sceneFolders: [] as { id: string; name: string }[],
   dictionary: { language: "en-GB", words: ["Patterpad", "Eldoria"], ignore: [], enabled: true }, // spell-check (#177)
   // The writing-status ladder with theme-palette colour slots (#196): drives the surface "Status" submenu,
   // the gutter badges, and the inspector dropdown in the preview.
@@ -134,6 +138,39 @@ const project = {
   extensions: probeDtos(),
   extensionNodes: { line: [{ id: "L_street_call", label: "ANNA: Over here!", scene: "scn_street" }] },
 };
+
+// Scene folders (design/proposals/scene-folders.md): the list's shape, kept as the project file keeps it and
+// laid out by the same code main uses. `?folders=N` seeds N scenes in acts and chapters, for a big list.
+let nav: SceneNavFields = {};
+const closedInPreview = new Set<string>();
+function relayout(): void {
+  const layout = sceneFolderLayout(nav, project.scenes.map((s) => s.id));
+  const rank = new Map(layout.sceneIds.map((id, i) => [id, i]));
+  project.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+  project.sceneIds = project.scenes.map((s) => s.id);
+  project.navRows = layout.rows;
+  project.sceneFolders = (nav.sceneFolders ?? []).map((f) => ({ id: f.id, name: f.name }));
+}
+function applyNav(next: SceneNavFields | { error: string }): { ok: true; project: typeof project } | { ok: false; error: string } {
+  if ("error" in next) return { ok: false, error: next.error };
+  nav = withNav({}, next);
+  relayout();
+  return { ok: true, project };
+}
+const seedFolders = Number(new URLSearchParams(location.search).get("folders") ?? "0");
+if (seedFolders > 0) {
+  const folders: { id: string; name: string; parent?: string }[] = [];
+  const filed: Record<string, string> = {};
+  for (let n = 1; n <= seedFolders; n++) {
+    const perAct = Math.ceil(seedFolders / 4), act = Math.ceil(n / perAct), chapter = `${act}-${Math.ceil((n - (act - 1) * perAct) / 10)}`;
+    if (!folders.some((f) => f.id === `act${act}`)) folders.push({ id: `act${act}`, name: `Act ${act}` });
+    if (!folders.some((f) => f.id === `ch${chapter}`)) folders.push({ id: `ch${chapter}`, name: `Chapter ${chapter}`, parent: `act${act}` });
+    project.scenes.push({ id: `scn_k${n}`, name: `Knot ${n}`, blocks: [] });
+    filed[`scn_k${n}`] = `ch${chapter}`;
+  }
+  nav = { sceneFolders: folders, sceneFolder: filed };
+}
+relayout();
 // A fake folder-derived index for the preview: a couple of resolved dialogue lines, the rest implicitly missing.
 const FAKE_AUDIO_INDEX: Record<string, { status: string; path: string; textHash?: string }> = {
   L_greet: { status: "recorded", path: "/audio/recorded/L_greet.wav" },
@@ -344,25 +381,31 @@ const stub = {
   importLoc: async (chosenLocale?: string) => ({ ok: true, locale: chosenLocale ?? "fr", updated: 7, files: 2 }),
   setStart: async (start: { scene: string }) => ({ ok: true, project: { ...project, start } }),
   exportWeb: async () => ({ ok: true, path: "/Users/ian/Sites/the-tavern", kept: ["index.html", "style.css"] }),
-  reorderScenes: async (ids: string[]) => {
-    const rank = new Map(ids.map((id, i) => [id, i]));
-    project.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
-    return { ok: true, project };
-  },
+  reorderScenes: async (ids: string[]) => applyNav(orderNavScenes(nav, project.sceneIds, ids)),
   createScene: async (name: string, _kit?: string, _speaker?: string, after?: string) => {
     const sceneId = `scn_${project.scenes.length + 1}`;
     const at = after ? project.scenes.findIndex((s) => s.id === after) : -1;
     const scene = { id: sceneId, name: name.trim() || "Scene", blocks: [{ id: `${sceneId}_main`, name: "Main" }] };
-    if (at >= 0) project.scenes.splice(at + 1, 0, scene); else project.scenes.push(scene);
-    project.sceneIds = project.scenes.map((s) => s.id);
+    project.scenes.push(scene);
+    if (at >= 0) nav = withNav({}, insertNavScene(nav, project.scenes.map((s) => s.id), sceneId, after));
+    relayout();
     return { ok: true, sceneId, project };
   },
-  moveScene: async (sceneId: string, dir: -1 | 1) => {
-    const i = project.scenes.findIndex((s) => s.id === sceneId), j = i + dir;
-    if (i < 0 || j < 0 || j >= project.scenes.length) return { ok: true, moved: false };
-    [project.scenes[i], project.scenes[j]] = [project.scenes[j]!, project.scenes[i]!];
-    return { ok: true, moved: true, project };
+  moveScene: async (rowId: string, dir: -1 | 1) => {
+    const next = moveNavRowBy(nav, project.sceneIds, rowId, dir);
+    if (next === null) return { ok: true, moved: false };
+    return { ...applyNav(next), moved: true };
   },
+  placeSceneRow: async (rowId: string, target: string | null, where: "before" | "after" | "into") => applyNav(placeNavRow(nav, project.sceneIds, rowId, target, where)),
+  createSceneFolder: async (after?: string, inside?: string) => {
+    const folderId = `fld_${Math.random().toString(36).slice(2, 7)}`;
+    const name = untitledFolderName((nav.sceneFolders ?? []).map((f) => f.name));
+    return { ...applyNav(addNavFolder(nav, project.sceneIds, { id: folderId, name }, after, inside)), folderId };
+  },
+  renameSceneFolder: async (id: string, name: string) => applyNav(renameNavFolder(nav, id, name.trim())),
+  deleteSceneFolder: async (id: string) => applyNav(removeNavFolder(nav, project.sceneIds, id)),
+  closedFolders: async () => [...closedInPreview],
+  setClosedFolders: async (_root: string, ids: string[]) => { closedInPreview.clear(); ids.forEach((id) => closedInPreview.add(id)); },
   // Canned severities: the tavern is referenced (severity 3), the street is content-only (2),
   // and anything created in-session reads as an untouched scaffold (1 - silent unless unsaved).
   sceneDeleteInfo: async (sceneId: string) => {
@@ -375,7 +418,9 @@ const stub = {
     };
   },
   deleteScene: async (sceneId: string) => {
+    nav = withNav({}, dropNavScene(nav, project.sceneIds, sceneId));
     project.scenes = project.scenes.filter((s: { id: string }) => s.id !== sceneId);
+    relayout();
     return { ok: true, project };
   },
   openCoverageWindow: async () => undefined,

@@ -15,7 +15,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, dirname, resolve, basename } from "node:path";
 import { parseSource } from "@patterkit/core";
 import type { ProjectFile, FlowFile, LocaleFile, AuthoringFile, Scene, ExtensionShard } from "@patterkit/model";
-import { EXTENSION_SHARD, EXTENSIONS_DIR, MANIFEST_EXTENSION, isCaseOnlyPropertyName, projectLayout } from "@patterkit/model";
+import { EXTENSION_SHARD, EXTENSIONS_DIR, MANIFEST_EXTENSION, isCaseOnlyPropertyName, projectLayout, sceneFolderLayout } from "@patterkit/model";
 import { discoverGameScopes } from "./game-scopes.js";
 import type { GameScopes } from "./game-scopes.js";
 
@@ -376,6 +376,15 @@ export function applySceneOrder(scenes: Scene[], order: string[] | undefined): v
   });
 }
 
+/** Sort scenes into the scene list's order as shown (`sceneFolderLayout`: `sceneOrder` within each folder,
+ *  folders nested), in place. The same as `applySceneOrder` for a project with no folders. Presentation
+ *  only - play order is untouched. */
+export function applySceneNavOrder(scenes: Scene[], project: Pick<ProjectFile, "sceneOrder" | "sceneFolders" | "sceneFolder">): void {
+  if (!project.sceneOrder?.length && !project.sceneFolders?.length) return;
+  const rank = new Map(sceneFolderLayout(project, scenes.map((s) => s.id)).sceneIds.map((id, i) => [id, i]));
+  scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+}
+
 export function loadProject(startPath: string): LoadedProject {
   const projectFile = findProjectFile(startPath);
   const root = dirname(projectFile);
@@ -395,7 +404,7 @@ export function loadProject(startPath: string): LoadedProject {
     scenes.push(scene);
     sceneFiles[scene.id] = f;
   }
-  applySceneOrder(scenes, project.sceneOrder);
+  applySceneNavOrder(scenes, project);
 
   const locales: LocaleFile[] = [];
   const localeFiles: string[] = [];

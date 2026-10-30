@@ -463,3 +463,56 @@ describe("flow merge: tags as a set", () => {
     expect(tags(runMerge(tg(["calm", "sad"]), tg(["sad"]), tg(["calm"])))).toBeUndefined();
   });
 });
+
+// Scene folders (design/proposals/scene-folders.md): the order merges by moves, folders field by field,
+// and filing scene by scene, so the everyday reorganising of a big project rarely clashes.
+describe("project merge: scene order and folders", () => {
+  const order = (r: any): string[] => r.merged.sceneOrder;
+
+  it("two people moving different scenes both land", () => {
+    const base = proj({ sceneOrder: ["a", "b", "c", "d", "e"] });
+    const r = runMerge(base, proj({ sceneOrder: ["b", "a", "c", "d", "e"] }), proj({ sceneOrder: ["a", "b", "c", "e", "d"] }));
+    expect(r.conflicts).toEqual([]);
+    expect(order(r)).toEqual(["b", "a", "c", "e", "d"]);
+  });
+
+  it("a move on one side and a new scene on the other both land", () => {
+    const base = proj({ sceneOrder: ["a", "b", "c"] });
+    const r = runMerge(base, proj({ sceneOrder: ["c", "a", "b"] }), proj({ sceneOrder: ["a", "n", "b", "c"] }));
+    expect(r.conflicts).toEqual([]);
+    expect(order(r)).toEqual(["c", "a", "n", "b"]);
+  });
+
+  it("drops what either side removed", () => {
+    const base = proj({ sceneOrder: ["a", "b", "c"] });
+    const r = runMerge(base, proj({ sceneOrder: ["a", "c"] }), proj({ sceneOrder: ["c", "a", "b"] }));
+    expect(r.conflicts).toEqual([]);
+    expect(order(r)).toEqual(["c", "a"]);
+  });
+
+  it("one scene moved two ways is a clash over the order that keeps ours", () => {
+    const base = proj({ sceneOrder: ["a", "b", "c", "d", "e"] });
+    const r = runMerge(base, proj({ sceneOrder: ["b", "c", "d", "e", "a"] }), proj({ sceneOrder: ["b", "c", "a", "d", "e"] }));
+    expect(paths(r)).toEqual(["sceneOrder:moved"]);
+    expect(order(r)).toEqual(["b", "c", "d", "e", "a"]);
+  });
+
+  it("filing different scenes both land; one scene filed two ways clashes", () => {
+    const base = proj({ sceneFolders: [{ id: "f", name: "F" }, { id: "g", name: "G" }] });
+    const clean = runMerge(base, proj({ sceneFolders: [{ id: "f", name: "F" }, { id: "g", name: "G" }], sceneFolder: { a: "f" } }),
+      proj({ sceneFolders: [{ id: "f", name: "F" }, { id: "g", name: "G" }], sceneFolder: { b: "g" } }));
+    expect(clean.conflicts).toEqual([]);
+    expect((clean.merged as any).sceneFolder).toEqual({ a: "f", b: "g" });
+    const clash = runMerge(base, proj({ sceneFolders: [{ id: "f", name: "F" }, { id: "g", name: "G" }], sceneFolder: { a: "f" } }),
+      proj({ sceneFolders: [{ id: "f", name: "F" }, { id: "g", name: "G" }], sceneFolder: { a: "g" } }));
+    expect(paths(clash)).toEqual(["sceneFolder.a:added-both"]);
+  });
+
+  it("folders merge field by field: a rename and a move both land", () => {
+    const base = proj({ sceneFolders: [{ id: "f", name: "F" }, { id: "g", name: "G" }] });
+    const r = runMerge(base, proj({ sceneFolders: [{ id: "f", name: "Act 1" }, { id: "g", name: "G" }] }),
+      proj({ sceneFolders: [{ id: "f", name: "F", parent: "g" }, { id: "g", name: "G" }, { id: "h", name: "H" }] }));
+    expect(r.conflicts).toEqual([]);
+    expect((r.merged as any).sceneFolders).toEqual([{ id: "f", name: "Act 1", parent: "g" }, { id: "g", name: "G" }, { id: "h", name: "H" }]);
+  });
+});

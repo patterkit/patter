@@ -1,7 +1,7 @@
 // Moving things up and down from the keyboard and the Edit menu (the hands-on fixes review, Q14 and ruling 3).
 //
 // One pair of commands, two things it can move. With focus in the Scenes list, Move Up / Move Down move a
-// scene in the project's order (the focused scene row's, else the open scene's); anywhere else they move
+// scene or folder among its siblings (the focused scene row's, else the open scene's); anywhere else they move
 // the script's selection (the surface's `moveSelection`). The Edit menu greys each item when it can't do
 // anything now, so the renderer works out both directions as focus and selection change and tells main.
 
@@ -9,8 +9,15 @@
  *  scene's. Null when focus isn't in the list, so the move goes to the script. */
 export function sceneMoveTarget(navList: HTMLElement, active: Element | null, openScene: string | null): string | null {
   if (!active || !navList.contains(active)) return null;
-  const row = active.closest<HTMLElement>(".nav-item");
+  const row = active.closest<HTMLElement>(".nav-item, .nav-folder-item");
   return row?.dataset["id"] ?? openScene;
+}
+
+/** The ids beside a row in the scene list, in order, it included: a move goes among these (scene folders).
+ *  Empty when the row isn't there. */
+export function navSiblings(rows: readonly { id: string; folder?: string }[], id: string): string[] {
+  const row = rows.find((r) => r.id === id);
+  return row ? rows.filter((r) => r.folder === row.folder).map((r) => r.id) : [];
 }
 
 /** Where a scene can go: up unless it's first, down unless it's last. */

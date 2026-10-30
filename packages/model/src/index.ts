@@ -850,6 +850,101 @@ export interface EstimatingConfig {
   tagEstimates?: { tag: string; lines: number }[];
 }
 
+/** A folder in the scene list (ProjectFile.sceneFolders): organisational only, it carries no meaning. */
+export interface SceneFolder {
+  id: string;
+  name: string;
+  /** The folder it sits in; omitted = the top level. A parent that doesn't exist, or a loop of parents
+   *  (only a bad merge makes one), reads as the top level. */
+  parent?: string;
+}
+
+/** One row of the scene list as laid out by `sceneFolderLayout`, top to bottom with every folder open. */
+export interface SceneNavRow {
+  kind: "folder" | "scene";
+  id: string;
+  /** 0 = the top level. */
+  depth: number;
+  /** The folder this row sits in, if any. */
+  folder?: string;
+}
+
+export interface SceneFolderLayout {
+  /** Every folder and scene, depth first, in authored order. */
+  rows: SceneNavRow[];
+  /** The scene ids in that order: what the nav, the exports, and the bundle list scenes by. */
+  sceneIds: string[];
+  /** Each folder's effective parent (undefined = top level), after the forgiving rules. */
+  folderParent: Map<string, string | undefined>;
+  /** Each scene's effective folder (undefined = top level). */
+  sceneFolder: Map<string, string | undefined>;
+}
+
+/**
+ * Lay out the scene list: folders and scenes, nested and ordered. Forgiving, as `sceneOrder` always was:
+ * a scene filed in a missing folder, or a folder with a missing parent, sits at the top level; a loop of
+ * parents is broken at the first folder of it in `sceneFolders`; ids in `sceneOrder` that are neither
+ * are ignored. In each level the rows `sceneOrder` lists come first, in its order, then unlisted scenes in
+ * the order given, then unlisted folders in `sceneFolders` order.
+ */
+export function sceneFolderLayout(
+  project: Pick<ProjectFile, "sceneOrder" | "sceneFolders" | "sceneFolder">,
+  sceneIds: readonly string[],
+): SceneFolderLayout {
+  const folders = project.sceneFolders ?? [];
+  const known = new Set(folders.map((f) => f.id));
+  const folderParent = new Map<string, string | undefined>();
+  for (const f of folders) folderParent.set(f.id, f.parent !== undefined && known.has(f.parent) && f.parent !== f.id ? f.parent : undefined);
+  // Break loops: walk up from each folder in list order; arriving back at it means it closes a loop.
+  for (const f of folders) {
+    let at = folderParent.get(f.id);
+    for (let steps = 0; at !== undefined && steps <= folders.length; steps++) {
+      if (at === f.id) { folderParent.set(f.id, undefined); break; }
+      at = folderParent.get(at);
+    }
+  }
+  const sceneFolder = new Map<string, string | undefined>();
+  for (const id of sceneIds) {
+    const f = project.sceneFolder?.[id];
+    sceneFolder.set(id, f !== undefined && known.has(f) ? f : undefined);
+  }
+  const rank = new Map((project.sceneOrder ?? []).map((id, i) => [id, i]));
+  const children = new Map<string | undefined, { kind: "folder" | "scene"; id: string; tie: number }[]>();
+  const add = (parent: string | undefined, kind: "folder" | "scene", id: string, tie: number): void => {
+    const list = children.get(parent) ?? [];
+    list.push({ kind, id, tie });
+    children.set(parent, list);
+  };
+  sceneIds.forEach((id, i) => add(sceneFolder.get(id), "scene", id, i));
+  folders.forEach((f, i) => add(folderParent.get(f.id), "folder", f.id, sceneIds.length + i));
+  const rows: SceneNavRow[] = [];
+  const out: string[] = [];
+  const walk = (parent: string | undefined, depth: number): void => {
+    const list = (children.get(parent) ?? []).slice().sort((a, b) => {
+      const ra = rank.get(a.id), rb = rank.get(b.id);
+      if (ra !== undefined && rb !== undefined) return ra - rb;
+      if (ra !== undefined) return -1;
+      if (rb !== undefined) return 1;
+      return a.tie - b.tie;
+    });
+    for (const c of list) {
+      rows.push({ kind: c.kind, id: c.id, depth, ...(parent !== undefined ? { folder: parent } : {}) });
+      if (c.kind === "scene") out.push(c.id);
+      else walk(c.id, depth + 1);
+    }
+  };
+  walk(undefined, 0);
+  return { rows, sceneIds: out, folderParent, sceneFolder };
+}
+
+/** A scene's folder path for display ("Act 1 / The docks"), or "" at the top level. */
+export function sceneFolderPath(project: Pick<ProjectFile, "sceneFolders">, layout: Pick<SceneFolderLayout, "folderParent" | "sceneFolder">, sceneId: string): string {
+  const names = new Map((project.sceneFolders ?? []).map((f) => [f.id, f.name]));
+  const parts: string[] = [];
+  for (let at = layout.sceneFolder.get(sceneId), n = 0; at !== undefined && n <= names.size; at = layout.folderParent.get(at), n++) parts.unshift(names.get(at) ?? "");
+  return parts.join(" / ");
+}
+
 export interface ProjectFile {
   schema: string;          // "patter/project@0"
   root?: boolean;
@@ -860,8 +955,17 @@ export interface ProjectFile {
   start?: { scene: string; block?: string };
   /** The authored scene order (scene ids) for navigation. Scenes not listed follow in file order;
    *  listed ids that no longer exist are ignored. Omitted = plain file order. Presentation only:
-   *  it never affects play, which always starts from `start` / an explicit address. */
+   *  it never affects play, which always starts from `start` / an explicit address.
+   *  Holds scene folder ids too (`sceneFolders`): folders and scenes mix in one order, and Patterpad keeps
+   *  the list equal to the scene list as shown, read top to bottom with every folder open. */
   sceneOrder?: string[];
+  /** Folders for organising the scene list (design/proposals/scene-folders.md). Navigation only, like
+   *  `sceneOrder`: no file moves, nothing reaches the bundle. The list's own order means nothing; where a
+   *  folder is shown comes from `sceneOrder`. Omitted = no folders. */
+  sceneFolders?: SceneFolder[];
+  /** Scene id -> the id of the folder it's filed in. A scene not listed sits at the top level; an entry
+   *  naming a folder that doesn't exist is ignored. A map, so two people filing different scenes merge. */
+  sceneFolder?: Record<string, string>;
   /** Version-control system (spec §12); omitted = unset / none. */
   vcs?: VcsKind;
   /** Project-wide VO mode (spec §16) - one boolean, no per-scene override. */

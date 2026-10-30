@@ -67,6 +67,9 @@ interface AppSlice {
   /** Where Storyletter is, when Patterpad couldn't find it and the author pointed at it (Show Card in
    *  Storyletter). Per person: where an app is installed differs from one machine to the next. */
   storyletterPath?: string;
+  /** The scene folders each author has closed, per project path (scene folders): the person's own view,
+   *  never the project's, so it never clashes. */
+  closedFolders?: Record<string, string[]>;
   /** Publish ▸ Auto Rebuild: a working habit, so per person rather than in the shared project file. */
   autoRebuild: boolean;
   /** What's New: the version that last ran, and the "Show what's new after updates" tickbox. */
@@ -105,6 +108,9 @@ export interface Store {
   setAutoRebuild(on: boolean): void;
   /** Storyletter's location, as the author pointed at it (undefined = look for it). */
   storyletterPath(): string | undefined;
+  /** The scene folders closed in one project's list. */
+  closedFolders(projectPath: string): string[];
+  setClosedFolders(projectPath: string, ids: string[]): void;
   setStoryletterPath(path: string): void;
   /** What's New's memory (app-shell whats-new-main), merged on write. */
   whatsNew(): WhatsNewMemory;
@@ -250,6 +256,14 @@ export function createStore(dir: string): Store {
     },
     storyletterPath() {
       return app.get().app.storyletterPath;
+    },
+    closedFolders(projectPath) {
+      return app.get().app.closedFolders?.[projectPath] ?? [];
+    },
+    setClosedFolders(projectPath, ids) {
+      const all = { ...(app.get().app.closedFolders ?? {}) };
+      if (ids.length) all[projectPath] = [...new Set(ids)]; else delete all[projectPath];
+      app.patchApp({ closedFolders: all });
     },
     setStoryletterPath(path) {
       app.patchApp({ storyletterPath: path });

@@ -23,7 +23,9 @@ export async function runReportXlsx(data: ReportData): Promise<Buffer> {
   // --- Scenes ---------------------------------------------------------------
   const scenes = wb.addWorksheet("Scenes");
   const action = data.totals.action.count > 0;
+  const filed = data.scenes.some((s) => s.folder); // scene folders: the column only when there are any
   scenes.columns = [
+    ...(filed ? [{ header: "Folder", key: "folder", width: 22 }] : []),
     { header: "Scene", key: "name", width: 24 },
     { header: "Status", key: "status", width: 10 },
     ...(v ? [{ header: "Voiced", key: "vCount", width: 8 }] : []),
@@ -39,8 +41,8 @@ export async function runReportXlsx(data: ReportData): Promise<Buffer> {
     { header: "Written left", key: "wRem", width: 11 },
     ...(v ? [{ header: "Voiced left", key: "vRem", width: 11 }] : []),
   ];
-  const sceneRow = (name: string, s: Pick<SceneReport, "voiced" | "written" | "action" | "choices" | "writtenRemaining" | "voicedRemaining"> & { estimate?: number; status?: string }) => ({
-    name, status: s.status,
+  const sceneRow = (name: string, s: Pick<SceneReport, "voiced" | "written" | "action" | "choices" | "writtenRemaining" | "voicedRemaining"> & { estimate?: number; status?: string; folder?: string }) => ({
+    name, folder: s.folder ?? "", status: s.status,
     vCount: s.voiced.count, wCount: s.written.count, words: s.written.words, choices: s.choices,
     aCount: s.action.count, aWords: s.action.words,
     ...Object.fromEntries(data.writingLadder.map((k) => [`w:${k}`, s.written.byWriting[k] ?? 0])),

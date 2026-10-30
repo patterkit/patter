@@ -125,7 +125,7 @@ scenes, showing how many `@patter` properties the project declares (see
 Below it, your list of scenes. The open scene unfolds to list its **blocks**. The block your
 cursor is in stays marked, and clicking one jumps straight to it. **Drag** a scene to
 reorder the list; the order is saved with the project (it changes nothing about how the
-story plays). Add a scene with the **+ New scene** row at the foot of the list (or
+story plays). Add a scene with the **+ New** row at the foot of the list, choosing **Scene** (or
 **File ▸ New Scene**, `⇧⌘N`): an **Untitled scene** appears straight after the one you're in,
 opens, and has its title selected, so just type its name and press Return. To start from a
 **scene kit** instead, choose **File ▸ New Scene from Kit…**: **Blank**, a
@@ -155,6 +155,24 @@ navigator. The navigator shows you where things live, and Back retraces where yo
 
 When you want nothing but the words, **Writing View** (`⇧⌘M`) clears both panes and the
 bottom bars away, leaving just the script and the hint bar. See [Reading & focus](/patterpad/reading-and-focus/).
+
+### Folders in the scene list
+
+A big project, such as one imported from Ink, can have hundreds of scenes. **Folders** keep the
+list in order. Choose **+ New ▸ Folder** at the foot of the list, or **File ▸ New Folder**, and
+a folder appears straight after the scene you're in, with its name ready to type. Drag a scene or a
+folder onto a folder to put it inside, or between two rows to place it there. Folders can hold
+folders: **New folder inside** on a folder's right-click menu makes one within it. In a long list, **Move to Folder…** on the right-click menu is quicker than dragging.
+
+Click a folder to open or close it. The arrow keys move through the list: **Right** opens a folder
+and **Left** closes it. Double-click a folder's name, or press `F2`, to rename it. Opening a scene opens the
+folders it's in, and a closed folder shows the version-control badges of the scenes inside it.
+
+Folders only organise the list. No file moves, so your loc files, audio, and version control are
+untouched, and the story plays the same. Deleting a folder moves its scenes up a level and never
+deletes a scene. Which folders you've closed is remembered for you, not saved in the project, so it
+never clashes with anyone else's. The production report, the voice script, and the loc spreadsheet
+gain a **Folder** column, and Find shows each result's folders.
 
 ## Saving
 

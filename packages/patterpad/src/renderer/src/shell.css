@@ -59,7 +59,7 @@
 .pane-centre { display: flex; flex-direction: column; }
 #editor { flex: 1; min-height: 0; }
 
-/* The scene rows, the Properties row and "New scene" are the shell's navigator row (`.shell-nav-row`,
+/* The scene rows, the Properties row and "New" are the shell's navigator row (`.shell-nav-row`,
    app-shell 0.65, the October 2026 UI review): 28px at weight 400, and the open document's row marked by
    `aria-current` on the neutral selection fill with a 2px accent mark. What stays here is this app's. */
 .nav-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -86,10 +86,29 @@
 .nav-block:hover { background: var(--hover); color: var(--ink); }
 .nav-block.active { color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); border-left-color: transparent; }
 
-/* Scene drag-to-reorder: the grabbed row dims; an accent seam marks the drop slot. */
-.nav-scene.dragging { opacity: 0.45; }
-.nav-scene.drop-before { box-shadow: 0 -2px 0 0 var(--accent); }
-.nav-scene.drop-after { box-shadow: 0 2px 0 0 var(--accent); }
+/* Scene drag-to-reorder (app-shell's wireReorder): the grabbed row dims; an accent seam marks the drop
+   slot, and a folder row taking a drop into it is ringed. */
+.nav-scene.dragging, .nav-folder.dragging { opacity: 0.45; }
+.nav-scene.drop-before, .nav-folder.drop-before { box-shadow: 0 -2px 0 0 var(--accent); }
+.nav-scene.drop-after, .nav-folder.drop-after { box-shadow: 0 2px 0 0 var(--accent); }
+.nav-folder.drop-into { box-shadow: inset 0 0 0 2px var(--accent); border-radius: var(--radius-sm); }
+
+/* Scene folders: the scenes and their folders are a tree (role="tree"), each row indented by its depth.
+   A folder row is the shell's nav row with a chevron and a count; a scene keeps its look. */
+.nav-tree { display: flex; flex-direction: column; }
+.nav-tree > * { flex: none; }
+/* One step in per level is a chevron and its gap (18px), so a folder's contents start one step right of its
+   name. With folders, a scene row holds an empty chevron slot, so names at one level line up. */
+.nav-scene > .nav-item, .nav-folder > .nav-folder-item { padding-left: calc(10px + var(--nav-depth, 0) * 18px); }
+.nav-scene .nav-block { margin-left: calc(17px + var(--nav-depth, 0) * 18px); width: calc(100% - 17px - var(--nav-depth, 0) * 18px); }
+.nav-tree.has-folders .nav-scene .nav-block { margin-left: calc(35px + var(--nav-depth, 0) * 18px); width: calc(100% - 35px - var(--nav-depth, 0) * 18px); }
+.nav-folder-item { font-weight: var(--weight-medium); }
+.nav-chev-space { flex: none; width: 12px; height: 12px; }
+.nav-chev { flex: none; width: 12px; height: 12px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); transition: transform var(--dur-quick) var(--ease-standard); }
+.nav-chev.open { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .nav-chev { transition: none; } }
+.nav-folder-item .vc-badge { margin-left: 4px; }
+.nav-rename { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--accent); border-radius: var(--radius-sm); padding: 1px 4px; }
 
 /* Destructive confirm (Delete Scene): the shell's frame + `.btn.danger`; ours is the referring-scene evidence list. */
 .del-refs { margin: 3px 0 6.5px; padding: 6.5px 9.5px; border-left: 2px solid var(--danger); }
@@ -99,7 +118,7 @@
 
 /* The nav's context menu is the shell's (openContextMenu + context-menu.css). */
 
-/* The quiet "New scene" foot of the list (the shell's `.shell-nav-add`), a breath under the last scene. */
+/* The quiet "New" foot of the list (a scene, a scene from a kit, or a folder) (the shell's `.shell-nav-add`), a breath under the last scene. */
 .nav-add-scene { margin-top: 2px; }
 
 /* Per-scene version-control badge (#145): a small glyph chip on the right of a nav row. */

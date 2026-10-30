@@ -20,11 +20,13 @@
 
 import { DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers } from "@patterkit/model";
 import type { Beat, Block, Group, Snippet } from "@patterkit/model";
-import { sourceStrings, mergeAuthoring, effectiveRecording } from "./loaded-helpers.js";
+import { sourceStrings, mergeAuthoring, effectiveRecording, sceneFolderPaths } from "./loaded-helpers.js";
 import { classesForChannel } from "./documentation.js";
 import type { LoadedProject } from "./load.js";
 
 export interface VoiceLine {
+  /** The scene's folder path in Patterpad's list ("Act 1 / The docks"), when it's filed in one. */
+  folder?: string;
   /** Readable container trail (`Scene › Block › Option`) - the scope changes signal a new run / branch. */
   scope: string;
   /** The line beat's id (recordings / filenames key to this). */
@@ -109,12 +111,16 @@ export function runVoiceScript(loaded: LoadedProject, opts: { everything?: boole
   // One row for a spoken beat, or nothing when it is cut, not a line, or not yet ready to record. Shared by
   // the line beats of a run and an option's prompt, so the two can never disagree on what gets recorded.
   // Returns whether a row was emitted, so a run knows when its leading line has been used.
+  const folders = sceneFolderPaths(loaded);
+  let sceneNow = ""; // the scene being walked, for its folder
   const emitLine = (beat: Beat, scope: string[], leadingVo: string[] | undefined): boolean => {
     if (beat.kind !== "line" || cutSet.has(beat.id)) return false;
     const ws = writingOf.get(beat.id) ?? stub;
     if (!everything && recordThreshold !== -1 && (writingIndex.get(ws) ?? 0) < recordThreshold) return false; // not ready to record
     const own = ownVo(beat.id);
+    const folder = folders.get(sceneNow);
     lines.push({
+      ...(folder ? { folder } : {}),
       scope: scope.join(" › "),
       id: beat.id,
       character: beat.character ?? "",
@@ -151,6 +157,7 @@ export function runVoiceScript(loaded: LoadedProject, opts: { everything?: boole
 
   for (const scene of loaded.scenes) {
     if (cutSet.has(scene.id)) continue;
+    sceneNow = scene.id;
     const sceneVo = ownVo(scene.id);
     for (const block of scene.blocks as Block[]) {
       if (cutSet.has(block.id)) continue;

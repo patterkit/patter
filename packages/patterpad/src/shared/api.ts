@@ -5,7 +5,7 @@
 import type { ThemeChoice } from "@wildwinter/app-shell/theme";
 import type { MenuCommand } from "@wildwinter/app-shell/menu";
 import type { WhatsNewState } from "@wildwinter/app-shell/whats-new-main";
-import type { GameDataFields, GameDataNodeKind, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier } from "@patterkit/model";
+import type { GameDataFields, GameDataNodeKind, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier, SceneNavRow } from "@patterkit/model";
 
 export type { VcsKind } from "@patterkit/model";
 import type { PairedCard } from "./paired-cards.js";
@@ -117,6 +117,11 @@ export interface OpenedProject {
   scenes: SceneSummary[];
   /** All scene ids - the cross-scene jump targets the surface offers. */
   sceneIds: string[];
+  /** The scene list as laid out, folders and scenes, top to bottom with every folder open
+   *  (`sceneFolderLayout`; design/proposals/scene-folders.md). */
+  navRows: SceneNavRow[];
+  /** The scene folders' names, by id. */
+  sceneFolders: { id: string; name: string }[];
   /** Spell-check setup (#177): the resolved dictionary language (defaulted from the source locale when
    *  unset), the project's custom word list, and the on/off flag - so the renderer can build the engine. */
   dictionary: { language: string; words: string[]; ignore: string[]; enabled: boolean };
@@ -1380,9 +1385,22 @@ export interface PatterApi {
    *  With `after` (a scene id) the new scene goes straight after it, written into `sceneOrder` in the same
    *  step; without it, at the end. */
   createScene(name: string, kit?: SceneKitId, speaker?: string, after?: string): Promise<SaveResult & { project?: OpenedProject; sceneId?: string }>;
-  /** Move a scene one place up (-1) or down (1) in the authored order (`sceneOrder`), one step of the
-   *  project history. `moved` is false at the first or last place, where nothing is written. */
+  /** Move a scene or folder one place up (-1) or down (1) among its siblings in the scene list, one step
+   *  of the project history. `moved` is false at the first or last place, where nothing is written. */
   moveScene(sceneId: string, dir: -1 | 1): Promise<SaveResult & { project?: OpenedProject; moved?: boolean }>;
+  /** The scene folders this person has closed in a project's list (remembered per person, never in the
+   *  project), and a new set of them. */
+  closedFolders(projectPath: string): Promise<string[]>;
+  setClosedFolders(projectPath: string, ids: string[]): Promise<void>;
+  /** Move a scene or folder in the scene list against a target row: before it, after it, or into it (a
+   *  folder; a null target with "into" is the top level's end). One step of the project history. */
+  placeSceneRow(rowId: string, target: string | null, where: "before" | "after" | "into"): Promise<SaveResult & { project?: OpenedProject }>;
+  /** A new scene folder, "New folder" (numbered), straight after `after` (a row id) in the same folder, or
+   *  with `inside` (a folder id) at the end of that folder. */
+  createSceneFolder(after?: string, inside?: string): Promise<SaveResult & { project?: OpenedProject; folderId?: string }>;
+  renameSceneFolder(id: string, name: string): Promise<SaveResult & { project?: OpenedProject }>;
+  /** Delete a scene folder: what it holds moves up into its place. Never deletes a scene. */
+  deleteSceneFolder(id: string): Promise<SaveResult & { project?: OpenedProject }>;
   /** What deleting a scene would cost - drives the delete confirm's severity: untouched scaffolds
    *  delete silently, content asks, and inbound references list the referring scenes by name. */
   sceneDeleteInfo(sceneId: string): Promise<SceneDeleteInfo | null>;

@@ -8,7 +8,7 @@
 // editor, CLI, and CI behave identically by construction.
 // ---------------------------------------------------------------------------
 
-export { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, applySceneOrder } from "./load.js";
+export { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, applySceneOrder, applySceneNavOrder } from "./load.js";
 export type { LoadedProject, LoadedManifest } from "./load.js";
 export { applyWrites } from "./write.js";
 export type { PlannedWrite } from "./write.js";
@@ -34,7 +34,7 @@ export { runPlay, renderPlay } from "./play.js";
 export type { PlayOptions, PlayResult, PlayEvent, PlayOutcome } from "./play.js";
 export { runCoverage, runCoverageAsync, renderCoverageText, proposeCoverageDrivers, leastReachedFirst, RARE_REACH_PCT } from "./coverage.js";
 export type { CoverageOptions, CoverageHooks, CoverageAsyncHooks, CoverageReport, CoverageBeat, CoverageOrder, ContentError } from "./coverage.js";
-export { resolveStart } from "./loaded-helpers.js";
+export { resolveStart, sceneFolderPaths } from "./loaded-helpers.js";
 export { runFormat } from "./format.js";
 export type { FormatResult } from "./format.js";
 export { runReport, renderReportText } from "./report.js";

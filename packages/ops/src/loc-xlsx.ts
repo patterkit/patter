@@ -4,6 +4,9 @@
 // / Gender / Qualifier. A view of the LocCatalog, like loc-format.ts's JSON/PO. exceljs is
 // lazy-loaded (heavy; only this path needs it), mirroring report-xlsx.ts.
 //
+// A Folder column, last, names each scene's folder in Patterpad's list when the project has folders: display
+// only, so the reader never looks at it, and a sheet without it reads the same.
+//
 // Round-trips: a hidden Scene column carries the scene id on every row; Status
 // "stale" carries the staleness flag. Source / Comments are read back for
 // completeness but applyLoc only consumes id + scene + translation + stale. Gender
@@ -82,7 +85,7 @@ function cellText(v: unknown): string {
 }
 
 /** Render the catalog as an .xlsx workbook: a sheet per scene, translator-facing columns. */
-export async function catalogToXlsx(catalog: LocCatalog): Promise<Buffer> {
+export async function catalogToXlsx(catalog: LocCatalog, opts: { folders?: ReadonlyMap<string, string> } = {}): Promise<Buffer> {
   const { default: ExcelJS } = await import("exceljs");
   const wb = new ExcelJS.Workbook();
   wb.creator = "patter";
@@ -105,6 +108,8 @@ export async function catalogToXlsx(catalog: LocCatalog): Promise<Buffer> {
       { header: "Scene", key: "scene", width: 22, hidden: true },
       // After the hidden Scene column, so the columns an older reader finds by position stay where they were.
       { header: "Qualifier", key: "qualifier", width: 11 },
+      // Scene folders: the scene's folder, last of all, when the project has any. Never read back.
+      ...(opts.folders?.size ? [{ header: "Folder", key: "folder", width: 22 }] : []),
     ];
     ws.getRow(1).font = { bold: true };
     // Frozen, not just bold: a long sheet is read by scrolling, and the header row is the only
@@ -114,7 +119,7 @@ export async function catalogToXlsx(catalog: LocCatalog): Promise<Buffer> {
     for (const e of entries) {
       ws.addRow({ id: e.id, source: e.source, translation: e.translation,
         comments: e.comments.join("\n"), status: e.stale ? "stale" : (e.translation ? "translated" : ""),
-        gender: e.context?.gender ?? "", scene, qualifier: e.context?.qualifier ?? "" });
+        gender: e.context?.gender ?? "", scene, qualifier: e.context?.qualifier ?? "", folder: opts.folders?.get(scene) ?? "" });
     }
   }
   // Which language the file is for (blank for a template), on a hidden sheet of its own, last. Shown when it's

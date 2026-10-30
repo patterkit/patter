@@ -1296,6 +1296,10 @@ function registerIpc(): void {
   ipcMain.handle("project:reorderScenes", (_e, ids: string[]) => project.reorderScenes(ids));
   ipcMain.handle("project:createScene", (_e, name: string, kit?: SceneKitId, speaker?: string, after?: string) => project.createScene(name, kit, speaker, after));
   ipcMain.handle("project:moveScene", (_e, sceneId: string, dir: -1 | 1) => project.moveScene(sceneId, dir));
+  ipcMain.handle("project:placeSceneRow", (_e, rowId: string, target: string | null, where: "before" | "after" | "into") => project.placeSceneRow(rowId, target, where));
+  ipcMain.handle("project:createSceneFolder", (_e, after?: string, inside?: string) => project.createSceneFolder(after, inside));
+  ipcMain.handle("project:renameSceneFolder", (_e, id: string, name: string) => project.renameSceneFolder(id, name));
+  ipcMain.handle("project:deleteSceneFolder", (_e, id: string) => project.deleteSceneFolder(id));
   ipcMain.handle("project:sceneDeleteInfo", (_e, sceneId: string) => project.sceneDeleteInfo(sceneId));
   ipcMain.handle("project:deleteScene", (_e, sceneId: string) => project.deleteScene(sceneId));
   ipcMain.handle("scene:read", (_e, id: string) => project.readScene(id));
@@ -1351,6 +1355,8 @@ function registerIpc(): void {
     return r;
   });
   ipcMain.handle("project:vcStatus", () => project.vcStatus());
+  ipcMain.handle("nav:closedFolders", (_e, projectPath: string) => store.closedFolders(projectPath));
+  ipcMain.handle("nav:setClosedFolders", (_e, projectPath: string, ids: string[]) => { store.setClosedFolders(projectPath, ids); });
   ipcMain.handle("scene:remember", (_e, projectPath: string, id: string, caretId?: string) => {
     store.recordScene(projectPath, id, caretId);
     searchFocus = { sceneId: id, fromBeatId: caretId }; // keep the search window's content-ranking anchored at the live caret

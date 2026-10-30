@@ -8,6 +8,19 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **Folders in the scene list.** **+ New ▸ Folder** at the foot of the list (which now offers a scene, a
+  scene from a kit, or a folder), or File ▸ New Folder makes one
+  straight after the open scene, its name ready to type. Drag a scene or folder onto a folder to put it inside,
+  or between rows to place it. Folders can hold folders: New folder inside, on a folder's right-click menu,
+  makes one within it. **Move to Folder…** on the right-click menu files a
+  scene without dragging, which is quicker in a big project. Click a folder to open or close it; the arrow keys
+  move through the list, and Right and Left open and close. Folders only organise the list: no file moves,
+  play doesn't change, and deleting a folder moves its scenes up rather than deleting them. Which folders you've
+  closed is remembered for you, not saved in the project. Opening a scene opens the folders it's in, a closed
+  folder shows its scenes' version-control badges, and Find shows each result's folders. The production report,
+  voice script, and loc spreadsheets gain a Folder column.
+- **Two people reordering scenes now merge.** When both moved different scenes, both moves land; only one
+  scene moved two ways is a clash.
 - **A choice that can run dry and end the dialogue is a warning, marked on the choice.** Patterpad now finds a
   choice that comes round again through other blocks or scenes, not only one that jumps straight back to its
   own block. Where nothing comes after it, it warns, and **Add a fallback** in the Problems bar adds one. Where

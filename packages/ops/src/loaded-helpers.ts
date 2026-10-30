@@ -5,7 +5,7 @@
 
 import type { LoadedProject } from "./load.js";
 import type { Block, DocLine, EditRecord, Scene } from "@patterkit/model";
-import { RERECORD_STATUS, effectiveGameId } from "@patterkit/model";
+import { RERECORD_STATUS, effectiveGameId, sceneFolderLayout, sceneFolderPath } from "@patterkit/model";
 
 /** The effective recording status of a dialogue line: the reserved `rerecord` status when the line is
  *  flagged needs-re-record (it masks everything, so a "recorded" take still reads as work), else the
@@ -107,4 +107,17 @@ export function mergeAuthoring(loaded: LoadedProject): MergedAuthoring {
     for (const [id, v] of Object.entries(a.edits ?? {})) edits.set(id, v);
   }
   return { writing, recording, cut, rerecord, documentation, edits };
+}
+
+/** Each filed scene's folder path ("Act 1 / The docks"), by scene id: the Folder column the report, voice
+ *  script, and loc spreadsheets carry (scene folders). Empty when the project has no folders. */
+export function sceneFolderPaths(loaded: Pick<LoadedProject, "project" | "scenes">): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!loaded.project.sceneFolders?.length) return out;
+  const layout = sceneFolderLayout(loaded.project, loaded.scenes.map((s) => s.id));
+  for (const s of loaded.scenes) {
+    const path = sceneFolderPath(loaded.project, layout, s.id);
+    if (path) out.set(s.id, path);
+  }
+  return out;
 }

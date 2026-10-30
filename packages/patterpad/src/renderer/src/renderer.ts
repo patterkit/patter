@@ -30,7 +30,7 @@ import "@wildwinter/app-shell/job.css"; // the long-job strip the publish paths 
 import "./shell.css"; // app shell layout, over the surface's page styles
 import "@patterkit/patterpad-surface/fonts.css"; // every face the windows draw, declared once
 
-import { moveMenuState, sceneMoveState, sceneMoveTarget } from "./scene-move.js";
+import { moveMenuState, navSiblings, sceneMoveState, sceneMoveTarget } from "./scene-move.js";
 import { returnToTwin } from "./focus-return.js";
 import { planStatus } from "./status-raise.js";
 import { missingLabel } from "@patterkit/patterpad-surface/reftext";
@@ -83,6 +83,7 @@ import { fileSafeName, untitledSceneName } from "../../shared/file-name.js";
 import { EXAMPLES } from "../../shared/examples.js";
 import { mountWelcome, openKitGallery, type KitGalleryItem, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, showUpdateReady, openCommandPalette, type PaletteItem, whatsNewAfterUpdate, openWhatsNew, type WhatsNewOptions, plural, formatCount, debounce } from "@wildwinter/app-shell";
 import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in this file
+import { rove, wireReorder, wireTreeKeys } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/keys.css"; // the keycaps every hint in this window draws
 // Key hints come from ONE helper that writes "⌘" on a Mac and "Ctrl" elsewhere, and metadata is a drawn
 // line, never joined with a typed dot (design-language §4): no "⌘" and no " · " in a string in this file.
@@ -555,6 +556,11 @@ function markCurrent(el: HTMLElement, on: boolean): void {
  *  reveals while the previously open scene's list closes (both ease - no pops). */
 function highlightNav(id: string): void {
   navListEl.querySelectorAll<HTMLElement>(".nav-item").forEach((el) => markCurrent(el, el.dataset["id"] === id));
+  // A scene inside a closed folder has no row: the nearest folder that shows takes the mark (scene folders,
+  // D8), as Storyletter's tree marks the nearest ancestor of a document with no row of its own.
+  const shown = navListEl.querySelector(`.nav-item[data-id="${CSS.escape(id)}"]`) !== null;
+  const holder = shown || !id ? undefined : visibleFolderOf(id);
+  navListEl.querySelectorAll<HTMLElement>(".nav-folder-item").forEach((el) => markCurrent(el, el.dataset["id"] === holder));
   navListEl.querySelectorAll<HTMLElement>(".nav-scene").forEach((el) => el.classList.toggle("open", el.dataset["id"] === id));
   refreshNavBlocks();
 }
@@ -629,12 +635,35 @@ function renderNav(): void {
   propsRow.append(Object.assign(document.createElement("span"), { className: "nav-doc-count shell-nav-count", textContent: String(patterProps.length) }));
   propsRow.addEventListener("click", () => void showPropertiesDoc());
   navListEl.appendChild(propsRow);
-  for (const s of project?.scenes ?? []) {
+  // The scenes and their folders (scene folders, design/proposals/scene-folders.md): a tree, one tab stop
+  // with the arrow keys (app-shell's tree keys), rows indented by depth. A closed folder's rows aren't drawn.
+  const tree = document.createElement("div");
+  tree.className = "nav-tree"; tree.setAttribute("role", "tree"); tree.setAttribute("aria-label", "Scenes");
+  // With folders, every scene row keeps a chevron's room before its name, so a folder's name lines up with the
+  // scenes beside it and what's inside a folder reads as one step in (the tree's own grammar, as Storyletter's).
+  const withFolders = (project?.sceneFolders ?? []).length > 0;
+  tree.classList.toggle("has-folders", withFolders);
+  const byId = new Map((project?.scenes ?? []).map((s) => [s.id, s]));
+  const folderName = new Map((project?.sceneFolders ?? []).map((f) => [f.id, f.name]));
+  let hiddenBelow = Infinity; // depth under a closed folder: rows deeper than it are skipped
+  for (const r of project?.navRows ?? []) {
+    if (r.depth > hiddenBelow) continue;
+    hiddenBelow = Infinity;
+    if (r.kind === "folder") {
+      tree.appendChild(folderRow(r.id, folderName.get(r.id) ?? "", r.depth));
+      if (closedFolders.has(r.id)) hiddenBelow = r.depth;
+      continue;
+    }
+    const s = byId.get(r.id);
+    if (!s) continue;
     const row = document.createElement("div");
     row.className = "nav-scene"; row.dataset["id"] = s.id;
+    row.style.setProperty("--nav-depth", String(r.depth));
     const b = document.createElement("button");
     b.className = "nav-item shell-nav-row"; b.type = "button"; b.dataset["id"] = s.id;
     b.dataset["vc"] = s.id; // the shard key `paintVcBadges` folds and badges this row from
+    treeItem(b, s.id, r.depth);
+    if (withFolders) b.append(Object.assign(document.createElement("span"), { className: "nav-chev-space" }));
     b.append(Object.assign(document.createElement("span"), { className: "nav-item-name", textContent: s.name }));
     b.addEventListener("click", () => void loadScene(s.id));
     b.addEventListener("contextmenu", (e) => { e.preventDefault(); sceneContextMenu(s.id, e.clientX, e.clientY); });
@@ -651,17 +680,227 @@ function renderNav(): void {
     blocks.className = "nav-blocks";
     blocks.appendChild(Object.assign(document.createElement("div"), { className: "nav-blocks-inner" }));
     row.appendChild(blocks);
-    wireSceneDrag(row);
-    navListEl.appendChild(row);
+    wireReorder(row, s.id, "y", dropRow);
+    tree.appendChild(row);
   }
+  navListEl.appendChild(tree);
+  wireTreeKeys(tree, (r) => { const id = r.dataset["id"]; if (id) toggleFolder(id); });
   // The quiet foot of the list: add a scene right where scenes live.
   const add = document.createElement("button");
   add.className = "nav-add-scene shell-nav-row shell-nav-add"; add.type = "button";
-  add.append(iconNode("add", 12), Object.assign(document.createElement("span"), { textContent: "New scene" })); // the drawn add, not a typed "+"
-  add.addEventListener("click", () => void newSceneNow());
+  add.setAttribute("aria-haspopup", "menu");
+  add.append(iconNode("add", 12), Object.assign(document.createElement("span"), { textContent: "New" })); // the drawn add, not a typed "+"
+  // One quiet row, three things it can make (scene folders): a click offers them, Scene first.
+  add.addEventListener("click", () => {
+    const r = add.getBoundingClientRect();
+    openContextMenu(r.left, r.bottom + 2, [
+      { label: "Scene", onClick: () => void newSceneNow() },
+      { label: "Scene from Kit…", onClick: () => newScenePrompt() },
+      { label: "Folder", onClick: () => void newFolderNow() },
+    ]);
+  });
   navListEl.appendChild(add);
   paintNavBadges(); // re-apply VC badges after a list rebuild
   if (currentSceneId) highlightNav(currentSceneId);
+  const treeEl = navListEl.querySelector<HTMLElement>(".nav-tree");
+  if (treeEl) rove(treeEl, treeEl.querySelector<HTMLElement>("[role=treeitem][aria-current]") ?? treeEl.querySelector<HTMLElement>("[role=treeitem]") ?? undefined);
+  void syncClosedFolders();
+}
+
+// --- scene folders (design/proposals/scene-folders.md) ----------------------------------------------
+// Cosmetic: a folder is a row in the list and nothing else. Which folders are closed is this person's own
+// view, remembered per project (never in the project, so it never clashes).
+
+/** The folders closed in the open project's list, and the project they were read for. */
+let closedFolders = new Set<string>();
+let closedFoldersFor: string | null = null;
+
+/** Read this person's closed folders when the open project changes, then draw the list with them. */
+async function syncClosedFolders(): Promise<void> {
+  const root = project?.root ?? null;
+  if (root === closedFoldersFor) return;
+  closedFoldersFor = root;
+  closedFolders = new Set(root ? await window.patter.closedFolders(root) : []);
+  if (closedFolders.size && project?.root === root) renderNav();
+}
+
+function saveClosedFolders(): void {
+  if (project) void window.patter.setClosedFolders(project.root, [...closedFolders]);
+}
+
+/** Open or close a folder. */
+function toggleFolder(id: string): void {
+  if (!(project?.sceneFolders ?? []).some((f) => f.id === id)) return;
+  if (closedFolders.has(id)) closedFolders.delete(id); else closedFolders.add(id);
+  saveClosedFolders();
+  renderNav();
+  navListEl.querySelector<HTMLElement>(`.nav-folder-item[data-id="${CSS.escape(id)}"]`)?.focus();
+}
+
+/** The folders a scene or folder sits in, innermost first. */
+function foldersAbove(id: string): string[] {
+  const rows = project?.navRows ?? [];
+  const parent = new Map(rows.map((r) => [r.id, r.folder]));
+  const out: string[] = [];
+  for (let at = parent.get(id); at !== undefined && out.length <= rows.length; at = parent.get(at)) out.push(at);
+  return out;
+}
+
+/** The outermost closed folder above a scene: the row that shows for it. */
+function visibleFolderOf(id: string): string | undefined {
+  return foldersAbove(id).filter((f) => closedFolders.has(f)).at(-1);
+}
+
+/** Opening a scene opens the folders it sits in (D8). Its row only: the author can close one again. */
+function revealInNav(sceneId: string): void {
+  const closed = foldersAbove(sceneId).filter((f) => closedFolders.has(f));
+  if (!closed.length) return;
+  for (const f of closed) closedFolders.delete(f);
+  saveClosedFolders();
+  renderNav();
+}
+
+/** A row's place in the tree, for app-shell's tree keys and for finding it again after a redraw. */
+function treeItem(b: HTMLElement, id: string, depth: number): void {
+  b.dataset["navKey"] = id;
+  b.setAttribute("role", "treeitem");
+  b.setAttribute("aria-level", String(depth + 1));
+  b.tabIndex = -1;
+}
+
+/** The scenes inside a folder, however deep. */
+function scenesInFolder(id: string): string[] {
+  return (project?.navRows ?? []).filter((r) => r.kind === "scene" && foldersAbove(r.id).includes(id)).map((r) => r.id);
+}
+
+function folderRow(id: string, name: string, depth: number): HTMLElement {
+  const open = !closedFolders.has(id);
+  const wrap = document.createElement("div");
+  wrap.className = "nav-folder"; wrap.dataset["id"] = id;
+  wrap.style.setProperty("--nav-depth", String(depth));
+  const b = document.createElement("button");
+  b.className = "nav-folder-item shell-nav-row"; b.type = "button"; b.dataset["id"] = id;
+  treeItem(b, id, depth);
+  b.setAttribute("aria-expanded", String(open));
+  const scenes = scenesInFolder(id);
+  // A closed folder shows the badges of the scenes inside it, folded, so a lock isn't hidden by folding.
+  if (!open && scenes.length) b.dataset["vc"] = scenes.join(" ");
+  const chev = document.createElement("span");
+  chev.className = `nav-chev${open ? " open" : ""}`;
+  chev.append(iconNode("collapsed", 12));
+  b.append(chev, Object.assign(document.createElement("span"), { className: "nav-item-name", textContent: name }));
+  b.append(Object.assign(document.createElement("span"), { className: "nav-n shell-nav-count", textContent: String(scenes.length) }));
+  b.dataset["tip"] = open ? "Close the folder" : "Open the folder";
+  b.addEventListener("click", () => toggleFolder(id));
+  b.addEventListener("dblclick", (e) => { e.preventDefault(); renameFolderInPlace(id); });
+  b.addEventListener("contextmenu", (e) => { e.preventDefault(); folderContextMenu(id, e.clientX, e.clientY); });
+  b.addEventListener("keydown", (e) => {
+    if (e.key === "F2") { e.preventDefault(); renameFolderInPlace(id); return; }
+    const dir = moveKeyDir(e);
+    if (dir === null) return;
+    e.preventDefault();
+    void moveSceneBy(id, dir);
+  });
+  wrap.append(b);
+  wireReorder(wrap, id, "y", dropRow, { onInto: (dragged, target) => void placeRow(dragged, target, "into") });
+  return wrap;
+}
+
+/** A drop before or after a row. */
+function dropRow(dragged: string, before: boolean, target: string): void {
+  void placeRow(dragged, target, before ? "before" : "after");
+}
+
+/** Move a scene or folder in the list, glide the rows, and keep a folder it went into open. */
+async function placeRow(rowId: string, target: string | null, where: "before" | "after" | "into"): Promise<void> {
+  if (!project) return;
+  const res = await tracked(window.patter.placeSceneRow(rowId, target, where));
+  if (!landed(res, "Couldn't move it")) return;
+  if (res.project) project = res.project;
+  if (where === "into" && target && closedFolders.delete(target)) saveClosedFolders();
+  flipNav(() => renderNav());
+  scheduleMoveState();
+}
+
+/** New Folder: made at once, after the open scene in its folder (or at the end of `inside`, a folder's own
+ *  menu), its name up for typing. */
+async function newFolderNow(inside?: string): Promise<void> {
+  if (!project) return;
+  const res = await tracked(window.patter.createSceneFolder(inside ? undefined : currentSceneId ?? undefined, inside));
+  if (!landed(res, "Couldn't add the folder") || !res.project || !res.folderId) return;
+  project = res.project;
+  if (inside && closedFolders.delete(inside)) saveClosedFolders(); // open it, so the new folder shows
+  renderNav();
+  renameFolderInPlace(res.folderId);
+}
+
+/** Rename a folder where it stands: its name becomes a field. Enter or leaving keeps it; Escape doesn't. */
+function renameFolderInPlace(id: string): void {
+  const b = navListEl.querySelector<HTMLElement>(`.nav-folder-item[data-id="${CSS.escape(id)}"]`);
+  const label = b?.querySelector<HTMLElement>(".nav-item-name");
+  if (!b || !label) return;
+  const before = label.textContent ?? "";
+  const input = Object.assign(document.createElement("input"), { className: "nav-rename", value: before, type: "text" });
+  input.setAttribute("aria-label", "Folder name");
+  let done = false;
+  const finish = async (keep: boolean): Promise<void> => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim();
+    if (keep && name && name !== before) {
+      const res = await tracked(window.patter.renameSceneFolder(id, name));
+      if (landed(res, "Couldn't rename the folder") && res.project) project = res.project;
+    }
+    renderNav();
+    navListEl.querySelector<HTMLElement>(`.nav-folder-item[data-id="${CSS.escape(id)}"]`)?.focus();
+  };
+  // The field lives inside the row's button: its own keys and clicks stay its own.
+  input.addEventListener("click", (e) => e.stopPropagation());
+  input.addEventListener("dblclick", (e) => e.stopPropagation());
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") { e.preventDefault(); void finish(true); }
+    else if (e.key === "Escape") { e.preventDefault(); void finish(false); }
+  });
+  input.addEventListener("blur", () => void finish(true));
+  label.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+function folderContextMenu(id: string, x: number, y: number): void {
+  const can = sceneMoveState(navSiblings(project?.navRows ?? [], id), id);
+  const n = scenesInFolder(id).length;
+  openContextMenu(x, y, [
+    { label: "Rename", onClick: () => renameFolderInPlace(id) },
+    { label: "New folder inside", onClick: () => void newFolderNow(id) },
+    { label: "Move to Folder…", onClick: () => moveToFolderMenu(id, x, y) },
+    { label: "Move up", disabled: !can.up, onClick: () => void moveSceneBy(id, -1) },
+    { label: "Move down", disabled: !can.down, onClick: () => void moveSceneBy(id, 1) },
+    { label: n === 0 ? "Delete folder" : n === 1 ? "Delete folder (its scene moves up)" : `Delete folder (its ${n} scenes move up)`, danger: true, onClick: () => void deleteFolderNow(id) },
+  ]);
+}
+
+/** Move to Folder: the folders to choose from, by path, and the top level. With hundreds of scenes it's
+ *  quicker than a drag. A folder can't go inside itself, so its own subtree isn't offered. */
+function moveToFolderMenu(rowId: string, x: number, y: number): void {
+  const rows = project?.navRows ?? [];
+  const names = new Map((project?.sceneFolders ?? []).map((f) => [f.id, f.name]));
+  const pathOf = (f: string): string => [f, ...foldersAbove(f)].reverse().map((id) => names.get(id) ?? "").join(" / ");
+  const here = rows.find((r) => r.id === rowId)?.folder;
+  const choices = rows.filter((r) => r.kind === "folder" && r.id !== rowId && !foldersAbove(r.id).includes(rowId));
+  openContextMenu(x, y, [
+    { label: "Top level", disabled: here === undefined, onClick: () => void placeRow(rowId, null, "into") },
+    ...choices.map((r) => ({ label: pathOf(r.id), disabled: r.id === here, onClick: () => void placeRow(rowId, r.id, "into") })),
+  ]);
+}
+
+async function deleteFolderNow(id: string): Promise<void> {
+  const res = await tracked(window.patter.deleteSceneFolder(id));
+  if (!landed(res, "Couldn't delete the folder")) return;
+  if (res.project) project = res.project;
+  if (closedFolders.delete(id)) saveClosedFolders();
+  flipNav(() => renderNav());
 }
 
 // --- new scene (File > New Scene / the nav's + row; File > New Scene from Kit…) ------------------
@@ -899,10 +1138,11 @@ async function undoRenameIfNewest(sceneId: string, depth: number): Promise<void>
 /** The nav's context menu: the shell's. Move up / Move down keep their places when they can't apply (the
  *  first or last scene), greyed. */
 function sceneContextMenu(sceneId: string, x: number, y: number): void {
-  const can = sceneMoveState(project?.scenes.map((s) => s.id) ?? [], sceneId);
+  const can = sceneMoveState(navSiblings(project?.navRows ?? [], sceneId), sceneId);
   openContextMenu(x, y, [
     { label: "Move up", disabled: !can.up, onClick: () => void moveSceneBy(sceneId, -1) },
     { label: "Move down", disabled: !can.down, onClick: () => void moveSceneBy(sceneId, 1) },
+    { label: "Move to Folder…", disabled: !(project?.sceneFolders ?? []).length, onClick: () => moveToFolderMenu(sceneId, x, y) },
     { label: "Delete scene", danger: true, onClick: () => void deleteScenePrompt(sceneId) },
   ]);
 }
@@ -912,13 +1152,14 @@ function sceneContextMenu(sceneId: string, x: number, y: number): void {
  *  step of the project history. The rows glide, and a row that had focus keeps it. */
 async function moveSceneBy(sceneId: string, dir: -1 | 1): Promise<void> {
   if (!project) return;
-  const hadFocus = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(".nav-item")?.dataset["id"] === sceneId;
+  const hadFocus = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(".nav-item, .nav-folder-item")?.dataset["id"] === sceneId;
+  const folder = (project.sceneFolders ?? []).some((f) => f.id === sceneId);
   const res = await tracked(window.patter.moveScene(sceneId, dir));
-  if (!landed(res, "Couldn't move the scene")) return;
-  if (!res.moved) { toast(dir < 0 ? "That's the first scene already." : "That's the last scene already.", "info"); return; }
+  if (!landed(res, folder ? "Couldn't move the folder" : "Couldn't move the scene")) return;
+  if (!res.moved) { toast(dir < 0 ? "That's the first in its folder already." : "That's the last in its folder already.", "info"); return; }
   if (res.project) project = res.project;
   flipNav(() => renderNav());
-  if (hadFocus) navListEl.querySelector<HTMLElement>(`.nav-item[data-id="${CSS.escape(sceneId)}"]`)?.focus();
+  if (hadFocus) navListEl.querySelector<HTMLElement>(`.nav-item[data-id="${CSS.escape(sceneId)}"], .nav-folder-item[data-id="${CSS.escape(sceneId)}"]`)?.focus();
   scheduleMoveState();
 }
 
@@ -939,7 +1180,7 @@ function scheduleMoveState(): void {
     moveStateFrame = 0;
     const state = moveMenuState({
       navList: navListEl, active: document.activeElement, openScene: currentSceneId,
-      order: project?.scenes.map((s) => s.id) ?? [],
+      order: navSiblings(project?.navRows ?? [], sceneMoveTarget(navListEl, document.activeElement, currentSceneId) ?? ""),
       ...(surface && !editorEl.hidden && project ? { canMoveSelection: (d: -1 | 1) => surface!.canMoveSelection(d) } : {}),
     });
     const sig = `${state.up}${state.down}`;
@@ -953,45 +1194,13 @@ document.addEventListener("focusout", scheduleMoveState);
 
 // --- scene reorder (drag a nav row; the order persists to the project) -------
 
-let dragSceneId: string | null = null;
-
-function clearDropMarks(): void {
-  navListEl.querySelectorAll(".drop-before, .drop-after").forEach((el) => el.classList.remove("drop-before", "drop-after"));
-}
-
-function wireSceneDrag(row: HTMLElement): void {
-  row.draggable = true;
-  row.addEventListener("dragstart", (e) => {
-    dragSceneId = row.dataset["id"] ?? null;
-    row.classList.add("dragging");
-    if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragSceneId ?? ""); }
-  });
-  row.addEventListener("dragend", () => { dragSceneId = null; row.classList.remove("dragging"); clearDropMarks(); });
-  row.addEventListener("dragover", (e) => {
-    if (!dragSceneId || dragSceneId === row.dataset["id"]) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-    const before = e.clientY < row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2;
-    clearDropMarks();
-    row.classList.add(before ? "drop-before" : "drop-after");
-  });
-  row.addEventListener("dragleave", () => row.classList.remove("drop-before", "drop-after"));
-  row.addEventListener("drop", (e) => {
-    e.preventDefault();
-    const before = row.classList.contains("drop-before");
-    clearDropMarks();
-    const targetId = row.dataset["id"];
-    if (dragSceneId && targetId && dragSceneId !== targetId) void commitSceneReorder(dragSceneId, targetId, before);
-  });
-}
-
 /** Rows GLIDE to their new slots (FLIP over the rebuild), per the animation strategy. */
 function flipNav(mutate: () => void): void {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { mutate(); return; }
   const first = new Map<string, DOMRect>();
-  navListEl.querySelectorAll<HTMLElement>(".nav-scene").forEach((el) => { if (el.dataset["id"]) first.set(el.dataset["id"], el.getBoundingClientRect()); });
+  navListEl.querySelectorAll<HTMLElement>(".nav-scene, .nav-folder").forEach((el) => { if (el.dataset["id"]) first.set(el.dataset["id"], el.getBoundingClientRect()); });
   mutate();
-  navListEl.querySelectorAll<HTMLElement>(".nav-scene").forEach((el) => {
+  navListEl.querySelectorAll<HTMLElement>(".nav-scene, .nav-folder").forEach((el) => {
     const f = el.dataset["id"] ? first.get(el.dataset["id"]) : undefined;
     if (!f) return;
     const dy = f.top - el.getBoundingClientRect().top;
@@ -1003,19 +1212,6 @@ function flipNav(mutate: () => void): void {
       el.addEventListener("transitionend", () => { el.style.transition = ""; }, { once: true });
     });
   });
-}
-
-/** Persist a drop: splice the moved scene against the target, save the order, glide the rows.
- *  A refused save (the scene list changed underneath the drag) re-renders the truth unchanged. */
-async function commitSceneReorder(movedId: string, targetId: string, before: boolean): Promise<void> {
-  if (!project) return;
-  const ids = project.scenes.map((s) => s.id).filter((id) => id !== movedId);
-  const at = ids.indexOf(targetId);
-  if (at < 0) return;
-  ids.splice(before ? at : at + 1, 0, movedId);
-  const res = await tracked(window.patter.reorderScenes(ids));
-  if (res.project) project = res.project;
-  flipNav(() => renderNav());
 }
 
 // --- version-control state (#145) --------------------------------------------
@@ -2947,6 +3143,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
   });
   mountingScene = false; // any onChange from here on is a real edit
   currentSceneId = sceneId;
+  revealInNav(sceneId);
   surfaceSceneId = sceneId;
   saver.cancel(); // mount fires onChange once (the initial mirror); not a user edit
   highlightNav(sceneId);
@@ -4511,6 +4708,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "new") createDialog();
   else if (cmd === "new-scene") void newSceneNow();
   else if (cmd === "new-scene-kit") newScenePrompt();
+  else if (cmd === "new-folder") void newFolderNow();
   else if (cmd === "delete-scene") void deleteScenePrompt();
   else if (cmd === "open") void openDialog();
   else if (cmd.startsWith("open-example:")) void openExample(cmd.slice("open-example:".length));

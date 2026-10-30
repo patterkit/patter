@@ -173,6 +173,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // gallery is the item after it.
         { label: "New Scene", accelerator: "Shift+CmdOrCtrl+N", enabled: hasProject, click: () => send("new-scene") },
         { label: "New Scene from Kit…", enabled: hasProject, click: () => send("new-scene-kit") },
+        { label: "New Folder", enabled: hasProject, click: () => send("new-folder") },
         { label: "Delete Scene", enabled: hasProject, click: () => send("delete-scene") },
         { type: "separator" },
         { ...FILE_MENU.projectSettings, enabled: hasProject, click: () => send("project-settings") },

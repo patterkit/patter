@@ -20,7 +20,7 @@ import { canonicalStringify, parseSource } from "@patterkit/core";
 import {
   loadProject, runValidate, runExport, runExportHtml, bundleOutputPath, besideBundlePath, runFormat, runPlay, renderPlay, runCoverage, renderCoverageText, proposeCoverageDrivers, runInit, runResolve, runPropertyUsage,
   runReport, renderReportText, runReportXlsx, runPack, runUnpack, runUnpackMerge, runMerge, planBuild, UnsupportedMergeError, SHARD_EXTENSIONS, CONFLICT_SIDECAR,
-  extractLoc, applyLoc, describeLocExport, describeLocImport, importLocale, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
+  extractLoc, applyLoc, describeLocExport, describeLocImport, importLocale, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog, sceneFolderPaths,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf, scanAudioStatus,
   planShareScopes, defaultGameScopesDir, GAME_SCOPES_DIR,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, qualifierNamer,
@@ -596,7 +596,7 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       const changes = describeLocExport(loaded, { locale });
       if (format === "xlsx") {
         if (flags.o === "-") return usage("loc-export", "-o - is not supported for --format xlsx: a spreadsheet is not text");
-        if (!commitBinary(flags.o, await catalogToXlsx(catalog))) return 1;
+        if (!commitBinary(flags.o, await catalogToXlsx(catalog, { folders: sceneFolderPaths(loaded) }))) return 1;
       } else {
         const content = format === "json" ? catalogToJson(catalog) : catalogToPo(catalog);
         if (flags.o === "-") { process.stdout.write(content); for (const l of changes) console.error(l); return 0; } // stdout for pipelines

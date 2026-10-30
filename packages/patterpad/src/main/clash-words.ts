@@ -284,6 +284,8 @@ function placeProject(ctx: ClashContext, path: string): Placed {
     return { where: `${ctx.extensionName(key)}'s ${field ? words(field) : "settings"}`, target: { kind: "settings", tab: `extension:${key}` } };
   }
   if (head === "sceneOrder") return { where: "Scene order", target: { kind: "none" } };
+  if (head === "sceneFolders") return { where: segs[2]?.key === "name" ? "A scene folder's name" : segs[2]?.key === "parent" ? "Where a scene folder sits" : "A scene folder", target: { kind: "none" } };
+  if (head === "sceneFolder") return { where: key ? `The folder for ${ctx.sceneName(key) ?? key}` : "Scene folders", target: { kind: "none" } };
   const tab = SETTINGS_TAB[head] ?? "general";
   return { where: PROJECT_WORDS[head] ?? `The project's ${words(head)} setting`, target: settings(tab) };
 }

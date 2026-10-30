@@ -34,7 +34,7 @@
 import { DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS, textIsAction } from "@patterkit/model";
 import type { Group, Snippet, EditRecord } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
-import { stringsByLocale, mergeAuthoring, effectiveRecording } from "./loaded-helpers.js";
+import { stringsByLocale, mergeAuthoring, effectiveRecording, sceneFolderPaths } from "./loaded-helpers.js";
 
 /** Fallback words-per-line for deriving an estimated scene's word count when the project has no real
  *  written lines yet to average from. */
@@ -58,6 +58,8 @@ export interface VoicedCounts extends WrittenCounts {
 export interface SceneReport {
   sceneId: string;
   name: string;
+  /** The scene's folder path in Patterpad's list ("Act 1 / The docks"), when it's filed in one. */
+  folder?: string;
   file?: string;
   /** The scene's writing status: its LOWEST-rung status-tracked beat. Absent when it has no such beats. */
   status?: string;
@@ -205,6 +207,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
   const wsOf = (id: string): string => { const w = writingOf.get(id); return w !== undefined && writingIndex.has(w) ? w : stub; };
   const rungIdxOf = (id: string): number => writingIndex.get(wsOf(id)) ?? 0;
 
+  const folders = sceneFolderPaths(loaded);
   for (const scene of loaded.scenes) {
     const sceneCut = cutSet.has(scene.id);
     const sceneAction = textIsAction(project, scene);
@@ -269,7 +272,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
         voicedShare += n; // the character-attributed portion is the scene's voiced estimate
       }
       const report: SceneReport = {
-        sceneId: scene.id, name: scene.name, file: loaded.sceneFiles[scene.id],
+        sceneId: scene.id, name: scene.name, ...(folders.has(scene.id) ? { folder: folders.get(scene.id)! } : {}), file: loaded.sceneFiles[scene.id],
         status, estimated: true, choices,
         voiced: emptyVoiced(writingLadder, recordingLadder), written: emptyWritten(writingLadder), action: emptyWritten(writingLadder),
         estimate: estimateLines,
@@ -304,7 +307,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
     const writtenStub = written.byWriting[stub] ?? 0;
     const voicedStub = voiced.byWriting[stub] ?? 0;
     reports.push({
-      sceneId: scene.id, name: scene.name, file: loaded.sceneFiles[scene.id],
+      sceneId: scene.id, name: scene.name, ...(folders.has(scene.id) ? { folder: folders.get(scene.id)! } : {}), file: loaded.sceneFiles[scene.id],
       status, estimated: false, choices, voiced, written, action,
       writtenDone: written.count - writtenStub, writtenRemaining: writtenStub,
       voicedDone: voiced.count - voicedStub, voicedRemaining: voicedStub,

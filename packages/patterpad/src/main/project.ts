@@ -6,8 +6,8 @@
 import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runFieldBrowse, listGameDataFields, runReplace, renameStage, renameGameDataStage, stageDialect, stageGateCount, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
-  extractLoc, applyLoc, describeLocExport, describeLocImport, importLocale, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
+import { loadProject, loadProjectLanding, applySceneNavOrder, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runFieldBrowse, listGameDataFields, runReplace, renameStage, renameGameDataStage, stageDialect, stageGateCount, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
+  extractLoc, applyLoc, describeLocExport, describeLocImport, importLocale, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog, sceneFolderPaths,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs, handoffWrite,
   discoverGameScopes, gameScopesCatalogue, gameScopeTokens, worldSettingsScopes, planWorldSave, planShareScopes, defaultGameScopesDir,
@@ -17,7 +17,7 @@ import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterki
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./scene-kits.js";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
-import { projectQualifiers, usedSpeakerPairs, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
+import { projectQualifiers, usedSpeakerPairs, sceneFolderLayout, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
 import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQualifiersInAuthoring, renameQualifiersInHandoff, renameQualifierLabels, moveQualifierKeys, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
 import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD, PROJECT_EXTENSION_STEM, castStringKey } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
@@ -45,6 +45,7 @@ import type { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { startAudioIndex, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
 import { keepUnresolvedMark } from "./unresolved-mark.js";
 import { describeClashes, splitClashId, type ClashContext } from "./clash-words.js";
+import { addNavFolder, dropNavScene, insertNavScene, moveNavRowBy, orderNavScenes, placeNavRow, removeNavFolder, renameNavFolder, untitledFolderName, withNav, type NavPlace, type SceneNavFields } from "./scene-nav.js";
 import { refreshPairedCards } from "./paired-cards.js";
 import { cardsPlaying } from "../shared/paired-cards.js";
 import { DiskStamps, History, captureBefore, UNDO_LIMIT, type FileState, type Applied, type FileRestorer } from "@wildwinter/app-shell/history";
@@ -397,6 +398,8 @@ function summarise(p: LoadedProject): OpenedProject {
     gameDataFields: p.project.gameDataFields ?? {},
     scenes: p.scenes.map((s) => ({ id: s.id, name: s.name, blocks: s.blocks.map((b) => ({ id: b.id, name: b.name })) })),
     sceneIds: p.scenes.map((s) => s.id),
+    navRows: sceneFolderLayout(p.project, p.scenes.map((s) => s.id)).rows,
+    sceneFolders: (p.project.sceneFolders ?? []).map((f) => ({ id: f.id, name: f.name })),
     dictionary: resolveDictionary(p.project),
     writingStatuses: p.project.writingStatuses ?? DEFAULT_WRITING_STATUSES,
     recordingStatuses: p.project.recordingStatuses ?? DEFAULT_RECORDING_STATUSES,
@@ -1307,7 +1310,7 @@ export function searchProject(query: string, focus?: SearchFocus): SearchEntry[]
   if (!query.trim()) return [];
   ensureHydrated(); // search spans every scene
   if (!loaded) return [];
-  return runSearch(loaded, query, focus).slice(0, 50);
+  return withFolderPaths(runSearch(loaded, query, focus).slice(0, 50));
 }
 
 /** Resolve a launch location (`patterpad <project> --at <where>`) to the node it names: an opaque beat
@@ -1339,7 +1342,7 @@ export function linesByStatus(status: string, dimension: "writing" | "recording"
   if (!status) return [];
   ensureHydrated(); // spans every scene
   if (!loaded) return [];
-  return runStatusBrowse(loaded, status, dimension, focus, dimension === "recording" ? recordingOverride() : undefined).slice(0, 500);
+  return withFolderPaths(runStatusBrowse(loaded, status, dimension, focus, dimension === "recording" ? recordingOverride() : undefined).slice(0, 500));
 }
 
 /** Property-usage search: every node referencing a property in a condition / effect / interpolated text. */
@@ -1347,7 +1350,7 @@ export function propertyUsage(query: string, focus?: SearchFocus): SearchEntry[]
   if (!query.trim()) return [];
   ensureHydrated(); // spans every scene's expressions
   if (!loaded) return [];
-  return runPropertyUsage(loaded, query, focus).slice(0, 200);
+  return withFolderPaths(runPropertyUsage(loaded, query, focus).slice(0, 200));
 }
 
 /** Field browse (family parity item 16): every node whose gameData field answers `query` (`mood = tense`),
@@ -1356,7 +1359,7 @@ export function fieldUsage(query: string, focus?: SearchFocus): SearchEntry[] {
   if (!query.trim()) return [];
   ensureHydrated(); // spans every scene's nodes
   if (!loaded) return [];
-  return runFieldBrowse(loaded, query, focus).slice(0, 500);
+  return withFolderPaths(runFieldBrowse(loaded, query, focus).slice(0, 500));
 }
 
 /** The project's declared gameData fields (name + the node kinds declaring it), for the Field tab's empty state.
@@ -1370,7 +1373,7 @@ export function tagUsage(tag: string, focus?: SearchFocus): SearchEntry[] {
   if (!tag.trim()) return [];
   ensureHydrated(); // spans every scene
   if (!loaded) return [];
-  return runTagBrowse(loaded, tag, focus).slice(0, 500);
+  return withFolderPaths(runTagBrowse(loaded, tag, focus).slice(0, 500));
 }
 
 /** The distinct author tags in the project + node counts, for the search window's Tag tab chips. */
@@ -2723,7 +2726,7 @@ export async function locExport(format: "json" | "xlsx" | "po", locale?: string)
   const changes = describeLocExport(loaded, { locale });
   const stem = safeStem("strings");
   const tag = locale ?? "template";
-  if (format === "xlsx") return { content: await catalogToXlsx(catalog), defaultName: `${stem} - ${tag}.xlsx`, changes };
+  if (format === "xlsx") return { content: await catalogToXlsx(catalog, { folders: sceneFolderPaths(loaded) }), defaultName: `${stem} - ${tag}.xlsx`, changes };
   if (format === "po") return { content: catalogToPo(catalog), defaultName: locale ? `${tag}.po` : `${stem}.pot`, changes };
   return { content: catalogToJson(catalog), defaultName: `${stem} - ${tag}.json`, changes };
 }
@@ -3496,9 +3499,12 @@ export function createScene(name: string, kit: SceneKit = "blank", speaker?: str
     // A new scene goes straight after `after` (the scene the author is in), written into `sceneOrder` in
     // the same commit so it stays there on reload (hands-on fixes review, ruling 3). Without `after`, or
     // when it isn't a scene, it goes at the end as before.
+    // It joins `after`'s folder (scene folders), as the scene the author was in.
     const at = after ? loaded.scenes.findIndex((s) => s.id === after) : -1;
-    const sceneOrder = at >= 0 ? [...loaded.scenes.slice(0, at + 1).map((s) => s.id), sceneId, ...loaded.scenes.slice(at + 1).map((s) => s.id)] : undefined;
-    const nextProject: ProjectFile = { ...loaded.project, ...(addToCast ? { cast } : {}), ...(sceneOrder ? { sceneOrder } : {}) };
+    const placed = at >= 0 ? insertNavScene(loaded.project, [...loaded.scenes.map((s) => s.id), sceneId], sceneId, after) : undefined;
+    const sceneOrder = placed?.sceneOrder;
+    const withCast: ProjectFile = { ...loaded.project, ...(addToCast ? { cast } : {}) };
+    const nextProject: ProjectFile = placed ? withNav(withCast, placed) : withCast;
     // One step: its undo deletes the files it made (and takes the speaker back out of the cast, and the
     // scene back out of the order).
     const res = await projectCommit("New scene", freshKey("scene"), [
@@ -3508,8 +3514,8 @@ export function createScene(name: string, kit: SceneKit = "blank", speaker?: str
     ]);
     if (!res.ok) return res;
     if (addToCast || sceneOrder) loaded.project = nextProject;
-    if (at >= 0) loaded.scenes.splice(at + 1, 0, scene);
-    else loaded.scenes.push(scene);
+    loaded.scenes.push(scene);
+    applySceneNavOrder(loaded.scenes, loaded.project);
     loaded.sceneFiles[sceneId] = flowPath;
     loaded.locales.push(locale);
     loaded.localeFiles.push(locPath);
@@ -3620,10 +3626,10 @@ export function deleteScene(sceneId: string): Promise<SaveResult & { project?: O
     }
 
     // Project-file cleanup rides the same step: the order entry + a start point that now dangles.
-    const hadOrder = !!p.project.sceneOrder?.includes(sceneId);
+    const hadOrder = !!p.project.sceneOrder?.includes(sceneId) || p.project.sceneFolder?.[sceneId] !== undefined;
     const startsHere = p.project.start?.scene === sceneId;
-    const next: ProjectFile = { ...p.project };
-    if (hadOrder) next.sceneOrder = next.sceneOrder!.filter((id) => id !== sceneId);
+    let next: ProjectFile = { ...p.project };
+    if (hadOrder) next = withNav(next, dropNavScene(next, p.scenes.map((s) => s.id), sceneId));
     if (startsHere) delete next.start;
     // A refused delete comes back as a result, not a throw, and stops the rest: once this ignored it,
     // reported the scene deleted, and left its strings on disk for a scene that no longer existed. What
@@ -3673,7 +3679,8 @@ function sceneExtensionShards(p: LoadedProject, sceneId: string): string[] {
 
 /** Persist the nav's authored scene order (ProjectFile.sceneOrder), lock-aware, and re-sort the
  *  in-memory list to match. Ids must all be scenes of the open project (a stale drag after an
- *  external change is refused rather than silently dropping scenes). Returns the refreshed summary. */
+ *  external change is refused rather than silently dropping scenes). Scenes keep their folders: in each
+ *  level they take the scene places in this order (`orderNavScenes`). Returns the refreshed summary. */
 export function reorderScenes(ids: string[]): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
@@ -3682,36 +3689,107 @@ export function reorderScenes(ids: string[]): Promise<SaveResult & { step?: Proj
     if (ids.length !== known.size || ids.some((id) => !known.has(id))) {
       return { ok: false, error: "The scene list changed, so the reorder was ignored." };
     }
-    const next: ProjectFile = { ...loaded.project, sceneOrder: ids };
-    const res = await commitProjectFile(next, "Reorder scenes");
-    if (!res.ok) return res;
-    const rank = new Map(ids.map((id, i) => [id, i]));
-    loaded.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
-    return { ok: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
+    return commitNav(orderNavScenes(loaded.project, [...known], ids), "Reorder scenes");
   });
 }
 
-/** Move one scene a place up (-1) or down (1) in the nav's authored order, written as the whole
- *  `sceneOrder` like a drag (hands-on fixes review, ruling 3): the scene's right-click menu, the Edit
- *  menu, and Ctrl+Cmd+Up / Down on a focused scene row all come here. At the first or last place it
- *  answers ok with nothing written and `moved: false`. One step of the project history. */
-export function moveScene(sceneId: string, dir: -1 | 1): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; moved?: boolean }> {
+/** Move one scene or folder a place up (-1) or down (1) among its siblings in the scene list (hands-on
+ *  fixes review, ruling 3): the right-click menu, the Edit menu, and Ctrl+Cmd+Up / Down on a focused row
+ *  all come here. At the first or last place it answers ok with nothing written and `moved: false`. One
+ *  step of the project history. */
+export function moveScene(rowId: string, dir: -1 | 1): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; moved?: boolean }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     ensureHydrated();
-    const ids = loaded.scenes.map((s) => s.id);
-    const i = ids.indexOf(sceneId);
-    if (i < 0) return { ok: false, error: "That scene isn't in the project any more." };
-    const j = i + dir;
-    if (j < 0 || j >= ids.length) return { ok: true, moved: false };
-    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
-    const next: ProjectFile = { ...loaded.project, sceneOrder: ids };
-    const res = await commitProjectFile(next, dir < 0 ? "Move scene up" : "Move scene down");
-    if (!res.ok) return res;
-    const rank = new Map(ids.map((id, k) => [id, k]));
-    loaded.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
-    return { ok: true, moved: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
+    const nav = moveNavRowBy(loaded.project, loaded.scenes.map((s) => s.id), rowId, dir);
+    if (nav === null) return { ok: true, moved: false };
+    if ("error" in nav) return { ok: false, error: nav.error as string };
+    const folder = (loaded.project.sceneFolders ?? []).some((f) => f.id === rowId);
+    const res = await commitNav(nav, `Move ${folder ? "folder" : "scene"} ${dir < 0 ? "up" : "down"}`);
+    return res.ok ? { ...res, moved: true } : res;
   });
+}
+
+/** Move a scene or folder in the scene list, against a target row: before it, after it, or into it (a
+ *  folder; a null target is the top level's end). Drag and drop, and Move to Folder, come here. */
+export function placeSceneRow(rowId: string, target: string | null, where: NavPlace): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {
+  return enqueueForProject(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    ensureHydrated();
+    const nav = placeNavRow(loaded.project, loaded.scenes.map((s) => s.id), rowId, target, where);
+    if ("error" in nav) return { ok: false, error: nav.error as string };
+    const folder = (loaded.project.sceneFolders ?? []).some((f) => f.id === rowId);
+    return commitNav(nav, where === "into" ? `Move ${folder ? "folder" : "scene"} to folder` : `Move ${folder ? "folder" : "scene"}`);
+  });
+}
+
+/** A new scene folder, "New folder" (numbered), straight after `after` in the same folder, or at the end
+ *  of the list; with `inside` (a folder), at the end of that folder (a folder's own right-click menu).
+ *  Returns its id, so the renderer can put its name up for typing. */
+export function createSceneFolder(after?: string, inside?: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject; folderId?: string }> {
+  return enqueueForProject(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    ensureHydrated();
+    const id = newId("fld");
+    const name = untitledFolderName((loaded.project.sceneFolders ?? []).map((f) => f.name));
+    const res = await commitNav(addNavFolder(loaded.project, loaded.scenes.map((s) => s.id), { id, name }, after, inside), "New folder");
+    return res.ok ? { ...res, folderId: id } : res;
+  });
+}
+
+/** Rename a scene folder. A blank name is refused; the same name writes nothing. */
+export function renameSceneFolder(id: string, name: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {
+  return enqueueForProject(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    const trimmed = name.trim();
+    if (!trimmed) return { ok: false, error: "A folder needs a name." };
+    if ((loaded.project.sceneFolders ?? []).find((f) => f.id === id)?.name === trimmed) return { ok: true, project: summarise(loaded) };
+    const nav = renameNavFolder(loaded.project, id, trimmed);
+    if ("error" in nav) return { ok: false, error: nav.error as string };
+    return commitNav(nav, "Rename folder");
+  });
+}
+
+/** Delete a scene folder. Its scenes and folders move up into its place; no scene is ever deleted with it,
+ *  and it's one undo step, so it asks nothing. */
+export function deleteSceneFolder(id: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {
+  return enqueueForProject(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    ensureHydrated();
+    const nav = removeNavFolder(loaded.project, loaded.scenes.map((s) => s.id), id);
+    if ("error" in nav) return { ok: false, error: nav.error as string };
+    return commitNav(nav, "Delete folder");
+  });
+}
+
+/** Search hits with each scene's folders in front of its location trail ("Act 1 > The docks > Arrival"), so a
+ *  result in a big project says where in the list it is (scene folders). Patterpad only: the CLI's trails
+ *  stay as they were. */
+function withFolderPaths<T extends { sceneId?: string; location: string[] }>(hits: T[]): T[] {
+  if (!loaded?.project.sceneFolders?.length) return hits;
+  const layout = sceneFolderLayout(loaded.project, loaded.scenes.map((s) => s.id));
+  const names = new Map(loaded.project.sceneFolders.map((f) => [f.id, f.name]));
+  const pathOf = new Map<string, string[]>();
+  const path = (sceneId: string): string[] => {
+    let p = pathOf.get(sceneId);
+    if (!p) {
+      p = [];
+      for (let at = layout.sceneFolder.get(sceneId), n = 0; at !== undefined && n <= names.size; at = layout.folderParent.get(at), n++) p.unshift(names.get(at) ?? "");
+      pathOf.set(sceneId, p);
+    }
+    return p;
+  };
+  return hits.map((h) => (h.sceneId && path(h.sceneId).length ? { ...h, location: [...path(h.sceneId), ...h.location] } : h));
+}
+
+/** Write a new shape of the scene list (scene-nav.ts) as one project step, and re-sort the scenes to it. */
+async function commitNav(nav: SceneNavFields, label: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {
+  if (!loaded) return { ok: false, error: "no project open" };
+  const next = withNav(loaded.project, nav);
+  const res = await commitProjectFile(next, label);
+  if (!res.ok) return res;
+  applySceneNavOrder(loaded.scenes, loaded.project);
+  return { ok: true, project: summarise(loaded), ...(res.step ? { step: res.step } : {}) };
 }
 
 /** Append a word to the project's custom dictionary (#177 "Add to dictionary") and save. Returns the
