@@ -197,8 +197,8 @@ Falling off the end of a block is a normal ending, the same as `END`, and the `e
 the choice had nothing left to offer, not because the story finished, so the reason is `"ran-dry"` and
 `onError` hears a [`dry-choice`](#when-something-goes-wrong) problem. An `END` straight after the dry choice
 still counts as running dry; your own `goto("END")` is a plain `"ended"`. The reason survives a save and
-load. Unity's step has `Reason` (`EndReason.Ended` or `EndReason.RanDry`), Unreal's `FPatterStep` has
-`EndReason` (`EPatterEndReason::RanDry`; `StepResult::reason` in C++), and Godot's end Dictionary has `"reason"`.
+load. Unity's step has `Reason` (`FlowEndReason.Ended` or `FlowEndReason.RanDry`), Unreal's `FPatterStep` has
+`EndReason` (`EPatterFlowEndReason::RanDry`; `StepResult::reason` in C++), and Godot's end Dictionary has `"reason"`.
 To mark a choice as allowed to run out, give it a fallback that says what happens then.
 
 ## Properties

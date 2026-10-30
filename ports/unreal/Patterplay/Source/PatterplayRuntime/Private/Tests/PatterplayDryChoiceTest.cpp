@@ -3,7 +3,7 @@
 //
 // The UE-boundary half the clang TestHost cannot reach: the core's `dry-choice` report arrives through
 // OnError as EPatterPlayErrorKind::DryChoice (and a Warning in the log), and the End step carries
-// EPatterEndReason::RanDry, through a save and load. The core's own behaviour is pinned in the TestHost
+// EPatterFlowEndReason::RanDry, through a save and load. The core's own behaviour is pinned in the TestHost
 // ([dry-choice]) and the conformance corpus.
 
 #include "Misc/AutomationTest.h"
@@ -59,14 +59,14 @@ bool FPatterplayDryChoiceTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("flow opens"), Flow)) return false;
 	const FPatterStep Offered = Flow->Advance();
 	TestTrue(TEXT("the hub is offered"), Offered.Type == EPatterStepType::Choice);
-	TestTrue(TEXT("a choice step's reason is Ended"), Offered.EndReason == EPatterEndReason::Ended);
+	TestTrue(TEXT("a choice step's reason is Ended"), Offered.EndReason == EPatterFlowEndReason::Ended);
 	Flow->Choose(TEXT("ask"));
 	TestEqual(TEXT("the answer plays"), Flow->Advance().Text, FString(TEXT("answered")));
 
 	// Back at the hub, the option used: the choice runs dry and the flow ends there.
 	const FPatterStep End = Flow->Advance();
 	TestTrue(TEXT("the flow ends"), End.Type == EPatterStepType::End);
-	TestTrue(TEXT("because the choice ran dry"), End.EndReason == EPatterEndReason::RanDry);
+	TestTrue(TEXT("because the choice ran dry"), End.EndReason == EPatterFlowEndReason::RanDry);
 	if (TestEqual(TEXT("one report"), Listener->Errors.Num(), 1))
 	{
 		const FPatterPlayError& Dry = Listener->Errors[0];
@@ -74,7 +74,7 @@ bool FPatterplayDryChoiceTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("node is the choice's group"), Dry.Node, FString(TEXT("g")));
 		TestEqual(TEXT("flow"), Dry.Flow, FString(TEXT("f")));
 	}
-	TestTrue(TEXT("asked again, the same end"), Flow->Advance().EndReason == EPatterEndReason::RanDry);
+	TestTrue(TEXT("asked again, the same end"), Flow->Advance().EndReason == EPatterFlowEndReason::RanDry);
 	TestEqual(TEXT("asked again, not reported again"), Listener->Errors.Num(), 1);
 
 	// A save keeps the reason; loading it doesn't report it again.
@@ -84,12 +84,12 @@ bool FPatterplayDryChoiceTest::RunTest(const FString& Parameters)
 	UPatterFlow* Loaded = Engine->GetFlow(TEXT("f"));
 	if (TestNotNull(TEXT("the flow came back"), Loaded))
 	{
-		TestTrue(TEXT("the loaded flow ends the same way"), Loaded->Advance().EndReason == EPatterEndReason::RanDry);
+		TestTrue(TEXT("the loaded flow ends the same way"), Loaded->Advance().EndReason == EPatterFlowEndReason::RanDry);
 		TestEqual(TEXT("the load reported nothing"), Listener->Errors.Num(), 1);
 
 		// The host ending it is a plain end.
 		TestTrue(TEXT("Goto END"), Loaded->Goto(TEXT("END"), TEXT("")));
-		TestTrue(TEXT("the host's end is plain"), Loaded->Advance().EndReason == EPatterEndReason::Ended);
+		TestTrue(TEXT("the host's end is plain"), Loaded->Advance().EndReason == EPatterFlowEndReason::Ended);
 	}
 	return true;
 }

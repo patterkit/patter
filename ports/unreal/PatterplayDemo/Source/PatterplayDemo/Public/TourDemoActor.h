@@ -89,7 +89,7 @@ private:
 	UFUNCTION() void HandleText(const FPatterStep& Step);
 	UFUNCTION() void HandleGameEvent(const FPatterStep& Step);
 	UFUNCTION() void HandleChoice(const FString& GroupId, const TArray<FPatterOption>& Options);
-	UFUNCTION() void HandleEnded(EPatterEndReason Reason);
+	UFUNCTION() void HandleEnded(EPatterFlowEndReason Reason);
 	// With the UMG example on, the widget shows the beats; the demo only voices them.
 	UFUNCTION() void HandleVoice(const FPatterStep& Step);
 	// Fire the beat's winning take, if the manifest resolves one; returns its duration (0 = none).

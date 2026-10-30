@@ -72,10 +72,10 @@ public:
 	}
 
 	UFUNCTION()
-	void HandleEnded(EPatterEndReason Reason)
+	void HandleEnded(EPatterFlowEndReason Reason)
 	{
 		// As the JS runner test writes it: "ended", or "ended:ran-dry".
-		Seen.Add(Reason == EPatterEndReason::RanDry ? TEXT("ended:ran-dry") : TEXT("ended"));
+		Seen.Add(Reason == EPatterFlowEndReason::RanDry ? TEXT("ended:ran-dry") : TEXT("ended"));
 	}
 
 private:

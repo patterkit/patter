@@ -22,9 +22,9 @@ enum class EPatterStepType : uint8
 	End
 };
 
-/** Why a flow ended: an End step's EndReason (the JS runtime's EndReason, "ended" | "ran-dry"). */
+/** Why a flow ended: an End step's EndReason (the JS runtime's FlowEndReason, "ended" | "ran-dry"). */
 UENUM(BlueprintType)
-enum class EPatterEndReason : uint8
+enum class EPatterFlowEndReason : uint8
 {
 	/** It ran out: the end of a block, an END, or the host's Goto("END"). Also every step that isn't an End. */
 	Ended,
@@ -576,7 +576,7 @@ struct FPatterStep
 	 *  there (reported once through OnError as well), else Ended. Asked again, an ended flow gives the same
 	 *  reason, and a save keeps it. Ended on every other step. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
-	EPatterEndReason EndReason = EPatterEndReason::Ended;
+	EPatterFlowEndReason EndReason = EPatterFlowEndReason::Ended;
 
 	// The beat's author Game Data (raw overrides). Host events ride on this: a game-event beat's
 	// cue lives here for your game to act on. Read a field's full effective value (override merged

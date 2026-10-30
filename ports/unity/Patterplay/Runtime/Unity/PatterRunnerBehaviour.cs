@@ -21,9 +21,9 @@ namespace Patterkit.Patterplay
     /// <summary>A choice the runner delivers: its group id and options.</summary>
     [Serializable] public sealed class PatterChoiceEvent : UnityEvent<string, List<ChoiceOption>> { }
 
-    /// <summary>The flow has ended: why (<see cref="EndReason.Ended"/>, or <see cref="EndReason.RanDry"/> when a
+    /// <summary>The flow has ended: why (<see cref="FlowEndReason.Ended"/>, or <see cref="FlowEndReason.RanDry"/> when a
     /// choice had nothing left and nothing came after it).</summary>
-    [Serializable] public sealed class PatterEndedEvent : UnityEvent<EndReason> { }
+    [Serializable] public sealed class PatterEndedEvent : UnityEvent<FlowEndReason> { }
 
     public sealed class PatterRunnerBehaviour : MonoBehaviour
     {
@@ -107,6 +107,6 @@ namespace Patterkit.Patterplay
         private void RaiseText(StepResult step) => OnText.Invoke(step);
         private void RaiseGameEvent(StepResult step) => OnGameEvent.Invoke(step);
         private void RaiseChoice(string groupId, List<ChoiceOption> options) => OnChoice.Invoke(groupId, options);
-        private void RaiseEnded(EndReason reason) => OnEnded.Invoke(reason);
+        private void RaiseEnded(FlowEndReason reason) => OnEnded.Invoke(reason);
     }
 }

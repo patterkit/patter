@@ -8,7 +8,7 @@
 //   Runner->SetEngine(Engine, TEXT("main"));
 //   Runner->OnLine.AddDynamic(this, &AMyActor::ShowLine);        // then Runner->Next() on each click
 //   Runner->OnChoice.AddDynamic(this, &AMyActor::OfferChoice);   // then Runner->Choose(OptionId)
-//   Runner->OnEnded.AddDynamic(this, &AMyActor::CloseDialogue);   // takes the EPatterEndReason
+//   Runner->OnEnded.AddDynamic(this, &AMyActor::CloseDialogue);   // takes the EPatterFlowEndReason
 //   Runner->Begin();                                              // the project's start scene
 //
 // A fuller dialogue manager for more complex games, Patterstage, is coming.
@@ -24,7 +24,7 @@ class UPatterFlow;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterRunnerStepEvent, const FPatterStep&, Step);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPatterRunnerChoiceEvent, const FString&, GroupId, const TArray<FPatterOption>&, Options);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterRunnerEndedEvent, EPatterEndReason, Reason);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterRunnerEndedEvent, EPatterFlowEndReason, Reason);
 
 // Plays one flow, a beat at a time, as events. Every delivered beat (a line, a text or a game event) waits
 // for Next; a choice waits for Choose. Handlers may call Next or Choose themselves: the runner finishes the

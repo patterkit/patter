@@ -1991,7 +1991,7 @@ namespace Patterkit.Patterplay
         public uint RngState;
         public Dictionary<string, int> Visits;
         public bool FlowEnded;
-        /// <summary>The choice group whose running dry ended the flow (its End step's EndReason.RanDry); null
+        /// <summary>The choice group whose running dry ended the flow (its End step's FlowEndReason.RanDry); null
         /// otherwise. Written to a save only when set, and honoured on a load only when FlowEnded.</summary>
         public string RanDry;
         public string CurrentSceneId;

@@ -34,7 +34,7 @@ namespace Patterkit.Patterplay.TestHost
                 runner.Text += s => seen.Add($"text:{s.Id}");
                 runner.GameEvent += s => seen.Add($"gameEvent:{s.Id}");
                 runner.Choice += (_, options) => seen.Add($"choice:{string.Join(",", options.Select(o => o.Id))}");
-                runner.Ended += reason => seen.Add(reason == EndReason.RanDry ? "ended:ran-dry" : "ended");
+                runner.Ended += reason => seen.Add(reason == FlowEndReason.RanDry ? "ended:ran-dry" : "ended");
                 return (runner, seen, engine);
             }
 

@@ -171,10 +171,10 @@ export type StepResult =
   /** The flow has finished. `reason` is `"ran-dry"` when it ended because a choice ran dry with nothing
    *  delivered after it (a hub that ran out, reported through `onError` too), else `"ended"`: falling off
    *  the end of a block, an `END`, or the host's `goto("END")`. */
-  | { type: "end"; reason: EndReason };
+  | { type: "end"; reason: FlowEndReason };
 
 /** Why a flow ended (see the `end` step). */
-export type EndReason = "ended" | "ran-dry";
+export type FlowEndReason = "ended" | "ran-dry";
 
 // --- Static structure introspection (editor / dev tooling) -------------------
 // A read-only view of the AUTHORED tree (scenes -> blocks -> groups/snippets -> beats), for dev

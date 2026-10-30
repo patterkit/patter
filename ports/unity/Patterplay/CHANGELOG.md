@@ -6,6 +6,13 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **`EndReason` is now `FlowEndReason`.** In C# the old name clashed (CS0104, "ambiguous reference") with a game's
+  own `EndReason` in any file using both namespaces. `StepResult.Reason`, `PatterRunner.Ended` (an
+  `Action<FlowEndReason>`), and `PatterRunnerBehaviour.OnEnded` now carry `FlowEndReason`; its values, `Ended` and
+  `RanDry`, are unchanged. Rename the type where your code names it; an alias for the old name is no longer needed.
+
 ## [0.37.0] - 2026-10-30
 
 ### Added

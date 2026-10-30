@@ -1179,7 +1179,7 @@ namespace patter
                 err.message = "choice '" + group + "' ran dry (no option left to take, and no fallback) with nothing after it, so the flow ended there";
                 report(err);
             }
-            return StepResult::End(ranDry_.empty() ? EndReason::Ended : EndReason::RanDry);
+            return StepResult::End(ranDry_.empty() ? FlowEndReason::Ended : FlowEndReason::RanDry);
         }
 
     public:

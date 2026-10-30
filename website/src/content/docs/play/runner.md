@@ -82,7 +82,7 @@ runner.Line += step => Show(step.SpeakerLabel, step.Text);
 runner.Text += step => Show("", step.Text);
 runner.GameEvent += step => PlayCutscene(step.GameData);
 runner.Choice += (groupId, options) => Offer(options, id => runner.Choose(id));
-runner.Ended += reason => CloseDialogue(reason); // EndReason.Ended, or EndReason.RanDry
+runner.Ended += reason => CloseDialogue(reason); // FlowEndReason.Ended, or FlowEndReason.RanDry
 
 runner.Begin();                              // or runner.Begin("tavern")
 // Your Continue button calls runner.Next().
@@ -90,7 +90,7 @@ runner.Begin();                              // or runner.Begin("tavern")
 
 From the Inspector: add **Patter Runner Behaviour** to a GameObject, give it a bundle asset (or call
 `Attach(engine)` from code), and wire **On Line**, **On Text**, **On Game Event**, **On Choice**, and **On Ended**
-to your UI (**On Ended** passes the `EndReason`). Buttons call `Next()` and `Choose(id)`; `Begin()` or
+to your UI (**On Ended** passes the `FlowEndReason`). Buttons call `Next()` and `Choose(id)`; `Begin()` or
 `Begin(scene)` starts the conversation.
 
 ## Godot

@@ -11,11 +11,11 @@ namespace patter
 {
     enum class StepType { Line, Text, GameEvent, Choice, End };
 
-    /// Why a flow ended (an End step's `reason`; JS EndReason "ended" | "ran-dry"). RanDry when it ended
+    /// Why a flow ended (an End step's `reason`; JS FlowEndReason "ended" | "ran-dry"). RanDry when it ended
     /// because a choice ran dry with nothing delivered after it (a hub that ran out, reported through
     /// onError too, as a `dry-choice`); Ended otherwise: falling off the end of a block, an END, or the
     /// host's gotoAddress("END").
-    enum class EndReason { Ended, RanDry };
+    enum class FlowEndReason { Ended, RanDry };
 
     struct ChoicePrompt
     {
@@ -89,8 +89,8 @@ namespace patter
         bool hasTags = false; std::vector<std::string> tags;   // author tags (#215)
         std::vector<ChoiceOption> options;       // choice only
         std::string groupId;                     // choice only
-        EndReason reason = EndReason::Ended;     // end only: why the flow ended
+        FlowEndReason reason = FlowEndReason::Ended;     // end only: why the flow ended
 
-        static StepResult End(EndReason why = EndReason::Ended) { StepResult r; r.type = StepType::End; r.reason = why; return r; }
+        static StepResult End(FlowEndReason why = FlowEndReason::Ended) { StepResult r; r.type = StepType::End; r.reason = why; return r; }
     };
 }

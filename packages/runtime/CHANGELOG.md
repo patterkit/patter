@@ -33,6 +33,12 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **`EndReason` is now `FlowEndReason`**, in all four runtimes: the type of an `end` step's `reason` (`"ended"` or
+  `"ran-dry"`). The name said too little, and in C# it clashed with a game's own `EndReason` when a file used both
+  namespaces. The values are unchanged; only code that names the type needs the new name.
+
 ## [0.37.0] - 2026-10-30
 
 ### Added

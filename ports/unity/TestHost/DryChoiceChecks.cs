@@ -41,8 +41,8 @@ namespace Patterkit.Patterplay.TestHost
                 flow.Advance(); flow.Choose("ask"); flow.Advance();
                 return (bundle, engine, flow, errors);
             }
-            bool RanDry(StepResult r) => r.Type == StepType.End && r.Reason == EndReason.RanDry;
-            bool Ended(StepResult r) => r.Type == StepType.End && r.Reason == EndReason.Ended;
+            bool RanDry(StepResult r) => r.Type == StepType.End && r.Reason == FlowEndReason.RanDry;
+            bool Ended(StepResult r) => r.Type == StepType.End && r.Reason == FlowEndReason.Ended;
             string Show(StepResult r) => $"{r.Type}/{r.Reason}";
 
             {

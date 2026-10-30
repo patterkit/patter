@@ -80,8 +80,8 @@ a dialogue widget without touching C++.
 For a straightforward game, the **Patter Runner** component (`UPatterRunnerComponent`; `patter::Runner` in
 the core's `Patter/Runner.h`) turns this pull API into push events. `Begin` delivers the first beat; each
 line, text, or game event arrives on `OnLine`, `OnText`, or `OnGameEvent` and waits for `Next`, and a choice
-arrives on `OnChoice` and waits for `Choose`. `OnEnded` hands its handler the end's `EPatterEndReason`
-(`patter::EndReason` in C++): `RanDry` when a choice had nothing left and nothing came after it, otherwise
+arrives on `OnChoice` and waits for `Choose`. `OnEnded` hands its handler the end's `EPatterFlowEndReason`
+(`patter::FlowEndReason` in C++): `RanDry` when a choice had nothing left and nothing came after it, otherwise
 `Ended`. The engine's save and load stay the one way to save.
 
 ## Demos
@@ -118,7 +118,7 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   `DryChoice`, naming the group, and the `End` step's `EndReason` is `RanDry` rather than `Ended`. An `END`
   straight after the choice still counts. Asking `Advance` again gives the same reason without a second
   report, a save keeps it (a load doesn't report it again), and `Goto("END")` ends the flow plainly. In
-  C++, the core's `patter::StepResult::reason` is `patter::EndReason::RanDry` and the report's kind is
+  C++, the core's `patter::StepResult::reason` is `patter::FlowEndReason::RanDry` and the report's kind is
   `"dry-choice"`. A dry choice that play carries on past stays silent.
 - **Locales**: `Locale()` is the locale in use and `Locales()` the bundle's default and included locales.
   `SetLocale` (and the `Locale` option) resolves by one rule on every runtime: case and `_` / `-` don't

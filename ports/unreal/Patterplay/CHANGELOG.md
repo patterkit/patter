@@ -7,6 +7,13 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **`EPatterEndReason` is now `EPatterFlowEndReason`, and `patter::EndReason` is `patter::FlowEndReason`**, matching
+  the other runtimes. `FPatterStep::EndReason` and `OnEnded`'s `Reason` keep their names and their values (`Ended`,
+  `RanDry`). A Blueprint saved against 0.37 loads with the new name: the plugin's `Config/DefaultPatterplay.ini`
+  redirects the old enum.
+
 ## [0.37.0] - 2026-10-30
 
 ### Added

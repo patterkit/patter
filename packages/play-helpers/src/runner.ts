@@ -15,7 +15,7 @@
 // A fuller dialogue manager for more complex games, Patterstage, is coming.
 // ---------------------------------------------------------------------------
 
-import type { ChoiceOption, EndReason, Engine, Flow, StepResult } from "@patterkit/runtime";
+import type { ChoiceOption, FlowEndReason, Engine, Flow, StepResult } from "@patterkit/runtime";
 
 type Step<T extends StepResult["type"]> = Extract<StepResult, { type: T }>;
 
@@ -27,7 +27,7 @@ export interface RunnerEvents {
   choice: { groupId: string; options: ChoiceOption[] };
   /** Why the flow ended, as its `end` step says: `"ran-dry"` when a choice had nothing left to offer and
    *  nothing came after it, otherwise `"ended"`. */
-  ended: EndReason;
+  ended: FlowEndReason;
 }
 
 export type RunnerEvent = keyof RunnerEvents;

@@ -9,9 +9,9 @@ namespace Patterkit.Patterplay
 {
     public enum StepType { Line, Text, GameEvent, Choice, End }
 
-    /// <summary>Why a flow ended (an End step's <see cref="StepResult.Reason"/>): the JS runtime's EndReason,
+    /// <summary>Why a flow ended (an End step's <see cref="StepResult.Reason"/>): the JS runtime's FlowEndReason,
     /// "ended" | "ran-dry".</summary>
-    public enum EndReason
+    public enum FlowEndReason
     {
         /// <summary>Falling off the end of a block, an `END`, or the host's Goto("END").</summary>
         Ended,
@@ -88,10 +88,10 @@ namespace Patterkit.Patterplay
         public List<string> Tags;            // author tags (#215); null when none
         public List<ChoiceOption> Options;   // choice only
         public string GroupId;               // choice only
-        /// <summary>End only: why the flow ended. <see cref="EndReason.RanDry"/> when a choice ran dry with nothing
-        /// delivered after it (a hub that ran out), else <see cref="EndReason.Ended"/>.</summary>
-        public EndReason Reason;
+        /// <summary>End only: why the flow ended. <see cref="FlowEndReason.RanDry"/> when a choice ran dry with nothing
+        /// delivered after it (a hub that ran out), else <see cref="FlowEndReason.Ended"/>.</summary>
+        public FlowEndReason Reason;
 
-        public static StepResult End(EndReason reason = EndReason.Ended) => new StepResult { Type = StepType.End, Reason = reason };
+        public static StepResult End(FlowEndReason reason = FlowEndReason.Ended) => new StepResult { Type = StepType.End, Reason = reason };
     }
 }

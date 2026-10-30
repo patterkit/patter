@@ -6,6 +6,11 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Nothing to change here: Godot reports why a flow ended as a string (`"ended"` or `"ran-dry"`), so the other
+  runtimes' rename of their `EndReason` type to `FlowEndReason` leaves it as it is.
+
 ## [0.37.0] - 2026-10-30
 
 ### Added

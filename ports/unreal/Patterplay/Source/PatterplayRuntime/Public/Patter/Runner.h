@@ -8,7 +8,7 @@
 //   patter::Runner runner(*engine);
 //   runner.onLine([&](const StepResult& step) { show(step.speakerLabel, step.text); });
 //   runner.onChoice([&](const RunnerChoice& c) { offer(c.options); });   // then runner.choose(id)
-//   runner.onEnded([&](EndReason why) { close(); });   // Ended, or RanDry: a choice had nothing left
+//   runner.onEnded([&](FlowEndReason why) { close(); });   // Ended, or RanDry: a choice had nothing left
 //   runner.begin();            // the project's start scene; next() on each click
 //
 // A fuller dialogue manager for more complex games, Patterstage, is coming.
@@ -48,7 +48,7 @@ namespace patter
         using ChoiceHandler = std::function<void(const RunnerChoice&)>;
         /** The ended event hands its handler why the flow ended, as its End step says: RanDry when a choice
          *  had nothing left to offer and nothing came after it, otherwise Ended. */
-        using EndedHandler = std::function<void(EndReason)>;
+        using EndedHandler = std::function<void(FlowEndReason)>;
         /** A handler's ticket, for off(). */
         using Subscription = std::uint64_t;
 

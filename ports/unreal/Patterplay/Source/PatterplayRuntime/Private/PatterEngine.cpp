@@ -178,7 +178,7 @@ namespace
 		Out.Extensions = ToUeExtensions(S.extensions);   // Patter extension values, raw, as JSON text
 		if (S.hasTags) for (const std::string& T : S.tags) Out.Tags.Add(Ue(T));
 		if (S.type == patter::StepType::Choice) Out.GroupId = Ue(S.groupId);
-		if (S.type == patter::StepType::End && S.reason == patter::EndReason::RanDry) Out.EndReason = EPatterEndReason::RanDry;
+		if (S.type == patter::StepType::End && S.reason == patter::FlowEndReason::RanDry) Out.EndReason = EPatterFlowEndReason::RanDry;
 		for (const patter::ChoiceOption& O : S.options) Out.Options.Add(ConvertOption(O));
 		return Out;
 	}

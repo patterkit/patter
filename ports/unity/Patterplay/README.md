@@ -133,13 +133,13 @@ scene** - import, open the scene, press Play, nothing to set up:
   failed at run time, a set-up problem (`"setup"`: a locale the bundle doesn't have, a host scope it
   doesn't declare), a moved save (`"save"`), and a choice that ran dry and so ended the flow
   (`"dry-choice"`). Without a handler, each is a `[Patterplay]` warning.
-- **Why a flow ended**: an `End` step's `Reason` is `EndReason.Ended`, or `EndReason.RanDry` when a choice
+- **Why a flow ended**: an `End` step's `Reason` is `FlowEndReason.Ended`, or `FlowEndReason.RanDry` when a choice
   ran dry (no option left to take, and no fallback) with nothing played after it, so the flow ended there:
   a hub whose options were all used, say. That case is also reported once through `OnError`, its `Node`
   the choice group. A dry choice that play carries on past is the gather idiom and stays silent (only
   `EngineOptions.OnDryChoice` hears it). The reason survives a save and load; the host's `Goto("END")` is a
-  plain `Ended`. The thin runner passes it on: `PatterRunner.Ended` is an `Action<EndReason>`, and
-  `PatterRunnerBehaviour.OnEnded` a `UnityEvent<EndReason>`, so a game can tell a story that ran out from
+  plain `Ended`. The thin runner passes it on: `PatterRunner.Ended` is an `Action<FlowEndReason>`, and
+  `PatterRunnerBehaviour.OnEnded` a `UnityEvent<FlowEndReason>`, so a game can tell a story that ran out from
   one that finished.
 - **Set one flow aside**: `engine.CaptureFlow(id)` returns its part of a save as a `FlowState` (its
   position, PRNG, visits, selectors, and its own property values, without its id). Close the flow after

@@ -232,7 +232,7 @@ static JsonValue normalize(const StepResult& s, bool idsOnly = false)
         case StepType::End:
             o.set("type", JsonValue::Str("end"));
             // Recorded only when it ran dry (corpus 10); absent = "ended".
-            if (s.reason == EndReason::RanDry) o.set("reason", JsonValue::Str("ran-dry"));
+            if (s.reason == FlowEndReason::RanDry) o.set("reason", JsonValue::Str("ran-dry"));
             break;
     }
     return o;
@@ -2757,7 +2757,7 @@ struct Recorded
             for (const ChoiceOption& o : c.options) ids += (ids.empty() ? "" : ",") + o.id;
             seen.push_back("choice:" + ids);
         });
-        runner.onEnded([this](EndReason why) { seen.push_back(why == EndReason::Ended ? "ended" : "ended:ran-dry"); });
+        runner.onEnded([this](FlowEndReason why) { seen.push_back(why == FlowEndReason::Ended ? "ended" : "ended:ran-dry"); });
     }
     std::string last() const { return seen.empty() ? std::string() : seen.back(); }
 };
@@ -2813,7 +2813,7 @@ static void runRunnerCases()
         runner.onText(step);
         runner.onGameEvent(step);
         runner.onChoice([&](const RunnerChoice&) { runner.choose("opt_a"); });
-        runner.onEnded([&](EndReason) { seen.push_back("ended"); });
+        runner.onEnded([&](FlowEndReason) { seen.push_back("ended"); });
         runner.begin("talk");
         expectSeen(seen, {"L1", "T1", "E1", "L_a", "ended"}, "the run");
         need(deepest == 1, "handlers nested " + std::to_string(deepest) + " deep");
@@ -2826,7 +2826,7 @@ static void runRunnerCases()
         std::vector<std::string> seen;
         runner.onLine([&](const StepResult& s) { seen.push_back(s.id); runner.next(); runner.stop(); });
         runner.onText([&](const StepResult& s) { seen.push_back(s.id); });
-        runner.onEnded([&](EndReason) { seen.push_back("ended"); });
+        runner.onEnded([&](FlowEndReason) { seen.push_back("ended"); });
         runner.begin("talk");
         expectSeen(seen, {"L1"}, "after start");
         need(runner.flow() && !runner.flow()->isEnded(), "the flow ended");
@@ -3136,29 +3136,29 @@ static void runDryChoiceCases()
         for (const auto& e : errors) out += (out.empty() ? "" : ",") + e.kind + "/" + e.node + "/" + e.flow;
         return out;
     };
-    const auto isEnd = [](const StepResult& r, EndReason why) { return r.type == StepType::End && r.reason == why; };
+    const auto isEnd = [](const StepResult& r, FlowEndReason why) { return r.type == StepType::End && r.reason == why; };
 
     dryCase("reports it through onError once, and ends with reason RanDry", [&]
     {
         Played p = play(plain);
-        need(isEnd(p.flow->advance(), EndReason::RanDry), "the end did not say it ran dry");
+        need(isEnd(p.flow->advance(), FlowEndReason::RanDry), "the end did not say it ran dry");
         need(kinds(*p.errors) == "dry-choice/g/f", "reports: " + kinds(*p.errors));
         need(p.errors->front().message == "choice 'g' ran dry (no option left to take, and no fallback) with nothing after it, so the flow ended there",
              "message: " + p.errors->front().message);
-        need(isEnd(p.flow->advance(), EndReason::RanDry), "asked again, the end changed");
+        need(isEnd(p.flow->advance(), FlowEndReason::RanDry), "asked again, the end changed");
         need(p.errors->size() == 1, "asked again, it was reported again: " + kinds(*p.errors));
     });
     dryCase("an END straight after the dry choice still ends because it ran dry", [&]
     {
         Played p = play(toEnd);
-        need(isEnd(p.flow->advance(), EndReason::RanDry), "the end did not say it ran dry");
+        need(isEnd(p.flow->advance(), FlowEndReason::RanDry), "the end did not say it ran dry");
         need(kinds(*p.errors) == "dry-choice/g/f", "reports: " + kinds(*p.errors));
     });
     dryCase("is silent when play carries on after it: the gather idiom", [&]
     {
         Played p = play(carriesOn);
         need(p.flow->advance().id == "ON", "play did not carry on");
-        need(isEnd(p.flow->advance(), EndReason::Ended), "the end was not plain");
+        need(isEnd(p.flow->advance(), FlowEndReason::Ended), "the end was not plain");
         need(p.errors->empty(), "reports: " + kinds(*p.errors));
     });
     dryCase("keeps the reason across a save and load, without reporting it again", [&]
@@ -3171,7 +3171,7 @@ static void runDryChoiceCases()
         EngineOptions opts; opts.onError = [&errors](const PlayError& e) { errors.push_back(e); };
         Engine again(plain, opts);
         deserializeState(again, json);
-        need(isEnd(again.getFlow("f")->advance(), EndReason::RanDry), "the loaded flow's end did not say it ran dry");
+        need(isEnd(again.getFlow("f")->advance(), FlowEndReason::RanDry), "the loaded flow's end did not say it ran dry");
         need(errors.empty(), "the load reported: " + kinds(errors));
         // Written only when set: a plain end's save has none.
         Played q = play(carriesOn);
@@ -3183,11 +3183,11 @@ static void runDryChoiceCases()
         Played p = play(plain);
         p.flow->advance();
         p.flow->gotoAddress("END");
-        need(isEnd(p.flow->advance(), EndReason::Ended), "goto END did not make it a plain end");
+        need(isEnd(p.flow->advance(), FlowEndReason::Ended), "goto END did not make it a plain end");
         Played b = play(plain);
         b.flow->advance();
         b.flow->gotoAddress("s"); // an ended flow resumes; the choice is dry again, so it ends the same way, reported again
-        need(isEnd(b.flow->advance(), EndReason::RanDry), "the revived flow's end did not say it ran dry");
+        need(isEnd(b.flow->advance(), FlowEndReason::RanDry), "the revived flow's end did not say it ran dry");
         need(kinds(*b.errors) == "dry-choice/g/f,dry-choice/g/f", "reports: " + kinds(*b.errors));
         Played c = play(plain);
         c.flow->advance();
@@ -3200,22 +3200,22 @@ static void runDryChoiceCases()
         p.flow->advance();
         std::shared_ptr<Flow> held = p.engine->flowPtr("f"); // a stale reference the game kept
         p.engine->closeFlow("f");
-        need(isEnd(held->advance(), EndReason::Ended), "a closed flow's end was not plain");
+        need(isEnd(held->advance(), FlowEndReason::Ended), "a closed flow's end was not plain");
     });
     dryCase("a rollback puts the dry choice and the reason back with the rest of the cursor", [&]
     {
         Played p = play(plain);
         Checkpoint cp = p.engine->checkpoint();
-        need(isEnd(p.flow->advance(), EndReason::RanDry), "the end did not say it ran dry");
+        need(isEnd(p.flow->advance(), FlowEndReason::RanDry), "the end did not say it ran dry");
         p.engine->rollback(cp);
         // Back before the end: the dry choice hasn't been met, so the end is met and reported again.
-        need(isEnd(p.flow->advance(), EndReason::RanDry), "after the rollback, the end did not say it ran dry");
+        need(isEnd(p.flow->advance(), FlowEndReason::RanDry), "after the rollback, the end did not say it ran dry");
         need(p.errors->size() == 2, "reports: " + kinds(*p.errors));
         Checkpoint cp2 = p.engine->checkpoint();
         p.flow->gotoAddress("END");
-        need(isEnd(p.flow->advance(), EndReason::Ended), "goto END did not make it a plain end");
+        need(isEnd(p.flow->advance(), FlowEndReason::Ended), "goto END did not make it a plain end");
         p.engine->rollback(cp2);
-        need(isEnd(p.flow->advance(), EndReason::RanDry), "the rollback did not put the reason back");
+        need(isEnd(p.flow->advance(), FlowEndReason::RanDry), "the rollback did not put the reason back");
         need(p.errors->size() == 2, "the restored reason was reported again: " + kinds(*p.errors));
     });
     std::cout << "  [dry-choice] a choice that runs dry and ends the flow, reported once, its end RanDry: " << g_dryPass << "/" << g_dryTotal << "\n";

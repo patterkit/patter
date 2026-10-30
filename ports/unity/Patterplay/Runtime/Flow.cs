@@ -406,7 +406,7 @@ namespace Patterkit.Patterplay
                 Report(new PlayError { Flow = Id, Kind = "dry-choice", Node = group,
                     Message = $"choice '{group}' ran dry (no option left to take, and no fallback) with nothing after it, so the flow ended there" });
             }
-            return StepResult.End(_ranDry != null ? EndReason.RanDry : EndReason.Ended);
+            return StepResult.End(_ranDry != null ? FlowEndReason.RanDry : FlowEndReason.Ended);
         }
 
         /// <summary>

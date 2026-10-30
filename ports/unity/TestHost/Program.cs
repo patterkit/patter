@@ -1517,7 +1517,7 @@ namespace Patterkit.Patterplay.TestHost
                 case StepType.End:
                     o["type"] = "end";
                     // Recorded only when a choice ran dry and ended the flow (corpus 10); absent = "ended".
-                    if (s.Reason == EndReason.RanDry) o["reason"] = "ran-dry";
+                    if (s.Reason == FlowEndReason.RanDry) o["reason"] = "ran-dry";
                     break;
             }
             return o;
