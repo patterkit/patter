@@ -700,7 +700,23 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .group-rail.is-choice > .group-rail-head { color: var(--muted); }
 .group-rail.is-option > .group-rail-head { color: var(--ink); }
 /* an option's rail stays neutral too - its PROMPT cell (the accent-tinted box below) is the anchor */
-.group-rail.is-option { border-left-color: var(--line); }
+.group-rail.is-option { border-left-color: var(--line); position: relative; }
+/* An option's head has no row of its own: it lies over the prompt's first line (the prompt's padding plus
+   one script line, so the head is set in the script's size), its grip in the gap between the diamond and
+   the text, and its tags and ⋯ at the right. Only those take the pointer; the line itself is the prompt's.
+   The prompt keeps clear of the tags by --option-head-w, which the view measures. */
+.group-rail.is-option > .group-rail-head {
+  position: absolute; top: 0; left: var(--rail-pad); right: 0; height: calc(1.45em + 0.3rem);
+  font-size: inherit; padding: 0; align-items: center; justify-content: flex-end; pointer-events: none;
+}
+.group-rail.is-option > .group-rail-head > * { pointer-events: auto; }
+.group-rail.is-option > .group-rail-head > .group-rail-label { font-size: 0.78rem; }
+.group-rail.is-option > .group-rail-head > .group-menu { margin-left: 0; }
+.group-rail.is-option > .group-rail-head > .rail-drag {
+  position: absolute; top: 0; bottom: 0; left: calc(5px - var(--rail-pad)); width: calc(var(--rail-pad) - 7px);
+  justify-content: center; font-size: 0.78rem;
+}
+.group-rail.is-option > .group-rail-body > .option-prompt { padding-right: calc(var(--option-head-w, 1.4rem) + 0.6rem); }
 /* a choice option's PROMPT (groups §13.10): the tied choice-text line at the top of the option - the
    option's ANCHOR, the confident label its contained content hangs off. Unboxed since the October 2026
    UI review: its weight and the diamond on the rail mark it, not a tinted cell. */

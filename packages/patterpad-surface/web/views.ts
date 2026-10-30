@@ -571,6 +571,17 @@ const groupView: NodeViewConstructor = (node, view, getPos) => {
     dom.classList.toggle("is-empty", chunks === 0);
   };
   paint(node);
+  // An option's head sits ON its prompt line (CSS), its tags and ⋯ at the right, so the prompt keeps clear of
+  // however wide they are: the room is measured, as a condition tag's width depends on its words.
+  const roomForHead = (): void => {
+    if (!dom.classList.contains("is-option")) { dom.style.removeProperty("--option-head-w"); return; }
+    const parts = [label, cond, dots].filter((el) => el.getBoundingClientRect().width > 0);
+    if (!parts.length) return;
+    const w = head.getBoundingClientRect().right - Math.min(...parts.map((el) => el.getBoundingClientRect().left));
+    dom.style.setProperty("--option-head-w", `${Math.ceil(w)}px`);
+  };
+  const headObserver = typeof ResizeObserver === "function" ? new ResizeObserver(roomForHead) : null;
+  for (const el of [label, cond, dots]) headObserver?.observe(el);
   // A group's condition tag humanizes `visits(id)` too, so it must re-resolve when the target list changes
   // (refreshJumpLabels) - otherwise a block ref painted before the targets were ready sticks on its raw id.
   let curNode = node;
@@ -578,8 +589,8 @@ const groupView: NodeViewConstructor = (node, view, getPos) => {
   jumpRefreshers.add(refresh);
   return {
     dom, contentDOM: body, ignoreMutation: ignoreChrome(body),
-    update: (n) => { if (n.type.name !== "group") return false; curNode = n; paint(n); return true; },
-    destroy: () => { jumpRefreshers.delete(refresh); },
+    update: (n) => { if (n.type.name !== "group") return false; curNode = n; paint(n); roomForHead(); return true; },
+    destroy: () => { jumpRefreshers.delete(refresh); headObserver?.disconnect(); },
   };
 };
 

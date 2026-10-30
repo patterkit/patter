@@ -222,7 +222,9 @@ describe("family style: chrome has its own scale", () => {
     ".beat.kind-line + .beat.kind-prose, .beat.kind-prose + .beat.kind-line", ".zone.cue .cue-text", ".zone.cue .cue-qual",
     ".beat.kind-line .zone.paren, .beat.kind-line .zone.say", ".zone.paren", ".suggestion-count", ".beat.kind-gameEvent",
     ".beat.kind-gameEvent .atom-fields", ".group-rail", ".group-rail-head", ".option-prompt",
-    ".group-rail.is-option > .option-after", ".group-rail-cond", ".group-menu", ".group-ctl", ".atom-del",
+    ".group-rail.is-option > .option-after", ".group-rail.is-option > .group-rail-head",
+    ".group-rail.is-option > .group-rail-head > .group-rail-label", ".group-rail.is-option > .group-rail-head > .rail-drag",
+    ".group-rail.is-option > .group-rail-body > .option-prompt", ".group-rail-cond", ".group-menu", ".group-ctl", ".atom-del",
   ]);
   const REM = /(?<![\w.-])\d*\.?\d+rem\b/;
 
