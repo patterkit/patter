@@ -28,9 +28,11 @@ const TEXT = {
   P: "Ask about the road",
   R: "Reply.",
 };
+// Voiced, so the page starts with Continue on and plays through on its timing (export-html-continue.test.ts
+// covers an unvoiced story, which starts with it off).
 const project: ProjectFile = {
   schema: "patter/project@0", project: { id: "t", name: "Timing" },
-  locales: { default: "en", all: ["en"] },
+  locales: { default: "en", all: ["en"] }, voiced: true,
 };
 const scene: Scene = {
   id: "s", type: "scene", name: "S",

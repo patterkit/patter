@@ -30,10 +30,13 @@ not above everything else on your screen. Unpin it from its own pin control.
 
 Step (**▸**) plays one beat, a line, a piece of text, or a game event.
 
-Auto-continue (the **▸▸ Continue** toggle in the header, on by default) turns Step into
+Auto-continue (the **▸▸ Continue** toggle in the header) turns Step into
 **Continue to next stop**. It plays on to the next choice or the end, revealing one line
 at a time. **◼ Stop** pauses the reveal, and Step/Continue picks it back up. Turn it off
-to step one beat at a time.
+to step one beat at a time. Until you choose, it follows the project's
+[Voiced](/patterpad/projects-and-settings/) setting: on for a voiced project, off for an
+unvoiced one, where nothing is meant to be heard at speaking pace. Your choice is remembered,
+and the [playable HTML](/patterpad/publishing/) starts the same way.
 
 **Continue** times the scene the way the game will. A line lasts as long as its recording, when
 it has one, or as long as it would take to read, by [Patter's reading estimate](/play/engine/#step-shapes),

@@ -38,10 +38,14 @@ anyone.
 **Publish ▸ Publish Playable HTML…** writes a single `.html` file containing your whole story and
 the same engine a shipped game would use. It needs nothing else, no internet, no install, no
 server. Anyone you give it to double-clicks it and plays, on a laptop or a phone, with choices,
-memory, and branching working exactly as they did in your Play window. Lines arrive on the
-timing you gave them, a reading estimate plus your pauses, and a Speed control (Half / Normal /
-Double / Instant) lets a reader slow it down, speed it up, or skip the waits. Players get a
-Restart, and their place is saved in that browser.
+memory, and branching working exactly as they did in your Play window. A reader goes at their
+own pace or lets the story play, with the same **Continue** toggle as the Play window. With it
+off, each line waits until they click or tap the page, press Space or Enter, or press **Next**,
+and the choices come with the last line. With it on, lines arrive on the timing you gave them, a
+reading estimate plus your pauses, and a Speed control (Half / Normal / Double / Instant) lets a
+reader slow it down, speed it up, or skip the waits. An unvoiced project starts with Continue off,
+since nothing in it is meant to be heard, and a voiced one starts with it on; a reader's own
+choice is remembered. Players get a Restart, and their place is saved in that browser.
 
 There are a few ways to get it to people.
 

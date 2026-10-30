@@ -902,7 +902,8 @@ export interface PatterPlayApi {
   /** The run's starting address (`<scene>.<block>`), the pin state, the play-language switcher (#195):
    *  every declared `locales`, the `locale` currently playing, the source `defaultLocale`; and whether the
    *  project is in Audio Folders mode (#206) so the window can show the "Play with audio" toggle. */
-  info(): Promise<{ address: string; pinned: boolean; theme: ThemePrefs; follow: boolean; audio: boolean; captions: boolean; locales: string[]; locale: string; defaultLocale: string }>;
+  /** `voiced`: the project's Voiced setting, which picks whether Continue starts on when the author hasn't chosen. */
+  info(): Promise<{ address: string; pinned: boolean; theme: ThemePrefs; follow: boolean; audio: boolean; captions: boolean; voiced: boolean; locales: string[]; locale: string; defaultLocale: string }>;
   /** Main changed this window's pin behind its back (Reset View re-pins every helper). */
   onPin(handler: (on: boolean) => void): void;
   /** Close this window (the head's close button; Esc routes here too). */

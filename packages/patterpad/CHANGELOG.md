@@ -8,6 +8,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **Read a published story at your own pace.** The playable HTML has Play's **Continue** toggle. With it off,
+  each line waits for a click or tap on the page, Space or Enter, or **Next**, and the choices come with the
+  last line; with it on, the story plays through at the chosen speed, as before. Until a reader chooses, an
+  unvoiced project starts with Continue off and a voiced one with it on, and Play's own Continue toggle now
+  starts the same way. A page published before this gets the toggle when the story is published again.
 - **Folders in the scene list.** **+ New ▸ Folder** at the foot of the list (which now offers a scene, a
   scene from a kit, or a folder), or File ▸ New Folder makes one
   straight after the open scene, its name ready to type. Drag a scene or folder onto a folder to put it inside,

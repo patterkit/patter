@@ -49,8 +49,9 @@ let audioOn = localStorage.getItem("patter.playAudio") !== "0";
 // Continue mode (a persistent header toggle): when on, advancing runs to the next natural stop (a choice or
 // the end) as a paced reveal instead of one beat at a time. It lives in the header rather than beside Step
 // because in Continue mode the per-beat Step row never appears (we run straight to the next choice), so an
-// inline checkbox would be unreachable once ticked. Remembered across runs; like audio above, it defaults
-// ON for a fresh install (no stored value) while still honouring an explicit off.
+// inline checkbox would be unreachable once ticked. Remembered across runs. With no stored choice, the
+// project's Voiced setting decides (applyInfo): a voiced story plays through, an unvoiced one steps, since
+// nothing in it is meant to be heard at speaking pace. The playable HTML page starts the same way.
 let continueMode = localStorage.getItem("patter.playContinue") !== "0";
 let runGen = 0; // bumped on start / restart / stale so a paced read bails the moment it's superseded
 // Stop / pause a paced run: `stopRequested` halts the reveal before the NEXT beat (the un-played rest waits
@@ -69,11 +70,16 @@ function setAudio(on: boolean): void {
 }
 audioEl.addEventListener("click", () => setAudio(!audioOn));
 
-function setContinue(on: boolean): void {
+/** Show Continue on or off without storing it: the default, before the author has chosen. */
+function reflectContinue(on: boolean): void {
   continueMode = on;
-  localStorage.setItem("patter.playContinue", on ? "1" : "0");
   continueEl.setAttribute("aria-pressed", String(on));
   continueEl.classList.toggle("on", on);
+}
+
+function setContinue(on: boolean): void {
+  reflectContinue(on);
+  localStorage.setItem("patter.playContinue", on ? "1" : "0");
   // Turning Continue OFF while a paced run is in flight (the Stop control is up) pauses it at the current
   // line - otherwise the reveal keeps auto-advancing, ignoring the toggle. If we're paused mid-reveal, or on
   // an idle Step row, re-label the control to the new mode instead.
@@ -81,8 +87,7 @@ function setContinue(on: boolean): void {
   else if (controlsEl.querySelector(".presume") && resumeState) showResume(resumeState.batch, resumeState.gen, resumeState.nextIdx);
   else if (controlsEl.querySelector(".padv-row")) showAdvance();
 }
-continueEl.setAttribute("aria-pressed", String(continueMode));
-continueEl.classList.toggle("on", continueMode);
+reflectContinue(continueMode);
 continueEl.addEventListener("click", () => setContinue(!continueMode));
 
 // Closed-captions toggle (#214): default ON (cues shown). Flipping it applies LIVE to the running engine -
@@ -525,6 +530,7 @@ document.body.prepend(toolWindowHead({
 type PlayInfo = Awaited<ReturnType<typeof play.info>>;
 function applyInfo(info: PlayInfo): void {
   addrEl.textContent = info.address;
+  if (localStorage.getItem("patter.playContinue") === null) reflectContinue(info.voiced); // the author hasn't chosen
   audioAvailable = info.audio;            // only offer "Play with audio" in Audio Folders mode (#206)
   audioEl.hidden = !audioAvailable;
   if (audioAvailable) setAudio(audioOn);  // reflect the remembered toggle state
@@ -545,7 +551,8 @@ function applyInfo(info: PlayInfo): void {
 }
 localeEl.addEventListener("change", () => { void play.setLocale(localeEl.value).then(() => startRun()); });
 
-void play.info().then((info) => { applyInfo(info); pin.set(info.pinned); applyTheme(info.theme); follow.set(info.follow); });
+// The first run waits for this: whether Continue starts on can depend on the project (applyInfo).
+const infoReady = play.info().then((info) => { applyInfo(info); pin.set(info.pinned); applyTheme(info.theme); follow.set(info.follow); });
 // The palette is the app's, not this window's: apply what the editor last chose, and follow it when
 // the author changes it. Importing theme.css is not enough, because the curated palettes only exist
 // under the `data-theme` attribute this sets.
@@ -567,4 +574,4 @@ play.onRefreshed((kind, options) => {
     if (options.length > 0) showChoices(options); else showAdvance();
   }
 });
-void startRun();
+void infoReady.then(() => startRun());

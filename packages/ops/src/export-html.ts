@@ -48,6 +48,10 @@ const PLAYER_JS = String.raw`
   // is stored under the key Patterpad's Play window uses, so the two keep one choice; the old reading paces
   // carry over (slow is half speed, fast is double).
   // A run token cancels an in-flight wait the moment the player restarts, loads, or picks a choice.
+  // Continue, as in Patterpad's Play window and under its stored key: on, the story plays through at the chosen
+  // speed; off, each beat waits for the reader (a click or tap on the page, Space or Enter, or the Next button).
+  // A reader's own choice holds; with none, an unvoiced story starts with it off, since nothing in it is meant to
+  // be heard at speaking pace, and a voiced one starts with it on.
   var createTimeline = (${createTimeline.toString()});
   var createClock = (${createClock.toString()});
   var DEFAULT_PAD = ${DEFAULT_PAD_AFTER}; // the built-in pause, for a bundle from before padding
@@ -57,17 +61,78 @@ const PLAYER_JS = String.raw`
   if (own(OLD_SPEED, speedKey)) speedKey = OLD_SPEED[speedKey];
   if (!own(SPEED_RATE, speedKey)) speedKey = "normal";
   var estimate = window.Patterplay.estimateLineDuration;
-  var clock = null, wake = null; // the run's clock, and a hook that re-times the wait in flight
+  var clock = null, wake = null, timeline = null; // the run's clock and timeline, and a hook that re-times the wait in flight
+  var continueMode = (function () { try { var v = localStorage.getItem("patter.playContinue"); if (v !== null) return v !== "0"; } catch (e) {} return !!BUNDLE.voiced; })();
+  var pendingStep = null; // with Continue off: shows the beat the reader is waiting on
   // Call then() when script time "at" comes on the run's clock. A change of speed wakes the wait, which
   // works out the time again; a superseded run's wait just stops.
   function waitUntil(at, token, then) {
     if (token !== runToken) return;
+    if (!continueMode) { wake = null; waitForReader(token, then); return; }
     var ms = clock.at(at) - Date.now();
     if (ms <= 0) { wake = null; then(); return; }
     var t = setTimeout(function () { waitUntil(at, token, then); }, ms);
     wake = function () { clearTimeout(t); waitUntil(at, token, then); };
   }
   function scrollDown() { window.scrollTo(0, document.body.scrollHeight); }
+
+  // With Continue off, the next beat waits behind a Next button (and any click or key that means "go on").
+  function waitForReader(token, then) {
+    clearNext();
+    var b = document.createElement("button");
+    b.className = "next"; b.id = "next"; b.textContent = "Next";
+    pendingStep = function () { if (token !== runToken) return; clearNext(); then(); };
+    b.onclick = function (e) { e.stopPropagation(); if (pendingStep) pendingStep(); };
+    controls.appendChild(b);
+    scrollDown();
+  }
+  function clearNext() { pendingStep = null; var b = document.getElementById("next"); if (b) b.remove(); }
+  document.addEventListener("click", function (e) {
+    if (!pendingStep) return;
+    var t = e.target;
+    if (t && t.closest && t.closest("button, a, select, input, label, .bar")) return; // the bar and other controls keep their own clicks
+    pendingStep();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!pendingStep || (e.key !== " " && e.key !== "Enter")) return;
+    var t = e.target;
+    if (t && t.closest && t.closest("button, select, input, textarea")) return; // a focused control answers its own key
+    e.preventDefault();
+    pendingStep();
+  });
+
+  // The Continue toggle. A page published before it existed has no such button, so it's added here.
+  var continueBtn = document.getElementById("continue");
+  if (!continueBtn) {
+    var inner = document.querySelector(".bar .inner");
+    if (inner) {
+      continueBtn = document.createElement("button");
+      continueBtn.id = "continue";
+      continueBtn.textContent = "Continue";
+      inner.insertBefore(continueBtn, document.querySelector(".bar .speedlabel") || document.getElementById("flash"));
+    }
+  }
+  function reflectContinue() {
+    if (!continueBtn) return;
+    continueBtn.setAttribute("aria-pressed", String(continueMode));
+    continueBtn.title = continueMode
+      ? "Continue is on: the story plays through at the chosen speed. Click to step through it yourself."
+      : "Continue is off: click the page, or press Space, for each line. Click to play it through instead.";
+  }
+  if (continueBtn) {
+    reflectContinue();
+    continueBtn.onclick = function () {
+      continueMode = !continueMode;
+      try { localStorage.setItem("patter.playContinue", continueMode ? "1" : "0"); } catch (e) {}
+      reflectContinue();
+      if (continueMode && pendingStep) {
+        // Playing on from a beat the reader was waiting on: the timing starts again from now.
+        timeline = createTimeline(DEFAULT_PAD);
+        clock = createClock(Date.now(), SPEED_RATE[speedKey]);
+        pendingStep();
+      } else if (!continueMode && wake) wake(); // the wait in flight becomes a wait for the reader
+    };
+  }
   var speedSel = document.getElementById("speed");
   if (speedSel) {
     speedSel.value = speedKey;
@@ -97,11 +162,18 @@ const PLAYER_JS = String.raw`
   function run() {
     controls.innerHTML = "";
     var token = ++runToken;
-    var timeline = createTimeline(DEFAULT_PAD);
+    clearNext();
+    timeline = createTimeline(DEFAULT_PAD);
     clock = createClock(Date.now(), SPEED_RATE[speedKey]);
+    var first = true;
     // A step read ahead appears when its time comes: a line or text when its pause is over, the choices
     // as the last line starts, the end as the last line still playing ends.
     function next(s) {
+      // The first beat (of a run, or the reply to a choice) starts at once. With Continue off, so do the
+      // choices and the end: the reader has nothing to wait for once the last line is up.
+      var atOnce = first || (!continueMode && (!s || s.type === "end" || s.type === "choice"));
+      first = false;
+      if (atOnce && !continueMode) { show(s); return; }
       var at = !s || s.type === "end" ? timeline.endAt() : s.type === "choice" ? timeline.choicesAt() : timeline.startOf();
       waitUntil(at, token, function () { show(s); });
     }
@@ -184,6 +256,10 @@ const STYLE = String.raw`
   .bar .speedlabel { font: 0.8rem ui-sans-serif, system-ui, sans-serif; color: #9a8f78; display: flex; align-items: center; gap: 0.3rem; }
   .bar #speed { font: 0.85rem ui-sans-serif, system-ui, sans-serif; background: #fff; border: 1px solid #d9cfbb; border-radius: 6px; padding: 0.3rem 0.4rem; cursor: pointer; color: #2b2620; }
   .bar #speed:hover { border-color: #b8956a; }
+  .bar #continue[aria-pressed="true"] { background: #efe4cf; border-color: #b8956a; }
+  .next { align-self: flex-start; font: 0.9rem ui-sans-serif, system-ui, sans-serif; background: #fff; border: 1px solid #d9cfbb; border-radius: 999px; padding: 0.35rem 1rem; cursor: pointer; color: #6b5f48; animation: fade 0.3s ease-out both; }
+  .next::after { content: " \25B8"; }
+  .next:hover { border-color: #b8956a; background: #fffaf0; }
   #flash { margin-left: auto; color: #9a8f78; font: 0.8rem ui-sans-serif, system-ui, sans-serif; opacity: 0; transition: opacity .2s; }
 `;
 
@@ -223,6 +299,7 @@ ${head}
   <button id="restart">↺ Restart</button>
   <button id="save">Save</button>
   <button id="load">Load</button>
+  <button id="continue" aria-pressed="false">Continue</button>
   <label class="speedlabel">Speed
     <select id="speed" title="How fast the scene plays: its timing at half speed, as written, at double speed, or with no waits">
       <option value="half">Half</option>

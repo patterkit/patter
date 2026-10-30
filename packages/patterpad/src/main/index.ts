@@ -1377,6 +1377,7 @@ function registerIpc(): void {
 
     audio: project.audioFoldersEnabled(), // #206: surfaces the "Play with audio" toggle in folder mode
     captions: project.playCaptionsState(), // #214: closed-captions toggle state (default on)
+    voiced: project.isVoiced(), // whether Continue starts on, until the author chooses
     ...project.playLocaleInfo(),
   }));
   ipcMain.handle("play:setLocale", (_e, locale: string) => project.setPlayLocale(locale));

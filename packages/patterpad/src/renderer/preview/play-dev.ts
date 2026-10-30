@@ -60,7 +60,7 @@ const stub = {
   mark: () => undefined,
   resetMarks: () => undefined,
   onRestart: () => undefined,
-  info: async () => ({ address: "the_tavern.intro", pinned: true, theme: { colour: "system" as const, font: "newsreader" as const }, follow: false, audio: true, captions: true, locales: ["en", "fr", "de"], locale, defaultLocale: "en" }),
+  info: async () => ({ address: "the_tavern.intro", pinned: true, theme: { colour: "system" as const, font: "newsreader" as const }, follow: false, audio: true, captions: true, voiced: new URLSearchParams(location.search).get("voiced") !== "0", locales: ["en", "fr", "de"], locale, defaultLocale: "en" }),
   audioBytes: async () => null, // no real clips in the preview -> Continue times each line by the estimate
   setPin: () => undefined,
   setLocale: async (l: string) => { locale = l; },
