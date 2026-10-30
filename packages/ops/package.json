@@ -37,7 +37,7 @@
     "@patterkit/core": "0.10.1",
     "@patterkit/dialect": "0.2.19",
     "@patterkit/model": "0.22.0",
-    "@patterkit/runtime": "0.36.0",
+    "@patterkit/runtime": "0.37.0",
     "@wildwinter/expr": "^0.6.0",
     "@wildwinter/toolkit": "^0.4.0",
     "@xmldom/xmldom": "^0.8.15",

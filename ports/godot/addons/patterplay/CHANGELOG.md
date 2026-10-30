@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-10-30
+
 ### Added
 
 - **A choice that runs dry and ends the flow is reported.** A choice with no option left to take and no

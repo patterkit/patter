@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-10-30
+
 ### Added
 
 - **A flow that ends because a choice ran dry says so.** When a choice with no option left to take and no

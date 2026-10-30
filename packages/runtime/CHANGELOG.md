@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-10-30
+
 ### Added
 
 - **A choice that runs dry and ends the flow says so.** It still gathers and never throws, but when nothing is
