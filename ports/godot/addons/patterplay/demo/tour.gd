@@ -83,7 +83,7 @@ func _on_game_event(step: Dictionary) -> void:
 	_show_next()
 
 
-func _on_ended() -> void:
+func _on_ended(_reason: String) -> void:
 	_append("[center]The End[/center]")
 	_show_restart()
 

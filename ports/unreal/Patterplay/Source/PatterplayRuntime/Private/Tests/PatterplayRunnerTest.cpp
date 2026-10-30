@@ -6,7 +6,8 @@
 // Choose, and the end raises OnEnded; handlers that call Next themselves don't deepen the stack; Stop drops
 // what was asked for and leaves the flow where it is; a later Begin(Scene) moves the same flow; a refusal is
 // returned, kept in GetLastError and logged, as Blueprint can't catch a throw; a load and a hot swap on the
-// same engine need nothing, and a new engine is handed over with Rebind.
+// same engine need nothing, and a new engine is handed over with Rebind; OnEnded hands on the end's reason,
+// RanDry when a choice ran dry with nothing after it.
 
 #include "Misc/AutomationTest.h"
 
@@ -20,6 +21,10 @@
 
 namespace
 {
+	// The JS runner test's hub: one option that comes back to it. Once it's used, the choice runs dry and
+	// nothing follows, so the flow ends because it ran dry.
+	const TCHAR* HubBundleJson = TEXT(R"JSON({"schema":"patter/bundle@0","content":{"project":"run_hub","hash":"runhub"},"voiced":false,"locales":{"default":"en","included":["en"]},"cast":[{"name":"NPC"}],"scenes":{"hub":{"id":"hub","type":"scene","name":"Hub","blocks":[{"id":"bh","type":"block","name":"BH","children":[{"id":"g","type":"group","selector":"choice","children":[{"id":"o","type":"group","prompt":{"id":"C_a","kind":"text"},"children":[{"id":"sn_o","type":"snippet","beats":[{"id":"L_a","kind":"line","character":"NPC"}],"jump":{"to":"hub"}}]}]}]}]}},"strings":{"en":{"C_a":"Ask.","L_a":"Asked."}}})JSON");
+
 	// The JS runner test's bundle, as the JS compiler exports it. talk: a line, a text and a game event, then
 	// a choice of two options, each a line and the end. shop: one line and the end.
 	const TCHAR* RunnerBundleJson = TEXT(R"JSON({"schema":"patter/bundle@0","content":{"project":"run","hash":"1mn9ico","structureHash":"1bg0cg5"},"voiced":false,"locales":{"default":"en","included":["en"]},"cast":[{"name":"NPC"}],"scenes":{"talk":{"id":"talk","type":"scene","name":"Talk","blocks":[{"id":"b1","type":"block","name":"B1","children":[{"id":"sn1","type":"snippet","beats":[{"id":"L1","kind":"line","character":"NPC"},{"id":"T1","kind":"text","action":true},{"id":"E1","kind":"gameEvent"}]},{"id":"grp","type":"group","selector":"choice","children":[{"id":"opt_a","type":"group","children":[{"id":"sn_a","type":"snippet","beats":[{"id":"L_a","kind":"line","character":"NPC"}],"jump":{"to":"END"}}],"prompt":{"id":"C_a","kind":"text"}},{"id":"opt_b","type":"group","children":[{"id":"sn_b","type":"snippet","beats":[{"id":"L_b","kind":"line","character":"NPC"}],"jump":{"to":"END"}}],"prompt":{"id":"C_b","kind":"text"}}]}]}]},"shop":{"id":"shop","type":"scene","name":"Shop","blocks":[{"id":"b2","type":"block","name":"B2","children":[{"id":"sn_s","type":"snippet","beats":[{"id":"L_s","kind":"line","character":"NPC"}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"L1":"Hello.","T1":"A door creaks.","C_a":"Ask.","C_b":"Leave.","L_a":"Asked.","L_b":"Bye.","L_s":"Welcome."}}})JSON");
@@ -150,6 +155,23 @@ bool FPatterplayRunnerTest::RunTest(const FString& Parameters)
 		Runner->Rebind(Another);
 		Runner->Next();
 		TestEqual(TEXT("after Rebind"), L->Last(), FString(TEXT("gameEvent:E1")));
+	}
+
+	// --- OnEnded hands on the reason: RanDry when a choice had nothing left and nothing came after it ---
+	{
+		UPatterBundle* Hub = UPatterBundle::LoadFromString(HubBundleJson);
+		if (!TestNotNull(TEXT("the hub bundle loads"), Hub)) return false;
+		UPatterEngine* Engine = UPatterEngine::Create(Hub, {});
+		UPatterRunnerComponent* Runner = NewObject<UPatterRunnerComponent>();
+		Runner->SetEngine(Engine, TEXT("main"));
+		UPatterplayRunnerListener* L = NewObject<UPatterplayRunnerListener>();
+		L->Listen(Runner);
+		// The dry choice is reported once, a Warning in the log.
+		AddExpectedMessagePlain(TEXT("ran dry"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 1);
+		Runner->Begin(TEXT("hub"));
+		Runner->Choose(TEXT("o"));
+		Runner->Next(); // back at the hub, its only option used: it runs dry, and nothing follows
+		TestEqual(TEXT("the end says it ran dry"), Joined(L->Seen), FString(TEXT("choice:o line:L_a ended:ran-dry")));
 	}
 	return true;
 }

@@ -241,7 +241,7 @@ void ATourDemoActor::HandleVoice(const FPatterStep& Step)
 	PlayClip(Step.Id);
 }
 
-void ATourDemoActor::HandleEnded()
+void ATourDemoActor::HandleEnded(EPatterEndReason Reason)
 {
 	AddLine(TEXT(""), TEXT("The End"), NoticeColour);
 	// Offer another run: the tour branches, so a replay actually differs.

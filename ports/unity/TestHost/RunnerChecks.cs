@@ -1,5 +1,5 @@
 // The thin runner (PatterRunner): the flow API turned from pull to push. Each delivered beat waits for Next(),
-// a choice for Choose(), and the end raises Ended; handlers that call Next() themselves don't deepen the stack;
+// a choice for Choose(), and the end raises Ended with its reason (RanDry when a choice ran dry); handlers that call Next() themselves don't deepen the stack;
 // Stop() drops what was asked for and leaves the flow where it is; a later Begin(scene) moves the same flow,
 // keeping the playthrough; Rebind() plays on after a hot swap. Mirrors the JS play-helpers' runner.test.ts,
 // on the same fixture (its bundle, exported by the JS compiler).
@@ -25,16 +25,16 @@ namespace Patterkit.Patterplay.TestHost
             string All(List<string> seen) => string.Join(" ", seen);
 
             // A runner whose every event is written down as kind:id.
-            (PatterRunner runner, List<string> seen, Engine engine) Recorded()
+            (PatterRunner runner, List<string> seen, Engine engine) Recorded(Engine on = null)
             {
-                var engine = new Engine(bundle);
+                var engine = on ?? new Engine(bundle);
                 var runner = new PatterRunner(engine);
                 var seen = new List<string>();
                 runner.Line += s => seen.Add($"line:{s.Id}");
                 runner.Text += s => seen.Add($"text:{s.Id}");
                 runner.GameEvent += s => seen.Add($"gameEvent:{s.Id}");
                 runner.Choice += (_, options) => seen.Add($"choice:{string.Join(",", options.Select(o => o.Id))}");
-                runner.Ended += () => seen.Add("ended");
+                runner.Ended += reason => seen.Add(reason == EndReason.RanDry ? "ended:ran-dry" : "ended");
                 return (runner, seen, engine);
             }
 
@@ -73,7 +73,7 @@ namespace Patterkit.Patterplay.TestHost
                 runner.Text += s => Step(s.Id);
                 runner.GameEvent += s => Step(s.Id);
                 runner.Choice += (_, __) => runner.Choose("opt_a");
-                runner.Ended += () => seen.Add("ended");
+                runner.Ended += _ => seen.Add("ended");
                 runner.Begin("talk");
                 Check("runner: handlers calling Next() themselves play a whole run", All(seen) == "L1 T1 E1 L_a ended", All(seen));
                 Check("runner: without deepening the stack", deepest == 1, $"deepest {deepest}");
@@ -83,7 +83,7 @@ namespace Patterkit.Patterplay.TestHost
                 var seen = new List<string>();
                 runner.Line += s => { seen.Add(s.Id); runner.Next(); runner.Stop(); };
                 runner.Text += s => seen.Add(s.Id);
-                runner.Ended += () => seen.Add("ended");
+                runner.Ended += _ => seen.Add("ended");
                 runner.Begin("talk");
                 Check("runner: Stop() drops a Next() a handler asked for", All(seen) == "L1", All(seen));
                 Check("runner: Stop() leaves the flow unended", !runner.Flow.IsEnded(), "flow ended");
@@ -138,6 +138,22 @@ namespace Patterkit.Patterplay.TestHost
                 Check("runner: carries on after a hot swap once rebound", Last(seen) == "choice:opt_a,opt_b", Last(seen));
             }
             {
+                // A hub whose one option comes back to it: once used, the choice runs dry and nothing follows.
+                const string hubJson = @"{""schema"":""patter/bundle@0"",""locales"":{""default"":""en"",""included"":[""en""]},""cast"":[{""name"":""NPC""}],
+                    ""scenes"":{""hub"":{""id"":""hub"",""type"":""scene"",""name"":""Hub"",""blocks"":[{""id"":""bh"",""type"":""block"",""name"":""BH"",""children"":[
+                      {""id"":""g"",""type"":""group"",""selector"":""choice"",""children"":[
+                        {""id"":""o"",""type"":""group"",""prompt"":{""id"":""C_a"",""kind"":""text""},""children"":[
+                          {""id"":""sn_o"",""type"":""snippet"",""beats"":[{""id"":""L_a"",""kind"":""line"",""character"":""NPC""}],""jump"":{""to"":""hub""}}]}]}]}]}},
+                    ""strings"":{""en"":{""C_a"":""Ask."",""L_a"":""Asked.""}}}";
+                var hub = new Engine(PatterBundleLoader.Parse(hubJson), new EngineOptions { OnError = _ => { } });
+                var (runner, seen, _) = Recorded(hub);
+                runner.Begin("hub");
+                runner.Choose("o");
+                runner.Next(); // back at the hub, its only option used: it runs dry, and nothing follows
+                Check("runner: hands Ended the reason, RanDry when a choice had nothing left and nothing came after it",
+                    All(seen) == "choice:o line:L_a ended:ran-dry", All(seen));
+            }
+            {
                 var runner = new PatterRunner(new Engine(bundle));
                 var seen = new List<string>();
                 Action<StepResult> handler = s => seen.Add(s.Id);
@@ -146,7 +162,7 @@ namespace Patterkit.Patterplay.TestHost
                 runner.Begin("talk");
                 Check("runner: stops listening when asked", seen.Count == 0, All(seen));
             }
-            if (_fails == before) Console.WriteLine("  [runner] the thin runner: beats on Next(), choices on Choose(), Stop, Start again, load and hot swap");
+            if (_fails == before) Console.WriteLine("  [runner] the thin runner: beats on Next(), choices on Choose(), the end and its reason, Stop, Start again, load and hot swap");
         }
     }
 }

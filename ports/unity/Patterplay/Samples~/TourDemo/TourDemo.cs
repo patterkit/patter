@@ -72,7 +72,7 @@ namespace Patterkit.Patterplay.Samples
             _runner.Text += step => { Show(Fmt(step.Text)); PlayClip(step.Id); };
             _runner.GameEvent += step => Show($"⚙ game event {step.Id}");
             _runner.Choice += (groupId, options) => { _options = options; _scroll.y = float.MaxValue; };
-            _runner.Ended += () => { Show("The End"); _ended = true; };
+            _runner.Ended += _ => { Show("The End"); _ended = true; };
 
             StartRun();
         }

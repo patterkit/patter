@@ -21,6 +21,10 @@ namespace Patterkit.Patterplay
     /// <summary>A choice the runner delivers: its group id and options.</summary>
     [Serializable] public sealed class PatterChoiceEvent : UnityEvent<string, List<ChoiceOption>> { }
 
+    /// <summary>The flow has ended: why (<see cref="EndReason.Ended"/>, or <see cref="EndReason.RanDry"/> when a
+    /// choice had nothing left and nothing came after it).</summary>
+    [Serializable] public sealed class PatterEndedEvent : UnityEvent<EndReason> { }
+
     public sealed class PatterRunnerBehaviour : MonoBehaviour
     {
         [Tooltip("Optional: a compiled .patterc. Set, the component makes its own engine as it wakes; empty, hand it one with Attach(engine).")]
@@ -33,7 +37,7 @@ namespace Patterkit.Patterplay
         public PatterStepEvent OnText = new PatterStepEvent();
         public PatterStepEvent OnGameEvent = new PatterStepEvent();
         public PatterChoiceEvent OnChoice = new PatterChoiceEvent();
-        public UnityEvent OnEnded = new UnityEvent();
+        public PatterEndedEvent OnEnded = new PatterEndedEvent();
 
         /// <summary>The engine the runner plays on, for saves and everything else the runner leaves alone.</summary>
         public Engine Engine { get; private set; }
@@ -103,6 +107,6 @@ namespace Patterkit.Patterplay
         private void RaiseText(StepResult step) => OnText.Invoke(step);
         private void RaiseGameEvent(StepResult step) => OnGameEvent.Invoke(step);
         private void RaiseChoice(string groupId, List<ChoiceOption> options) => OnChoice.Invoke(groupId, options);
-        private void RaiseEnded() => OnEnded.Invoke();
+        private void RaiseEnded(EndReason reason) => OnEnded.Invoke(reason);
     }
 }

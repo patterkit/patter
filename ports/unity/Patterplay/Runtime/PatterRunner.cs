@@ -7,7 +7,7 @@
 //   var runner = new PatterRunner(engine);
 //   runner.Line += step => Show(step.SpeakerLabel, step.Text);
 //   runner.Choice += (groupId, options) => Offer(options);   // then runner.Choose(id)
-//   runner.Ended += Close;
+//   runner.Ended += reason => Close();   // EndReason.Ended, or RanDry: a choice had nothing left
 //   runner.Begin();            // the project's start scene; Next() on each click
 //
 // A plain class, so it plays anywhere; PatterRunnerBehaviour wraps it in UnityEvents for the Inspector.
@@ -43,8 +43,9 @@ namespace Patterkit.Patterplay
         public event Action<StepResult> GameEvent;
         /// <summary>A choice: its group id and options. Answer with <see cref="Choose"/>.</summary>
         public event Action<string, List<ChoiceOption>> Choice;
-        /// <summary>The flow has ended.</summary>
-        public event Action Ended;
+        /// <summary>The flow has ended, and why, as its End step says: <see cref="EndReason.RanDry"/> when a
+        /// choice had nothing left to offer and nothing came after it, otherwise <see cref="EndReason.Ended"/>.</summary>
+        public event Action<EndReason> Ended;
 
         public PatterRunner(Engine engine, string flowId = "main")
         {
@@ -133,7 +134,7 @@ namespace Patterkit.Patterplay
                 case StepType.Text: Text?.Invoke(step); break;
                 case StepType.GameEvent: GameEvent?.Invoke(step); break;
                 case StepType.Choice: Choice?.Invoke(step.GroupId, step.Options); break;
-                case StepType.End: Ended?.Invoke(); break;
+                case StepType.End: Ended?.Invoke(step.Reason); break;
             }
         }
     }

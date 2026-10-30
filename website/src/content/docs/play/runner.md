@@ -27,7 +27,9 @@ is an ordinary flow.
   `next()`, a game event included, so your game can play an animation or move the camera before carrying on.
   If it doesn't care, call `next()` straight from the handler.
 - **`choose(id)`** picks an option of the pending choice and delivers what it leads to.
-- At the end, **`ended`** is raised.
+- At the end, **`ended`** is raised with the reason the flow ended: `"ended"`, or `"ran-dry"` when a choice had
+  nothing left to offer and nothing came after it (see [Why a flow ended](/play/engine/#why-a-flow-ended)). A
+  game can then say the conversation ran out, rather than closing it as if it had finished.
 - **`stop()`** stops delivering. The flow stays where it is, open and saveable, and `ended` isn't raised;
   `next()` carries on from there later.
 - **`rebind(engine)`** plays on after a [hot swap](/play/live-debug/), which returns a new engine.
@@ -57,7 +59,7 @@ runner.on("line", (step) => show(step.speakerLabel, step.text));
 runner.on("text", (step) => show("", step.text));
 runner.on("gameEvent", (step) => { playCutscene(step.gameData); });
 runner.on("choice", (step) => offer(step.options, (id) => runner.choose(id)));
-runner.on("ended", () => closeDialogue());
+runner.on("ended", (reason) => closeDialogue(reason)); // "ended", or "ran-dry"
 
 continueButton.onclick = () => runner.next();
 runner.begin();                               // or runner.begin("tavern")
@@ -80,7 +82,7 @@ runner.Line += step => Show(step.SpeakerLabel, step.Text);
 runner.Text += step => Show("", step.Text);
 runner.GameEvent += step => PlayCutscene(step.GameData);
 runner.Choice += (groupId, options) => Offer(options, id => runner.Choose(id));
-runner.Ended += CloseDialogue;
+runner.Ended += reason => CloseDialogue(reason); // EndReason.Ended, or EndReason.RanDry
 
 runner.Begin();                              // or runner.Begin("tavern")
 // Your Continue button calls runner.Next().
@@ -88,7 +90,8 @@ runner.Begin();                              // or runner.Begin("tavern")
 
 From the Inspector: add **Patter Runner Behaviour** to a GameObject, give it a bundle asset (or call
 `Attach(engine)` from code), and wire **On Line**, **On Text**, **On Game Event**, **On Choice**, and **On Ended**
-to your UI. Buttons call `Next()` and `Choose(id)`; `Begin()` or `Begin(scene)` starts the conversation.
+to your UI (**On Ended** passes the `EndReason`). Buttons call `Next()` and `Choose(id)`; `Begin()` or
+`Begin(scene)` starts the conversation.
 
 ## Godot
 
@@ -103,7 +106,7 @@ func _ready() -> void:
 	runner.text.connect(func(step): show_line("", step["text"]))
 	runner.game_event.connect(func(step): play_cutscene(step.get("gameData", {})))
 	runner.choice.connect(func(step): offer(step["options"]))   # then runner.choose(id)
-	runner.ended.connect(close_dialogue)
+	runner.ended.connect(func(reason): close_dialogue(reason))   # "ended", or "ran-dry"
 	runner.begin()                           # or runner.begin("tavern")
 	# Your Continue button calls runner.next().
 ```

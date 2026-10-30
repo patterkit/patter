@@ -59,7 +59,7 @@ private:
 	void HandleChoice(const FString& GroupId, const TArray<FPatterOption>& Options);
 
 	UFUNCTION()
-	void HandleEnded();
+	void HandleEnded(EPatterEndReason Reason);
 
 	UFUNCTION()
 	void HandleContinue();

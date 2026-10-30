@@ -72,7 +72,11 @@ public:
 	}
 
 	UFUNCTION()
-	void HandleEnded() { Seen.Add(TEXT("ended")); }
+	void HandleEnded(EPatterEndReason Reason)
+	{
+		// As the JS runner test writes it: "ended", or "ended:ran-dry".
+		Seen.Add(Reason == EPatterEndReason::RanDry ? TEXT("ended:ran-dry") : TEXT("ended"));
+	}
 
 private:
 	UPatterRunnerComponent* Runner = nullptr;

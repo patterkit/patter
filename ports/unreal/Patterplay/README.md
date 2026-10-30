@@ -77,6 +77,13 @@ The same `UPatterEngine` / `UPatterFlow` API is exposed to **Blueprint** (with `
 and `FPatterOption` as Blueprint structs), so a designer can drive the flow and bind steps to
 a dialogue widget without touching C++.
 
+For a straightforward game, the **Patter Runner** component (`UPatterRunnerComponent`; `patter::Runner` in
+the core's `Patter/Runner.h`) turns this pull API into push events. `Begin` delivers the first beat; each
+line, text, or game event arrives on `OnLine`, `OnText`, or `OnGameEvent` and waits for `Next`, and a choice
+arrives on `OnChoice` and waits for `Choose`. `OnEnded` hands its handler the end's `EPatterEndReason`
+(`patter::EndReason` in C++): `RanDry` when a choice had nothing left and nothing came after it, otherwise
+`Ended`. The engine's save and load stay the one way to save.
+
 ## Demos
 
 The **PatterplayDemo** sample project holds two working references (see its README):

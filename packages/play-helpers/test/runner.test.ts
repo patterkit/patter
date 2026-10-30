@@ -54,7 +54,7 @@ function recorded(engine = new Engine(bundle)) {
   runner.on("text", (s) => seen.push(`text:${s.id}`));
   runner.on("gameEvent", (s) => seen.push(`gameEvent:${s.id}`));
   runner.on("choice", (c) => seen.push(`choice:${c.options.map((o) => o.id).join(",")}`));
-  runner.on("ended", () => seen.push("ended"));
+  runner.on("ended", (reason) => seen.push(reason === "ended" ? "ended" : `ended:${reason}`));
   return { runner, seen, engine };
 }
 
@@ -162,6 +162,20 @@ describe("Runner", () => {
     runner.rebind(swapped);
     runner.next();
     expect(seen.at(-1)).toBe("choice:opt_a,opt_b");
+  });
+
+  it("hands `ended` the reason: ran-dry when a choice had nothing left and nothing came after it", () => {
+    const hub: Scene = { id: "hub", type: "scene", name: "Hub", blocks: [{ id: "bh", type: "block", name: "BH", children: [
+      { id: "g", type: "group", selector: "choice", children: [
+        { id: "o", type: "group", prompt: { id: "C_a", kind: "text" },
+          children: [{ id: "sn_o", type: "snippet", beats: [{ id: "L_a", kind: "line", character: "NPC" }], jump: { to: "hub" } }] },
+      ] },
+    ] }] };
+    const { runner, seen } = recorded(new Engine(exportBundle({ project, scenes: [hub], locales: [locale("hub")] })));
+    runner.begin("hub");
+    runner.choose("o");
+    runner.next(); // back at the hub, its only option used: it runs dry, and nothing follows
+    expect(seen).toEqual(["choice:o", "line:L_a", "ended:ran-dry"]);
   });
 
   it("stops listening when asked", () => {

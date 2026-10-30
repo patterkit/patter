@@ -135,8 +135,8 @@ In `demo/` (delete the folder freely):
   the bundle doesn't have, a host scope it doesn't declare, reported as the engine is built), a load
   whose place has gone (`"save"`), and a choice that ran dry and so ended the flow (`"dry-choice"`, whose
   `node` is the choice group: a hub whose options were all used, say). That flow's `"end"` step says
-  `"reason": "ran-dry"`; any other end says `"ended"`. The reason survives a save and load, and the host's
-  `goto("END")` is a plain end. A dry choice that play carries on past isn't reported: it's the gather
+  `"reason": "ran-dry"`; any other end says `"ended"`, and `PatterRunner`'s `ended(reason)` signal passes it
+  on. The reason survives a save and load, and the host's `goto("END")` is a plain end. A dry choice that play carries on past isn't reported: it's the gather
   idiom. A call it refuses can't throw in GDScript: `set_property` returns the
   refusal (`""` when written; a value that doesn't fit its declaration, or a name the content doesn't
   declare, is refused), and `advance()` and `choose()` keep theirs for `flow.last_error()`, cleared by the

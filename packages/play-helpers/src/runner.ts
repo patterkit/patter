@@ -9,13 +9,13 @@
 //   const runner = new Runner(engine);
 //   runner.on("line", (step) => { show(step.speakerLabel, step.text); });
 //   runner.on("choice", (step) => offer(step.options));   // then runner.choose(id)
-//   runner.on("ended", () => close());
+//   runner.on("ended", (reason) => close());   // "ended", or "ran-dry": a choice had nothing left
 //   runner.begin();            // the project's start scene; next() on each click
 //
 // A fuller dialogue manager for more complex games, Patterstage, is coming.
 // ---------------------------------------------------------------------------
 
-import type { ChoiceOption, Engine, Flow, StepResult } from "@patterkit/runtime";
+import type { ChoiceOption, EndReason, Engine, Flow, StepResult } from "@patterkit/runtime";
 
 type Step<T extends StepResult["type"]> = Extract<StepResult, { type: T }>;
 
@@ -25,7 +25,9 @@ export interface RunnerEvents {
   text: Step<"text">;
   gameEvent: Step<"gameEvent">;
   choice: { groupId: string; options: ChoiceOption[] };
-  ended: undefined;
+  /** Why the flow ended, as its `end` step says: `"ran-dry"` when a choice had nothing left to offer and
+   *  nothing came after it, otherwise `"ended"`. */
+  ended: EndReason;
 }
 
 export type RunnerEvent = keyof RunnerEvents;
@@ -131,7 +133,7 @@ export class Runner {
       case "text": return this.emit("text", step);
       case "gameEvent": return this.emit("gameEvent", step);
       case "choice": return this.emit("choice", { groupId: step.groupId, options: step.options });
-      case "end": return this.emit("ended", undefined);
+      case "end": return this.emit("ended", step.reason);
     }
   }
 

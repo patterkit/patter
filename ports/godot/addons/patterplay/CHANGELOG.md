@@ -19,6 +19,14 @@ same runtime behaviour.
   `goto` to a scene, `reset`, and a checkpoint's rollback put it back as they do the rest of the cursor. The
   conformance corpus is version 10.
 
+### Changed
+
+- **`PatterRunner`'s `ended` signal carries the reason: `signal ended(reason: String)`.** It's the end
+  step's `"reason"`, `"ran-dry"` when a choice had nothing left to offer and nothing came after it, else
+  `"ended"`, as the runner does in all four runtimes. The signal now has one argument, so a handler
+  connected to it takes one too: `func _on_ended(reason: String)`, or `func(_reason): close()`. The Tour
+  demo's handler does.
+
 ## [0.36.0] - 2026-10-29
 
 ### Added

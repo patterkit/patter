@@ -108,6 +108,6 @@ void UPatterRunnerComponent::Deliver(const FPatterStep& Step)
 		case EPatterStepType::Text: OnText.Broadcast(Step); return;
 		case EPatterStepType::GameEvent: OnGameEvent.Broadcast(Step); return;
 		case EPatterStepType::Choice: OnChoice.Broadcast(Step.GroupId, Step.Options); return;
-		case EPatterStepType::End: OnEnded.Broadcast(); return;
+		case EPatterStepType::End: OnEnded.Broadcast(Step.EndReason); return;
 	}
 }

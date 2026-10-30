@@ -126,7 +126,7 @@ void UTourRunnerWidget::HandleChoice(const FString& GroupId, const TArray<FPatte
 	if (!bAny && ContinueButton) ContinueButton->SetVisibility(ESlateVisibility::Visible);
 }
 
-void UTourRunnerWidget::HandleEnded()
+void UTourRunnerWidget::HandleEnded(EPatterEndReason Reason)
 {
 	if (ChoiceList) ChoiceList->ClearChildren();
 	if (ContinueButton) ContinueButton->SetVisibility(ESlateVisibility::Collapsed);

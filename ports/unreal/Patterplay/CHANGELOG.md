@@ -20,6 +20,17 @@ runtime behaviour.
   `patter::StepResult::reason` (`patter::EndReason`) and the `"dry-choice"` `PlayError`. A dry choice that
   play carries on past stays silent, and `OnDryChoice` is unchanged. The conformance corpus is version 10.
 
+### Changed
+
+- **The Patter Runner's `OnEnded` says why the flow ended.** `UPatterRunnerComponent::OnEnded` now carries
+  the end's `EPatterEndReason`: `RanDry` when a choice had nothing left to offer and nothing came after it,
+  otherwise `Ended`. It's a new delegate signature (`FPatterRunnerEndedEvent` takes one `EPatterEndReason`
+  parameter), so a C++ handler bound with `AddDynamic` needs a `UFUNCTION` taking an `EPatterEndReason`, and a
+  Blueprint's bound event gains a `Reason` pin (refresh the node). In the core, `patter::Runner::onEnded`'s
+  handler takes a `patter::EndReason` (`EndedHandler` is `std::function<void(EndReason)>`), so a lambda with
+  no parameter no longer compiles. The same change is in all four runtimes; the JS runner's `ended` event
+  hands its handler `"ended"` or `"ran-dry"`.
+
 ## [0.36.0] - 2026-10-29
 
 ### Added

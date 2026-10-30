@@ -2743,10 +2743,10 @@ static const Bundle& runnerBundle()
 /** A runner whose every event is written down as kind:id. */
 struct Recorded
 {
-    std::unique_ptr<Engine> engine = standalone(runnerBundle(), 0);
-    Runner runner{*engine};
+    std::unique_ptr<Engine> engine;
+    Runner runner;
     std::vector<std::string> seen;
-    Recorded()
+    explicit Recorded(const Bundle& bundle = runnerBundle()) : engine(standalone(bundle, 0)), runner(*engine)
     {
         runner.onLine([this](const StepResult& s) { seen.push_back("line:" + s.id); });
         runner.onText([this](const StepResult& s) { seen.push_back("text:" + s.id); });
@@ -2757,7 +2757,7 @@ struct Recorded
             for (const ChoiceOption& o : c.options) ids += (ids.empty() ? "" : ",") + o.id;
             seen.push_back("choice:" + ids);
         });
-        runner.onEnded([this] { seen.push_back("ended"); });
+        runner.onEnded([this](EndReason why) { seen.push_back(why == EndReason::Ended ? "ended" : "ended:ran-dry"); });
     }
     std::string last() const { return seen.empty() ? std::string() : seen.back(); }
 };
@@ -2813,7 +2813,7 @@ static void runRunnerCases()
         runner.onText(step);
         runner.onGameEvent(step);
         runner.onChoice([&](const RunnerChoice&) { runner.choose("opt_a"); });
-        runner.onEnded([&] { seen.push_back("ended"); });
+        runner.onEnded([&](EndReason) { seen.push_back("ended"); });
         runner.begin("talk");
         expectSeen(seen, {"L1", "T1", "E1", "L_a", "ended"}, "the run");
         need(deepest == 1, "handlers nested " + std::to_string(deepest) + " deep");
@@ -2826,7 +2826,7 @@ static void runRunnerCases()
         std::vector<std::string> seen;
         runner.onLine([&](const StepResult& s) { seen.push_back(s.id); runner.next(); runner.stop(); });
         runner.onText([&](const StepResult& s) { seen.push_back(s.id); });
-        runner.onEnded([&] { seen.push_back("ended"); });
+        runner.onEnded([&](EndReason) { seen.push_back("ended"); });
         runner.begin("talk");
         expectSeen(seen, {"L1"}, "after start");
         need(runner.flow() && !runner.flow()->isEnded(), "the flow ended");
@@ -2904,6 +2904,22 @@ static void runRunnerCases()
         runner.off(ticket);
         runner.begin("talk");
         expectSeen(seen, {}, "after off()");
+    });
+
+    runCase("hands ended the reason: RanDry when a choice had nothing left and nothing came after it", []
+    {
+        // A hub of one option that comes back to it: once it's used, the choice runs dry and nothing follows.
+        static const Bundle hub = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},"cast":[{"name":"NPC"}],
+          "strings":{"en":{"C_a":"Ask.","L_a":"Asked."}},
+          "scenes":{"hub":{"id":"hub","type":"scene","name":"Hub","blocks":[{"id":"bh","type":"block","name":"BH","children":[
+            {"id":"g","type":"group","selector":"choice","children":[
+              {"id":"o","type":"group","prompt":{"id":"C_a","kind":"text"},"children":[
+                {"id":"sn_o","type":"snippet","beats":[{"id":"L_a","kind":"line","character":"NPC"}],"jump":{"to":"hub"}}]}]}]}]}}})JSON"));
+        Recorded r(hub);
+        r.runner.begin("hub");
+        r.runner.choose("o");
+        r.runner.next(); // back at the hub, its only option used: it runs dry, and nothing follows
+        expectSeen(r.seen, {"choice:o", "line:L_a", "ended:ran-dry"}, "the run");
     });
 
     std::cout << "  [runner] the thin runner: beats pushed as events, next() and choose() queued, stop(), begin() moving the flow, rebind(): " << g_runPass << "/" << g_runTotal << "\n";

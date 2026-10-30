@@ -9,7 +9,7 @@
 #   runner.attach(engine)                                   # plays flow "main"
 #   runner.line.connect(func(step): show(step["speakerLabel"], step["text"]))
 #   runner.choice.connect(func(step): offer(step["options"]))   # then runner.choose(id)
-#   runner.ended.connect(close)
+#   runner.ended.connect(func(reason): close())   # "ended", or "ran-dry": a choice had nothing left
 #   runner.begin()          # the project's start scene; next() on each click
 #
 # A fuller dialogue manager for more complex games, Patterstage, is coming.
@@ -28,8 +28,9 @@ signal text(step: Dictionary)
 signal game_event(step: Dictionary)
 ## The pending choice: {"groupId", "options"}.
 signal choice(step: Dictionary)
-## The flow has run out of content.
-signal ended
+## The flow has run out of content. `reason` is why, as its end step says: "ran-dry" when a choice had
+## nothing left to offer and nothing came after it, otherwise "ended".
+signal ended(reason: String)
 
 ## The flow the runner plays.
 @export var flow_id := "main"
@@ -162,4 +163,4 @@ func _deliver(step: Dictionary) -> void:
 		"choice":
 			choice.emit({"groupId": step["groupId"], "options": step["options"]})
 		"end":
-			ended.emit()
+			ended.emit(str(step.get("reason", "ended")))

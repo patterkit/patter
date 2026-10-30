@@ -18,6 +18,15 @@ same runtime behaviour.
   The host's `Goto("END")` ends it plainly, and `Goto` to a scene or `Reset` clears it. `OnDryChoice` is
   unchanged. The conformance corpus is version 10.
 
+### Changed
+
+- **The thin runner's end says why.** `PatterRunner.Ended` is now an `event Action<EndReason>`, handed the
+  `End` step's `Reason`: `EndReason.RanDry` when a choice had nothing left and nothing came after it,
+  otherwise `EndReason.Ended`. `PatterRunnerBehaviour.OnEnded` is now a `PatterEndedEvent`
+  (`UnityEvent<EndReason>`) that carries it too. This changes the event's signature: a handler written as
+  `() => ...` becomes `reason => ...` (or `_ => ...` to ignore it). Listeners wired in the Inspector keep
+  working. The same in all four runtimes.
+
 ## [0.36.0] - 2026-10-29
 
 ### Added

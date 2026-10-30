@@ -138,7 +138,9 @@ scene** - import, open the scene, press Play, nothing to set up:
   a hub whose options were all used, say. That case is also reported once through `OnError`, its `Node`
   the choice group. A dry choice that play carries on past is the gather idiom and stays silent (only
   `EngineOptions.OnDryChoice` hears it). The reason survives a save and load; the host's `Goto("END")` is a
-  plain `Ended`.
+  plain `Ended`. The thin runner passes it on: `PatterRunner.Ended` is an `Action<EndReason>`, and
+  `PatterRunnerBehaviour.OnEnded` a `UnityEvent<EndReason>`, so a game can tell a story that ran out from
+  one that finished.
 - **Set one flow aside**: `engine.CaptureFlow(id)` returns its part of a save as a `FlowState` (its
   position, PRNG, visits, selectors, and its own property values, without its id). Close the flow after
   capturing, keep the state as JSON with `PatterSave.SaveFlowState` / `ReadFlowState`, and
