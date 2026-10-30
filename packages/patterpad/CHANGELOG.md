@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Play's "Follow in the editor" shows the scene when the project overview is up.** The editor took the scene being
+  played, but left the overview over it, so nothing seemed to follow. The same went for a search or Coverage jump
+  made from the overview.
+
 ## [0.41.0] - 2026-10-30
 
 ### Added

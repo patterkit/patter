@@ -1086,7 +1086,7 @@ async function doDeleteScene(id: string): Promise<ProjectStep | undefined> {
     // switch below doesn't try to save (and toast a refusal on) the scene we just deleted.
     saver.cancel();
     docsDirty = false; commentsDirty = false;
-    if (neighbour) await loadScene(neighbour);
+    if (neighbour) await loadScene(neighbour, { behind: true });
   } else if (currentSceneId) highlightNav(currentSceneId);
   return res.step;
 }
@@ -1735,7 +1735,7 @@ async function afterProjectHistory(r: ProjectHistoryOutcome): Promise<void> {
     surface?.destroy(); surface = null; surfaceSceneId = null; editorEl.replaceChildren();
     const wasShowing = currentSceneId === open;
     currentSceneId = null;
-    if (wasShowing && project.scenes[0]) await loadScene(project.scenes[0].id);
+    if (wasShowing && project.scenes[0]) await loadScene(project.scenes[0].id, { behind: true });
   } else if (open && currentSceneId === open && r.scenes.includes(open)) {
     await reloadOpenScene();
   } else if (open && r.scenes.includes(open)) {
@@ -3053,8 +3053,18 @@ function queueScene(run: () => Promise<void>): Promise<void> {
   return next;
 }
 
-function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Promise<void> {
-  return queueScene(() => loadSceneNow(sceneId, opts));
+function loadScene(sceneId: string, opts?: { restoreCaret?: string; behind?: boolean }): Promise<void> {
+  return queueScene(async () => {
+    // Every route that takes the writer to a scene ends in the workspace, showing it. Only the navigator and the
+    // overview's own list used to switch views first, so Play following along (or its playhead), a search or
+    // Coverage jump, or a problem's Go to issue, taken while the overview was up, loaded the scene behind it and it
+    // stayed hidden (Ian, 2026-10-30). This holds for the scene already open behind the overview too, which is why
+    // those routes call here even for it (loadSceneNow returns at once for the open scene). `behind` is for
+    // housekeeping (a deleted, rolled-back, or merged-away scene replaced), which mustn't take the writer off the
+    // page they're on.
+    if (!opts?.behind && project && !overviewEl.hidden) { enterWorkspace(); renderNav(); }
+    await loadSceneNow(sceneId, opts);
+  });
 }
 
 async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): Promise<void> {
@@ -3222,7 +3232,7 @@ async function playFromStart(): Promise<void> {
 
 // --- dual id/handle search (go-to-anything) ----------------------------------
 async function jumpTo(entry: SearchEntry): Promise<void> {
-  if (entry.sceneId !== currentSceneId) await loadScene(entry.sceneId); // load its scene if elsewhere
+  await loadScene(entry.sceneId); // its scene: loaded if elsewhere, shown if the overview covers it
   if (entry.kind !== "scene") surface?.revealNode(entry.id);             // then reveal the node
 }
 
@@ -3232,7 +3242,7 @@ async function openTarget(targetId: string): Promise<void> {
   if (!project || !targetId || targetId === "END") return;
   const scene = project.scenes.find((s) => s.id === targetId || s.blocks.some((b) => b.id === targetId));
   if (!scene) return;
-  if (scene.id !== currentSceneId) await loadScene(scene.id);
+  await loadScene(scene.id);
   if (scene.id !== targetId) surface?.revealNode(targetId);
 }
 function openSearch(mode: "content" | "replace" = "content"): void {
@@ -3963,7 +3973,7 @@ async function mergePatterpack(): Promise<void> {
   // The open scene RE-READ, sidecars and all: `loadScene` returns at once for the scene already open, so
   // the editor kept the pre-merge text and comments, and the first edit autosaved them over the merge.
   if (currentSceneId && project.scenes.some((sc) => sc.id === currentSceneId)) await reloadOpenScene();
-  else if (project.scenes[0]) await loadScene(project.scenes[0].id); // their pack deleted the scene we were in
+  else if (project.scenes[0]) await loadScene(project.scenes[0].id, { behind: true }); // their pack deleted the scene we were in
   void refreshProblems();
   void refreshVcStatus();
   void refreshClashes(); // the banner says what the merge left to settle
@@ -4834,7 +4844,7 @@ window.patter.onMenu((cmd) => {
 let markChain: Promise<void> = Promise.resolve();
 window.patter.onPlayMark((id, sceneId, optionId) => {
   markChain = markChain.then(async () => {
-    if (sceneId && sceneId !== currentSceneId) await loadScene(sceneId);
+    if (sceneId) await loadScene(sceneId);
     const s = surface;
     s?.markLine(markTarget(id, optionId, (option) => s.promptOf(option)));
   }).catch(() => {}); // a failed scene load shouldn't wedge the chain
@@ -4864,7 +4874,7 @@ window.patter.onReplaceApplied(() => void (async () => {
 })());
 // Coverage window (#159): a clicked result row jumps the editor; the "Game scopes…" button opens settings.
 window.patter.onCoverageNavigate((sceneId, beatId) => void (async () => {
-  if (sceneId !== currentSceneId) await loadScene(sceneId);
+  await loadScene(sceneId);
   surface?.revealNode(beatId);
 })());
 window.patter.onOpenWorldSettings(() => void openProjectSettings("world"));
