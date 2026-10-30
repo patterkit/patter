@@ -1168,7 +1168,7 @@ export interface PatterFieldsApi {
   onTheme(handler: (theme: ThemePrefs) => void): void;
 }
 
-export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "not-in-project" | "spelling" | "game-scopes" | "extensions";
+export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "not-in-project" | "game-scopes" | "extensions";
 
 /** A one-click remedy for a problem (spec §4). Extensible discriminated union.
  *  `add-to-cast` / `declare-property` are project-file writes (applyFix); `retarget-jump`,

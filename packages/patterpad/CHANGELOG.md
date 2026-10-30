@@ -31,6 +31,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   own block. Where nothing comes after it, it warns, and **Add a fallback** in the Problems bar adds one. Where
   play carries on after it, it's a quieter note, since asking until nothing's left and then moving on is often
   what you mean.
+- **The problems count no longer moves when another scene opens.** The title bar's count, and the problems you
+  step through, are the project's problems only. Spelling keeps its underlines and gets its own count in the
+  problems bar, for the scene that's open: click it to go to the next possible mistake in that scene.
 - **Play says when a run ended because a choice ran dry**, in place of "The End", and moves the editor to the
   choice.
 

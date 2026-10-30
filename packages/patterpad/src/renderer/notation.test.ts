@@ -132,7 +132,7 @@ describe("the problems bar's copy", () => {
     expect(problemCode({ category: "merge" })).toBe("merge-conflict");
     expect(problemCode({ category: "structure", detail: "missing-prompt" })).toBe("missing-prompt");
     expect(problemCode({ category: "condition", detail: "cond" })).toBe("cond");
-    for (const category of ["not-in-project", "spelling", "hygiene"] as const) expect(problemCode({ category, detail: "x" })).toBeUndefined();
+    for (const category of ["not-in-project", "hygiene"] as const) expect(problemCode({ category, detail: "x" })).toBeUndefined();
   });
 
   it("keeps the hand-written sentences and their next steps", () => {
@@ -191,7 +191,6 @@ describe("the problems bar's copy", () => {
     expect(problemLineFor(problem({ category: "hygiene", severity: "warning", message: "has a BOM", file: "/p/a.patterflow" }), "a.patterflow")).toBe("a.patterflow: has a BOM");
     expect(problemLineFor(problem({ category: "hygiene", severity: "warning", message: "has a BOM" }))).toBe("has a BOM");
     expect(problemLineFor(problem({ category: "not-in-project", message: "b.patterflow isn't part of this project [b]" }))).toBe("b.patterflow isn't part of this project");
-    expect(problemLineFor(problem({ category: "spelling", severity: "info", message: "“teh” may be misspelt" }))).toBe("“teh” may be misspelt");
     // The translator strips a trailing `[where]` and never writes one of its own.
     expect(problemLineFor(problem({ detail: "nope", message: "odd [x]" }))).toBe("odd");
     expect(problemLineFor(problem({ category: "condition", message: "bad thing [node-1]" }))).toBe("bad thing");

@@ -1398,6 +1398,12 @@ function setTheme(patch: Partial<ThemePrefs>): void {
 
 let problems: Problem[] = [];
 let problemAt = 0;
+// The open scene's possible misspellings. Kept apart from `problems` (the validator's, project-wide): mixed in,
+// the title bar's count changed whenever another scene opened, and a click that opened one looked like the
+// validator losing problems (Ian, 2026-10-30, brief problems-count-without-spelling). Their own count sits in
+// the problems bar and steps through this scene only.
+let misspellings: Array<{ nodeId: string; word: string }> = [];
+let misspellingAt = 0;
 
 /** A human label for a quick-fix (spec §4) - writer-speak, no engine jargon. */
 function fixLabel(fix: NonNullable<Problem["fix"]>): string {
@@ -1425,7 +1431,7 @@ function relToProject(path: string | undefined): string | undefined {
 const PROBLEM_CATEGORY: Record<Problem["category"], string> = {
   structure: "Structure", condition: "Condition", interpolation: "Text",
   hygiene: "Tidy-up", "stale-bundle": "Build", merge: "Merge", "not-in-project": "Not in project",
-  spelling: "Spelling", "game-scopes": "Shared scopes", extensions: "Extensions",
+  "game-scopes": "Shared scopes", extensions: "Extensions",
 };
 
 // The sentences themselves (one per validator code, plus the softened fallback) live in problem-copy.ts,
@@ -1448,6 +1454,23 @@ let problemFixEl: HTMLButtonElement | null = null;
  *  repaint while either is up (a validation after a Properties edit, F8) must leave them hidden there,
  *  or the bar appears over a page that has no scene to step through. */
 const barsBelongHere = (): boolean => !panesEl.hidden && propsDocEl.hidden && overviewEl.hidden;
+
+/** The problems bar's spelling count: the open scene's possible misspellings, a click going to the next one.
+ *  Null when there are none. It never leaves the open scene. */
+function spellingChip(): HTMLButtonElement | null {
+  const n = misspellings.length;
+  if (n === 0) return null;
+  const chip = el("button", "spelling-count", `Spelling: ${n}`);
+  chip.type = "button";
+  chip.dataset["tip"] = `${plural(n, "possible spelling mistake")} in this scene. Click to go to the next one.`;
+  chip.addEventListener("click", () => {
+    const at = misspellingAt % misspellings.length;
+    misspellingAt = at + 1;
+    const m = misspellings[at];
+    if (m) surface?.revealNode(m.nodeId);
+  });
+  return chip;
+}
 
 function paintProblems(): void {
   if (!barsBelongHere()) { problembarEl.hidden = true; return; }
@@ -1483,8 +1506,10 @@ function paintProblems(): void {
       void goToProblem(problems[problemAt]);
     },
     onGo: (i) => { void goToProblem(problems[i]); },
-    actions: [problemFixEl],
-    // No `empty`: no problems, no problems bar. This one is ambient, not a mode.
+    actions: [problemFixEl, spellingChip()],
+    // No problems and no misspellings, no problems bar: this one is ambient, not a mode. With only
+    // misspellings, it stays up to show their count beside a clean line.
+    ...(misspellings.length > 0 ? { empty: healthCleanLine() } : {}),
   });
   paintHealth();
 }
@@ -1886,30 +1911,23 @@ async function registerCharacter(name: string): Promise<void> {
 }
 
 /** Push the current problems to the surface as inline squiggles (ids not in the open scene are ignored).
- *  Spelling is EXCLUDED - it already has its own wavy underline from the spell-check plugin (#177). */
+ *  Spelling isn't among them: it has its own wavy underline from the spell-check plugin (#177). */
 function applyProblemMarks(): void {
   // A note (info: a choice that can run dry and then carry on) stays in the bar: it isn't a fault to mark.
   surface?.markProblems(problems
-    .filter((p) => p.nodeId && p.category !== "spelling" && p.severity !== "info")
+    .filter((p) => p.nodeId && p.severity !== "info")
     .map((p) => ({ id: p.nodeId!, severity: p.severity as "error" | "warning" })));
 }
 
-/** The open scene's misspellings as problems-panel entries (info severity; renderer-only, #177). */
-function spellingProblems(): Problem[] {
-  return (surface?.spellingIssues() ?? []).map((i) => ({
-    category: "spelling" as const, severity: "info" as const, nodeId: i.nodeId,
-    message: `Possible spelling mistake: “${i.word}”.`,
-  }));
-}
-
 function renderProblems(dto: ProblemsDto): void {
-  // Flow-validation problems (from the validator) + the open scene's spelling issues (#177), combined for
-  // the problems bar. Spelling is editorial (info) and never blocks a build.
+  // The validator's problems, project-wide, for the count and the stepper; the open scene's spelling (#177)
+  // beside them, counted on its own. Spelling is editorial and never blocks a build.
   // Stay on the problem being looked at: this runs at every typing pause and every save, and starting
   // again from the first sent anyone stepping through the list back to the top each time they typed.
   // The same problem is the same node and message; when it has gone (fixed), the one now in its place.
+  misspellings = surface?.spellingIssues() ?? [];
   const was = problems[problemAt];
-  const next = [...dto.problems, ...spellingProblems()];
+  const next = [...dto.problems];
   const same = was ? next.findIndex((q) => q.nodeId === was.nodeId && q.message === was.message) : -1;
   problems = next;
   problemAt = same >= 0 ? same : Math.min(problemAt, Math.max(0, problems.length - 1));

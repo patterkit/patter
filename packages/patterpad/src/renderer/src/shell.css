@@ -468,6 +468,17 @@
 .stepbar-cat.done { color: var(--muted); }
 
 /* The quick-fix chip is the shell's `.stepbar-action` (stepper.css), amber under a warn count there too. */
+/* The open scene's spelling count, at the right-hand end: a quiet neutral button, not a fix, so it never takes
+   the problems' colour. After a quick-fix chip it sits beside it rather than splitting the space. */
+.spelling-count {
+  flex: none; margin-left: auto; cursor: pointer;
+  padding: 2px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--muted);
+  font: 600 var(--text-xs) var(--font-ui);
+  transition: color var(--dur-tint) var(--ease-standard), border-color var(--dur-tint) var(--ease-standard);
+}
+.spelling-count:hover { color: var(--ink); border-color: var(--muted); }
+.stepbar-action + .spelling-count { margin-left: 6px; }
 
 /* The review walk is the problems bar plus ONE modifier: a subtle accent-tinted ground, so the mode you
    entered reads as distinct from the ambient bar above it. */
