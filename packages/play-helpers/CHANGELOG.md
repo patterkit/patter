@@ -1,5 +1,15 @@
 # @patterkit/play-helpers
 
+## 0.12.0
+
+### Minor Changes
+
+- a8bcc86: The runner's `ended` event hands its handler a `FlowEndReason`, the runtime's new name for what was `EndReason` (`"ended"` or `"ran-dry"`). Only code that names the type needs the change.
+
+### Patch Changes
+
+- e3d2239: Uses `@patterkit/runtime` 0.38.0, the Patterplay 0.38.0 release.
+
 ## 0.11.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @patterkit/ops
 
+## 0.26.1
+
+### Patch Changes
+
+- e3d2239: Uses `@patterkit/runtime` 0.38.0, the Patterplay 0.38.0 release.
+
 ## 0.26.0
 
 ### Minor Changes
