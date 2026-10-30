@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-10-30
+
 ### Added
 
 - **Read a published story at your own pace.** The playable HTML has Play's **Continue** toggle. With it off,
