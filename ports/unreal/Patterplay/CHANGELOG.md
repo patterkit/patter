@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-10-31
+
 ### Added
 
 - **Speech units, for a lip flap.** `UPatterGameData::SpeechUnits(Text, Locale)` (Blueprint, an array of the new

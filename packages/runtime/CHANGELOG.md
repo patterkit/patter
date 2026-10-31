@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-10-31
+
 ### Added
 
 - **The units a line is spoken in.** `speechUnits(text, locale)`, re-exported from `@patterkit/model`, breaks a line

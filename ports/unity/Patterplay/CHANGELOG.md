@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-10-31
+
 ### Added
 
 - **Speech units, for a lip flap.** `Bundle.SpeechUnits(text, locale)` breaks a line into the units it's spoken

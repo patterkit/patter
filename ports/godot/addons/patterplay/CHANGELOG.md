@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-10-31
+
 ### Added
 
 - **Speech units and syllable counting.** `PatterBundle.speech_units(text, locale)` breaks a line into the units
