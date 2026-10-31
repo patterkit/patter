@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-10-31
+
 ### Added
 
 - **Timing for lines without audio.** Project settings has a new field on the General tab: how many syllables a
