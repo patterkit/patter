@@ -240,7 +240,7 @@ function placeAuthoring(ctx: ClashContext, shard: Obj, file: string, path: strin
 
 /** The Project Settings tab each project key is edited on (renderer.ts `buildSettingsDialog`). */
 const SETTINGS_TAB: Record<string, string> = {
-  project: "general", start: "general", voiced: "general", formatting: "general", padAfterDefault: "general",
+  project: "general", start: "general", voiced: "general", formatting: "general", padAfterDefault: "general", estimateSyllablesPerSecond: "general",
   vcs: "vcs", export: "build", autoRebuild: "build", cast: "cast", qualifiers: "qualifiers", speakerPattern: "qualifiers",
   gameDataFields: "gamedata", writingStatuses: "writing-status", recordingStatuses: "recording-status", trackAudioStatus: "recording-status",
   audioRoot: "recording-status", audioFolders: "recording-status", scratchStatus: "recording-status", estimating: "estimating",

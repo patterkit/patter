@@ -297,6 +297,7 @@ export function exportBundle(input: ExportInput): Bundle {
         ...(foreignScopes ? { scopeRegistry: foreignScopes } : {}),
         ...(qualifiers.length > 0 ? { qualifiers } : {}),
         ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
+        ...(typeof project.estimateSyllablesPerSecond === "number" ? { estimateSyllablesPerSecond: project.estimateSyllablesPerSecond } : {}),
         // Each node's values are in `scenes`; the declarations and the project's own values are here.
         ...(extensionSection !== undefined ? { extensions: extensionSection } : {}),
         ...(start !== undefined ? { start } : {}),
@@ -310,6 +311,7 @@ export function exportBundle(input: ExportInput): Bundle {
         ...(foreignScopes ? { scopeRegistry: foreignScopes } : {}),
         ...(qualifiers.length > 0 ? { qualifiers } : {}),
         ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
+        ...(typeof project.estimateSyllablesPerSecond === "number" ? { estimateSyllablesPerSecond: project.estimateSyllablesPerSecond } : {}),
         ...(extensionSection !== undefined ? { extensions: extensionSection } : {}),
         ...(start !== undefined ? { start } : {}),
       }, { trailingComma: false })),
@@ -336,6 +338,8 @@ export function exportBundle(input: ExportInput): Bundle {
     ...(speakerPattern !== undefined ? { speakerPattern } : {}),
     // The project's own line-padding default, only when it sets one: absent, every runtime uses the built-in one.
     ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
+    // The project's own rate for a line with no recording, only when it sets one: absent, every runtime uses 4.
+    ...(typeof project.estimateSyllablesPerSecond === "number" ? { estimateSyllablesPerSecond: project.estimateSyllablesPerSecond } : {}),
 
     properties: resolved(project.properties),
     scopeRegistry: hostScopes && {

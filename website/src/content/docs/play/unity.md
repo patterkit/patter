@@ -86,7 +86,12 @@ writer and the translator chose (see [How a qualified speaker is shown](/setup/c
 `Text` step's `PadAfter` (a `double?`, null on the other steps) is the writer's pause after it in
 seconds, already resolved; `Bundle.DefaultPadAfter` (0.6) is the one a project gets when it sets
 none. The [timing rules](/play/engine/#step-shapes) say how to play it, and
-`Bundle.EstimateLineDuration(text)` how long a line with no recording lasts. A `Text` step with
+`Bundle.EstimateLineDuration(step.SpokenText, step.SpokenLocale, step.EstimateRate ?? Bundle.DefaultEstimateSyllablesPerSecond)`
+how long a line with no recording lasts: `SpokenText` is the line in the project's main language, the one
+it's spoken in, whatever language is shown (null in an IDs-only bundle), and `EstimateRate` the project's
+syllables a second for an estimate. `Bundle.SpeechUnits(text, locale)` gives the syllables, shut beats, and
+pauses it's made of (each a `SpeechUnit` with `Kind`, `Weight`, `Start`, and `End`), to lay over a line's
+length and move a mouth, and `Bundle.CountSyllables(text, locale)` the count. A `Text` step with
 `Action` set is [action](/play/engine/#step-shapes), a direction for whoever stages the scene: stage
 it, or let it pass, but don't show it as on-screen text. `Action` is false on shown text and on a
 replayed prompt.

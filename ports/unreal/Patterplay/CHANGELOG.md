@@ -7,6 +7,37 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Speech units, for a lip flap.** `UPatterGameData::SpeechUnits(Text, Locale)` (Blueprint, an array of the new
+  `FPatterSpeechUnit`) and `patter::speechUnits(text, locale)` (the core) break a line into the units it would be
+  spoken in: its syllables, its beats with the mouth shut, and its pauses, each with a kind
+  (`EPatterSpeechUnitKind` / `patter::SpeechUnitKind`: syllable, closed, or pause), a weight, and code-point
+  offsets. Lay them over a line's length to move a mouth. `UPatterGameData::CountSyllables` and
+  `patter::countSyllables` give a line's syllable count. They're counted from the text alone, per script, by one
+  generated table every runtime carries (`Patter/SpeechTable.h`). The weights are `SPEECH_DIGIT_WEIGHT`,
+  `SPEECH_KANJI_WEIGHT`, `SPEECH_PAUSE_SHORT_WEIGHT`, and `SPEECH_PAUSE_LONG_WEIGHT`.
+- **How a line is spoken, on every line and text step.** `FPatterStep::SpokenText` (with `bHasSpokenText`) is the
+  beat in the project's main language, whatever language is being shown: interpolated (though a voiced project's
+  lines aren't), with caption cues left out whether captions are on or not, and empty for the caption character's
+  lines. `SpokenLocale` (with `bHasSpokenLocale`) is that language, and `EstimateRate` the project's syllables a
+  second for an estimate. An IDs-only build sets no spoken text or locale. A replayed option prompt carries them
+  too. The core's `patter::StepResult` has `spokenText`, `spokenLocale`, and `estimateRate`.
+- **The project's own estimate rate.** The bundle's optional `estimateSyllablesPerSecond` is read
+  (`patter::Bundle::estimateSyllablesPerSecond`); absent, it's 4.
+
+### Changed
+
+- **A line with no recording is timed by its syllables, not its characters.** `EstimateLineDuration` and
+  `patter::estimateLineDuration` now take a third parameter, the rate in syllables a second (default 4, and any
+  rate that isn't a positive number is the default), and give the total weight of the line's speech units, its
+  pauses included, at that rate, clamped to 1.5 to 18 seconds. Pass a step's `SpokenText`, `SpokenLocale`, and
+  `EstimateRate`. The locale now matters: it's the language the line is spoken in. A line with a recording lasts
+  as long as the recording. `LINE_CHARS_PER_SECOND` is gone; the new constants are
+  `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND`, `ESTIMATE_SYLLABLES_PER_SECOND_MIN`, and
+  `ESTIMATE_SYLLABLES_PER_SECOND_MAX`. The conformance corpus is version 11, whose `speech` section and re-pinned
+  `durations` hold every runtime to it.
+
 ## [0.38.0] - 2026-10-30
 
 ### Changed

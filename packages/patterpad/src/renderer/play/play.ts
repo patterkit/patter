@@ -422,7 +422,8 @@ async function revealFrom(batch: PlayBatch, gen: number, startIdx: number): Prom
     clock.delay(performance.now() - clock.at(start));
     // A game event, and action text (a direction, never shown to the player), take no time of their own: only
     // their pause separates them from the next beat.
-    const length = s.kind === "gameEvent" || s.action ? 0 : lineLength(clip?.duration, estimateLineDuration(s.text ?? ""));
+    // A line with no recording lasts as long as the runtime says it would take to speak, in the project's main language.
+    const length = s.kind === "gameEvent" || s.action ? 0 : lineLength(clip?.duration, s.estimate ?? estimateLineDuration(s.text ?? ""));
     timeline.place(s, length);
     const el = appendStep(s); play.mark(s.id, s.scene); scrollToEnd();
     if (clip && audioOn) playLoaded(clip, el);

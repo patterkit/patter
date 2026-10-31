@@ -6,6 +6,18 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Timing for lines without audio.** Project settings has a new field on the General tab: how many syllables a
+  second a line with no recording is timed at (default 4, from 2 to 10). Lines with a recording always last as long
+  as the recording.
+
+### Changed
+
+- **Play times a line with no recording by its syllables, in the project's main language.** A line lasts about as
+  long as it would take to say, so Chinese, Japanese, Korean, Arabic, and Thai lines no longer flash past, and it's
+  timed by the language it's spoken in, not the one Play is showing.
+
 ## [0.41.2] - 2026-10-30
 
 ### Changed

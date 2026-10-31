@@ -79,6 +79,18 @@ namespace patter
         // dialogue scene's text, unless the project localises it). Its text is the source in every locale. False
         // on any other step, and on a replayed option prompt, which never is.
         bool action = false;
+        // How a line or text step is spoken, for timing a line with no recording and for moving a mouth:
+        // estimateLineDuration(spokenText, spokenLocale, estimateRate). A line is spoken in the project's main
+        // language whatever language is being shown, so spokenText is the beat in that language (interpolated as
+        // the shown text is, though a voiced project's lines aren't, with caption cues left out whether captions
+        // are on or not, and empty for the caption character's lines) and spokenLocale that language. Both unset
+        // (hasSpokenText false) in an IDs-only build, which has no text, and for a beat the main language has no
+        // string for. estimateRate is the project's syllables a second for an estimate
+        // (estimateSyllablesPerSecond, default 4), always set on a line or text step and 0 on any other. A line
+        // with a recording lasts as long as the recording.
+        bool hasSpokenText = false; std::string spokenText;
+        bool hasSpokenLocale = false; std::string spokenLocale;
+        double estimateRate = 0;
         // The beat's own author gameData, raw: the game's own copy (null when it sets none), so editing it
         // changes nothing the engine, or another engine on the same bundle, hands out next.
         std::shared_ptr<GameData> gameData;

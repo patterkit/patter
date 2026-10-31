@@ -37,7 +37,8 @@ const PLAYER_JS = String.raw`
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
 
   // Pacing (line padding): a source-only reader carries no audio, so each line is timed by Patter's own rule
-  // for a line with no recording (estimateLineDuration, from the runtime), and the step's padAfter
+  // for a line with no recording (estimateLineDuration, from the runtime: the line as spoken in the project's main
+  // language, at its rate, whatever language the page shows), and the step's padAfter
   // says when the next one starts: after a pause, at once, or cutting in before this one ends. The player
   // rules are play-timeline.ts's, inlined below by their source: the first line starts at once, as does the
   // reply to a choice; a cut-in never starts before the line it cuts into; a game event is never held here,
@@ -183,7 +184,7 @@ const PLAYER_JS = String.raw`
       if (s.type === "choice") { renderChoice(s); return; }
       // Action text (a direction for whoever stages the scene, never shown to the player) takes no time of its
       // own, only its pause, and reads as a direction.
-      timeline.place(s, s.action ? 0 : estimate(s.text));
+      timeline.place(s, s.action ? 0 : estimate(s.spokenText != null ? s.spokenText : s.text, s.spokenLocale, s.estimateRate));
       if (s.type === "line") {
         // The speaker's label as the runtime resolved it (TAM (O.S.), or a pair's own label): this page never
         // puts a name and a qualifier together itself. (Its bundle always carries the strings, so a line with a

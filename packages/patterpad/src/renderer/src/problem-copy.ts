@@ -17,7 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { defaultProblemCopy, describeProblem, problemName, type ProblemCopyTable, type ProblemLike } from "@wildwinter/app-shell";
-import { PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
+import { PAD_AFTER_MIN, PAD_AFTER_MAX, ESTIMATE_SYLLABLES_PER_SECOND_MIN, ESTIMATE_SYLLABLES_PER_SECOND_MAX } from "@patterkit/model";
 import { entryProblemLine, extensionLine, quoted } from "@wildwinter/app-shell/extension-copy";
 import type { ExtensionDto, Problem } from "../../shared/api.js";
 
@@ -45,6 +45,10 @@ export const PATTERPAD_PROBLEM_COPY: ProblemCopyTable = {
   "invalid-pad": () => ({
     text: "This pause is outside the range Patter allows.",
     next: `Use a number of seconds from ${PAD_AFTER_MIN} to ${PAD_AFTER_MAX}.`,
+  }),
+  "invalid-estimate-rate": () => ({
+    text: "The timing for lines without audio is outside the range Patter allows.",
+    next: `Use a number of syllables a second from ${ESTIMATE_SYLLABLES_PER_SECOND_MIN} to ${ESTIMATE_SYLLABLES_PER_SECOND_MAX} in Project settings.`,
   }),
   "pad-overlaps-seam": () => ({
     text: "This line ends its snippet, so nothing can cut in on it.",

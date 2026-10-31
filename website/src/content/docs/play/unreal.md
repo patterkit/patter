@@ -62,7 +62,13 @@ way the writer and the translator chose (see [How a qualified speaker is shown](
 set on a `Line` or `Text` step and 0 on any other, so it has no `bHas` flag. The
 [timing rules](/play/engine/#step-shapes) say how to play it, and `Estimate Line Duration`
 (`UPatterGameData::EstimateLineDuration`, `patter::estimateLineDuration` in C++) how long a line with no
-recording lasts. A `Text` step with `bAction` set
+recording lasts: pass it the step's `SpokenText`, `SpokenLocale`, and `EstimateRate`. `SpokenText` is the line
+in the project's main language, the one it's spoken in, whatever language is shown (`bHasSpokenText` is false
+in an IDs-only bundle), and `EstimateRate` the project's syllables a second for an estimate. `Speech Units`
+gives the syllables, shut beats, and pauses it's made of (each an `FPatterSpeechUnit` with `Kind`, `Weight`,
+`Start`, and `End`), to lay over a line's length and move a mouth, and `Count Syllables` the count. `Start`
+and `End` count code points, so an emoji is one, though it takes two characters in an `FString`. A `Text`
+step with `bAction` set
 (`action` on the C++ `StepResult`) is [action](/play/engine/#step-shapes), a direction for whoever
 stages the scene: stage it, or let it pass, but don't show it as on-screen text. It's false on any
 other step and on a replayed prompt.

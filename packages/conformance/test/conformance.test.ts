@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
 import { describeBundle, Engine } from "@patterkit/runtime";
-import { buildCorpus, serializeCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, runAudioCase, runDurationCase, cases } from "../src/index.js";
+import { buildCorpus, serializeCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, runAudioCase, runDurationCase, runSpeechCase, cases } from "../src/index.js";
 
 const corpus = buildCorpus(cases);
 const corpusPath = fileURLToPath(new URL("../corpus.json", import.meta.url));
@@ -124,6 +124,14 @@ describe("duration cases (how long a line with no recording lasts, every runtime
   for (const c of corpus.durations) {
     it(c.name, () => {
       expect(runDurationCase(c)).toBe(c.expected);
+    });
+  }
+});
+
+describe("speech cases (the units a line is spoken in, every runtime)", () => {
+  for (const c of corpus.speech) {
+    it(c.name, () => {
+      expect(runSpeechCase(c)).toEqual({ units: c.units, syllables: c.syllables });
     });
   }
 });

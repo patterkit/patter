@@ -17,8 +17,10 @@ export { stageIndex, compareStages, nextStage } from "@wildwinter/expr";
 export type { Bundle } from "@patterkit/model";
 /** The built-in pause after a line, in seconds, when nothing in the project sets one (line padding). */
 export { DEFAULT_PAD_AFTER } from "@patterkit/model";
-/** How long a line with no recording lasts, in seconds: the one rule every Patter tool and runtime times a line by. */
-export { estimateLineDuration } from "@patterkit/model";
+/** How long a line with no recording lasts, in seconds: the one rule every Patter tool and runtime times a line by,
+ *  from the speech units it would be spoken in (also what a game lays over a line's length to move a mouth). */
+export { estimateLineDuration, speechUnits, countSyllables, DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND } from "@patterkit/model";
+export type { SpeechUnit, SpeechUnitKind } from "@patterkit/model";
 // The one rule for a scene reference (its gameId first, then its internal id), for a host or tool that has
 // to land where the engine will without constructing one: the Storylet Engine's pairing check, say.
 export { resolveSceneRef, sceneAddressIndex } from "@patterkit/model";
@@ -27,7 +29,7 @@ export { resolveSceneRef, sceneAddressIndex } from "@patterkit/model";
 // host typing a row should not have to depend on the kernel to name it.
 export type { LoadMisfit, PropertyRow } from "@wildwinter/scoperegistry";
 export type {
-  StepResult, FlowEndReason, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, HostScope,
+  StepResult, SpokenFields, FlowEndReason, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, HostScope,
   EngineSave, SaveGame, SaveGameV3, FlowSnapshot, FlowState, FlowValues, FlowCursor, SelectorSnapshot, SavedChoice, SavedChoiceOption, SavedChoicePrompt, StackFrame, SaveEnvelope,
   BeatInfo, OutlineNode, OutlineBlock, OutlineScene, FlatBeat,
   TraceEvent, EngineTraceHandler, LogEntry, EngineLogEntry, PlayError,

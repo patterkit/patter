@@ -172,6 +172,12 @@ namespace
 		if (S.hasSpeakerLabel) Out.SpeakerLabel = Ue(S.speakerLabel);
 		Out.PadAfter = S.padAfter;   // line padding: set on a line or text step, 0 on the rest
 		Out.bAction = S.action;      // action text: a text step only, never a replayed prompt
+		// How it's spoken: the main language's text and that language, unset in an IDs-only build, and the rate.
+		Out.bHasSpokenText = S.hasSpokenText;
+		if (S.hasSpokenText) Out.SpokenText = Ue(S.spokenText);
+		Out.bHasSpokenLocale = S.hasSpokenLocale;
+		if (S.hasSpokenLocale) Out.SpokenLocale = Ue(S.spokenLocale);
+		Out.EstimateRate = S.estimateRate;
 		// Game Data + tags cross the UObject boundary too: host events ride on Game Data (#116), so a
 		// Blueprint host must be able to read them straight off the step (parity with the other ports).
 		if (S.gameData) Out.GameData = ConvertGameData(*S.gameData);

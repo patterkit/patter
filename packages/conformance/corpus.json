@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "expressions": [
     {
       "name": "number comparison",
@@ -24416,6 +24416,439 @@
       ]
     },
     {
+      "name": "a line is spoken in the main language: its text there, that language, and the project's rate",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0ksy3ut",
+          "structureHash": "003glpe"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          },
+          {
+            "name": "SFX"
+          }
+        ],
+        "estimateSyllablesPerSecond": 4,
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "shared": true,
+            "default": "Ada"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L1",
+                        "kind": "line",
+                        "character": "NPC"
+                      },
+                      {
+                        "id": "L2",
+                        "kind": "line",
+                        "character": "SFX"
+                      },
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "L3",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L1": "Hello {@name}, [laughs] welcome home.",
+            "L2": "[a door slams]",
+            "T1": "The rain on {@name}.",
+            "L3": "Goodbye."
+          },
+          "fr": {
+            "L1": "Bonjour {@name}, [rit] bienvenue.",
+            "L2": "[une porte claque]",
+            "T1": "La pluie sur {@name}."
+          }
+        }
+      },
+      "locale": "fr",
+      "spoken": true,
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L1",
+              "text": "Bonjour Ada, [rit] bienvenue.",
+              "character": "NPC",
+              "spokenText": "Hello Ada, welcome home.",
+              "spokenLocale": "en",
+              "estimateRate": 4
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L2",
+              "text": "[une porte claque]",
+              "character": "SFX",
+              "spokenText": "",
+              "spokenLocale": "en",
+              "estimateRate": 4
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "La pluie sur Ada.",
+              "spokenText": "The rain on Ada.",
+              "spokenLocale": "en",
+              "estimateRate": 4
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L3",
+              "text": "<Untranslated: L3> Goodbye.",
+              "character": "NPC",
+              "spokenText": "Goodbye.",
+              "spokenLocale": "en",
+              "estimateRate": 4
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a voiced project's spoken lines aren't interpolated, and its rate is the default",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1nj9c0f",
+          "structureHash": "0c3mfgo"
+        },
+        "voiced": true,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          },
+          {
+            "name": "SFX"
+          }
+        ],
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "shared": true,
+            "default": "Ada"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L1",
+                        "kind": "line",
+                        "character": "NPC"
+                      },
+                      {
+                        "id": "L2",
+                        "kind": "line",
+                        "character": "SFX"
+                      },
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "L3",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L1": "Hello {@name}, [laughs] welcome home.",
+            "L2": "[a door slams]",
+            "T1": "The rain on {@name}.",
+            "L3": "Goodbye."
+          },
+          "fr": {
+            "L1": "Bonjour {@name}, [rit] bienvenue.",
+            "L2": "[une porte claque]",
+            "T1": "La pluie sur {@name}."
+          }
+        }
+      },
+      "locale": "fr",
+      "spoken": true,
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L1",
+              "text": "Bonjour {@name}, [rit] bienvenue.",
+              "character": "NPC",
+              "spokenText": "Hello {@name}, welcome home.",
+              "spokenLocale": "en",
+              "estimateRate": 4
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L2",
+              "text": "[une porte claque]",
+              "character": "SFX",
+              "spokenText": "",
+              "spokenLocale": "en",
+              "estimateRate": 4
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "La pluie sur Ada.",
+              "spokenText": "The rain on Ada.",
+              "spokenLocale": "en",
+              "estimateRate": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an IDs-only bundle gives only the rate a line is estimated at",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0ww64d9",
+          "structureHash": "0it3qrc"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          },
+          {
+            "name": "SFX"
+          }
+        ],
+        "estimateSyllablesPerSecond": 6,
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "shared": true,
+            "default": "Ada"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L1",
+                        "kind": "line",
+                        "character": "NPC"
+                      },
+                      {
+                        "id": "L2",
+                        "kind": "line",
+                        "character": "SFX"
+                      },
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "L3",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {},
+        "localisation": {
+          "mode": "ids"
+        }
+      },
+      "spoken": true,
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L1",
+              "text": "L1",
+              "character": "NPC",
+              "estimateRate": 6
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L2",
+              "text": "L2",
+              "character": "SFX",
+              "estimateRate": 6
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "T1",
+              "estimateRate": 6
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "a host scope bound under a token the bundle doesn't declare (only the case differs) is reported, never folded",
       "bundle": {
         "schema": "patter/bundle@0",
@@ -31780,58 +32213,2284 @@
     {
       "name": "a short line is held for the shortest time",
       "text": "Ah.",
+      "locale": "en",
       "expected": 1.5
     },
     {
-      "name": "21 characters is exactly the shortest time",
-      "text": "Twenty-one letters!!!",
-      "expected": 1.5
-    },
-    {
-      "name": "a line lasts its characters at 14 a second",
+      "name": "a line lasts its syllables at 4 a second",
       "text": "The lamps are lit along the harbour wall tonight.",
-      "expected": 3.5
-    },
-    {
-      "name": "soft hyphens aren't counted",
-      "text": "In­com­pre­hen­si­ble and ex­tra­or­di­nar­y!",
-      "expected": 2.5
-    },
-    {
-      "name": "a line of nothing but soft hyphens is an empty line",
-      "text": "­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­",
-      "expected": 1.5
-    },
-    {
-      "name": "a character outside the Basic Multilingual Plane counts once",
-      "text": "Look up, Tam: 🌙 🌊 🌙 🌊, the moon on the sea",
+      "locale": "en",
       "expected": 3
     },
     {
-      "name": "a line of astral characters counts each once",
-      "text": "🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙🌙",
+      "name": "the locale is the language the line is spoken in",
+      "text": "The lamps are lit along the harbour wall tonight.",
+      "expected": 3.25
+    },
+    {
+      "name": "a project's own rate",
+      "text": "The lamps are lit along the harbour wall tonight.",
+      "locale": "en",
+      "syllablesPerSecond": 5,
+      "expected": 2.4
+    },
+    {
+      "name": "the slowest rate",
+      "text": "The lamps are lit along the harbour wall tonight.",
+      "locale": "en",
+      "syllablesPerSecond": 2,
+      "expected": 6
+    },
+    {
+      "name": "the quickest rate, held for the shortest time",
+      "text": "The lamps are lit along the harbour wall tonight.",
+      "locale": "en",
+      "syllablesPerSecond": 10,
+      "expected": 1.5
+    },
+    {
+      "name": "a rate of nothing is the default",
+      "text": "The lamps are lit along the harbour wall tonight.",
+      "locale": "en",
+      "syllablesPerSecond": 0,
+      "expected": 3
+    },
+    {
+      "name": "a rate below nothing is the default",
+      "text": "The lamps are lit along the harbour wall tonight.",
+      "locale": "en",
+      "syllablesPerSecond": -3,
+      "expected": 3
+    },
+    {
+      "name": "pauses add their weight",
+      "text": "Wait... what?! Really?",
+      "locale": "en",
       "expected": 2
     },
     {
-      "name": "a character beyond Latin counts once",
-      "text": "こんにちは、港の灯りが見えますか。今夜は潮が満ちています",
-      "expected": 2
+      "name": "a Chinese line lasts its characters",
+      "text": "你好，世界。今天天气很好。",
+      "locale": "zh-Hans",
+      "expected": 3.25
     },
     {
-      "name": "252 characters is exactly the longest time",
-      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "name": "a Japanese line lasts its morae and kanji",
+      "text": "港の灯りが見えますか。",
+      "locale": "ja",
+      "expected": 3.25
+    },
+    {
+      "name": "digits weigh 1.5 each",
+      "text": "It costs 3.5 pounds, or 1,000 in 2026.",
+      "locale": "en",
+      "expected": 5.25
+    },
+    {
+      "name": "72 syllables is exactly the longest time",
+      "text": "la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la ",
+      "locale": "en",
       "expected": 18
     },
     {
       "name": "a longer line is held to the longest time",
-      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "text": "la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la ",
+      "locale": "en",
       "expected": 18
+    }
+  ],
+  "speech": [
+    {
+      "name": "an empty line has no units",
+      "text": "",
+      "units": [],
+      "syllables": 0
     },
     {
-      "name": "the locale changes nothing yet",
+      "name": "English: a group of vowels a syllable, and a lone final e silent",
       "text": "The lamps are lit along the harbour wall tonight.",
-      "locale": "fr-FR",
-      "expected": 3.5
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 13
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 14,
+          "end": 17
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 18,
+          "end": 19
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 19,
+          "end": 23
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 24,
+          "end": 27
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 28,
+          "end": 30
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 30,
+          "end": 35
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 36,
+          "end": 40
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 41,
+          "end": 43
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 43,
+          "end": 48
+        }
+      ],
+      "syllables": 12
+    },
+    {
+      "name": "with no locale there's no silent e",
+      "text": "The lamps are lit along the harbour wall tonight.",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 11
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 13
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 14,
+          "end": 17
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 18,
+          "end": 19
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 19,
+          "end": 23
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 24,
+          "end": 27
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 28,
+          "end": 30
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 30,
+          "end": 35
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 36,
+          "end": 40
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 41,
+          "end": 43
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 43,
+          "end": 48
+        }
+      ],
+      "syllables": 13
+    },
+    {
+      "name": "English keeps a consonant and le, and a comma is a short pause",
+      "text": "A table, a little bottle, a cradle.",
+      "locale": "en-GB",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 7
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 10
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 13
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 17
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 18,
+          "end": 20
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 20,
+          "end": 24
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 24,
+          "end": 25
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 26,
+          "end": 27
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 28,
+          "end": 31
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 31,
+          "end": 34
+        }
+      ],
+      "syllables": 11
+    },
+    {
+      "name": "French: a lone final e or es is silent",
+      "text": "Une lampe brûle dans les fenêtres.",
+      "locale": "fr_FR",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 15
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 16,
+          "end": 20
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 21,
+          "end": 24
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 25,
+          "end": 27
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 27,
+          "end": 33
+        }
+      ],
+      "syllables": 7
+    },
+    {
+      "name": "the silent e is English's and French's alone",
+      "text": "Une lampe brûle dans les fenêtres.",
+      "locale": "de",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 13
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 15
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 16,
+          "end": 20
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 21,
+          "end": 24
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 25,
+          "end": 27
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 27,
+          "end": 29
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 29,
+          "end": 33
+        }
+      ],
+      "syllables": 11
+    },
+    {
+      "name": "accented and other Latin vowels count as vowels",
+      "text": "Café, naïve, Ærøskøbing, cœur.",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 4
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 11
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 11,
+          "end": 12
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 14
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 14,
+          "end": 16
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 16,
+          "end": 19
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 19,
+          "end": 23
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 23,
+          "end": 24
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 25,
+          "end": 29
+        }
+      ],
+      "syllables": 8
+    },
+    {
+      "name": "an apostrophe joins a word",
+      "text": "Don't, l'eau, rock’n’roll.",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 5
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 12
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 12,
+          "end": 13
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 14,
+          "end": 16
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 16,
+          "end": 25
+        }
+      ],
+      "syllables": 4
+    },
+    {
+      "name": "German umlauts and ß",
+      "text": "Über die Brücke, Straße.",
+      "locale": "de",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 5,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 12
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 12,
+          "end": 15
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 15,
+          "end": 16
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 17,
+          "end": 21
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 21,
+          "end": 23
+        }
+      ],
+      "syllables": 7
+    },
+    {
+      "name": "Polish accented letters",
+      "text": "Zażółć gęślą jaźń.",
+      "locale": "pl",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 12
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 17
+        }
+      ],
+      "syllables": 5
+    },
+    {
+      "name": "Turkish dotless and dotted i are vowels",
+      "text": "Işık, İstanbul.",
+      "locale": "tr",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 4
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 10
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 14
+        }
+      ],
+      "syllables": 5
+    },
+    {
+      "name": "a word with no vowel is one syllable",
+      "text": "Hmm. Brr. Grr!",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 3
+        },
+        {
+          "kind": "pause",
+          "weight": 2,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 5,
+          "end": 8
+        },
+        {
+          "kind": "pause",
+          "weight": 2,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 13
+        }
+      ],
+      "syllables": 3
+    },
+    {
+      "name": "Cyrillic: one syllable a vowel letter, and a question mark is a long pause",
+      "text": "Привет, как дела? Моя собака.",
+      "locale": "ru",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 6
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 6,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 11
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 12,
+          "end": 14
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 14,
+          "end": 16
+        },
+        {
+          "kind": "pause",
+          "weight": 2,
+          "start": 16,
+          "end": 17
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 18,
+          "end": 20
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 20,
+          "end": 21
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 22,
+          "end": 24
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 24,
+          "end": 26
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 26,
+          "end": 28
+        }
+      ],
+      "syllables": 10
+    },
+    {
+      "name": "Ukrainian і ї є are vowels, and й isn't",
+      "text": "Їжак і єнот йдуть.",
+      "locale": "uk",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 11
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 12,
+          "end": 17
+        }
+      ],
+      "syllables": 6
+    },
+    {
+      "name": "Han: one syllable a character, with CJK punctuation",
+      "text": "你好，世界。今天天气很好。",
+      "locale": "zh-Hans",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 2
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "pause",
+          "weight": 2,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 10
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 11
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 12
+        }
+      ],
+      "syllables": 10
+    },
+    {
+      "name": "Japanese: kanji about two, kana one a mora",
+      "text": "港の灯りが見えますか。",
+      "locale": "ja",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 10
+        }
+      ],
+      "syllables": 13
+    },
+    {
+      "name": "kana in the line makes it Japanese whatever the locale",
+      "text": "港の灯り",
+      "locale": "zh",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 4
+        }
+      ],
+      "syllables": 6
+    },
+    {
+      "name": "kana makes it Japanese with no locale too",
+      "text": "港の灯り",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 4
+        }
+      ],
+      "syllables": 6
+    },
+    {
+      "name": "small kana merge with the one before, and っ is a shut beat",
+      "text": "きょうはがっこうへいきます。",
+      "locale": "ja",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "closed",
+          "weight": 1,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 10
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 11
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 12
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 12,
+          "end": 13
+        }
+      ],
+      "syllables": 12
+    },
+    {
+      "name": "ー holds the kana before it for another beat",
+      "text": "ラーメン、コーヒー！",
+      "locale": "ja",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 5,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 7,
+          "end": 9
+        }
+      ],
+      "syllables": 8
+    },
+    {
+      "name": "a small kana or っ with nothing before stands alone, and a lone ー says nothing",
+      "text": "ファイト、ッ、ーあ",
+      "locale": "ja",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "closed",
+          "weight": 1,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 6,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        }
+      ],
+      "syllables": 5
+    },
+    {
+      "name": "halfwidth katakana, its voicing mark, and its ー",
+      "text": "ｶﾞｯｺｰ",
+      "locale": "ja",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "closed",
+          "weight": 1,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 3,
+          "end": 5
+        }
+      ],
+      "syllables": 4
+    },
+    {
+      "name": "Hangul: one syllable a block",
+      "text": "안녕하세요, 반갑습니다.",
+      "locale": "ko",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 10
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 11
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 12
+        }
+      ],
+      "syllables": 10
+    },
+    {
+      "name": "lone Hangul letters count as another script's",
+      "text": "ㅋㅋㅋ",
+      "locale": "ko",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 3
+        }
+      ],
+      "syllables": 1
+    },
+    {
+      "name": "Arabic: one syllable a written short vowel",
+      "text": "مَرْحَبًا بِكُمْ",
+      "locale": "ar",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 12
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 12,
+          "end": 16
+        }
+      ],
+      "syllables": 5
+    },
+    {
+      "name": "Arabic with no vowels written: one syllable per two letters, and ؟ is a long pause",
+      "text": "مرحبا بكم في المدينة؟",
+      "locale": "ar",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 12
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 15
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 15,
+          "end": 17
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 17,
+          "end": 19
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 19,
+          "end": 20
+        }
+      ],
+      "syllables": 10
+    },
+    {
+      "name": "a tatweel stretches a word and says nothing",
+      "text": "ـمـرحـبـا",
+      "locale": "ar",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        }
+      ],
+      "syllables": 3
+    },
+    {
+      "name": "Thai: one syllable a vowel, and a space between Thai words a short pause",
+      "text": "สวัสดีครับ ภาษาไทย",
+      "locale": "th",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 10
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 10,
+          "end": 11
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 13
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 15
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 15,
+          "end": 18
+        }
+      ],
+      "syllables": 6
+    },
+    {
+      "name": "Thai: a leading vowel takes the signs after it, and consonants with no vowel hold one per two",
+      "text": "เรียน ขอบคุณ ถนน กรุงเทพมหานคร",
+      "locale": "th",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 5
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 12
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 12,
+          "end": 13
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 15
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 15,
+          "end": 16
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 16,
+          "end": 17
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 17,
+          "end": 20
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 20,
+          "end": 23
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 23,
+          "end": 24
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 24,
+          "end": 27
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 27,
+          "end": 30
+        }
+      ],
+      "syllables": 10
+    },
+    {
+      "name": "a script outside the set: one syllable per three letters",
+      "text": "Γεια σου κόσμε.",
+      "locale": "el",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 5,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 12
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 12,
+          "end": 14
+        }
+      ],
+      "syllables": 5
+    },
+    {
+      "name": "Devanagari is outside the set too, and । is a long pause",
+      "text": "नमस्ते दुनिया।",
+      "locale": "hi",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 10
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 13
+        }
+      ],
+      "syllables": 4
+    },
+    {
+      "name": "a digit weighs 1.5, and a full stop or comma inside a number is part of it",
+      "text": "It costs 3.5 pounds, or 1,000 in 2026.",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 9,
+          "end": 10
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 11,
+          "end": 12
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 19
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 19,
+          "end": 20
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 21,
+          "end": 23
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 24,
+          "end": 25
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 26,
+          "end": 27
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 27,
+          "end": 28
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 28,
+          "end": 29
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 30,
+          "end": 32
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 33,
+          "end": 34
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 34,
+          "end": 35
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 35,
+          "end": 36
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 36,
+          "end": 37
+        }
+      ],
+      "syllables": 20
+    },
+    {
+      "name": "Arabic-Indic digits weigh 1.5",
+      "text": "١٢٣ ٤٥",
+      "locale": "ar",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 0,
+          "end": 1
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 1,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 2,
+          "end": 3
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "syllable",
+          "weight": 1.5,
+          "start": 5,
+          "end": 6
+        }
+      ],
+      "syllables": 7.5
+    },
+    {
+      "name": "punctuation in a row is one pause, the stronger, and the last is dropped",
+      "text": "Wait... what?! Really?",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 4
+        },
+        {
+          "kind": "pause",
+          "weight": 2,
+          "start": 4,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 12
+        },
+        {
+          "kind": "pause",
+          "weight": 2,
+          "start": 12,
+          "end": 14
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 15,
+          "end": 18
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 18,
+          "end": 21
+        }
+      ],
+      "syllables": 4
+    },
+    {
+      "name": "a pause before the first syllable is dropped",
+      "text": "...Well, then.",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 7
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 13
+        }
+      ],
+      "syllables": 2
+    },
+    {
+      "name": "formatting tags and entities say nothing",
+      "text": "<b>Bold</b> and <i>soft</i> &amp; <bi>both</bi> &#38; a < b > c.",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 12,
+          "end": 15
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 19,
+          "end": 23
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 38,
+          "end": 42
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 54,
+          "end": 55
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 58,
+          "end": 59
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 62,
+          "end": 63
+        }
+      ],
+      "syllables": 7
+    },
+    {
+      "name": "emoji and symbols say nothing, and a pause runs over them",
+      "text": "Look up, Tam: 🌙 🌊, the moon on the sea",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 5,
+          "end": 7
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 12
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 12,
+          "end": 18
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 19,
+          "end": 22
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 23,
+          "end": 27
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 28,
+          "end": 30
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 31,
+          "end": 34
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 35,
+          "end": 38
+        }
+      ],
+      "syllables": 8
+    },
+    {
+      "name": "a dash, a semicolon, and a colon are short pauses",
+      "text": "Hello — goodbye; and: then.",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 5
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 6,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 11
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 15
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 15,
+          "end": 16
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 17,
+          "end": 20
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 20,
+          "end": 21
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 22,
+          "end": 26
+        }
+      ],
+      "syllables": 6
+    },
+    {
+      "name": "an e and a combining accent is an accented e, never silent",
+      "text": "été",
+      "locale": "fr",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 5
+        }
+      ],
+      "syllables": 2
+    },
+    {
+      "name": "a soft hyphen joins a word",
+      "text": "­In­com­pre­hen­si­ble",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 11
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 14
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 14,
+          "end": 18
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 18,
+          "end": 22
+        }
+      ],
+      "syllables": 6
+    },
+    {
+      "name": "scripts change mid-word",
+      "text": "Hello世界こんにちは",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 5
+        },
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 2,
+          "start": 6,
+          "end": 7
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 8
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 10
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 11
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 12
+        }
+      ],
+      "syllables": 11
+    },
+    {
+      "name": "Spanish opening marks say nothing",
+      "text": "¿Qué tal? ¡Hola!",
+      "locale": "es",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 5,
+          "end": 8
+        },
+        {
+          "kind": "pause",
+          "weight": 2,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 13
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 15
+        }
+      ],
+      "syllables": 4
     }
   ]
 }

@@ -52,7 +52,13 @@ Show `speakerLabel` as the speaker's name: it's localised and already puts the t
 the writer and the translator chose (see [How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)).
 A `"line"` or `"text"` step always carries `"padAfter"`, the writer's pause after it in seconds,
 already resolved; the [timing rules](/play/engine/#step-shapes) say how to play it, and
-`PatterBundle.estimate_line_duration(text)` how long a line with no recording lasts. A `"text"` step
+`PatterBundle.estimate_line_duration(step.get("spokenText", ""), step.get("spokenLocale", ""), step["estimateRate"])`
+how long a line with no recording lasts: `"spokenText"` is the line in the project's main language, the one
+it's spoken in, whatever language is shown (absent in an IDs-only bundle), and `"estimateRate"` the
+project's syllables a second for an estimate. `PatterBundle.speech_units(text, locale)` gives the
+syllables, shut beats, and pauses it's made of (each a dictionary of `"kind"`, `"weight"`, `"start"`, and
+`"end"`), to lay over a line's length and move a mouth, and `PatterBundle.count_syllables(text, locale)`
+the count. A `"text"` step
 with `step["action"]` set to `true` is [action](/play/engine/#step-shapes), a direction for whoever
 stages the scene: stage it, or let it pass, but don't show it as on-screen text. The key is absent on
 shown text, and a replayed prompt is never action.

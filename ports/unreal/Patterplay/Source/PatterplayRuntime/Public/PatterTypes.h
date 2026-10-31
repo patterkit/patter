@@ -22,6 +22,41 @@ enum class EPatterStepType : uint8
 	End
 };
 
+/** What a speech unit is (the JS runtime's SpeechUnitKind): a syllable, a beat with the mouth shut, or a pause. */
+UENUM(BlueprintType)
+enum class EPatterSpeechUnitKind : uint8
+{
+	/** A syllable: the mouth opens. */
+	Syllable,
+	/** A beat with the mouth shut (Japanese's small tsu). */
+	Closed,
+	/** A pause at punctuation. */
+	Pause
+};
+
+/** One unit of a line as it would be spoken (UPatterGameData::SpeechUnits): its kind, its weight, and where it is
+ *  in the text. Start and End are code-point offsets, End exclusive: a character outside the Basic Multilingual
+ *  Plane (an emoji) counts once, though an FString holds it as two TCHARs. */
+USTRUCT(BlueprintType)
+struct FPatterSpeechUnit
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	EPatterSpeechUnitKind Kind = EPatterSpeechUnitKind::Syllable;
+
+	/** How many syllables' time it takes: 1 for most, 1.5 for a digit, 2 for a kanji in Japanese or a long
+	 *  pause. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	double Weight = 1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	int32 Start = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	int32 End = 0;
+};
+
 /** Why a flow ended: an End step's EndReason (the JS runtime's FlowEndReason, "ended" | "ran-dry"). */
 UENUM(BlueprintType)
 enum class EPatterFlowEndReason : uint8
@@ -564,6 +599,31 @@ struct FPatterStep
 	 *  locale. False on any other step, and on a replayed option prompt, which never is. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bAction = false;
+
+	/** How a Line or Text step is spoken, for timing a line with no recording and for moving a mouth:
+	 *  UPatterGameData::EstimateLineDuration(SpokenText, SpokenLocale, EstimateRate), and SpeechUnits for the
+	 *  mouth. The beat in the project's main language, whatever language is being shown (interpolated as Text
+	 *  is, though a voiced project's lines aren't, with caption cues left out whether captions are on or not, and
+	 *  empty for the caption character's lines). Unset (bHasSpokenText false) in an IDs-only build, which has no
+	 *  text, and for a beat the main language has no string for. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString SpokenText;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasSpokenText = false;
+
+	/** The language SpokenText is in: the project's main language. Set exactly when SpokenText is. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString SpokenLocale;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasSpokenLocale = false;
+
+	/** The project's syllables a second for a line with no recording (its estimateSyllablesPerSecond, default
+	 *  4). Always set on a Line or Text step; 0 on any other. A line with a recording lasts as long as the
+	 *  recording. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	double EstimateRate = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterOption> Options;

@@ -59,8 +59,27 @@ so does each choice option's `prompt`, as `padAfter`, for a game that voices the
 silenced by closed captions keeps its pause.
 When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects. `get_outline()` and `get_beat_sequence()`
 give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the beat sets its own. For a
-line with no recording, `PatterBundle.estimate_line_duration(text)` gives how long it lasts, in seconds: Patter's
-one rule, the same in every runtime and in Patterpad's Play window.
+line with a recording, the line lasts as long as the recording. For one without,
+`PatterBundle.estimate_line_duration(step["spokenText"], step["spokenLocale"], step["estimateRate"])` gives how
+long it lasts, in seconds: the weight of its syllables and its pauses at the project's syllables a second (4
+unless the project sets `estimateSyllablesPerSecond`), clamped to 1.5 to 18 seconds. It's Patter's one rule, the
+same in every runtime and in Patterpad's Play window.
+
+So you can time a line and move a mouth by the same measure, every `"line"` and `"text"` step (a replayed prompt
+too) carries how it's spoken:
+
+- `spokenText`: the line in the project's main language, whatever language is being shown, interpolated as the
+  shown text is (a voiced project's lines aren't), with caption cues always left out, and empty for the caption
+  character's lines.
+- `spokenLocale`: that language. Both are absent from an IDs-only build, which has no text, so pass your own.
+- `estimateRate`: the project's syllables a second for an estimate, always there.
+
+`PatterBundle.speech_units(text, locale)` breaks a line into the units it would be spoken in, in order, each
+`{"kind": "syllable" | "closed" | "pause", "weight": float, "start": int, "end": int}`, with code-point offsets
+(end exclusive). For a lip flap, spread them over the line's length by weight: a syllable opens the mouth, and a
+`"closed"` beat (Japanese っ) and a pause keep it shut. `PatterBundle.count_syllables(text, locale)` gives the
+syllables alone. The locale is the language the line is spoken in: it decides English's and French's silent e,
+and that a kanji weighs two.
 
 A `"text"` step with `action: true` is action: a direction for whoever stages the scene, never shown to the
 player. It's a dialogue scene's text when the project doesn't localise it, and its text is the source in

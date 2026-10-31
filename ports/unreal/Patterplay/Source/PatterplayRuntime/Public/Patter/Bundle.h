@@ -4,6 +4,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 #include <map>
@@ -13,6 +14,7 @@
 #include "PatterValue.h"
 #include "Ast.h"
 #include "JsonTree.h"
+#include "Speech.h"     // speechUnits, which countSyllables and estimateLineDuration are built on
 #include "Expr/OrderedMap.h"   // NodeExtensions keep the bundle's key order
 
 namespace patter
@@ -30,29 +32,38 @@ namespace patter
     // (line padding, design/proposals/line-padding.md): the same on every runtime and in Patterpad's Play window.
     inline constexpr double DEFAULT_PAD_AFTER = 0.6;
 
-    // The reading rate estimateLineDuration times a line by, in characters a second, and the shortest and longest
-    // a line with no recording lasts, in seconds.
-    inline constexpr double LINE_CHARS_PER_SECOND = 14.0;
+    // How many syllables a second a line with no recording is timed at, unless the project sets its own
+    // (`estimateSyllablesPerSecond`), and the range validation keeps a project's within; and the shortest and
+    // longest a line with no recording lasts, in seconds.
+    inline constexpr double DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND = 4.0;
+    inline constexpr double ESTIMATE_SYLLABLES_PER_SECOND_MIN = 2.0;
+    inline constexpr double ESTIMATE_SYLLABLES_PER_SECOND_MAX = 10.0;
     inline constexpr double LINE_DURATION_MIN = 1.5;
     inline constexpr double LINE_DURATION_MAX = 18.0;
 
-    /** How long a line with no recording lasts, in seconds: its characters at 14 a second, clamped to 1.5 to 18
-     *  seconds. `text` is UTF-8, and a character is a Unicode code point (one outside the Basic Multilingual Plane
-     *  counts once, however many bytes it takes); soft hyphens (U+00AD) aren't counted. This is the one rule every
-     *  Patter tool and runtime times a line by, held to the same numbers by the conformance corpus. `locale` is
-     *  reserved for per-language reading rates and is unused for now. */
-    inline double estimateLineDuration(const std::string& text, const std::string& locale = "")
+    /** How many syllables a line would be spoken in: its syllables' and shut beats' weights, pauses aside. `locale`
+     *  is the language it's spoken in, as for speechUnits. */
+    inline double countSyllables(const std::string& text, const std::string& locale = "")
     {
-        (void)locale;
-        std::size_t count = 0;
-        for (std::size_t i = 0; i < text.size(); ++i)
-        {
-            const unsigned char b = static_cast<unsigned char>(text[i]);
-            if ((b & 0xC0) == 0x80) continue;                                                       // a continuation byte
-            if (b == 0xC2 && i + 1 < text.size() && static_cast<unsigned char>(text[i + 1]) == 0xAD) continue; // U+00AD
-            ++count;
-        }
-        const double seconds = static_cast<double>(count) / LINE_CHARS_PER_SECOND;
+        double total = 0;
+        for (const SpeechUnit& u : speechUnits(text, locale)) if (u.kind != SpeechUnitKind::Pause) total += u.weight;
+        return total;
+    }
+
+    /** How long a line with no recording lasts, in seconds: the total weight of its speech units (its syllables
+     *  and its pauses, speechUnits) at `syllablesPerSecond` (default 4, the project's `estimateSyllablesPerSecond`
+     *  when it sets one, a step's `estimateRate`), clamped to 1.5 to 18 seconds. `text` (UTF-8) and `locale` are
+     *  the line as it's spoken, in the project's main language (a step's `spokenText` and `spokenLocale`), never a
+     *  translation being shown. This is the one rule every Patter tool and runtime times a line by, held to the
+     *  same numbers by the conformance corpus. A rate that isn't a finite positive number is the default. A line
+     *  with a recording lasts as long as the recording, whatever this says. */
+    inline double estimateLineDuration(const std::string& text, const std::string& locale = "",
+                                       double syllablesPerSecond = DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND)
+    {
+        const double rate = std::isfinite(syllablesPerSecond) && syllablesPerSecond > 0 ? syllablesPerSecond : DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND;
+        double weight = 0;
+        for (const SpeechUnit& u : speechUnits(text, locale)) weight += u.weight;
+        const double seconds = weight / rate;
         return seconds < LINE_DURATION_MIN ? LINE_DURATION_MIN : seconds > LINE_DURATION_MAX ? LINE_DURATION_MAX : seconds;
     }
 
@@ -257,6 +268,9 @@ namespace patter
         bool hasSpeakerPattern = false; std::string speakerPattern;
         // The project's own line-padding default, when it sets one; absent = DEFAULT_PAD_AFTER.
         bool hasPadAfterDefault = false; double padAfterDefault = 0;
+        // The project's own syllables a second for a line with no recording (estimateLineDuration), when it sets
+        // one; absent = DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND.
+        bool hasEstimateSyllablesPerSecond = false; double estimateSyllablesPerSecond = 0;
         std::vector<PropertyDecl> properties;
         std::map<std::string, Scene> scenes;
         // Scene ids in AUTHORED order (the bundle's key order, which is the project's nav order). `scenes`

@@ -41,12 +41,22 @@ export type ScopeBag = Record<string, ScalarValue>;
  * runner compares them deeply, whatever order an object's keys arrive in. Absent when the node has none.
  */
 export type TranscriptStep =
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter?: number; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
-  | { type: "text"; id: string; text: string; padAfter?: number; action?: true; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
+  | ({ type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter?: number; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] } & TranscriptSpoken)
+  | ({ type: "text"; id: string; text: string; padAfter?: number; action?: true; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] } & TranscriptSpoken)
   | { type: "gameEvent"; id: string; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "choice"; groupId: string; options: TranscriptOption[] }
   /** `reason` is recorded only when the flow ended because a choice ran dry (corpus 10); absent = "ended". */
   | { type: "end"; reason?: "ran-dry" };
+
+/** How a line or text step is spoken (corpus 11), recorded only in a scripted case that sets `spoken`, so every
+ *  earlier transcript is as it was. Recorded there whenever the step carries them; `spokenText` and
+ *  `spokenLocale` are `"<missing>"` when a runtime drops them from a bundle with text, and absent from an IDs-only
+ *  one, and `estimateRate` is `"<missing>"` when a runtime drops it. */
+export interface TranscriptSpoken {
+  spokenText?: string;
+  spokenLocale?: string;
+  estimateRate?: number | "<missing>";
+}
 
 /** One option of a transcript `choice`: the runtime's ChoiceOption, keys absent when unset. */
 export interface TranscriptOption {
@@ -291,6 +301,8 @@ export interface ScriptedCase {
   hostScopes?: string[];
   /** Engine construction options, for this engine and every engine `saveLoad` / `hotSwap` makes. */
   engineOptions?: CaseEngineOptions;
+  /** Record each line and text step's spoken fields in its transcript (`TranscriptSpoken`, corpus 11). */
+  spoken?: true;
   script: ScriptOp[];
 }
 
@@ -371,6 +383,7 @@ export interface Corpus {
   outlines: OutlineCase[];
   audio: AudioCase[];
   durations: DurationCase[];
+  speech: SpeechCase[];
 }
 
 /**
@@ -397,16 +410,29 @@ export interface AudioCase {
 }
 
 /**
- * A duration case (corpus 9): how long a line with no recording lasts, in seconds, by the one rule every runtime
- * shares (`estimateLineDuration`): its characters at 14 a second, clamped to 1.5 to 18, a character being a Unicode
- * code point (one outside the Basic Multilingual Plane counts once) and soft hyphens (U+00AD) not counted. `locale`,
- * when given, is passed through; it changes nothing yet. A runner compares to within 1e-9.
+ * A duration case (corpus 9, re-pinned in 11): how long a line with no recording lasts, in seconds, by the one rule
+ * every runtime shares (`estimateLineDuration`): the total weight of its speech units at `syllablesPerSecond` (5 when
+ * absent), clamped to 1.5 to 18. `locale` is the language the line is spoken in. A runner compares to within 1e-9.
  */
 export interface DurationCase {
   name: string;
   text: string;
   locale?: string;
+  syllablesPerSecond?: number;
   expected: number;
+}
+
+/**
+ * A speech case (corpus 11): a line broken into the units it would be spoken in (`speechUnits`), each its kind,
+ * weight, and code-point offsets, and its syllable count (`countSyllables`). `locale` is the language the line is
+ * spoken in. A runner compares the units exactly, and the count to within 1e-9.
+ */
+export interface SpeechCase {
+  name: string;
+  text: string;
+  locale?: string;
+  units: { kind: "syllable" | "closed" | "pause"; weight: number; start: number; end: number }[];
+  syllables: number;
 }
 
 /**
@@ -490,6 +516,8 @@ export interface ScriptedFixture {
   engineOptions?: CaseEngineOptions;
   /** Build the bundle IDs-only, as a runtime case can (no strings; steps carry beat ids and no names). */
   idsOnly?: boolean;
+  /** Record the spoken fields (`ScriptedCase.spoken`). */
+  spoken?: true;
   script: ScriptOp[];
   /** The extensions' manifests, as a project keeps them in `extensions/<id>.extension.json` (corpus 3): each
    *  compiled through the real `exportBundle` with `extensionShards` and the project's `extensions`. */
@@ -539,6 +567,7 @@ export interface Fixtures {
   outlines: DescribeFixture[];
   audio: AudioCase[];
   durations: DurationCase[];
+  speech: SpeechCase[];
 }
 
 /** An authored describe fixture (source form; compiled by buildCorpus into a DescribeCase). */

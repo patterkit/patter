@@ -221,7 +221,9 @@ export function createViewHost(deps: ViewHostDeps, target?: Window): ViewHost {
         // Action text is a direction, never played: it takes no time, as in Play.
         if (node.kind === "text" && node.host["action"] === true) { out[id] = { seconds: 0, measured: false }; continue; }
         const recorded = node.kind === "line" ? await deps.recordedSeconds(id) : null;
-        out[id] = lineMedia(recorded, estimateLineDuration(String(node.host["text"] ?? "")));
+        // The authored text is the project's main language, the one a line is spoken in.
+        const p = deps.project();
+        out[id] = lineMedia(recorded, estimateLineDuration(String(node.host["text"] ?? ""), p?.sourceLocale, p?.estimateSyllablesPerSecond));
       }
       return out;
     },

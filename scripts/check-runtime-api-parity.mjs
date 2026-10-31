@@ -32,7 +32,7 @@ const SURFACES = {
       // there and inherited, and the addon ships both files.
       "ports/godot/addons/patterplay/runtime/expr/state_logger.gd",
       "ports/godot/addons/patterplay/runtime/save.gd", "ports/godot/addons/patterplay/runtime/runner.gd"] },
-  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Bundle.h", "ports/unreal/Patterplay/Source/PatterplayEditor/Private/PatterBundleDetails.cpp", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Runner.h"] },
+  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Bundle.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Speech.h", "ports/unreal/Patterplay/Source/PatterplayEditor/Private/PatterBundleDetails.cpp", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Runner.h"] },
   bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterSave.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterGameData.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterRunnerComponent.h"] },
 };
 
@@ -144,6 +144,11 @@ const API = [
   // @patterkit/model's; the Unreal core's is in namespace patter), a static on the bundle's holder where it does
   // not (Unity's Bundle, Godot's PatterBundle), and Blueprint's on its function library (UPatterGameData).
   { on: "Bundle", js: "estimateLineDuration", unity: "EstimateLineDuration", godot: "estimate_line_duration", unreal: "estimateLineDuration", bp: "EstimateLineDuration" },
+  // The units a line is spoken in (its syllables, shut beats, and pauses, each weighed), which the estimate is the
+  // total weight of and a game lays over a line's length to move a mouth; and its syllable count. Beside the
+  // estimate on every surface, corpus-gated by the `speech` section.
+  { on: "Bundle", js: "speechUnits", unity: "SpeechUnits", godot: "speech_units", unreal: "speechUnits", bp: "SpeechUnits" },
+  { on: "Bundle", js: "countSyllables", unity: "CountSyllables", godot: "count_syllables", unreal: "countSyllables", bp: "CountSyllables" },
 
   // Cast: who is declared, and who speaks in a scope. Static structure queries, corpus-gated by the
   // `expectCast` script op (declaration order for the project, first-appearance order for a scope).

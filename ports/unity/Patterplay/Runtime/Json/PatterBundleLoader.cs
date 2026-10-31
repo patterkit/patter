@@ -98,6 +98,7 @@ namespace Patterkit.Patterplay
 
             // The project's line-padding default (absent = the built-in one).
             bundle.PadAfterDefault = Num(b["padAfterDefault"]);
+            bundle.EstimateSyllablesPerSecond = Num(b["estimateSyllablesPerSecond"]); // absent = the built-in rate
 
             if (b["properties"] is JArray props)
                 foreach (var p in props) bundle.Properties.Add(PropDecl((JObject)p));

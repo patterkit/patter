@@ -6,6 +6,32 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Speech units, for a lip flap.** `Bundle.SpeechUnits(text, locale)` breaks a line into the units it's spoken
+  in, in order: each `SpeechUnit` is a `SpeechUnitKind.Syllable`, a `Closed` beat with the mouth shut (っ), or a
+  `Pause` at its punctuation, with a `Weight` and `Start` and `End` offsets in code points (a surrogate pair
+  counts once). Lay them over a line's length to move a mouth. `Bundle.CountSyllables(text, locale)` gives the
+  syllable count, pauses aside. They're counted from the text alone, script by script (Latin, Cyrillic, Han, kana,
+  Hangul, Arabic, Thai, and a rule for any other), the same in all four runtimes. The weights are
+  `Bundle.SpeechDigitWeight`, `SpeechKanjiWeight`, `SpeechPauseShortWeight`, and `SpeechPauseLongWeight`.
+- **How a line is spoken, on its step.** A line or text step now carries `SpokenText`, the beat's string in the
+  project's main language whatever language is being shown (interpolated, closed-caption cues always left out,
+  and empty for the caption character's lines), `SpokenLocale`, that language, and `EstimateRate`, the project's
+  syllables a second for an estimate. `SpokenText` and `SpokenLocale` are null in an IDs-only bundle. A replayed
+  prompt carries them too, and so do `PatterRunner`'s events.
+- **The project's own rate.** A bundle's `estimateSyllablesPerSecond` is read into
+  `Bundle.EstimateSyllablesPerSecond` (null means `Bundle.DefaultEstimateSyllablesPerSecond`, 4). A project
+  keeps it between `EstimateSyllablesPerSecondMin` (2) and `EstimateSyllablesPerSecondMax` (10).
+
+### Changed
+
+- **The estimate counts syllables, not characters.** `Bundle.EstimateLineDuration(text, locale,
+  syllablesPerSecond)` now times a line by the total weight of its speech units, pauses included, at
+  `syllablesPerSecond` (default 4; a rate that isn't a finite positive number is the default), still clamped to
+  1.5 to 18 seconds. Pass a step's `SpokenText`, `SpokenLocale`, and `EstimateRate`. A line with a recording
+  lasts as long as the recording. `Bundle.LineCharsPerSecond` is gone. The conformance corpus is version 11.
+
 ## [0.38.0] - 2026-10-30
 
 ### Changed

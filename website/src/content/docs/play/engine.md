@@ -116,8 +116,8 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 
 | `step.type` | Fields |
 | --- | --- |
-| `"line"` | `id`, `text`, `character?`, `characterName?`, `direction?`, `qualifier?`, `qualifierName?`, `speakerLabel?`, `padAfter`, `gameData?`, `tags?` |
-| `"text"` | `id`, `text`, `padAfter`, `action?`, `gameData?`, `tags?` |
+| `"line"` | `id`, `text`, `character?`, `characterName?`, `direction?`, `qualifier?`, `qualifierName?`, `speakerLabel?`, `padAfter`, `spokenText?`, `spokenLocale?`, `estimateRate`, `gameData?`, `tags?` |
+| `"text"` | `id`, `text`, `padAfter`, `action?`, `spokenText?`, `spokenLocale?`, `estimateRate`, `gameData?`, `tags?` |
 | `"gameEvent"` | `id`, `gameData?`, `tags?`: no text; the host-event beat |
 | `"choice"` | `groupId`, `options: ChoiceOption[]` |
 | `"end"` | `reason`: `"ended"`, or `"ran-dry"` (see below) |
@@ -160,12 +160,27 @@ these are the rules the writer expects:
 - Give action no time of its own: like a game event, only its `padAfter` separates it from the next beat.
 - Apply no pauses when the player clicks through.
 
-A line with no recording lasts **`estimateLineDuration(text)`** seconds: its characters at 14 a second,
-never less than 1.5 seconds or more than 18. A character outside the Basic Multilingual Plane, such as an
-emoji, counts once, and soft hyphens don't count. It's Patter's one rule, the same in every runtime, in
-Patterpad's Play window, and in the playable HTML page, so a line your game times by it lasts as long as the
-writer heard it. An optional second argument, a locale, is kept for per-language reading rates and changes
-nothing yet.
+A line with no recording lasts
+**`estimateLineDuration(step.spokenText, step.spokenLocale, step.estimateRate)`** seconds: about as long as
+it would take to say, never less than 1.5 seconds or more than 18. A line is spoken in the project's main
+language whatever language the player reads, so **`spokenText`** is the line in that language (interpolated
+as `text` is, with [caption](/play/closed-captions/) cues left out, and empty for the caption character's
+lines) and **`spokenLocale`** is that language. A French player reading subtitles over an English line gets
+the English line's timing. **`estimateRate`** is the project's syllables a second for an estimate, 4 unless
+the writer sets **Timing for lines without audio** in Project settings. A line with a recording always lasts
+as long as the recording. It's Patter's one rule, the same in every runtime, in Patterpad's Play window, and
+in the playable HTML page, so a line your game times by it lasts as long as the writer heard it. In an
+IDs-only bundle there's no text, so pass your own main-language text and locale, with `estimateRate`.
+
+The estimate is the total weight of the line's **speech units**: **`speechUnits(text, locale)`** gives them
+in order, each `{ kind, weight, start, end }`, where `kind` is `"syllable"`, `"closed"` (a beat with the
+mouth shut, such as Japanese っ), or `"pause"` (punctuation: short ones weigh 1, long ones 2), and `start` and
+`end` are code-point offsets into the text. Lay them over the line's length by weight, a recording's or the
+estimate, to open and close a mouth, so the mouth and the subtitle's timing agree.
+**`countSyllables(text, locale)`** gives the syllable count. They're counted per script: groups of vowels
+for Latin, vowel letters for Cyrillic, one a character for Chinese, one a mora for kana (about two for each
+kanji in Japanese), one a block for Hangul, written short vowels or about one per two letters for Arabic, and
+vowels for Thai. Any other script is counted at about one per three letters.
 
 A **`ChoiceOption`** is `{ id, prompt?, eligible, gameData? }`: ineligible options are still present
 (greyed) unless they're secret; pass `id` to `choose()`. Its `prompt` is `{ kind, text, padAfter }`,

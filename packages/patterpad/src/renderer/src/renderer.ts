@@ -109,7 +109,7 @@ import "@wildwinter/app-shell/notes-editor.css"; // the family's Notes editor (r
 import "@wildwinter/app-shell/comments.css"; // a shared module carries its own CSS
 import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from "./suggestion-popover.js";
 import type { PropertyDecl, PropertyType, DocLine, Comment, Suggestion } from "@patterkit/model";
-import { DEFAULT_DOCUMENTATION_CLASSES, DEFAULT_PAD_AFTER, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
+import { DEFAULT_DOCUMENTATION_CLASSES, DEFAULT_PAD_AFTER, PAD_AFTER_MIN, PAD_AFTER_MAX, DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND, ESTIMATE_SYLLABLES_PER_SECOND_MIN, ESTIMATE_SYLLABLES_PER_SECOND_MAX } from "@patterkit/model";
 import { openValuePicker, qualifierRows } from "./value-picker.js";
 import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt, SceneVcStatus, VcStatusDto, AddExtensionResult } from "../../shared/api.js";
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
@@ -4029,7 +4029,7 @@ let settingsRead: SettingsRead | null = null;
 /** The controls and editors of the OPEN dialog, filled by each section's mount() and read by Save. */
 interface LiveSettings {
   name: HTMLInputElement; start: HTMLSelectElement;
-  voiced: HTMLInputElement; formatting: HTMLInputElement; padAfter: HTMLInputElement;
+  voiced: HTMLInputElement; formatting: HTMLInputElement; padAfter: HTMLInputElement; estimateRate: HTMLInputElement;
   build: HTMLInputElement; buildLocales: HTMLSelectElement; buildSourceDebug: HTMLInputElement;
   vcs: HTMLSelectElement;
   ccOpen: HTMLInputElement; ccClose: HTMLInputElement; ccCharacter: HTMLInputElement;
@@ -4112,16 +4112,26 @@ function buildSettingsDialog(): SettingsDialog {
       const padAfter = el("input", "settings-seconds"); padAfter.type = "number"; padAfter.step = "0.1";
       padAfter.min = String(PAD_AFTER_MIN); padAfter.max = String(PAD_AFTER_MAX);
       padAfter.value = formatSeconds(s.padAfterDefault ?? DEFAULT_PAD_AFTER); padAfter.placeholder = formatSeconds(DEFAULT_PAD_AFTER);
+      // How long a line with no recording lasts: syllables a second. Blank goes back to the built-in rate.
+      const estimateRate = el("input", "settings-seconds"); estimateRate.type = "number"; estimateRate.step = "0.1";
+      estimateRate.min = String(ESTIMATE_SYLLABLES_PER_SECOND_MIN); estimateRate.max = String(ESTIMATE_SYLLABLES_PER_SECOND_MAX);
+      estimateRate.value = formatSeconds(s.estimateSyllablesPerSecond ?? DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND);
+      estimateRate.placeholder = formatSeconds(DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND);
       host.append(sField("Project name", name), sField("Start", start, sNote("settings-fieldnote", "The scene Play from Start opens.")),
         sField("Pad after", padAfter, sNote("settings-fieldnote", "Seconds of pause after each line, unless the line or something around it sets its own.")),
+        sField("Timing for lines without audio", estimateRate, sNote("settings-fieldnote", "Syllables a second. How long a line with no recording lasts, worked out from its text in the project's main language. Lines with a recording always last as long as the recording.")),
         voiced.row, formatting.row);
-      Object.assign(live, { name, start, voiced: voiced.input, formatting: formatting.input, padAfter });
+      Object.assign(live, { name, start, voiced: voiced.input, formatting: formatting.input, padAfter, estimateRate });
       // A blank name used to close the dialog and drop every other edit with it (parity row 7); now it
       // is the fault the gate names.
       return { firstInvalid: () => {
         if (!name.value.trim()) return { el: name, message: "Give the project a name." };
         const pad = padAfter.value.trim() === "" ? DEFAULT_PAD_AFTER : Number(padAfter.value);
         if (!Number.isFinite(pad) || pad < PAD_AFTER_MIN || pad > PAD_AFTER_MAX) return { el: padAfter, message: `Use a number of seconds from ${PAD_AFTER_MIN} to ${PAD_AFTER_MAX}.` };
+        const rate = estimateRate.value.trim() === "" ? DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND : Number(estimateRate.value);
+        if (!Number.isFinite(rate) || rate < ESTIMATE_SYLLABLES_PER_SECOND_MIN || rate > ESTIMATE_SYLLABLES_PER_SECOND_MAX) {
+          return { el: estimateRate, message: `Use a number of syllables a second from ${ESTIMATE_SYLLABLES_PER_SECOND_MIN} to ${ESTIMATE_SYLLABLES_PER_SECOND_MAX}.` };
+        }
         return null;
       } };
     } },
@@ -4291,6 +4301,7 @@ async function saveSettingsFromDialog(): Promise<boolean> {
     name: l.name.value.trim(), vcs: l.vcs.value as VcsKind, ...(l.start.value ? { start: { scene: l.start.value } } : {}),
     voiced: l.voiced.checked, formatting: l.formatting.checked,
     padAfterDefault: l.padAfter.value.trim() === "" ? DEFAULT_PAD_AFTER : Number(l.padAfter.value), // the gate checked its range
+    estimateSyllablesPerSecond: l.estimateRate.value.trim() === "" ? DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND : Number(l.estimateRate.value),
     closedCaptions: { open: l.ccOpen.value, close: l.ccClose.value, character: l.ccCharacter.value.trim() },
     buildBundle: l.build.value.trim(), buildLocalisation: l.buildLocales.value as "embedded" | "ids", buildSourceDebug: l.buildSourceDebug.checked,
     ...l.langs.value(), localiseDialogueText: l.localiseDialogueText.checked, gameDataFields: l.gd.value(),

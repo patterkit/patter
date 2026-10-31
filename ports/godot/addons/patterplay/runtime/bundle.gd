@@ -248,21 +248,53 @@ static func format_speaker_label(pattern: String, name: String, qualifier: Strin
 ## runtime and in Patterpad's Play window.
 const DEFAULT_PAD_AFTER := 0.6
 
-## The reading rate estimate_line_duration times a line by, in characters a second.
-const LINE_CHARS_PER_SECOND := 14.0
+## How many syllables a second a line with no recording is timed at, unless the project sets its own
+## ("estimateSyllablesPerSecond"), and the range validation keeps a project's within.
+const DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND := 4.0
+const ESTIMATE_SYLLABLES_PER_SECOND_MIN := 2.0
+const ESTIMATE_SYLLABLES_PER_SECOND_MAX := 10.0
 ## The shortest and longest a line with no recording lasts, in seconds.
 const LINE_DURATION_MIN := 1.5
 const LINE_DURATION_MAX := 18.0
 
+## A digit's weight in speech_units: most read as one or two syllables.
+const SPEECH_DIGIT_WEIGHT := 1.5
+## A Han character's weight in Japanese text.
+const SPEECH_KANJI_WEIGHT := 2.0
+## A short pause's weight (`,` `;` `、`), and a long one's (`.` `?` `。`).
+const SPEECH_PAUSE_SHORT_WEIGHT := 1.0
+const SPEECH_PAUSE_LONG_WEIGHT := 2.0
 
-## How long a line with no recording lasts, in seconds: its characters at 14 a second, clamped to 1.5 to 18
-## seconds. A character is a Unicode code point (a Godot String holds one per character, so one outside the
-## Basic Multilingual Plane counts once), and soft hyphens (U+00AD) aren't counted. This is the one rule every
-## Patter tool and runtime times a line by, held to the same numbers by the conformance corpus. `_locale` is
-## reserved for per-language reading rates and is unused for now.
-static func estimate_line_duration(text: String, _locale: String = "") -> float:
-	var count := text.length() - text.count(char(0xAD))
-	return clampf(count / LINE_CHARS_PER_SECOND, LINE_DURATION_MIN, LINE_DURATION_MAX)
+
+## How long a line with no recording lasts, in seconds: the total weight of its speech units (its syllables and its
+## pauses, speech_units) at `syllables_per_second` (default 4, the project's "estimateSyllablesPerSecond" when it
+## sets one, a line step's "estimateRate"), clamped to 1.5 to 18 seconds. `text` and `locale` are the line as it's
+## spoken, in the project's main language (a line step's "spokenText" and "spokenLocale"), never a translation
+## being shown. This is the one rule every Patter tool and runtime times a line by, held to the same numbers by the
+## conformance corpus. A rate that isn't a positive number is the default. A line with a recording lasts as long as
+## the recording, whatever this says.
+static func estimate_line_duration(text: String, locale: String = "", syllables_per_second: float = DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND) -> float:
+	var rate := syllables_per_second if is_finite(syllables_per_second) and syllables_per_second > 0.0 else DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND
+	var weight := 0.0
+	for u in PatterSpeech.units(text, locale):
+		weight += float(u["weight"])
+	return clampf(weight / rate, LINE_DURATION_MIN, LINE_DURATION_MAX)
+
+
+## A line broken into the units it would be spoken in: its syllables, its beats with the mouth shut, and its
+## pauses, in order, each {"kind": "syllable" | "closed" | "pause", "weight": float, "start": int, "end": int},
+## the offsets in code points (end exclusive). Lay them over a line's length (its recording's, or
+## estimate_line_duration's) to move a mouth: a syllable opens it, "closed" (っ) and a pause keep it shut.
+## `locale` is the language the line is spoken in (the project's main language, a step's "spokenLocale"); it
+## decides English's and French's silent e, and Japanese kanji.
+static func speech_units(text: String, locale: String = "") -> Array:
+	return PatterSpeech.units(text, locale)
+
+
+## How many syllables a line would be spoken in: its syllables' and shut beats' weights, pauses aside. `locale` is
+## the language it's spoken in, as for speech_units.
+static func count_syllables(text: String, locale: String = "") -> float:
+	return PatterSpeech.count(text, locale)
 
 
 # Line padding: the pause after a line or text beat, `padAfter`, in seconds. A beat without its own takes

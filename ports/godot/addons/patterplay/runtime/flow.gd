@@ -1210,6 +1210,7 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 		# in every locale; the compiler sees to that. A replayed prompt (_prompt_result) never is.
 		if beat.get("action", false) == true:
 			rt["action"] = true
+		_put_spoken(rt, beat)
 		if beat.has("gameData"):
 			rt["gameData"] = _norm_gamedata(beat["gameData"])
 		_put_extensions(rt, beat)
@@ -1244,12 +1245,37 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 		if label != null:
 			r["speakerLabel"] = label
 	r["padAfter"] = _pad_of(beat["id"])  # a silent line still fires, so it still carries its pause
+	_put_spoken(r, beat)
 	if beat.has("gameData"):
 		r["gameData"] = _norm_gamedata(beat["gameData"])
 	_put_extensions(r, beat)
 	if not tags.is_empty():
 		r["tags"] = tags
 	return r
+
+
+# How a line or text beat is spoken, onto its step, for timing a line with no recording and for moving a mouth
+# (PatterBundle.estimate_line_duration(step["spokenText"], step["spokenLocale"], step["estimateRate"])):
+# "spokenText", its text in the project's main language whatever language is shown, interpolated as the shown
+# text is (a voiced project's lines aren't), caption cues always left out, and empty for the caption character's
+# lines; "spokenLocale", that language; and "estimateRate", the project's syllables a second for an estimate
+# ("estimateSyllablesPerSecond", default 4), always there. The first two are left off in an IDs-only bundle, which
+# has no text (the game passes its own), and for a beat the main language has no string for.
+func _put_spoken(out: Dictionary, beat: Dictionary) -> void:
+	var rate = _host.bundle.get("estimateSyllablesPerSecond")
+	out["estimateRate"] = float(rate) if rate is float or rate is int else PatterBundle.DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND
+	var source = null if _host.emit_ids else _host.default_strings.get(beat["id"])
+	if source == null:
+		return
+	var spoken: String
+	if beat["kind"] == "text":
+		spoken = _interp(str(source))
+	elif beat.get("character", "") == _host.caption_character:
+		spoken = ""
+	else:
+		spoken = strip_captions(str(source) if _host.bundle.get("voiced", false) else _interp(str(source)))
+	out["spokenText"] = spoken
+	out["spokenLocale"] = str(_host.bundle["locales"]["default"])
 
 
 # A line or text beat's resolved pause (line padding): its own `padAfter`, else the nearest default above
@@ -1353,6 +1379,7 @@ func _prompt_result(beat: Dictionary, shown: Dictionary) -> Dictionary:
 			if shown.has(k):
 				r[k] = str(shown[k])
 	r["padAfter"] = _pad_of(beat["id"])
+	_put_spoken(r, beat)
 	if beat.has("gameData"):
 		r["gameData"] = _norm_gamedata(beat["gameData"])
 	_put_extensions(r, beat)

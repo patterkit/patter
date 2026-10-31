@@ -6,6 +6,30 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Speech units and syllable counting.** `PatterBundle.speech_units(text, locale)` breaks a line into the units
+  it would be spoken in: its syllables, its beats with the mouth shut (Japanese っ), and its pauses at
+  punctuation, each `{"kind", "weight", "start", "end"}` with code-point offsets, to lay over a line's length for
+  a lip flap. `PatterBundle.count_syllables(text, locale)` gives the syllables alone. They count Latin, Cyrillic,
+  Han, kana, Hangul, Arabic, Thai, and other scripts from one generated table (`PatterSpeechTable`) that every
+  runtime carries. The weights are `SPEECH_DIGIT_WEIGHT`, `SPEECH_KANJI_WEIGHT`, `SPEECH_PAUSE_SHORT_WEIGHT`, and
+  `SPEECH_PAUSE_LONG_WEIGHT`.
+- **How a line is spoken, on every line and text step.** `"spokenText"` is the line in the project's main
+  language whatever language is shown (interpolated, caption cues always left out, empty for the caption
+  character's lines), `"spokenLocale"` that language (both absent in an IDs-only build), and `"estimateRate"` the
+  project's syllables a second, from the bundle's `estimateSyllablesPerSecond` (4 when it sets none). A replayed
+  prompt carries them too, and so do the steps `PatterRunner`'s signals hand over.
+
+### Changed
+
+- **`estimate_line_duration(text, locale, syllables_per_second)` times a line by its speech units.** It's the
+  total weight of the line's syllables and pauses at the rate (default `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND`, 4;
+  a rate that isn't a positive number is the default), clamped to 1.5 to 18 seconds, instead of its characters
+  at 14 a second. Pass a step's `spokenText`, `spokenLocale`, and `estimateRate`. `LINE_CHARS_PER_SECOND` is gone;
+  `ESTIMATE_SYLLABLES_PER_SECOND_MIN` and `_MAX` (2 and 10) are the range a project's rate is kept within. A
+  line with a recording still lasts as long as the recording. The conformance corpus is version 11.
+
 ## [0.38.0] - 2026-10-30
 
 ### Changed

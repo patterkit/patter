@@ -87,6 +87,13 @@ func _initialize() -> void:
 	var du := _run_durations(root["durations"])
 	print("durations: %d/%d  (how long a line with no recording lasts)" % [du, root["durations"].size()])
 	_expect_all("durations", du, root["durations"].size())
+	if not root.has("speech"):
+		push_error("corpus has no speech section")
+		quit(2)
+		return
+	var spc := _run_speech(root["speech"])
+	print("speech: %d/%d  (a line's speech units and syllable count)" % [spc, root["speech"].size()])
+	_expect_all("speech", spc, root["speech"].size())
 	_run_describe_smoke()
 	_run_host_scope_writable_check()
 
@@ -523,8 +530,9 @@ func _run_runtime(arr: Array) -> int:
 # step, and every choice option's prompt, carries `padAfter`, a float, but a transcript records it only
 # when it isn't the built-in 0.6. One missing the field, or carrying a non-float, is marked so the
 # comparison fails. A line step's or line prompt's `speakerLabel` is recorded as _transcript_label says.
-# `ids_only`: the bundle's strings are IDs-only, so names (the label among them) are the game's.
-func _transcript_step(step: Dictionary, ids_only := false) -> Dictionary:
+# `ids_only`: the bundle's strings are IDs-only, so names (the label among them) are the game's. `spoken`: the
+# case records how each line and text is spoken (corpus 11, _transcript_spoken); any other leaves those fields out.
+func _transcript_step(step: Dictionary, ids_only := false, spoken := false) -> Dictionary:
 	var kind = step.get("type", "")
 	if kind == "end":
 		# Every end carries its reason; a transcript records it only when the flow ran dry (corpus 10). One
@@ -553,7 +561,23 @@ func _transcript_step(step: Dictionary, ids_only := false) -> Dictionary:
 	var t := _transcript_pad(step.duplicate())
 	if kind == "line":
 		_transcript_label(t, ids_only)
+	_transcript_spoken(t, ids_only, spoken)
 	return t
+
+
+# A line or text step's spoken fields as a transcript records them (the reference runner's spokenFields): only in
+# a case that sets `spoken`. There, "spokenText" and "spokenLocale" are marked "<missing>" when dropped from a
+# bundle with text (in an IDs-only one they're recorded only when present), and "estimateRate" when dropped.
+func _transcript_spoken(out: Dictionary, ids_only: bool, spoken: bool) -> void:
+	if not spoken:
+		for k in ["spokenText", "spokenLocale", "estimateRate"]:
+			out.erase(k)
+		return
+	for k in ["spokenText", "spokenLocale"]:
+		if not ids_only and not out.has(k):
+			out[k] = "<missing>"
+	if not out.has("estimateRate"):
+		out["estimateRate"] = "<missing>"
 
 
 # Whether a bundle's strings are IDs-only, as the runtime reads it (a source-debug build still resolves
@@ -706,12 +730,39 @@ func _run_durations(arr: Array) -> int:
 	var pass_count := 0
 	for c in arr:
 		var name: String = c["name"]
-		var got: float = PatterBundle.estimate_line_duration(c["text"], c.get("locale", ""))
+		var got: float = PatterBundle.estimate_line_duration(c["text"], c.get("locale", ""), float(c.get("syllablesPerSecond", PatterBundle.DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND)))
 		var want: float = c["expected"]
 		if absf(got - want) <= 1e-9:
 			pass_count += 1
 		else:
 			_fail("durations", name, "expected %s, got %s" % [want, got])
+	return pass_count
+
+
+# Each text through PatterBundle.speech_units, its units held to the reference's exactly (kind, weight, and
+# code-point offsets), and through count_syllables, to within 1e-9.
+func _run_speech(arr: Array) -> int:
+	var pass_count := 0
+	for c in arr:
+		var name: String = c["name"]
+		var locale: String = c.get("locale", "")
+		var got := PatterBundle.speech_units(c["text"], locale)
+		var want: Array = c["units"]
+		var same := got.size() == want.size()
+		if same:
+			for j in got.size():
+				var g: Dictionary = got[j]
+				var w: Dictionary = want[j]
+				if g["kind"] != w["kind"] or float(g["weight"]) != float(w["weight"]) or int(g["start"]) != int(w["start"]) or int(g["end"]) != int(w["end"]):
+					same = false
+					break
+		var syllables := PatterBundle.count_syllables(c["text"], locale)
+		if not same:
+			_fail("speech", name, "units mismatch\n    expected %s\n    got      %s" % [JSON.stringify(want), JSON.stringify(got)])
+		elif absf(syllables - float(c["syllables"])) > 1e-9:
+			_fail("speech", name, "syllables: expected %s, got %s" % [c["syllables"], syllables])
+		else:
+			pass_count += 1
 	return pass_count
 
 
@@ -726,14 +777,14 @@ func _run_scripted(arr: Array) -> int:
 			options["seed"] = int(c["seed"])
 		_apply_engine_options(c, options)
 		var holder := {"engine": PatterEngine.new(c["bundle"], options)}
-		if _run_script(holder, c["script"], c["bundle"], c.get("bundleB", {}), options, name):
+		if _run_script(holder, c["script"], c["bundle"], c.get("bundleB", {}), options, name, c.get("spoken", false) == true):
 			pass_count += 1
 	return pass_count
 
 ## Run a script's ops against a LIVE engine held in `holder["engine"]` (saveLoad / hotSwap replace
 ## it, and GDScript passes objects by value). Shared by the scripted cases and the saves cases, whose
 ## engine arrives already loaded from an envelope another runtime wrote.
-func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: Dictionary, options: Dictionary, name: String) -> bool:
+func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: Dictionary, options: Dictionary, name: String, spoken := false) -> bool:
 	var current := ""
 	var cp = null   # the open checkpoint, between a "checkpoint" op and its "rollback" / "commit"
 	var handed = null   # what the last advance or stepFor handed the host, for `scribble`
@@ -767,14 +818,14 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 				current = op["flow"]
 			"advance":
 				var step: Dictionary = holder["engine"].get_flow(current).advance()
-				chunk.append(_transcript_step(_clone(step), _ids_only(bundle)))
+				chunk.append(_transcript_step(_clone(step), _ids_only(bundle), spoken))
 				handed = step
 			"stepFor":
 				# The step a flow would deliver for a beat now, recorded as a delivered one is; none for an
 				# unknown id. The flow named, else the current one.
 				var sf = holder["engine"].get_flow(op.get("flow", current)).step_for(op["beat"])
 				if sf != null:
-					chunk.append(_transcript_step(_clone(sf), _ids_only(bundle)))
+					chunk.append(_transcript_step(_clone(sf), _ids_only(bundle), spoken))
 				handed = sf
 			"scribble":
 				# A careless host defaces what it was handed. It is its own copy, so nothing the engine says

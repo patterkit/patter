@@ -109,14 +109,14 @@ describe("playable HTML: line timing", () => {
     expect(stage()).toEqual(["ANNA" + TEXT.A]); // the first line starts at once
 
     // A cut-in: B starts half a second before A's estimated end.
-    const aToB = ms(estimateLineDuration(TEXT.A) - 0.5);
+    const aToB = ms(estimateLineDuration(TEXT.A, "en") - 0.5);
     vi.advanceTimersByTime(aToB - 1);
     expect(stage()).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(stage()).toHaveLength(2);
 
     // A pause, with a game event between that isn't held: it runs from B's end as usual.
-    const bToC = ms(estimateLineDuration(TEXT.B) + 2);
+    const bToC = ms(estimateLineDuration(TEXT.B, "en") + 2);
     vi.advanceTimersByTime(bToC - 1);
     expect(stage()).toHaveLength(2);
     vi.advanceTimersByTime(1);
@@ -134,7 +134,7 @@ describe("playable HTML: line timing", () => {
     expect(stage()[4]).toBe("BEN" + TEXT.R);
 
     // The last line's pause is unused: the end comes as the line ends.
-    vi.advanceTimersByTime(ms(estimateLineDuration(TEXT.R)) - 1);
+    vi.advanceTimersByTime(ms(estimateLineDuration(TEXT.R, "en")) - 1);
     expect(stage()).toHaveLength(5);
     vi.advanceTimersByTime(1);
     expect(stage()[5]).toBe("The End");
@@ -145,7 +145,7 @@ describe("playable HTML: line timing", () => {
   ])("the stored speed %s scales the whole timing by %s, reading the old values", (stored, scale) => {
     localStorage.setItem("patter.playSpeed", stored);
     startPage();
-    const gap = Math.round((estimateLineDuration(TEXT.A) - 0.5) * scale * 1000);
+    const gap = Math.round((estimateLineDuration(TEXT.A, "en") - 0.5) * scale * 1000);
     vi.advanceTimersByTime(gap - 1);
     expect(stage()).toHaveLength(1);
     vi.advanceTimersByTime(1);
@@ -169,7 +169,7 @@ describe("playable HTML: line timing", () => {
 
   it("ends when every line still playing has finished, an earlier cut-in-on line included", () => {
     startPage(cutInThen("end"));
-    const long = estimateLineDuration(LONG.L), short = estimateLineDuration(LONG.S);
+    const long = estimateLineDuration(LONG.L, "en"), short = estimateLineDuration(LONG.S, "en");
     vi.advanceTimersByTime(ms(long - 4));
     expect(stage()).toHaveLength(2); // the short line cuts in four seconds before the long one ends
     vi.advanceTimersByTime(ms(short) + 1);
@@ -182,7 +182,7 @@ describe("playable HTML: line timing", () => {
 
   it("shows the choices as the last line before them starts, while an earlier one still plays", () => {
     startPage(cutInThen("choice"));
-    vi.advanceTimersByTime(ms(estimateLineDuration(LONG.L) - 4) - 1);
+    vi.advanceTimersByTime(ms(estimateLineDuration(LONG.L, "en") - 4) - 1);
     expect(document.querySelector("#controls .choice")).toBeNull();
     vi.advanceTimersByTime(1);
     expect(stage()).toHaveLength(2);
@@ -191,7 +191,7 @@ describe("playable HTML: line timing", () => {
 
   it("applies a change of speed at once, keeping the time already played", () => {
     startPage(); // A lasts 1.5 seconds (the estimate's floor) and B cuts in half a second before it ends
-    expect(estimateLineDuration(TEXT.A)).toBe(1.5);
+    expect(estimateLineDuration(TEXT.A, "en")).toBe(1.5);
     vi.advanceTimersByTime(500); // half a second played at normal speed
     const select = document.querySelector<HTMLSelectElement>("#speed")!;
     select.value = "half";

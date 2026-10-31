@@ -104,6 +104,7 @@ const project = {
   cast: ["BARKEEP", "ANNA", "BO"],
   qualifiers: QUALIFIERS,
   padAfterDefault: 0.6, // line padding: the built-in default, as a project that sets none reads
+  estimateSyllablesPerSecond: 4, // the built-in rate for a line with no recording
   gameDataFields: {
     scene: [{ name: "music", type: "text", default: "tavern-loop", purpose: "Background music cue id for this scene." }],
     line: [{ name: "mood", type: "enum", values: ["calm", "tense", "hostile"], purpose: "Facial-animation mood for this line." }],
@@ -440,7 +441,7 @@ const stub = {
   writeProjectExtension: async () => ({ ok: false, error: "The preview can't write the project." }),
   onCoverageNavigate: () => undefined,
   onOpenWorldSettings: () => undefined,
-  readSettings: async () => ({ name: "The Tavern", vcs: "git", start: { scene: "scn_tavern" }, voiced: true, trackAudioStatus: true, formatting: true, padAfterDefault: 0.6, localiseDialogueText: false, buildBundle: "../patter-dist/the_tavern.patterc", buildLocalisation: "embedded", buildSourceDebug: false, localeDefault: "en", locales: ["en", "fr"],
+  readSettings: async () => ({ name: "The Tavern", vcs: "git", start: { scene: "scn_tavern" }, voiced: true, trackAudioStatus: true, formatting: true, padAfterDefault: 0.6, estimateSyllablesPerSecond: 4, localiseDialogueText: false, buildBundle: "../patter-dist/the_tavern.patterc", buildLocalisation: "embedded", buildSourceDebug: false, localeDefault: "en", locales: ["en", "fr"],
     gameDataFields: {
       scene: [{ name: "music", type: "text", default: "tavern-loop", purpose: "Background music cue id for this scene." }],
       line: [{ name: "mood", type: "enum", values: ["calm", "tense", "hostile"], purpose: "Facial-animation mood for this line." }],

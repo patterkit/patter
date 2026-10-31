@@ -108,6 +108,9 @@ export interface OpenedProject {
   /** The project's default pause after a line, in seconds (ProjectFile.padAfterDefault, else the built-in
    *  `DEFAULT_PAD_AFTER`): what the inspector's Pad after field shows when nothing nearer sets one. */
   padAfterDefault: number;
+  /** How many syllables a second a line with no recording is timed at (ProjectFile.estimateSyllablesPerSecond,
+   *  else `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND`). */
+  estimateSyllablesPerSecond: number;
   /** Localise text lines in dialogue scenes (ProjectFile.localiseDialogueText, default off). Off, a dialogue
    *  scene's text is action: the surface draws it as a direction and Play doesn't show it as text. */
   localiseDialogueText: boolean;
@@ -241,6 +244,10 @@ export interface ProjectSettingsDto {
    *  populated (the built-in default when the project sets none); saveSettings drops it again when it
    *  still matches. Optional on save, so a caller with an older settings shape leaves it alone. */
   padAfterDefault?: number;
+  /** How many syllables a second a line with no recording is timed at (ProjectFile.estimateSyllablesPerSecond).
+   *  Populated and dropped again on save as `padAfterDefault` is. Optional on save, so a caller with an older
+   *  settings shape leaves it alone. */
+  estimateSyllablesPerSecond?: number;
   /** Localise text lines in dialogue scenes (ProjectFile.localiseDialogueText): default off, stored only when
    *  on. Optional on save, so a caller with an older settings shape leaves it alone. */
   localiseDialogueText?: boolean;
@@ -854,6 +861,9 @@ export interface PlayStep {
   /** line / text only: the pause after it before the next line, in seconds, resolved by the runtime
    *  (line padding). Negative = the next line cuts in. */
   padAfter?: number;
+  /** line / text only: how long it lasts if it has no recording, in seconds, worked out by the runtime from the
+   *  line as it's spoken in the project's main language (`estimateLineDuration`), whatever language Play shows. */
+  estimate?: number;
 }
 
 export interface PlayChoiceOption {

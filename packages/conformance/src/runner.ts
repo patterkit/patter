@@ -17,13 +17,13 @@ import { evaluate, deserialiseAst, makePrng } from "@wildwinter/expr";
 import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
-import { Engine, effectiveGameData, estimateLineDuration, extensionDecls, extensionsOf, gameDataFields } from "@patterkit/runtime";
+import { Engine, effectiveGameData, estimateLineDuration, speechUnits, countSyllables, extensionDecls, extensionsOf, gameDataFields } from "@patterkit/runtime";
 import type { Checkpoint, EngineOptions, HostScope, LoadMisfit, PlayError, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, FlowState, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
-  AudioCase, DurationCase, LogCase,
+  AudioCase, DurationCase, SpeechCase, TranscriptSpoken, LogCase,
   ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptOption, TranscriptPrompt, TranscriptStep,
 } from "./types.js";
 
@@ -106,7 +106,7 @@ export function runScript(
   engine: Engine, ops: ScriptOp[],
   /** `refits` and `errors` collect what every engine's `onRefit` and `onError` reported, when the options feed
    *  them (caseOptions does). */
-  ctx: { bundle: Bundle; bundleB?: Bundle; options: EngineOptions; refits?: LoadMisfit[]; errors?: PlayError[] }, current = "",
+  ctx: { bundle: Bundle; bundleB?: Bundle; options: EngineOptions; refits?: LoadMisfit[]; errors?: PlayError[]; spoken?: boolean }, current = "",
 ): { chunks: TranscriptStep[][]; engine: Engine } {
   const chunks: TranscriptStep[][] = [];
   let checkpoint: Checkpoint | undefined;
@@ -146,14 +146,14 @@ export function runScript(
         break;
       case "advance": {
         const r = engine.getFlow(current)!.advance();
-        chunk.push(normaliseStep(r, isIdsOnly(ctx.bundle)));
+        chunk.push(normaliseStep(r, isIdsOnly(ctx.bundle), ctx.spoken));
         handed = r;
         break;
       }
       case "stepFor": {
         // The step the flow would deliver for a beat now, recorded as a delivered one is; none for an unknown id.
         const r = engine.getFlow(op.flow ?? current)!.stepFor(op.beat);
-        if (r) chunk.push(normaliseStep(r, isIdsOnly(ctx.bundle)));
+        if (r) chunk.push(normaliseStep(r, isIdsOnly(ctx.bundle), ctx.spoken));
         handed = r;
         break;
       }
@@ -347,7 +347,7 @@ export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
   const refits: LoadMisfit[] = [];
   const errors: PlayError[] = [];
   const options = caseOptions(c, refits, errors); // recording from the first engine's construction on
-  return runScript(new Engine(c.bundle, options), c.script, { bundle: c.bundle, bundleB: c.bundleB, options, refits, errors }).chunks;
+  return runScript(new Engine(c.bundle, options), c.script, { bundle: c.bundle, bundleB: c.bundleB, options, refits, errors, spoken: c.spoken }).chunks;
 }
 
 /**
@@ -422,9 +422,19 @@ function labelField(character: string | undefined, characterName: string | undef
   return speakerLabel === plain ? undefined : (speakerLabel ?? "<missing>");
 }
 
+/** A line or text step's spoken fields, as a case that sets `spoken` records them (`TranscriptSpoken`). */
+function spokenFields(r: Extract<StepResult, { type: "line" | "text" }>, idsOnly: boolean): TranscriptSpoken {
+  const out: TranscriptSpoken = {};
+  if (!idsOnly || r.spokenText !== undefined) out.spokenText = r.spokenText ?? "<missing>";
+  if (!idsOnly || r.spokenLocale !== undefined) out.spokenLocale = r.spokenLocale ?? "<missing>";
+  out.estimateRate = r.estimateRate ?? "<missing>";
+  return out;
+}
+
 /** Normalise a StepResult, keeping the fields the contract pins (drops undefined). `idsOnly`: the bundle's
- *  strings are IDs-only, so names (the speaker's label among them) are the game's to resolve. */
-export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
+ *  strings are IDs-only, so names (the speaker's label among them) are the game's to resolve. `spoken`: record
+ *  how each line and text is spoken (corpus 11). */
+export function normaliseStep(r: StepResult, idsOnly = false, spoken = false): TranscriptStep {
   switch (r.type) {
     case "line": {
       const s: TranscriptStep = { type: "line", id: r.id, text: r.text };
@@ -436,6 +446,7 @@ export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
       const label = labelField(r.character, r.characterName, r.speakerLabel, idsOnly);
       if (label !== undefined) s.speakerLabel = label;                      // the speaker's label, where it differs
       if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = padField(r.padAfter);          // line padding, when not the default
+      if (spoken) Object.assign(s, spokenFields(r, idsOnly));                               // how it's spoken, when the case asks
       if (r.gameData !== undefined) s.gameData = clone(r.gameData);
       if (r.extensions !== undefined) s.extensions = r.extensions; // Patter extension values, raw
       if (r.tags !== undefined) s.tags = r.tags; // accumulated author tags (#215)
@@ -445,6 +456,7 @@ export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
       const s: TranscriptStep = { type: "text", id: r.id, text: r.text };
       if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = padField(r.padAfter);
       if (r.action) s.action = true; // action text: not shown to the player
+      if (spoken) Object.assign(s, spokenFields(r, idsOnly));
       if (r.gameData !== undefined) s.gameData = clone(r.gameData);
       if (r.extensions !== undefined) s.extensions = r.extensions;
       if (r.tags !== undefined) s.tags = r.tags;
@@ -532,5 +544,10 @@ export function runAudioCase(c: AudioCase): (string | null)[] {
 
 /** How long a duration case's line lasts, by the reference's estimateLineDuration. */
 export function runDurationCase(c: DurationCase): number {
-  return estimateLineDuration(c.text, c.locale);
+  return estimateLineDuration(c.text, c.locale, c.syllablesPerSecond);
+}
+
+/** A speech case's units and syllable count, by the reference's speechUnits and countSyllables. */
+export function runSpeechCase(c: SpeechCase): { units: SpeechCase["units"]; syllables: number } {
+  return { units: speechUnits(c.text, c.locale), syllables: countSyllables(c.text, c.locale) };
 }

@@ -15,7 +15,7 @@
 // wired in with the compiler.)
 // ---------------------------------------------------------------------------
 
-import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers, usedSpeakerPairs, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
+import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers, usedSpeakerPairs, PAD_AFTER_MIN, PAD_AFTER_MAX, ESTIMATE_SYLLABLES_PER_SECOND_MIN, ESTIMATE_SYLLABLES_PER_SECOND_MAX } from "@patterkit/model";
 import type { ProjectFile, Scene, Block, Group, Snippet, PropertyDecl, AuthoringFile, GameData, GameDataField, GameDataNodeKind } from "@patterkit/model";
 import { isValidGameId, effectiveGameId } from "@patterkit/model";
 import { isValidPropertyName, propertyNameify, RESERVED_PROPERTY_NAMES } from "@patterkit/model";
@@ -40,6 +40,7 @@ export interface ValidationIssue {
     | "unknown-qualifier"
     | "invalid-qualifier"
     | "invalid-pad"
+    | "invalid-estimate-rate"
     | "pad-overlaps-seam"
     | "prompt-pad-without-beat"
     | "qualifier-without-speaker"
@@ -674,6 +675,10 @@ function validateProjectFile(project: ProjectFile, issues: ValidationIssue[]): v
   const pad: unknown = project.padAfterDefault;
   if (pad !== undefined && (typeof pad !== "number" || !Number.isFinite(pad) || pad < PAD_AFTER_MIN || pad > PAD_AFTER_MAX)) {
     issues.push({ code: "invalid-pad", message: `the project default pause '${String(pad)}' must be a number of seconds from ${PAD_AFTER_MIN} to ${PAD_AFTER_MAX}` });
+  }
+  const rate: unknown = project.estimateSyllablesPerSecond;
+  if (rate !== undefined && (typeof rate !== "number" || !Number.isFinite(rate) || rate < ESTIMATE_SYLLABLES_PER_SECOND_MIN || rate > ESTIMATE_SYLLABLES_PER_SECOND_MAX)) {
+    issues.push({ code: "invalid-estimate-rate", message: `the timing for lines without audio '${String(rate)}' must be a number of syllables a second from ${ESTIMATE_SYLLABLES_PER_SECOND_MIN} to ${ESTIMATE_SYLLABLES_PER_SECOND_MAX}` });
   }
 
   // Speaker qualifiers: each has a name and a valid gameId, unique in the project (a line stores the gameId).

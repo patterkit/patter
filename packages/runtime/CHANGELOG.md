@@ -33,6 +33,29 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **The units a line is spoken in.** `speechUnits(text, locale)`, re-exported from `@patterkit/model`, breaks a line
+  into its syllables, its beats with the mouth shut (Japanese っ), and its pauses at punctuation, in order, each with a
+  weight and its code-point offsets. A game lays them over a line's length to move a mouth, whether the length is a
+  recording's or the estimate. `countSyllables(text, locale)` gives the syllable count. Counted per script from one
+  generated table every runtime carries: Latin, Cyrillic, Han, kana, Hangul, Arabic, and Thai, with any other script
+  counted roughly by its letters.
+- **How each line is spoken.** Every line and text step carries `spokenText`, the line in the project's main
+  language whatever language is shown (interpolated as the shown text is, with caption cues left out, and empty for
+  the caption character's lines), `spokenLocale`, that language, and `estimateRate`, the project's syllables a
+  second for an estimate. An IDs-only bundle has no text, so it carries only the rate.
+
+### Changed
+
+- **`estimateLineDuration(text, locale, syllablesPerSecond)` counts syllables, not characters.** A line with no
+  recording lasts the total weight of its speech units (short pauses weigh 1, long ones 2) at the project's rate,
+  4 syllables a second unless it sets its own (`estimateSyllablesPerSecond`, 2 to 10), clamped to 1.5 to 18 seconds
+  as before. Pass the step's `spokenText`, `spokenLocale`, and `estimateRate`, so a line is timed in the language
+  it's spoken in, not a translation being shown. A Chinese, Japanese, Korean, Arabic, or Thai line now stays up about
+  as long as it would take to say. A line with a recording still lasts as long as the recording. The conformance
+  corpus is version 11.
+
 ## [0.38.0] - 2026-10-30
 
 ### Changed

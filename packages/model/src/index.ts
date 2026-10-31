@@ -12,6 +12,7 @@
 
 import type { AstNode } from "@wildwinter/expr";
 import { gameIdify, isValidGameId } from "@wildwinter/toolkit";
+import { speechUnits } from "./speech.js";
 
 export type ScalarValue = boolean | number | string | string[];
 
@@ -335,6 +336,8 @@ export function isContentlessBeat(beat: Beat, hasText: boolean): boolean {
 // ---------------------------------------------------------------------------
 
 export { gameIdify, isValidGameId };
+export { speechUnits, countSyllables, SPEECH_DIGIT_WEIGHT, SPEECH_KANJI_WEIGHT, SPEECH_PAUSE_SHORT_WEIGHT, SPEECH_PAUSE_LONG_WEIGHT } from "./speech.js";
+export type { SpeechUnit, SpeechUnitKind } from "./speech.js";
 
 // ---------------------------------------------------------------------------
 // Property names (design: `@wildwinter/app-shell` src/property-names.ts, which
@@ -630,21 +633,28 @@ export const DEFAULT_PAD_AFTER = 0.6;
 export const PAD_AFTER_MIN = -10;
 export const PAD_AFTER_MAX = 60;
 
-/** The reading rate a line with no recording is timed by, in characters a second (`estimateLineDuration`). */
-export const LINE_CHARS_PER_SECOND = 14;
+/** How many syllables a second a line with no recording is timed at, unless the project sets its own
+ *  (`estimateSyllablesPerSecond`), and the range validation keeps a project's within. */
+export const DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND = 4;
+export const ESTIMATE_SYLLABLES_PER_SECOND_MIN = 2;
+export const ESTIMATE_SYLLABLES_PER_SECOND_MAX = 10;
 /** The shortest and longest a line with no recording lasts, in seconds (`estimateLineDuration`). */
 export const LINE_DURATION_MIN = 1.5;
 export const LINE_DURATION_MAX = 18;
 
-/** How long a line with no recording lasts, in seconds: its characters at 14 a second, clamped to 1.5 to 18
- *  seconds. A character is a Unicode code point (one outside the Basic Multilingual Plane counts once), and soft
- *  hyphens (U+00AD) aren't counted. This is the one rule every Patter tool and runtime times a line by: Patterpad's
- *  Play window, the playable HTML page, and the Unity, Unreal, and Godot runtimes, which the conformance corpus
- *  holds to the same numbers. `locale` is reserved for per-language reading rates and is unused for now. */
-export function estimateLineDuration(text: string, _locale?: string): number {
-  let count = 0;
-  for (const ch of text ?? "") if (ch !== "\u00AD") count++;
-  return Math.min(Math.max(count / LINE_CHARS_PER_SECOND, LINE_DURATION_MIN), LINE_DURATION_MAX);
+/** How long a line with no recording lasts, in seconds: the total weight of its speech units (its syllables and its
+ *  pauses, `speechUnits`) at `syllablesPerSecond` (default 4, the project's `estimateSyllablesPerSecond` when it
+ *  sets one), clamped to 1.5 to 18 seconds. `text` and `locale` are the line as it's spoken, in the project's main
+ *  language (a line result's `spokenText` and `spokenLocale`), never a translation being shown. This is the one
+ *  rule every Patter tool and runtime times a line by: Patterpad's Play window, the playable HTML page, and the
+ *  Unity, Unreal, and Godot runtimes, which the conformance corpus holds to the same numbers. A rate that isn't a
+ *  positive number is the default. A line with a recording lasts as long as the recording, whatever this says. */
+export function estimateLineDuration(text: string, locale?: string, syllablesPerSecond?: number): number {
+  const rate = typeof syllablesPerSecond === "number" && Number.isFinite(syllablesPerSecond) && syllablesPerSecond > 0
+    ? syllablesPerSecond : DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND;
+  let weight = 0;
+  for (const u of speechUnits(text ?? "", locale)) weight += u.weight;
+  return Math.min(Math.max(weight / rate, LINE_DURATION_MIN), LINE_DURATION_MAX);
 }
 
 /** A qualifier as it reaches a compiled bundle: its `gameId` and authored name (the unlocalised fallback). */
@@ -1035,6 +1045,10 @@ export interface ProjectFile {
   /** The project's default `padAfter` for every line and text beat that sets none and has no default above it.
    *  Absent = `DEFAULT_PAD_AFTER`. */
   padAfterDefault?: number;
+  /** How many syllables a second a line with no recording is timed at (`estimateLineDuration`), from 2 to 10.
+   *  Only estimates use it: a line with a recording lasts as long as the recording. Absent =
+   *  `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND`. */
+  estimateSyllablesPerSecond?: number;
   /** Localise text lines in dialogue scenes (design/proposals/action-text.md). Off (absent) by default: a
    *  dialogue scene's text beats (`isDialogueScene`) are then ACTION, left out of the loc files and the
    *  written word counts, and compiled with `action: true`. On: they're localised and shown as a text
@@ -1481,6 +1495,9 @@ export interface Bundle {
   speakerPattern?: string;
   /** The project's own `padAfterDefault`, when it sets one; absent = `DEFAULT_PAD_AFTER`. */
   padAfterDefault?: number;
+  /** The project's own `estimateSyllablesPerSecond`, when it sets one; absent =
+   *  `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND`. */
+  estimateSyllablesPerSecond?: number;
   properties?: PropertyDecl[];
   /** Host / world scope declarations, baked from the project so the runtime can self-back a declared
    *  scope (`@world`, ...) when no host resolver claims its token. Absent = no host scopes. */

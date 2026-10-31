@@ -1018,7 +1018,7 @@ namespace Patterkit.Patterplay
                 case "gameEvent":
                     return new StepResult { Type = StepType.GameEvent, Id = beat.Id, GameData = gameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
                 case "text":
-                    return new StepResult { Type = StepType.Text, Id = beat.Id, Text = Interpolate(ResolveString(beat.Id)), PadAfter = PadOf(beat.Id), Action = beat.Action, GameData = gameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
+                    return WithSpoken(new StepResult { Type = StepType.Text, Id = beat.Id, Text = Interpolate(ResolveString(beat.Id)), PadAfter = PadOf(beat.Id), Action = beat.Action, GameData = gameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags }, beat);
                 case "line":
                 {
                     string raw = ResolveString(beat.Id);
@@ -1030,7 +1030,7 @@ namespace Patterkit.Patterplay
                     bool captionChar = off && !string.IsNullOrEmpty(_host.CaptionCharacter) && beat.Character == _host.CaptionCharacter;
                     string text = captionChar ? "" : CaptionLine(_host.Bundle.Voiced ? raw : Interpolate(raw));
                     bool silent = off && text.Length == 0;
-                    return new StepResult
+                    return WithSpoken(new StepResult
                     {
                         Type = StepType.Line,
                         Id = beat.Id,
@@ -1045,7 +1045,7 @@ namespace Patterkit.Patterplay
                         GameData = gameData,
                         Extensions = Engine.ExtensionsOrNull(beat.Extensions),
                         Tags = tags,
-                    };
+                    }, beat);
                 }
                 default: throw new Exception($"unknown beat kind: {beat.Kind}");
             }
@@ -1064,6 +1064,21 @@ namespace Patterkit.Patterplay
 
         /// <summary>Caption-strip a dialogue line ONLY when captions are off; otherwise pass it through.</summary>
         private string CaptionLine(string text) => _host.CaptionsOn ? text : StripCaptions(text);
+
+        /// <summary>A line or text step with how its beat is spoken: its text in the project's main language,
+        /// interpolated as the shown text is (a voiced project's lines aren't), caption cues always left out, and
+        /// empty for the caption character's lines; that language; and the project's rate for an estimate. No text
+        /// in an IDs-only bundle, or for a beat the main language has no string for.</summary>
+        private StepResult WithSpoken(StepResult step, Beat beat)
+        {
+            step.EstimateRate = _host.Bundle.EstimateSyllablesPerSecond ?? Bundle.DefaultEstimateSyllablesPerSecond;
+            if (_host.EmitIds || !_host.DefaultStrings.TryGetValue(beat.Id, out var source)) return step;
+            if (beat.Kind == "text") step.SpokenText = Interpolate(source);
+            else if (beat.Character == _host.CaptionCharacter) step.SpokenText = "";
+            else step.SpokenText = StripCaptions(_host.Bundle.Voiced ? source : Interpolate(source));
+            step.SpokenLocale = _host.Bundle.Locales.Default;
+            return step;
+        }
 
         private ChoicePrompt PromptFor(Node node)
         {
@@ -1091,14 +1106,14 @@ namespace Patterkit.Patterplay
         {
             var tags = TagsOf(beat.Id);
             if (shown.Kind == "text")
-                return new StepResult { Type = StepType.Text, Id = beat.Id, Text = shown.Text, PadAfter = PadOf(beat.Id), GameData = GameDataHelpers.CopyGameData(beat.GameData), Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
-            return new StepResult
+                return WithSpoken(new StepResult { Type = StepType.Text, Id = beat.Id, Text = shown.Text, PadAfter = PadOf(beat.Id), GameData = GameDataHelpers.CopyGameData(beat.GameData), Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags }, beat);
+            return WithSpoken(new StepResult
             {
                 Type = StepType.Line, Id = beat.Id, Text = shown.Text,
                 Character = shown.Character, CharacterName = shown.CharacterName, Direction = shown.Direction,
                 Qualifier = shown.Qualifier, QualifierName = shown.QualifierName, SpeakerLabel = shown.SpeakerLabel, PadAfter = PadOf(beat.Id),
                 GameData = GameDataHelpers.CopyGameData(beat.GameData), Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags,
-            };
+            }, beat);
         }
 
         /// <summary>A beat's accumulated author tags (#215) as a COPY, or null when none (so the step omits them,

@@ -92,6 +92,10 @@ namespace Patterkit.Patterplay.TestHost
             int du = RunDurations(durationsArr);
             Console.WriteLine($"  [durations] how long a line with no recording lasts: {du}/{durationsArr.GetArrayLength()}");
             if (du != durationsArr.GetArrayLength()) Fail("durations", "section total", $"{du} of {durationsArr.GetArrayLength()} passed");
+            if (!root.TryGetProperty("speech", out var speechArr)) { Console.Error.WriteLine("corpus has no speech section"); return 2; }
+            int spc = RunSpeech(speechArr);
+            Console.WriteLine($"  [speech] the units a line is spoken in, and its syllable count: {spc}/{speechArr.GetArrayLength()}");
+            if (spc != speechArr.GetArrayLength()) Fail("speech", "section total", $"{spc} of {speechArr.GetArrayLength()} passed");
 
             // Verify the Unity JSON save/load: replay the scripted cases routing saveLoad through
             // PatterSave's JSON string round-trip.
@@ -869,6 +873,8 @@ namespace Patterkit.Patterplay.TestHost
         /// <summary>The locale the running case last asked for (its `locale`, then each setLocale): what the
         /// PatterSave JSON pass builds a hotSwap's replacement in, as Engine.HotSwap does.</summary>
         private static string _askedLocale;
+        /// <summary>Whether the running case records each line and text step's spoken fields (its `spoken`, corpus 11).</summary>
+        private static bool _spoken;
 
         /// <summary>A host scope over a store the runner keeps for the whole case (corpus 8): empty to start,
         /// read and written by name, shared by every engine the case makes.</summary>
@@ -889,6 +895,7 @@ namespace Patterkit.Patterplay.TestHost
             // The case's locale and host scopes (corpus 8), for every engine it makes.
             if (c.TryGetProperty("locale", out var lc) && lc.ValueKind == JsonValueKind.String) opts.Locale = lc.GetString();
             _askedLocale = opts.Locale;
+            _spoken = c.TryGetProperty("spoken", out var sp) && sp.ValueKind == JsonValueKind.True;
             if (c.TryGetProperty("hostScopes", out var hs) && hs.ValueKind == JsonValueKind.Array)
             {
                 opts.HostScopes = new Dictionary<string, IHostScope>();
@@ -971,7 +978,7 @@ namespace Patterkit.Patterplay.TestHost
                                 break;
                             case "advance":
                                 handed = engine.GetFlow(current).Advance();
-                                chunk.Add(Normalize(handed, IsIdsOnly(bundle)));
+                                chunk.Add(Normalize(handed, IsIdsOnly(bundle), _spoken));
                                 break;
                             case "scribble":
                                 // A careless host defaces what it was handed. It is its own copy, so nothing the
@@ -985,7 +992,7 @@ namespace Patterkit.Patterplay.TestHost
                                 // is; none for an unknown id.
                                 string on = op.TryGetProperty("flow", out var sf) ? sf.GetString() : current;
                                 var r = engine.GetFlow(on).StepFor(op.GetProperty("beat").GetString());
-                                if (r != null) chunk.Add(Normalize(r, IsIdsOnly(bundle)));
+                                if (r != null) chunk.Add(Normalize(r, IsIdsOnly(bundle), _spoken));
                                 handed = r;
                                 break;
                             }
@@ -1465,8 +1472,9 @@ namespace Patterkit.Patterplay.TestHost
         }
 
         /// <summary>Normalise a step as runner.ts normaliseStep does. `idsOnly`: the bundle's strings are IDs-only,
-        /// so names (the speaker's label among them) are the game's to resolve.</summary>
-        private static object Normalize(StepResult s, bool idsOnly = false)
+        /// so names (the speaker's label among them) are the game's to resolve. `spoken`: record how each line and
+        /// text is spoken (corpus 11).</summary>
+        private static object Normalize(StepResult s, bool idsOnly = false, bool spoken = false)
         {
             var o = new Dictionary<string, object>();
             switch (s.Type)
@@ -1481,6 +1489,7 @@ namespace Patterkit.Patterplay.TestHost
                     var label = LabelField(s.Character, s.CharacterName, s.SpeakerLabel, idsOnly);
                     if (label != null) o["speakerLabel"] = label;                       // the speaker's label, where it differs
                     NormalizePad(s, o);                                                 // line padding, when not the default
+                    if (spoken) NormalizeSpoken(s, o, idsOnly);                         // how it's spoken, when the case asks
                     if (s.GameData != null) o["gameData"] = GameDataToObject(s.GameData);
                     if (s.Extensions != null) o["extensions"] = JsonTreeToObject(s.Extensions); // Patter extension values, raw
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
@@ -1489,6 +1498,7 @@ namespace Patterkit.Patterplay.TestHost
                     o["type"] = "text"; o["id"] = s.Id; o["text"] = s.Text;
                     NormalizePad(s, o);
                     if (s.Action) o["action"] = true;                                   // action text: not shown to the player
+                    if (spoken) NormalizeSpoken(s, o, idsOnly);
                     if (s.GameData != null) o["gameData"] = GameDataToObject(s.GameData);
                     if (s.Extensions != null) o["extensions"] = JsonTreeToObject(s.Extensions); // Patter extension values, raw
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
@@ -1529,6 +1539,15 @@ namespace Patterkit.Patterplay.TestHost
         {
             if (s.PadAfter == null) o["padAfter"] = "<missing>";
             else if (s.PadAfter.Value != Bundle.DefaultPadAfter) o["padAfter"] = s.PadAfter.Value;
+        }
+
+        // A line or text step's spoken fields, as a case that sets `spoken` records them (runner.ts spokenFields): a
+        // dropped one is a marker, except the text and its locale in an IDs-only bundle, which has none.
+        private static void NormalizeSpoken(StepResult s, Dictionary<string, object> o, bool idsOnly)
+        {
+            if (!idsOnly || s.SpokenText != null) o["spokenText"] = s.SpokenText ?? "<missing>";
+            if (!idsOnly || s.SpokenLocale != null) o["spokenLocale"] = s.SpokenLocale ?? "<missing>";
+            o["estimateRate"] = s.EstimateRate.HasValue ? (object)s.EstimateRate.Value : "<missing>";
         }
 
         private static Dictionary<string, object> NormalizePrompt(ChoicePrompt p, bool idsOnly)
@@ -1753,6 +1772,8 @@ namespace Patterkit.Patterplay.TestHost
 
             // The project's line-padding default (absent = the built-in one).
             bundle.PadAfterDefault = Num(b, "padAfterDefault");
+            // The project's rate for a line with no recording (absent = the built-in one).
+            bundle.EstimateSyllablesPerSecond = Num(b, "estimateSyllablesPerSecond");
 
             if (b.TryGetProperty("properties", out var props))
                 foreach (var p in props.EnumerateArray()) bundle.Properties.Add(ParsePropDecl(p));

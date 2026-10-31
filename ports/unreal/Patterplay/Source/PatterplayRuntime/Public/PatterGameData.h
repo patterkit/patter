@@ -132,10 +132,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay|GameData")
 	static bool NextStage(const FPatterGameDataField& Field, const FString& Stage, FString& OutStage);
 
-	/** How long a line with no recording lasts, in seconds: its characters at 14 a second, clamped to 1.5 to 18
-	 *  seconds, a character outside the Basic Multilingual Plane counted once and soft hyphens (U+00AD) not
-	 *  counted. The one rule every Patter tool and runtime times a line by (the core's
-	 *  patter::estimateLineDuration). Locale is reserved for per-language reading rates and is unused for now. */
+	/** How long a line with no recording lasts, in seconds: the total weight of its speech units (SpeechUnits:
+	 *  its syllables and its pauses) at SyllablesPerSecond, clamped to 1.5 to 18 seconds. Pass a step's
+	 *  SpokenText, SpokenLocale, and EstimateRate: the line as it's spoken, in the project's main language, never
+	 *  a translation being shown. A rate that isn't a positive number is the default, 4. The one rule every Patter
+	 *  tool and runtime times a line by (the core's patter::estimateLineDuration). A line with a recording lasts
+	 *  as long as the recording, whatever this says. */
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Timing", meta = (AdvancedDisplay = "Locale,SyllablesPerSecond"))
+	static double EstimateLineDuration(const FString& Text, const FString& Locale = TEXT(""), double SyllablesPerSecond = 4.0);
+
+	/** A line broken into the units it would be spoken in: its syllables, its beats with the mouth shut, and its
+	 *  pauses, in order, each with a weight and its code-point offsets. Lay them over a line's length (its
+	 *  recording's, or EstimateLineDuration's) to move a mouth: each unit takes its weight's share. Locale is the
+	 *  language the line is spoken in (a step's SpokenLocale); it decides English's and French's silent e, and
+	 *  Japanese kanji. The core's patter::speechUnits. */
 	UFUNCTION(BlueprintPure, Category = "Patterplay|Timing", meta = (AdvancedDisplay = "Locale"))
-	static double EstimateLineDuration(const FString& Text, const FString& Locale = TEXT(""));
+	static TArray<FPatterSpeechUnit> SpeechUnits(const FString& Text, const FString& Locale = TEXT(""));
+
+	/** How many syllables a line would be spoken in: its syllables' and shut beats' weights, pauses aside.
+	 *  Locale as for SpeechUnits. The core's patter::countSyllables. */
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Timing", meta = (AdvancedDisplay = "Locale"))
+	static double CountSyllables(const FString& Text, const FString& Locale = TEXT(""));
 };

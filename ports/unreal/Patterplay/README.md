@@ -59,8 +59,21 @@ line's own, else the nearest default above it (its snippet, groups, block, scene
 else the built-in 0.6. A negative value starts the next line that long before this one ends (a cut-in);
 only a snippet's last line is never negative (a negative pause before a game event stands). An option's
 `Prompt` carries its pause too, as `PadAfter`, for a game that voices the prompts itself. When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects.
-For a line with no recording, `UPatterGameData::EstimateLineDuration` (C++ `patter::estimateLineDuration`)
-gives how long it lasts, in seconds: Patter's one rule, the same in every runtime and in Patterpad's Play window.
+A line with a recording lasts as long as the recording. For one with no recording,
+`UPatterGameData::EstimateLineDuration(Step.SpokenText, Step.SpokenLocale, Step.EstimateRate)` (C++
+`patter::estimateLineDuration`) gives how long it lasts, in seconds: Patter's one rule, the same in every runtime
+and in Patterpad's Play window. It counts the line's syllables and the pauses at its punctuation, each weighed, at
+the project's syllables a second (`EstimateRate`, 4 unless the project sets its own), clamped to 1.5 to 18
+seconds. A line or text step carries what that needs: `SpokenText` is the line in the project's main language
+whatever language is being shown (interpolated, with caption cues left out, and empty for the caption
+character's lines), `SpokenLocale` that language, and `EstimateRate` the rate. An IDs-only build sets no
+`SpokenText` or `SpokenLocale` (`bHasSpokenText` is false), so pass your own text.
+
+To move a mouth, `UPatterGameData::SpeechUnits(Text, Locale)` (C++ `patter::speechUnits`) breaks a line into the
+units it's spoken in: syllables, beats with the mouth shut, and pauses, each an `FPatterSpeechUnit` with its
+`Kind`, `Weight`, and `Start` and `End` (code-point offsets, so an emoji counts once). Lay them over the line's
+length, the recording's or the estimate's, each taking its weight's share, and the mouth keeps time with the
+estimate. `UPatterGameData::CountSyllables` (C++ `patter::countSyllables`) gives the syllable count alone.
 
 A text step with `bAction` set is action: a direction for whoever stages the scene, such as "Mara turns
 away.", that the player never sees. A dialogue scene's text is action unless the project localises it, so

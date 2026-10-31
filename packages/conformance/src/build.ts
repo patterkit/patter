@@ -48,8 +48,12 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  10: a choice that runs dry and ends the flow (Ian's rulings, 2026-10-30). The end step's `reason: "ran-dry"`
  *  (recorded only then), the onError kind `dry-choice`, and a save cursor's `ranDry`, so a loaded flow ends the
  *  same way. The cases `scriptedDryChoiceEnds` and `scriptedDryChoiceCarriesOn`. No earlier expectation changed.
+ *  11: speech units (design/proposals/syllable-counter.md). The section `speech` (`speechUnits`, `countSyllables`);
+ *  `durations` re-pinned, a line timed by its speech units' weight at a rate (`syllablesPerSecond`, default 4);
+ *  the bundle's `estimateSyllablesPerSecond`; and each line and text step's `spokenText`, `spokenLocale`, and
+ *  `estimateRate`, recorded only in a scripted case that sets `spoken`. Only the duration expectations changed.
  */
-export const CORPUS_VERSION = 10;
+export const CORPUS_VERSION = 11;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at
@@ -119,6 +123,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     ...(f.locale !== undefined ? { locale: f.locale } : {}),
     ...(f.hostScopes !== undefined ? { hostScopes: f.hostScopes } : {}),
     ...(f.engineOptions !== undefined ? { engineOptions: f.engineOptions } : {}),
+    ...(f.spoken ? { spoken: true as const } : {}),
     script: f.script,
   }));
 
@@ -178,7 +183,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     };
   });
 
-  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, describes, outlines, audio: fixtures.audio, durations: fixtures.durations };
+  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, describes, outlines, audio: fixtures.audio, durations: fixtures.durations, speech: fixtures.speech };
 }
 
 // The corpus as the committed corpus.json text. Every case's inputs (`bundle`, `bundleB`, `envelope`) write a

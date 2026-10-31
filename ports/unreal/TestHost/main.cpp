@@ -159,8 +159,20 @@ static void setLabelField(JsonValue& o, bool hasCharacter, const std::string& ch
     o.set("speakerLabel", JsonValue::Str(hasSpeakerLabel ? speakerLabel : "<missing>"));
 }
 
+// A line or text step's spoken fields, as a case that sets `spoken` records them (corpus 11): spokenText and
+// spokenLocale, or a marker when a runtime drops them from a bundle with text (absent from an IDs-only one), and
+// estimateRate, or a marker when a runtime drops it. The JS runner's spokenFields.
+static void setSpokenFields(JsonValue& o, const StepResult& s, bool idsOnly)
+{
+    if (!idsOnly || s.hasSpokenText) o.set("spokenText", JsonValue::Str(s.hasSpokenText ? s.spokenText : "<missing>"));
+    if (!idsOnly || s.hasSpokenLocale) o.set("spokenLocale", JsonValue::Str(s.hasSpokenLocale ? s.spokenLocale : "<missing>"));
+    if (s.estimateRate > 0) o.set("estimateRate", JsonValue::Num(s.estimateRate));
+    else o.set("estimateRate", JsonValue::Str("<missing>"));
+}
+
 // `idsOnly`: the bundle's strings are IDs-only, so names (the speaker's label among them) are the game's to resolve.
-static JsonValue normalize(const StepResult& s, bool idsOnly = false)
+// `spoken`: record how each line and text is spoken (corpus 11).
+static JsonValue normalize(const StepResult& s, bool idsOnly = false, bool spoken = false)
 {
     JsonValue o = JsonValue::Obj();
     switch (s.type)
@@ -174,6 +186,7 @@ static JsonValue normalize(const StepResult& s, bool idsOnly = false)
             if (s.hasQualifierName) o.set("qualifierName", JsonValue::Str(s.qualifierName));   // and its locale-resolved name
             setLabelField(o, s.hasCharacter, s.character, s.hasCharacterName, s.characterName, s.hasSpeakerLabel, s.speakerLabel, idsOnly); // where it differs
             if (s.padAfter != DEFAULT_PAD_AFTER) o.set("padAfter", JsonValue::Num(s.padAfter)); // line padding, when not the default
+            if (spoken) setSpokenFields(o, s, idsOnly);                                          // how it's spoken, when the case asks
             if (s.gameData) o.set("gameData", gameDataToJson(*s.gameData));
             if (!s.extensions.empty()) o.set("extensions", extensionsToJson(s.extensions));   // Patter extension values, raw
             if (s.hasTags) o.set("tags", tagsToJson(s.tags));
@@ -182,6 +195,7 @@ static JsonValue normalize(const StepResult& s, bool idsOnly = false)
             o.set("type", JsonValue::Str("text")); o.set("id", JsonValue::Str(s.id)); o.set("text", JsonValue::Str(s.text));
             if (s.padAfter != DEFAULT_PAD_AFTER) o.set("padAfter", JsonValue::Num(s.padAfter));
             if (s.action) o.set("action", JsonValue::Boolean(true)); // action text: not shown to the player
+            if (spoken) setSpokenFields(o, s, idsOnly);
             if (s.gameData) o.set("gameData", gameDataToJson(*s.gameData));
             if (!s.extensions.empty()) o.set("extensions", extensionsToJson(s.extensions));   // Patter extension values, raw
             if (s.hasTags) o.set("tags", tagsToJson(s.tags));
@@ -892,12 +906,48 @@ static int runDurations(const JsonValue& arr)
         try
         {
             const JsonValue* locale = c.find("locale");
-            const double got = locale ? estimateLineDuration(c.at("text").str, locale->str) : estimateLineDuration(c.at("text").str);
+            const JsonValue* rate = c.find("syllablesPerSecond");
+            const double got = estimateLineDuration(c.at("text").str, locale ? locale->str : std::string(),
+                                                    rate ? rate->num : DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND);
             const double want = c.at("expected").num;
             if (std::fabs(got - want) <= 1e-9) ++pass;
             else fail("durations", name, "expected " + std::to_string(want) + ", got " + std::to_string(got));
         }
         catch (const std::exception& ex) { fail("durations", name, ex.what()); }
+    }
+    return pass;
+}
+
+// The corpus's speech cases (corpus 11): each text (UTF-8) through the core's speechUnits, every unit's kind, weight,
+// and code-point offsets matched exactly, and its countSyllables to within 1e-9.
+static int runSpeech(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            const JsonValue* locale = c.find("locale");
+            const std::string loc = locale ? locale->str : std::string();
+            const std::vector<SpeechUnit> got = speechUnits(c.at("text").str, loc);
+            JsonValue units = JsonValue::Arr();
+            for (const SpeechUnit& u : got)
+            {
+                JsonValue o = JsonValue::Obj();
+                o.set("kind", JsonValue::Str(speechUnitKindName(u.kind)));
+                o.set("weight", JsonValue::Num(u.weight));
+                o.set("start", JsonValue::Num(u.start));
+                o.set("end", JsonValue::Num(u.end));
+                units.push(o);
+            }
+            const double syllables = countSyllables(c.at("text").str, loc);
+            const double want = c.at("syllables").num;
+            if (!matchValue(units, c.at("units"))) fail("speech", name, "units: expected " + dump(c.at("units")) + ", got " + dump(units));
+            else if (std::fabs(syllables - want) > 1e-9) fail("speech", name, "syllables: expected " + std::to_string(want) + ", got " + std::to_string(syllables));
+            else ++pass;
+        }
+        catch (const std::exception& ex) { fail("speech", name, ex.what()); }
     }
     return pass;
 }
@@ -930,7 +980,7 @@ static int propertyReads = 0;   // expectProperties ops that ran and matched
 // engine arrives already loaded from an envelope another runtime wrote.
 // `bundleB` is the case's EDITED bundle, null when it has none.
 static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine> engine, const Bundle& bundle, const Bundle* bundleB,
-    const EngineOptions& opts, const JsonValue& script, const std::string& name, std::string current)
+    const EngineOptions& opts, const JsonValue& script, const std::string& name, std::string current, bool spoken = false)
 {
     bool ok = true;
     patter::Checkpoint checkpoint;
@@ -986,14 +1036,14 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                 else if (kind == "advance")
                 {
                     handed = engine->getFlow(current)->advance();
-                    chunk.push(normalize(*handed, isIdsOnly(bundle)));
+                    chunk.push(normalize(*handed, isIdsOnly(bundle), spoken));
                 }
                 // The step a flow would deliver for a beat now, recorded as a delivered one is; none for an unknown id.
                 else if (kind == "stepFor")
                 {
                     const std::string flowId = op.has("flow") ? op.at("flow").str : current;
                     handed = engine->getFlow(flowId)->stepFor(op.at("beat").str);
-                    if (handed) chunk.push(normalize(*handed, isIdsOnly(bundle)));
+                    if (handed) chunk.push(normalize(*handed, isIdsOnly(bundle), spoken));
                 }
                 // A careless host (corpus 8) defaces what it was handed, in place: every flags list gains
                 // "scribbled", then every value becomes "scribbled" and the map gains the key too. It is the host's
@@ -1385,7 +1435,8 @@ int runScripted(const JsonValue& arr)
             if (const JsonValue* sd = c.find("seed")) { opts.hasSeed = true; opts.seed = static_cast<int64_t>(sd->num); }
             applyEngineOptions(c, opts);
             auto engine = std::make_shared<Engine>(bundle, opts);
-            if (runScript(engine, bundle, bb ? &bundleB : nullptr, opts, c.at("script"), name, "").first) ++pass;
+            const JsonValue* sp = c.find("spoken");   // record the spoken fields (corpus 11)
+            if (runScript(engine, bundle, bb ? &bundleB : nullptr, opts, c.at("script"), name, "", sp && sp->isBool() && sp->b).first) ++pass;
         }
         catch (const std::exception& ex) { fail("scripted", name, ex.what()); }
     }
@@ -3822,6 +3873,11 @@ int main(int argc, char** argv)
     int du = runDurations(*durationsArr);
     std::cout << "  [durations] how long a line with no recording lasts: " << du << "/" << durationsArr->arr.size() << "\n";
     if (du != static_cast<int>(durationsArr->arr.size())) fail("durations", "section total", std::to_string(du) + " of " + std::to_string(durationsArr->arr.size()) + " passed");
+    const JsonValue* speechArr = root.find("speech");
+    if (!speechArr) { std::cerr << "corpus has no speech section\n"; return 2; }
+    int su = runSpeech(*speechArr);
+    std::cout << "  [speech] the units a line is spoken in, and its syllables: " << su << "/" << speechArr->arr.size() << "\n";
+    if (su != static_cast<int>(speechArr->arr.size())) fail("speech", "section total", std::to_string(su) + " of " + std::to_string(speechArr->arr.size()) + " passed");
     runInspectorSmoke();
     runOneRegistry();
     runFlowStateCases();

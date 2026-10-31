@@ -2,7 +2,8 @@
 // included), log, interpolation and caption stripping; the engine's locale, captions and source-debug
 // getters, addresses, scene and block tags and Game Data, every open flow, and OpenFlow with a block and
 // a seed; an option's prompt as one value, the flags that tell an unset speaker from an empty one,
-// StepFor, a beat's step before it plays, and EstimateLineDuration, how long a line with no recording lasts.
+// StepFor, a beat's step before it plays, EstimateLineDuration, how long a line with no recording lasts, the
+// SpeechUnits and CountSyllables it's built on, and a step's spoken fields.
 // Runs via
 //   -ExecCmds="Automation RunTests Patterplay.Blueprint"
 
@@ -88,16 +89,26 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("GameDataValue: an undeclared field with no override"), UPatterGameData::GameDataValue(BlockFields, {}, TEXT("nothing"), Light, TypedLight));
 
 	// --- how long a line with no recording lasts: an FString reaches the core's rule whole ---------------
-	// (UTF-16 in, so an emoji's surrogate pair is one character; the corpus holds the core to every case.)
+	// (UTF-16 in, so an emoji's surrogate pair is one code point; the corpus holds the core to every case.)
+	const FString Lamps = TEXT("The lamps are lit along the harbour wall tonight.");
 	TestEqual(TEXT("EstimateLineDuration: the shortest"), UPatterGameData::EstimateLineDuration(TEXT("Ah.")), 1.5);
-	TestEqual(TEXT("EstimateLineDuration: 14 a second"), UPatterGameData::EstimateLineDuration(TEXT("The lamps are lit along the harbour wall tonight.")), 3.5);
-	FString Moons;
-	for (int32 I = 0; I < 28; ++I) Moons += TEXT("\U0001F319");
-	TestEqual(TEXT("EstimateLineDuration: an emoji counts once"), UPatterGameData::EstimateLineDuration(Moons), 2.0);
-	FString Hyphens;
-	for (int32 I = 0; I < 100; ++I) Hyphens += TEXT("\u00AD");
-	TestEqual(TEXT("EstimateLineDuration: soft hyphens don't count"), UPatterGameData::EstimateLineDuration(Hyphens, TEXT("fr")), 1.5);
-	TestEqual(TEXT("EstimateLineDuration: the longest"), UPatterGameData::EstimateLineDuration(FString::ChrN(400, TEXT('x'))), 18.0);
+	TestEqual(TEXT("EstimateLineDuration: 4 syllables a second"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en")), 3.0);
+	TestEqual(TEXT("EstimateLineDuration: the project's own rate"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en"), 3.0), 4.0);
+	TestEqual(TEXT("EstimateLineDuration: a rate that isn't positive is the default"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en"), -1.0), 3.0);
+	FString Chant;
+	for (int32 I = 0; I < 100; ++I) Chant += TEXT("la ");
+	TestEqual(TEXT("EstimateLineDuration: the longest"), UPatterGameData::EstimateLineDuration(Chant), 18.0);
+	TestEqual(TEXT("CountSyllables: a silent final e in English"), UPatterGameData::CountSyllables(Lamps, TEXT("en")), 12.0);
+	TestEqual(TEXT("CountSyllables: consonant + le isn't silent"), UPatterGameData::CountSyllables(TEXT("table"), TEXT("en")), 2.0);
+	// An emoji weighs nothing, and counts once in the offsets: Ah [2, 4), the comma [4, 5), no [6, 8).
+	const TArray<FPatterSpeechUnit> Units = UPatterGameData::SpeechUnits(TEXT("\U0001F319 Ah, no."), TEXT("en"));
+	TestEqual(TEXT("SpeechUnits: two syllables and the pause between"), Units.Num(), 3);
+	if (Units.Num() == 3)
+	{
+		TestTrue(TEXT("SpeechUnits: a syllable after the emoji, in code points"), Units[0].Kind == EPatterSpeechUnitKind::Syllable && Units[0].Start == 2 && Units[0].End == 4 && Units[0].Weight == 1.0);
+		TestTrue(TEXT("SpeechUnits: the comma, a short pause"), Units[1].Kind == EPatterSpeechUnitKind::Pause && Units[1].Start == 4 && Units[1].End == 5 && Units[1].Weight == 1.0);
+		TestTrue(TEXT("SpeechUnits: the full stop at the end is dropped"), Units[2].Kind == EPatterSpeechUnitKind::Syllable && Units[2].Start == 6 && Units[2].End == 8);
+	}
 
 	// --- the audio resolver joins its base and a take, keeping a base that is a root --------------------
 	const FString Manifest = TEXT(R"({"clips": {"L": {"file": "final/L.wav"}}})");
@@ -143,6 +154,10 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("StepFor equals Advance: pause"), Ahead.PadAfter, Line.PadAfter);
 	TestTrue(TEXT("StepFor equals Advance: tags and Game Data"), Ahead.Tags == Line.Tags && Ahead.GameData.Num() == Line.GameData.Num());
 	TestEqual(TEXT("the line interpolates @gold"), Line.Text, FString(TEXT("Gold 3.")));
+	TestTrue(TEXT("SpokenText: the line in the main language, interpolated"), Line.bHasSpokenText && Line.SpokenText == TEXT("Gold 3."));
+	TestTrue(TEXT("SpokenLocale: the main language"), Line.bHasSpokenLocale && Line.SpokenLocale == TEXT("en"));
+	TestEqual(TEXT("EstimateRate: the default, as the project sets none"), Line.EstimateRate, 4.0);
+	TestEqual(TEXT("StepFor equals Advance: spoken text"), Ahead.SpokenText, Line.SpokenText);
 	TestTrue(TEXT("bHasCharacter"), Line.bHasCharacter);
 	TestEqual(TEXT("Character"), Line.Character, FString(TEXT("ANNA")));
 	TestFalse(TEXT("bHasDirection: the line has none"), Line.bHasDirection);

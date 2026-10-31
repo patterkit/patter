@@ -2339,11 +2339,12 @@ namespace patter
             };
             r.extensions = beat.extensions;   // Patter extension values, raw, on every kind of beat
             if (beat.kind == "gameEvent") { r.type = StepType::GameEvent; r.id = beat.id; r.gameData = copyGameData(beat.gameData); applyTags(r); return r; }
-            if (beat.kind == "text") { r.type = StepType::Text; r.id = beat.id; r.text = interp(resolveString(beat.id)); r.padAfter = padOf(beat.id); r.action = beat.action; r.gameData = copyGameData(beat.gameData); applyTags(r); return r; }
+            if (beat.kind == "text") { r.type = StepType::Text; r.id = beat.id; r.text = interp(resolveString(beat.id)); r.padAfter = padOf(beat.id); r.action = beat.action; applySpoken(r, beat); r.gameData = copyGameData(beat.gameData); applyTags(r); return r; }
             // line
             std::string raw = resolveString(beat.id);
             r.type = StepType::Line; r.id = beat.id;
             r.padAfter = padOf(beat.id);   // a silent line still fires, so it still carries its pause
+            applySpoken(r, beat);
             // Closed captions (#214): a line goes SILENT (off only) when the caption CHARACTER speaks it
             // (whole line is a caption, delimiters or not) OR stripping cues leaves it empty. A silent line
             // still FIRES (audio plays) but carries no text + no speaker.
@@ -2365,6 +2366,23 @@ namespace patter
             r.gameData = copyGameData(beat.gameData);   // the game's own copy
             applyTags(r);
             return r;
+        }
+        // How a line or text beat is spoken (StepResult's spoken fields): its text in the project's main language,
+        // interpolated as the shown text is (a voiced project's lines aren't), caption cues always left out, and
+        // empty for the caption character's lines; that language; and the project's rate for an estimate. No text
+        // in an IDs-only build, or for a beat the main language has no string for.
+        void applySpoken(StepResult& r, const Beat& beat)
+        {
+            const Bundle& bundle = *host_->bundle;
+            r.estimateRate = bundle.hasEstimateSyllablesPerSecond ? bundle.estimateSyllablesPerSecond : DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND;
+            if (host_->emitIds) return;
+            auto source = host_->defaultStrings->find(beat.id);
+            if (source == host_->defaultStrings->end()) return;
+            r.hasSpokenText = true;
+            if (beat.kind == "text") r.spokenText = interp(source->second);
+            else if (beat.character == host_->captionCharacter) r.spokenText = std::string();
+            else r.spokenText = patter::stripCaptions(bundle.voiced ? source->second : interp(source->second), host_->captionOpen, host_->captionClose);
+            r.hasSpokenLocale = true; r.spokenLocale = bundle.locales.defaultLocale;
         }
         // A line or text beat's resolved pause (line padding): its own `padAfter`, else the nearest default
         // above it, else the project's, else the built-in one; clamped to zero on a snippet's last line.
@@ -2418,6 +2436,7 @@ namespace patter
         {
             StepResult r;
             r.id = beat.id; r.text = shown.text; r.gameData = copyGameData(beat.gameData); r.extensions = beat.extensions; r.padAfter = padOf(beat.id);
+            applySpoken(r, beat);
             auto it = host_->tagIndex.find(beat.id);
             if (it != host_->tagIndex.end() && !it->second.empty()) { r.hasTags = true; r.tags = it->second; }
             if (shown.kind == "text") { r.type = StepType::Text; return r; }

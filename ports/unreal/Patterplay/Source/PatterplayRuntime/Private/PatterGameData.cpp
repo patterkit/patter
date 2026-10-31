@@ -249,7 +249,27 @@ bool UPatterGameData::NextStage(const FPatterGameDataField& Field, const FString
 	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
-double UPatterGameData::EstimateLineDuration(const FString& Text, const FString& Locale)
+double UPatterGameData::EstimateLineDuration(const FString& Text, const FString& Locale, double SyllablesPerSecond)
 {
-	return patter::estimateLineDuration(Std(Text), Std(Locale));
+	return patter::estimateLineDuration(Std(Text), Std(Locale), SyllablesPerSecond);
+}
+
+TArray<FPatterSpeechUnit> UPatterGameData::SpeechUnits(const FString& Text, const FString& Locale)
+{
+	TArray<FPatterSpeechUnit> Out;
+	for (const patter::SpeechUnit& U : patter::speechUnits(Std(Text), Std(Locale)))
+	{
+		FPatterSpeechUnit& Unit = Out.AddDefaulted_GetRef();
+		Unit.Kind = U.kind == patter::SpeechUnitKind::Pause ? EPatterSpeechUnitKind::Pause
+			: U.kind == patter::SpeechUnitKind::Closed ? EPatterSpeechUnitKind::Closed : EPatterSpeechUnitKind::Syllable;
+		Unit.Weight = U.weight;
+		Unit.Start = U.start;
+		Unit.End = U.end;
+	}
+	return Out;
+}
+
+double UPatterGameData::CountSyllables(const FString& Text, const FString& Locale)
+{
+	return patter::countSyllables(Std(Text), Std(Locale));
 }

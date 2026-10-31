@@ -17,7 +17,7 @@ import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterki
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./scene-kits.js";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
-import { projectQualifiers, usedSpeakerPairs, sceneFolderLayout, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
+import { projectQualifiers, usedSpeakerPairs, sceneFolderLayout, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER, DEFAULT_SPEAKER_PATTERN, DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND, estimateLineDuration } from "@patterkit/model";
 import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQualifiersInAuthoring, renameQualifiersInHandoff, renameQualifierLabels, moveQualifierKeys, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
 import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD, PROJECT_EXTENSION_STEM, castStringKey } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
@@ -394,6 +394,7 @@ function summarise(p: LoadedProject): OpenedProject {
     ...castNamesOf(p),
     qualifiers: projectQualifiers(p.project),
     padAfterDefault: p.project.padAfterDefault ?? DEFAULT_PAD_AFTER,
+    estimateSyllablesPerSecond: p.project.estimateSyllablesPerSecond ?? DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND,
     localiseDialogueText: p.project.localiseDialogueText ?? false,
     gameDataFields: p.project.gameDataFields ?? {},
     scenes: p.scenes.map((s) => ({ id: s.id, name: s.name, blocks: s.blocks.map((b) => ({ id: b.id, name: b.name })) })),
@@ -2101,14 +2102,18 @@ function resetPlaySession(): void { flow = null; engine = null; playBundle = nul
 // `scene` is the flow's CURRENT scene (Flow.currentScene), captured right after the advance that
 // produced this beat - the runtime sets it when a jump crosses scenes, so it is the authority on
 // where the playhead is. The editor uses it to follow a cross-scene jump.
+/** How long a played line or text lasts with no recording: as it's spoken, in the project's main language, at the
+ *  project's rate, whatever language Play shows (an IDs-only build has no spoken text, so its shown text). */
+const estimateOf = (r: Extract<StepResult, { type: "line" | "text" }>): number =>
+  estimateLineDuration(r.spokenText ?? r.text, r.spokenLocale, r.estimateRate);
 const toStep = (r: StepResult, scene: string | null): PlayStep | null => {
   const s = scene ?? undefined;
   if (r.type === "line") {
     // The cue's colour slot, when the cast stores one (kept through a rename): the play window paints with it.
     const colour = r.character ? (loaded?.project.cast ?? []).find((c) => c.name === r.character)?.colour : undefined;
-    return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction, qualifier: r.qualifier, qualifierName: r.qualifierName, speakerLabel: r.speakerLabel, padAfter: r.padAfter, ...(colour !== undefined ? { colour } : {}) };
+    return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction, qualifier: r.qualifier, qualifierName: r.qualifierName, speakerLabel: r.speakerLabel, padAfter: r.padAfter, estimate: estimateOf(r), ...(colour !== undefined ? { colour } : {}) };
   }
-  if (r.type === "text") return { kind: "text", id: r.id, scene: s, text: r.text, padAfter: r.padAfter, ...(r.action ? { action: true } : {}) };
+  if (r.type === "text") return { kind: "text", id: r.id, scene: s, text: r.text, padAfter: r.padAfter, estimate: estimateOf(r), ...(r.action ? { action: true } : {}) };
   if (r.type === "gameEvent") return { kind: "gameEvent", id: r.id, scene: s };
   return null; // choice / end carry no played beat
 };
@@ -3203,6 +3208,8 @@ export function readSettings(): ProjectSettingsDto | null {
     formatting: p.formatting ?? true,
     // Line padding: the project's default pause, else the built-in one, so the field is never blank.
     padAfterDefault: p.padAfterDefault ?? DEFAULT_PAD_AFTER,
+    // The timing for lines without audio, likewise never blank.
+    estimateSyllablesPerSecond: p.estimateSyllablesPerSecond ?? DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND,
     localiseDialogueText: p.localiseDialogueText ?? false,
     localeDefault: p.locales.default,
     locales: p.locales.all,
@@ -3327,6 +3334,9 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
       // Line padding: stored only when it differs from the built-in default, as the ladders are. A caller
       // that sends none (an older settings shape) leaves the project's as it is.
       padAfterDefault: s.padAfterDefault === undefined ? loaded.project.padAfterDefault : s.padAfterDefault === DEFAULT_PAD_AFTER ? undefined : s.padAfterDefault,
+      // The timing for lines without audio: the same, against the built-in rate.
+      estimateSyllablesPerSecond: s.estimateSyllablesPerSecond === undefined ? loaded.project.estimateSyllablesPerSecond
+        : s.estimateSyllablesPerSecond === DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND ? undefined : s.estimateSyllablesPerSecond,
       // Action text: default OFF, so stored only when ticked on; an older settings shape leaves it alone.
       localiseDialogueText: s.localiseDialogueText === undefined ? loaded.project.localiseDialogueText : s.localiseDialogueText ? true : undefined,
       // Autosave and Auto Rebuild are no longer project settings (rulings A and B of the October 2026
