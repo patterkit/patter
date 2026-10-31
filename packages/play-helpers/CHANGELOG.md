@@ -1,5 +1,13 @@
 # @patterkit/play-helpers
 
+## 0.12.1
+
+### Patch Changes
+
+- 1e2deaf: Uses `@patterkit/runtime` 0.39.0, the Patterplay 0.39.0 release.
+- Updated dependencies [4e3910a]
+  - @patterkit/model@0.24.0
+
 ## 0.12.0
 
 ### Minor Changes
