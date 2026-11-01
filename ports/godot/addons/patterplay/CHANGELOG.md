@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-01
+
 ### Added
 
 - **Steering, for tools.** The engine option `steer` takes an Object with `gate(point)` and `pick(point)` methods,

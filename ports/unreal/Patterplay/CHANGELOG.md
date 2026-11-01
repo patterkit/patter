@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-01
+
 ### Added
 
 - **Steering, for tools (C++ only).** The core's `patter::EngineOptions::steer` takes a `patter::Steerer`, a struct

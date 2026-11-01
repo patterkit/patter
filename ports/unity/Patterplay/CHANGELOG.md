@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-01
+
 ### Added
 
 - **Steering, for tools.** `EngineOptions.Steer` takes an `ISteerer`, a hook for a bake or a test that has to

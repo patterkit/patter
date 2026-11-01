@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-01
+
 ### Added
 
 - **Steering, for tools.** The engine option `steer` takes a steerer with `gate(point)` and `pick(point)`, for a bake
