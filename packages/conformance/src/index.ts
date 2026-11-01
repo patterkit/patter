@@ -7,8 +7,8 @@
 
 export type {
   Corpus, DurationCase, SpeechCase, TranscriptSpoken, ExpressionCase, SpecificityCase, RuntimeCase, ScriptedCase, GameDataCase, SaveCase, ScriptOp, CaseEngineOptions, TranscriptStep, TranscriptOption, TranscriptPrompt, ScopeBag,
-  ExpressionFixture, SpecificityFixture, RuntimeFixture, ScriptedFixture, GameDataFixture, SaveFixture, Fixtures,
+  ExpressionFixture, SpecificityFixture, RuntimeFixture, ScriptedFixture, GameDataFixture, SaveFixture, Fixtures, SteerCase, SteerFixture, SteerPointRecord,
 } from "./types.js";
 export { buildCorpus, serializeCorpus } from "./build.js";
-export { runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runScript, runSaveCase, runGameDataCase, runLogCase, runAudioCase, runDurationCase, runSpeechCase, envelopeKeyPaths, normaliseStep, mulberry32 } from "./runner.js";
+export { runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runScript, runSaveCase, runGameDataCase, runLogCase, runSteerCase, runAudioCase, runDurationCase, runSpeechCase, envelopeKeyPaths, normaliseStep, mulberry32 } from "./runner.js";
 export { cases } from "./cases.js";

@@ -33,6 +33,15 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Steering, for tools.** The engine option `steer` takes a steerer with `gate(point)` and `pick(point)`, for a bake
+  or a test that has to reach content whatever the game's data says. `gate` decides each condition a run, a choice
+  option, or a fallback reaches, and `pick` decides each branch and sequence pick, and each hears every point as it's
+  passed, with its default. An option steered true is offered as eligible, and a hidden one is offered. Steering
+  changes no values, and the log's new `steered` entry says when an answer overruled the engine. Never for a shipped
+  game. The conformance corpus is version 12, with the section `steers`.
+
 ## [0.39.0] - 2026-10-31
 
 ### Added

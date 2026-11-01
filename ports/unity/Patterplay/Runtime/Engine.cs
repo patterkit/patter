@@ -87,6 +87,11 @@ namespace Patterkit.Patterplay
         /// whenever a choice runs dry. Unaffected by Log and useful with it off - it is live
         /// feedback, not an audit read afterwards.</summary>
         public Action<string> OnDryChoice;
+        /// <summary>Tooling only (a bake, a test): steer every decision the flow makes on game data, its
+        /// conditions and its branch and sequence picks, and hear each one as it's passed (see
+        /// <see cref="ISteerer"/>). Never set it in a shipped game. Unset, nothing changes. A HotSwap
+        /// replacement keeps it. Parity with the JS runtime's steer.</summary>
+        public ISteerer Steer;
         /// <summary>Called with each problem the engine reported and carried on past (see <see cref="PlayError"/>):
         /// a condition that failed and counted as false, an effect that failed and was skipped, a part of a
         /// Best-match condition that failed and scored as false, a set-up problem (reported as the constructor
@@ -237,6 +242,58 @@ namespace Patterkit.Patterplay
             : $"{Kind} on {Node} in flow '{Flow}' failed, played through: {Message}";
     }
 
+    /// <summary>
+    /// A tool's hand on the flow's decisions (<see cref="EngineOptions.Steer"/>): for a bake or a test that has
+    /// to reach content whatever the game's data says, never for play. Every decision on game data is one of two
+    /// kinds, and each has a method. Every answer is explicit: a steerer that only listens returns
+    /// <c>point.Default</c>, and a method a steerer leaves out answers the default for its kind (each has a
+    /// default implementation that does just that). Steering changes no values: effects run as written, and a
+    /// later condition reads whatever the story has set. The same hook on every runtime (steer in JS).
+    /// </summary>
+    public interface ISteerer
+    {
+        /// <summary>A node's condition, as a run, a choice, or a fallback reaches it: return whether it holds.
+        /// Asked only for a node that has a condition. An option answered true is offered as eligible (a hidden
+        /// one included), and Choose takes it. Left out, the condition's own verdict.</summary>
+        bool Gate(GatePoint point) => point.Default;
+        /// <summary>A branch or sequence about to pick one child: return the child's id to play, or "" for
+        /// none. Asked once per pick (its children's conditions aren't also asked as gates), after the selector
+        /// has run, so its cursor moves as it would have. An id that isn't one of the group's children (or
+        /// null) throws, as Choose with an unknown id does. Left out, the selector's pick.</summary>
+        string Pick(PickPoint point) => point.Default;
+    }
+
+    /// <summary>A condition the flow has reached (see <see cref="ISteerer.Gate"/>).</summary>
+    public sealed class GatePoint
+    {
+        /// <summary>The flow's id.</summary>
+        public string Flow;
+        /// <summary>The snippet, group, or option whose condition this is.</summary>
+        public string Node;
+        /// <summary>"run" (a run's child, skipped if false), "option" (a choice's option, greyed or hidden),
+        /// or "fallback" (a choice's fallback).</summary>
+        public string Where;
+        /// <summary>The condition's text, as authored ("" when the bundle doesn't carry it).</summary>
+        public string Source;
+        /// <summary>What the condition says now: false if it failed to evaluate (reported to OnError as ever).</summary>
+        public bool Default;
+    }
+
+    /// <summary>A branch or sequence about to pick (see <see cref="ISteerer.Pick"/>).</summary>
+    public sealed class PickPoint
+    {
+        /// <summary>The flow's id.</summary>
+        public string Flow;
+        /// <summary>The branch or sequence.</summary>
+        public string Group;
+        /// <summary>"branch" or "sequence".</summary>
+        public string Selector;
+        /// <summary>Every child, in authored order, with its condition's real verdict.</summary>
+        public List<(string Id, bool Eligible)> Children;
+        /// <summary>The child the engine would pick, or "" for none.</summary>
+        public string Default;
+    }
+
     /// <summary>One retained decision: what the engine chose and why, not what it produced. The JS runtime's
     /// LogEntry, under the same field names: `Type` says which of them an entry carries, and the rest are
     /// null. `Seq` is monotonic across the flow and survives ClearLog.
@@ -248,6 +305,9 @@ namespace Patterkit.Patterplay
     /// <item>jump: To, Mode</item>
     /// <item>write: Target, Value, Prev (null when there was none)</item>
     /// <item>diagnostic: a content error the engine played through (see <see cref="PlayError"/>): Kind, Node, Source, Message</item>
+    /// <item>steered: a steerer's answer that overruled the engine (see <see cref="ISteerer"/>), logged before the
+    /// entry it changed: Node (the gated node, or for a pick the group), Kind ("gate" or "pick"), Default and
+    /// Answer (a bool for a gate; for a pick a child id, "" for none)</item>
     /// </list></summary>
     public sealed class LogEntry
     {
@@ -275,12 +335,17 @@ namespace Patterkit.Patterplay
         public string Target;
         public ExprValue Value;
         public ExprValue Prev;
-        /// <summary>A diagnostic's <see cref="PlayError.Kind"/>: condition | effect | best-match | setup | save.</summary>
+        /// <summary>A diagnostic's <see cref="PlayError.Kind"/>: condition | effect | best-match | setup | save;
+        /// a steered entry's "gate" or "pick".</summary>
         public string Kind;
         public string Node;
         /// <summary>A diagnostic's expression source, when the bundle carries it.</summary>
         public string Source;
         public string Message;
+        /// <summary>A steered entry's default: a bool for a gate, a child id (string, "" for none) for a pick.</summary>
+        public object Default;
+        /// <summary>A steered entry's answer: a bool for a gate, a child id (string, "" for none) for a pick.</summary>
+        public object Answer;
 
         /// <summary>A copy, for the engine's stream.</summary>
         internal LogEntry Copy() => (LogEntry)MemberwiseClone();
@@ -337,6 +402,8 @@ namespace Patterkit.Patterplay
         /// in JS). Live feedback, distinct from the log's `dry` entry: a shipped game runs with the log off
         /// and this still wired.</summary>
         public Action<string> OnDryChoice;
+        /// <summary>The tooling steerer (EngineOptions.Steer), or null.</summary>
+        public ISteerer Steer;
         /// <summary>The game's EngineOptions.OnError, or null to report through Engine.DefaultOnError.</summary>
         public Action<PlayError> OnError;
         /// <summary>The game's EngineOptions.OnRefit, or null to report through Engine.DefaultOnRefit.</summary>
@@ -694,6 +761,7 @@ namespace Patterkit.Patterplay
                 Tracing = options.Log,
                 EngineLog = _engineLog,
                 OnDryChoice = options.OnDryChoice,
+                Steer = options.Steer,
                 OnError = options.OnError,
                 OnRefit = options.OnRefit,
                 Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay, QualifierDisplay = qualifierDisplay,

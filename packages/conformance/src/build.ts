@@ -14,7 +14,7 @@ import { EXTENSION_SHARD, EXTENSIONS_DIR, MANIFEST_EXTENSION, PROJECT_EXTENSION_
 import type { Bundle, ExtensionShard, SaveEnvelope } from "@patterkit/model";
 import type { ExportInput } from "@patterkit/compiler";
 import { envelopeKeyPaths, runScript } from "./runner.js";
-import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameDataCase, LogCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase } from "./types.js";
+import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameDataCase, LogCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase, SteerCase } from "./types.js";
 
 /**
  * The corpus version, which says what a runner must understand.
@@ -52,8 +52,11 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  `durations` re-pinned, a line timed by its speech units' weight at a rate (`syllablesPerSecond`, default 4);
  *  the bundle's `estimateSyllablesPerSecond`; and each line and text step's `spokenText`, `spokenLocale`, and
  *  `estimateRate`, recorded only in a scripted case that sets `spoken`. Only the duration expectations changed.
+ *  12: steering (patterkit design/proposals/patterplay-steering.md). The section `steers`: a tool's steerer on the
+ *  engine (`steer`), answering each condition a run, a choice or a fallback reaches and each branch and sequence
+ *  pick, and the log entry `steered`. No earlier expectation changed.
  */
-export const CORPUS_VERSION = 11;
+export const CORPUS_VERSION = 12;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at
@@ -168,6 +171,18 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     expectedLog: f.expectedLog, // hand-authored contract, carried through unchanged
   }));
 
+  const steers: SteerCase[] = fixtures.steers.map((f) => ({
+    name: f.name,
+    bundle: exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales }),
+    ...(f.seed !== undefined ? { seed: f.seed } : {}),
+    start: { scene: f.start?.scene ?? f.scenes[0]!.id, ...(f.start?.block ? { block: f.start.block } : {}) },
+    ...(f.choices ? { choices: f.choices } : {}),
+    answers: f.answers,
+    expectedPoints: f.expectedPoints,
+    expectedTranscript: f.expectedTranscript,
+    ...(f.expectedLog ? { expectedLog: f.expectedLog } : {}),
+  }));
+
   const describes: DescribeCase[] = fixtures.describes.map((f) => {
     const bundle = exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales, extensions: fixtureExtensions(f) });
     return { name: f.name, bundle, expected: JSON.parse(JSON.stringify(describeBundle(bundle))) };
@@ -183,7 +198,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     };
   });
 
-  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, describes, outlines, audio: fixtures.audio, durations: fixtures.durations, speech: fixtures.speech };
+  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, steers, describes, outlines, audio: fixtures.audio, durations: fixtures.durations, speech: fixtures.speech };
 }
 
 // The corpus as the committed corpus.json text. Every case's inputs (`bundle`, `bundleB`, `envelope`) write a

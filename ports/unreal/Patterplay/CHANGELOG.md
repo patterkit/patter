@@ -7,6 +7,18 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Steering, for tools (C++ only).** The core's `patter::EngineOptions::steer` takes a `patter::Steerer`, a struct
+  of two `std::function`s, `gate` (a `patter::GatePoint` in, a `bool` out) and `pick` (a `patter::PickPoint` in, a
+  child's id or `""` out), for a bake or a test that has to reach content whatever the game's data says. `gate`
+  decides each condition a run, a choice option, or a fallback reaches, and `pick` decides each branch and sequence
+  pick, and each hears every point as it's passed, with its default (`def`). An option steered true is offered as
+  eligible, and a hidden one is offered. A pick naming a child the group doesn't have throws `std::runtime_error`.
+  Steering changes no values, a hot swap keeps the steerer, and the log's new `steered` entry
+  (`patter::LogEntry::def` and `answer`) says when an answer overruled the engine. Never for a shipped game, and
+  there's no Blueprint form. The TestHost runs the conformance corpus's new `steers` section (corpus version 12).
+
 ## [0.39.0] - 2026-10-31
 
 ### Added

@@ -6,6 +6,17 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Steering, for tools.** The engine option `steer` takes an Object with `gate(point)` and `pick(point)` methods,
+  for a bake or a test that has to reach content whatever the game's data says. `gate` decides each condition a
+  run, a choice option, or a fallback reaches, and `pick` decides each branch and sequence pick, and each hears
+  every point as it's passed, with its default. A method the Object doesn't have answers the default. An option
+  steered true is offered as eligible, and a hidden one is offered. Steering changes no values, and the log's new
+  `steered` entry says when an answer overruled the engine. An answer that isn't one is refused as `choose()`
+  refuses an unknown option, through `flow.last_error()`. Never for a shipped game. The conformance corpus is
+  version 12, with the section `steers`.
+
 ## [0.39.0] - 2026-10-31
 
 ### Added

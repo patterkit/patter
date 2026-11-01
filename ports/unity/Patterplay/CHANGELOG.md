@@ -6,6 +6,20 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Steering, for tools.** `EngineOptions.Steer` takes an `ISteerer`, a hook for a bake or a test that has to
+  reach content whatever the game's data says (never for a shipped game). `Gate(GatePoint)` answers each
+  condition a run's child, a choice's option, or a choice's fallback reaches, and is asked only for a node that
+  has a condition; an option answered true is offered as eligible (a hidden one included) and `Choose` takes it.
+  `Pick(PickPoint)` answers each branch or sequence pick with a child's id or `""` for none, once per pick and
+  after the selector has run, so a sequence's cursor and a shuffle's bag move as they would have; its children's
+  conditions aren't also asked as gates. Each point carries its `Default`, and both methods default to answering
+  it, so a steerer can implement just one. A pick naming a child the group doesn't have, or answering null,
+  throws, as `Choose` with an unknown id does. Steering changes no values, and a `HotSwap` keeps the steerer. With
+  `Log` on, an answer that differs from its default adds a `steered` entry (`Node`, `Kind` "gate" or "pick",
+  `Default`, and `Answer`) before the entry it changed. The conformance corpus is version 12.
+
 ## [0.39.0] - 2026-10-31
 
 ### Added

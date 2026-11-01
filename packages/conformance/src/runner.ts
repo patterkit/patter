@@ -23,7 +23,7 @@ import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, FlowState, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
-  AudioCase, DurationCase, SpeechCase, TranscriptSpoken, LogCase,
+  AudioCase, DurationCase, SpeechCase, TranscriptSpoken, LogCase, SteerCase, SteerPointRecord,
   ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptOption, TranscriptPrompt, TranscriptStep,
 } from "./types.js";
 
@@ -535,6 +535,49 @@ export function runLogCase(c: LogCase, maxSteps = 200): { log: unknown[]; traced
   };
   const on = play(true);
   return { log: on.log, tracedOn: on.traced, tracedOff: play(false).traced };
+}
+
+/**
+ * Play a steering case: a steerer answers each point from the case's `answers` in order, then with the point's
+ * default, and every point is recorded with its answer. The engine log is returned when the case expects one
+ * (the play then runs with `log` on). A condition that fails to evaluate is reported, not printed.
+ */
+export function runSteerCase(c: SteerCase, maxSteps = 1000): { points: SteerPointRecord[]; transcript: TranscriptStep[]; log?: unknown[] } {
+  const answers = [...c.answers];
+  const points: SteerPointRecord[] = [];
+  const engine = new Engine(c.bundle, {
+    ...(c.seed !== undefined ? { seed: c.seed } : {}),
+    ...(c.expectedLog ? { log: true } : {}),
+    onError: () => {},
+    steer: {
+      gate: (p) => {
+        const next = answers.shift();
+        const answer = next === undefined ? p.default : next as boolean;
+        points.push({ kind: "gate", ...p, answer });
+        return answer;
+      },
+      pick: (p) => {
+        const next = answers.shift();
+        const answer = next === undefined ? p.default : next as string;
+        points.push({ kind: "pick", ...p, answer });
+        return answer;
+      },
+    },
+  });
+  const flow = engine.openFlow("main", { scene: c.start.scene, ...(c.start.block ? { block: c.start.block } : {}) });
+  const choices = [...(c.choices ?? [])];
+  const transcript: TranscriptStep[] = [];
+  for (let i = 0; i < maxSteps; i++) {
+    const r = flow.advance();
+    transcript.push(normaliseStep(r));
+    if (r.type === "end") break;
+    if (r.type === "choice") {
+      const pick = choices.shift() ?? r.options.find((o) => o.eligible)?.id;
+      if (pick === undefined) break;
+      flow.choose(pick);
+    }
+  }
+  return { points, transcript, ...(c.expectedLog ? { log: JSON.parse(JSON.stringify(engine.log())) as unknown[] } : {}) };
 }
 
 /** What the audio resolver gives for each lookup of an audio case (the reference's createAudioResolver). */

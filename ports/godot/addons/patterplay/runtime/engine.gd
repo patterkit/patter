@@ -73,7 +73,7 @@ class Checkpoint extends RefCounted:
 ## Every key the options Dictionary takes. Another is reported ("setup"): the options are an untyped
 ## Dictionary, so a mistyped or retired key would otherwise be ignored in silence. JS's ENGINE_OPTIONS.
 const ENGINE_OPTIONS := ["rng", "seed", "locale", "host_scopes", "registry", "replay_prompt_on_choose",
-	"closed_captions", "on_dry_choice", "on_error", "on_refit", "log"]
+	"closed_captions", "on_dry_choice", "steer", "on_error", "on_refit", "log"]
 
 
 func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
@@ -90,6 +90,7 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	_current_locale = _resolve_locale(bundle, _requested_locale)
 	if _current_locale.has("problem"):
 		_setup.append([str(_requested_locale), _current_locale["problem"]])
+	var steer = _usable_steerer(options.get("steer"))
 	# Localisation mode (spec §11): "ids" + no source-debug -> emit beat IDs + omit character names.
 	var loc: Dictionary = bundle.get("localisation", {})
 	var emit_ids: bool = loc.get("mode", "embedded") == "ids" and not loc.get("sourceDebug", false)
@@ -102,6 +103,7 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	# The SHARED array, not a callable closing over `self`: see flow_host.gd.
 	h.engine_log = _engine_log
 	h.on_dry_choice = options.get("on_dry_choice")
+	h.steer = steer
 	h.on_error = options.get("on_error")
 	h.on_refit = options.get("on_refit")
 	h.bundle = bundle
@@ -199,6 +201,23 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 		for s in _setup:
 			_report_setup(s[0], s[1])
 	_setup = []
+
+
+## The "steer" option if it's a steerer: an Object whose `gate` and `pick`, where it has members by those
+## names, are methods. Anything else (not an Object, or a `gate` or `pick` property that isn't a method) is
+## reported ("setup") and ignored, so a mistyped steerer never half-steers a run. JS's usableSteerer.
+func _usable_steerer(steer) -> Object:
+	if steer == null:
+		return null
+	var ok: bool = steer is Object and is_instance_valid(steer)
+	if ok:
+		for m in ["gate", "pick"]:
+			if not (steer as Object).has_method(m) and m in steer:
+				ok = false
+	if ok:
+		return steer
+	_setup.append(["steer", 'the engine option "steer" isn\'t a steerer (an object with gate and pick methods), so it\'s ignored'])
+	return null
 
 
 ## Report a set-up problem (a "setup" error, which belongs to no flow): to the game's on_error, and to

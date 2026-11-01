@@ -13,6 +13,7 @@
 #include <cmath>
 #include <sstream>
 #include <iostream>
+#include <deque>
 #include <queue>
 #include <chrono>
 #include "Json.h"
@@ -581,6 +582,11 @@ static JsonValue logEntryToJson(const LogEntry& e, bool withSeq = true)
         if (!e.source.empty()) o.set("source", JsonValue::Str(e.source));
         o.set("message", JsonValue::Str(e.message));
     }
+    else if (e.type == "steered")
+    {
+        o.set("node", JsonValue::Str(e.node)); o.set("kind", JsonValue::Str(e.kind));
+        o.set("default", valueToJson(e.def)); o.set("answer", valueToJson(e.answer));
+    }
     return o;
 }
 
@@ -646,6 +652,108 @@ static int runLogs(const JsonValue& arr)
             else ++pass;
         }
         catch (const std::exception& ex) { fail("logs", name, ex.what()); }
+    }
+    return pass;
+}
+
+// The corpus's steering cases (corpus 12), as the reference's runSteerCase plays them: a steerer answers each
+// point from the case's `answers` in order, then with the point's default, and every point is recorded with its
+// answer. The flow is "main", the case's seed is the engine's seed, the log is on only when the case expects
+// one, and a condition that fails to evaluate is reported to a handler that swallows it.
+struct SteerRun { JsonValue points = JsonValue::Arr(); JsonValue transcript = JsonValue::Arr(); JsonValue log = JsonValue::Arr(); };
+
+static SteerRun playSteerCase(const JsonValue& c)
+{
+    Bundle bundle = parseBundle(c.at("bundle"));
+    const JsonValue* expectedLog = c.find("expectedLog");
+    auto answers = std::make_shared<std::deque<JsonValue>>(c.at("answers").arr.begin(), c.at("answers").arr.end());
+    auto run = std::make_shared<SteerRun>();
+    EngineOptions opts;
+    if (const JsonValue* sd = c.find("seed")) { opts.hasSeed = true; opts.seed = static_cast<int64_t>(sd->num); }
+    opts.log = expectedLog != nullptr;
+    opts.onError = [](const PlayError&) {};
+    const auto verdicts = [](const std::vector<std::pair<std::string, bool>>& list)
+    {
+        JsonValue a = JsonValue::Arr();
+        for (const auto& v : list) { JsonValue o = JsonValue::Obj(); o.set("id", JsonValue::Str(v.first)); o.set("eligible", JsonValue::Boolean(v.second)); a.push(o); }
+        return a;
+    };
+    opts.steer.gate = [answers, run](const GatePoint& p)
+    {
+        bool answer = p.def;
+        if (!answers->empty())
+        {
+            const JsonValue next = answers->front(); answers->pop_front();
+            if (next.type != JsonValue::Bool) throw std::runtime_error("the case answers a gate (" + p.node + ") with " + dump(next));
+            answer = next.b;
+        }
+        JsonValue o = JsonValue::Obj();
+        o.set("kind", JsonValue::Str("gate")); o.set("flow", JsonValue::Str(p.flow)); o.set("node", JsonValue::Str(p.node));
+        o.set("where", JsonValue::Str(p.where)); o.set("source", JsonValue::Str(p.source));
+        o.set("default", JsonValue::Boolean(p.def)); o.set("answer", JsonValue::Boolean(answer));
+        run->points.push(o);
+        return answer;
+    };
+    opts.steer.pick = [answers, run, verdicts](const PickPoint& p)
+    {
+        std::string answer = p.def;
+        if (!answers->empty())
+        {
+            const JsonValue next = answers->front(); answers->pop_front();
+            if (next.type != JsonValue::String) throw std::runtime_error("the case answers a pick (" + p.group + ") with " + dump(next));
+            answer = next.str;
+        }
+        JsonValue o = JsonValue::Obj();
+        o.set("kind", JsonValue::Str("pick")); o.set("flow", JsonValue::Str(p.flow)); o.set("group", JsonValue::Str(p.group));
+        o.set("selector", JsonValue::Str(p.selector)); o.set("children", verdicts(p.children));
+        o.set("default", JsonValue::Str(p.def)); o.set("answer", JsonValue::Str(answer));
+        run->points.push(o);
+        return answer;
+    };
+    Engine engine(bundle, opts);
+    const JsonValue& start = c.at("start");
+    std::string startBlock;
+    if (const JsonValue* bl = start.find("block")) startBlock = bl->str;
+    Flow* flow = engine.openFlow("main", start.at("scene").str, startBlock);
+    std::queue<std::string> scripted;
+    if (const JsonValue* ch = c.find("choices")) for (const auto& x : ch->arr) scripted.push(x.str);
+    for (int i = 0; i < 1000; ++i)
+    {
+        StepResult step = flow->advance();
+        run->transcript.push(normalize(step, isIdsOnly(bundle)));
+        if (step.type == StepType::End) break;
+        if (step.type == StepType::Choice)
+        {
+            std::string pick;
+            if (!scripted.empty()) { pick = scripted.front(); scripted.pop(); }
+            else for (auto& o : step.options) if (o.eligible) { pick = o.id; break; }
+            if (pick.empty()) break;
+            flow->choose(pick);
+        }
+    }
+    if (expectedLog) for (const LogEntry& e : engine.log()) run->log.push(logEntryToJson(e));
+    return *run;
+}
+
+static int runSteers(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            SteerRun run = playSteerCase(c);
+            const JsonValue* expectedLog = c.find("expectedLog");
+            if (!matchValue(run.points, c.at("expectedPoints")))
+                fail("steers", name, "points mismatch\n    expected " + dump(c.at("expectedPoints")) + "\n    got      " + dump(run.points));
+            else if (!matchValue(run.transcript, c.at("expectedTranscript")))
+                fail("steers", name, "transcript mismatch\n    expected " + dump(c.at("expectedTranscript")) + "\n    got      " + dump(run.transcript));
+            else if (expectedLog && !matchValue(run.log, *expectedLog))
+                fail("steers", name, "log mismatch\n    expected " + dump(*expectedLog) + "\n    got      " + dump(run.log));
+            else ++pass;
+        }
+        catch (const std::exception& ex) { fail("steers", name, ex.what()); }
     }
     return pass;
 }
@@ -3272,6 +3380,86 @@ static void runDryChoiceCases()
     std::cout << "  [dry-choice] a choice that runs dry and ends the flow, reported once, its end RanDry: " << g_dryPass << "/" << g_dryTotal << "\n";
 }
 
+// Steering beyond what the corpus pins: these mirror the JS tests (steer.test.ts) that apply here. An answer of
+// the wrong type and a steerer of the wrong shape can't be written in C++ (the option is a struct of two typed
+// std::functions), so JS's checks for those have no counterpart. Added: a steered answer reaches onTrace with
+// the log off, and no steerer changes nothing.
+static int g_steerPass = 0, g_steerTotal = 0;
+
+static void steerCase(const std::string& name, const std::function<void()>& body)
+{
+    ++g_steerTotal;
+    try { body(); ++g_steerPass; }
+    catch (const std::exception& ex) { fail("steer", name, ex.what()); }
+}
+
+static void runSteerCases()
+{
+    // steer.test.ts's fixture, as the JS compiler exports it: a run child on @met, then a branch whose first
+    // child is on @met and whose second has no condition.
+    static const Bundle bundle = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"p","hash":"108ck7d","structureHash":"0kfwn76"},"voiced":false,"locales":{"default":"en","included":["en"]},"properties":[{"name":"met","type":"boolean","default":false}],"scenes":{"s":{"id":"s","type":"scene","name":"S","blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"sn_a","type":"snippet","condition":{"src":"@met","ast":["sv","patter","met"]},"beats":[{"id":"A","kind":"text"}]},{"id":"g","type":"group","selector":"branch","children":[{"id":"sn_yes","type":"snippet","condition":{"src":"@met","ast":["sv","patter","met"]},"beats":[{"id":"YES","kind":"text"}]},{"id":"sn_no","type":"snippet","beats":[{"id":"NO","kind":"text"}]}]},{"id":"sn_end","type":"snippet","jump":{"to":"END"}}]}]}},"strings":{"en":{"A":"a","YES":"yes","NO":"no"}}})JSON"));
+    const auto texts = [](Engine& engine)
+    {
+        Flow* flow = engine.openFlow("main", "");
+        std::string out;
+        for (StepResult r = flow->advance(); r.type != StepType::End; r = flow->advance())
+            if (r.type == StepType::Text) out += (out.empty() ? "" : ",") + r.text;
+        return out;
+    };
+    const auto steered = [](Steerer steer) { EngineOptions opts; opts.steer = std::move(steer); return opts; };
+
+    steerCase("a pick naming a child the group doesn't have throws, as choose() with an unknown id does", [&]
+    {
+        Steerer s; s.pick = [](const PickPoint&) { return std::string("sn_nowhere"); };
+        Engine engine(bundle, steered(s));
+        expectThrow([&] { texts(engine); }, "steer: pick for g answered \"sn_nowhere\", which isn't one of its children", "an unknown pick");
+    });
+    steerCase("a function left empty answers the default for its kind", [&]
+    {
+        Steerer gate; gate.gate = [](const GatePoint&) { return true; };
+        Engine a(bundle, steered(gate));
+        need(texts(a) == "a,no", "gate alone: " + texts(a));
+        Steerer pick; pick.pick = [](const PickPoint&) { return std::string("sn_yes"); };
+        Engine b(bundle, steered(pick));
+        const std::string got = texts(b);
+        need(got == "yes", "pick alone: " + got);
+    });
+    steerCase("no steerer changes nothing", [&]
+    {
+        Engine engine(bundle, EngineOptions{});
+        const std::string got = texts(engine);
+        need(got == "no", "unsteered: " + got);
+    });
+    steerCase("a hot swap keeps the steerer", [&]
+    {
+        Steerer s;
+        s.gate = [](const GatePoint&) { return true; };
+        s.pick = [](const PickPoint&) { return std::string("sn_yes"); };
+        Engine engine(bundle, steered(s));
+        std::unique_ptr<Engine> next = engine.hotSwap(bundle);
+        const std::string got = texts(*next);
+        need(got == "a,yes", "after the hot swap: " + got);
+    });
+    steerCase("a steered answer reaches onTrace with the log off, before the entry it changed", [&]
+    {
+        Steerer s; s.pick = [](const PickPoint&) { return std::string("sn_yes"); };
+        Engine engine(bundle, steered(s));
+        std::vector<std::string> seen;
+        auto stop = engine.onTrace([&seen](const std::string&, const LogEntry& e) { seen.push_back(traceKey(e)); });
+        texts(engine);
+        stop();
+        need(seen.size() >= 2, "only " + std::to_string(seen.size()) + " entries");
+        const std::string want = R"({"type":"steered","flow":"main","scene":"s","node":"g","kind":"pick","default":"sn_no","answer":"sn_yes"})";
+        size_t at = 0;
+        while (at < seen.size() && seen[at] != want) ++at;
+        need(at + 1 < seen.size(), "no steered entry: " + joined(seen));
+        need(seen[at + 1].find(R"("type":"select")") != std::string::npos && seen[at + 1].find(R"("picked":"sn_yes")") != std::string::npos,
+             "the steered entry wasn't followed by its select: " + seen[at + 1]);
+        need(engine.log().empty(), "the log kept entries with the log off");
+    });
+    std::cout << "  [steer] a steerer's unknown pick throws, an empty function answers the default, a hot swap keeps it: " << g_steerPass << "/" << g_steerTotal << "\n";
+}
+
 // The one address rule, on the engine's lookups: a block address given with a scene resolves WITHIN that
 // scene only (its gameId there, then the internal id of a block in it), so a real block of another scene
 // gives nothing; with no scene, a block resolves by internal id. The corpus pins openFlow and goto; these
@@ -3853,6 +4041,12 @@ int main(int argc, char** argv)
     int lg = runLogs(*logsArr);
     std::cout << "  [logs] decision logs, and onTrace streaming the same decisions: " << lg << "/" << logsArr->arr.size() << "\n";
     if (lg != static_cast<int>(logsArr->arr.size())) fail("logs", "section total", std::to_string(lg) + " of " + std::to_string(logsArr->arr.size()) + " passed");
+    // Corpus 12's steering cases. The section must exist, as for the others.
+    const JsonValue* steersArr = root.find("steers");
+    if (!steersArr) { std::cerr << "corpus has no steers section\n"; return 2; }
+    int st = runSteers(*steersArr);
+    std::cout << "  [steers] a steerer's answers at every gate and pick, its points, and the log: " << st << "/" << steersArr->arr.size() << "\n";
+    if (st != static_cast<int>(steersArr->arr.size())) fail("steers", "section total", std::to_string(st) + " of " + std::to_string(steersArr->arr.size()) + " passed");
     const JsonValue* describesArr = root.find("describes");
     if (!describesArr) { std::cerr << "corpus has no describes section\n"; return 2; }
     int ds = runDescribes(*describesArr);
@@ -3892,6 +4086,7 @@ int main(int argc, char** argv)
     runHostScopeWritableSmoke();
     runPlayErrorCases();
     runDryChoiceCases();
+    runSteerCases();
     runAddressLookupCases();
     runTraceLogSmoke();
     runOutlineSmoke();

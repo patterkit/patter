@@ -8,7 +8,7 @@
 // corpus.json; the test asserts the reference engine reproduces every value.
 // ---------------------------------------------------------------------------
 
-import type { DescribeFixture, DurationCase, SpeechCase, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
+import type { DescribeFixture, DurationCase, SpeechCase, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, SteerFixture, TranscriptStep } from "./types.js";
 import type { Bundle, CompiledGroup, CompiledSnippet, Group, ProjectFile, LocaleFile, SaveGame, Scene, Snippet } from "@patterkit/model";
 import { castStringKey, qualifierStringKey, speakerLabelKey, SPEAKER_PATTERN_KEY } from "@patterkit/model";
 import type { ExtensionShard } from "@patterkit/model";
@@ -4424,6 +4424,266 @@ const asVersion3 = (save: SaveGame, bundle: Bundle): void => {
   }
 };
 
+// --- steering (patterkit design/proposals/patterplay-steering.md) ----------------------------------------
+// A tool's steerer answers every condition a run, a choice or a fallback reaches (a gate) and every branch and
+// sequence pick, so a bake reaches content whatever the game's data says. The answers are given in order; past
+// the list's end, each point gets its default. `met` is false and `gold` is 0 throughout: no effect sets them.
+const steerProject = project({ properties: [
+  { name: "met", type: "boolean", default: false },
+  { name: "gold", type: "number", default: 0 },
+  { name: "zero", type: "number", default: 0 },
+] });
+
+const steerRun = {
+  name: "steer: a run's child steered on, another steered off, and an unconditioned one never asked",
+  project: steerProject,
+  scenes: [oneBlock("s", [
+    { id: "sn_a", type: "snippet", condition: "@met", beats: [{ id: "A", kind: "text" }] },
+    { id: "sn_b", type: "snippet", condition: "not @met", beats: [{ id: "B", kind: "text" }] },
+    { id: "sn_c", type: "snippet", beats: [{ id: "C", kind: "text" }], jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { A: "a", B: "b", C: "c" })],
+  answers: [true, false],
+  expectedPoints: [
+    { kind: "gate", flow: "main", node: "sn_a", where: "run", source: "@met", default: false, answer: true },
+    { kind: "gate", flow: "main", node: "sn_b", where: "run", source: "not @met", default: true, answer: false },
+  ],
+  expectedTranscript: [
+    { type: "text", id: "A", text: "a" },
+    { type: "text", id: "C", text: "c" },
+    { type: "end" },
+  ],
+} satisfies SteerFixture;
+
+const steerOptions = {
+  name: "steer: an option whose condition is false is offered and taken; a hidden one is offered",
+  project: steerProject,
+  scenes: [oneBlock("s", [
+    { id: "g", type: "group", selector: "choice", children: [
+      { id: "o_met", type: "group", condition: "@met", prompt: { id: "P_met", kind: "text" }, children: [
+        { id: "sn_met", type: "snippet", beats: [{ id: "MET", kind: "text" }], jump: { to: "END" } }] },
+      { id: "o_secret", type: "group", condition: "@gold > 10", secretUntilEligible: true, prompt: { id: "P_secret", kind: "text" }, children: [
+        { id: "sn_secret", type: "snippet", beats: [{ id: "SECRET", kind: "text" }], jump: { to: "END" } }] },
+      { id: "o_plain", type: "group", prompt: { id: "P_plain", kind: "text" }, children: [
+        { id: "sn_plain", type: "snippet", beats: [{ id: "PLAIN", kind: "text" }], jump: { to: "END" } }] },
+    ] },
+  ])],
+  locales: [loc("s", { P_met: "Greet", P_secret: "Bribe", P_plain: "Leave", MET: "hello again", SECRET: "a bribe", PLAIN: "bye" })],
+  answers: [true, true],
+  choices: ["o_secret"],
+  expectedPoints: [
+    { kind: "gate", flow: "main", node: "o_met", where: "option", source: "@met", default: false, answer: true },
+    { kind: "gate", flow: "main", node: "o_secret", where: "option", source: "@gold > 10", default: false, answer: true },
+  ],
+  expectedTranscript: [
+    { type: "choice", groupId: "g", options: [{ id: "o_met", eligible: true, prompt: { kind: "text", text: "Greet" } }, { id: "o_secret", eligible: true, prompt: { kind: "text", text: "Bribe" } }, { id: "o_plain", eligible: true, prompt: { kind: "text", text: "Leave" } }] },
+    { type: "text", id: "SECRET", text: "a bribe" },
+    { type: "end" },
+  ],
+} satisfies SteerFixture;
+
+const fallbackChoice = (fallbackCondition: string) => [oneBlock("s", [
+  { id: "g", type: "group", selector: "choice", children: [
+    { id: "sn_o1", type: "snippet", condition: "not @met", choiceText: "One", beats: [{ id: "O1", kind: "text" }] },
+    { id: "sn_o2", type: "snippet", condition: "@gold == 0", choiceText: "Two", beats: [{ id: "O2", kind: "text" }] },
+    { id: "sn_fb", type: "snippet", fallback: true, condition: fallbackCondition, beats: [{ id: "FB", kind: "text" }] },
+  ] },
+  { id: "sn_after", type: "snippet", beats: [{ id: "AFTER", kind: "text" }], jump: { to: "END" } },
+])];
+const fallbackStrings = [loc("s", { O1: "one", O2: "two", FB: "the fallback", AFTER: "after" })];
+
+const steerFallback = {
+  name: "steer: every option steered false, and the fallback steered true, reaches the fallback",
+  project: steerProject,
+  scenes: fallbackChoice("@met"),
+  locales: fallbackStrings,
+  answers: [false, false, true],
+  expectedPoints: [
+    { kind: "gate", flow: "main", node: "sn_o1", where: "option", source: "not @met", default: true, answer: false },
+    { kind: "gate", flow: "main", node: "sn_o2", where: "option", source: "@gold == 0", default: true, answer: false },
+    { kind: "gate", flow: "main", node: "sn_fb", where: "fallback", source: "@met", default: false, answer: true },
+  ],
+  expectedTranscript: [
+    { type: "text", id: "FB", text: "the fallback" },
+    { type: "text", id: "AFTER", text: "after" },
+    { type: "end" },
+  ],
+} satisfies SteerFixture;
+
+const steerRunsDry = {
+  name: "steer: every option and the fallback steered false runs the choice dry",
+  project: steerProject,
+  scenes: fallbackChoice("not @met"),
+  locales: fallbackStrings,
+  answers: [false, false, false],
+  expectedPoints: [
+    { kind: "gate", flow: "main", node: "sn_o1", where: "option", source: "not @met", default: true, answer: false },
+    { kind: "gate", flow: "main", node: "sn_o2", where: "option", source: "@gold == 0", default: true, answer: false },
+    { kind: "gate", flow: "main", node: "sn_fb", where: "fallback", source: "not @met", default: true, answer: false },
+  ],
+  expectedTranscript: [
+    { type: "text", id: "AFTER", text: "after" },
+    { type: "end" },
+  ],
+} satisfies SteerFixture;
+
+const steerBranch = {
+  name: "steer: a branch picked past its first eligible child, and another picked to none",
+  project: steerProject,
+  scenes: [oneBlock("s", [
+    { id: "g_1", type: "group", selector: "branch", children: [
+      { id: "sn_hi", type: "snippet", condition: "@gold > 10", beats: [{ id: "HI", kind: "text" }] },
+      { id: "sn_mid", type: "snippet", condition: "@gold >= 0", beats: [{ id: "MID", kind: "text" }] },
+      { id: "sn_low", type: "snippet", beats: [{ id: "LOW", kind: "text" }] },
+    ] },
+    { id: "g_2", type: "group", selector: "branch", children: [
+      { id: "sn_yes", type: "snippet", condition: "@met", beats: [{ id: "YES", kind: "text" }] },
+      { id: "sn_no", type: "snippet", beats: [{ id: "NO", kind: "text" }] },
+    ] },
+    { id: "sn_end", type: "snippet", beats: [{ id: "END_T", kind: "text" }], jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { HI: "high", MID: "mid", LOW: "low", YES: "yes", NO: "no", END_T: "done" })],
+  answers: ["sn_hi", ""],
+  expectedPoints: [
+    { kind: "pick", flow: "main", group: "g_1", selector: "branch", children: [{ id: "sn_hi", eligible: false }, { id: "sn_mid", eligible: true }, { id: "sn_low", eligible: true }], default: "sn_mid", answer: "sn_hi" },
+    { kind: "pick", flow: "main", group: "g_2", selector: "branch", children: [{ id: "sn_yes", eligible: false }, { id: "sn_no", eligible: true }], default: "sn_no", answer: "" },
+  ],
+  expectedTranscript: [
+    { type: "text", id: "HI", text: "high" },
+    { type: "text", id: "END_T", text: "done" },
+    { type: "end" },
+  ],
+} satisfies SteerFixture;
+
+const steerSequences = {
+  name: "steer: each order of sequence picked to a later child or to none, and one with nothing eligible picked",
+  project: steerProject,
+  seed: 7,
+  scenes: [oneBlock("s", [
+    { id: "g_seq", type: "group", selector: "sequence", options: { order: "sequential", exhaust: "once" }, children: [
+      { id: "sq_1", type: "snippet", beats: [{ id: "SQ1", kind: "text" }] },
+      { id: "sq_2", type: "snippet", beats: [{ id: "SQ2", kind: "text" }] },
+      { id: "sq_3", type: "snippet", beats: [{ id: "SQ3", kind: "text" }] },
+    ] },
+    { id: "g_shuf", type: "group", selector: "sequence", options: { order: "shuffle", exhaust: "repeat" }, children: [
+      { id: "sh_1", type: "snippet", beats: [{ id: "SH1", kind: "text" }] },
+      { id: "sh_2", type: "snippet", beats: [{ id: "SH2", kind: "text" }] },
+    ] },
+    { id: "g_best", type: "group", selector: "sequence", options: { order: "specificity", exhaust: "repeat" }, children: [
+      { id: "bm_any", type: "snippet", beats: [{ id: "BM_ANY", kind: "text" }] },
+      { id: "bm_rich", type: "snippet", condition: "@gold > 100 and @met", beats: [{ id: "BM_RICH", kind: "text" }] },
+    ] },
+    { id: "g_shut", type: "group", selector: "sequence", children: [
+      { id: "sx_1", type: "snippet", condition: "@met", beats: [{ id: "SX1", kind: "text" }] },
+      { id: "sx_2", type: "snippet", condition: "@gold > 0", beats: [{ id: "SX2", kind: "text" }] },
+    ] },
+    { id: "sn_end", type: "snippet", jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { SQ1: "first", SQ2: "second", SQ3: "third", SH1: "heads", SH2: "tails", BM_ANY: "anyone", BM_RICH: "the rich one", SX1: "shut one", SX2: "shut two" })],
+  answers: ["sq_3", "", "bm_rich", "sx_2"],
+  expectedPoints: [
+    { kind: "pick", flow: "main", group: "g_seq", selector: "sequence", children: [{ id: "sq_1", eligible: true }, { id: "sq_2", eligible: true }, { id: "sq_3", eligible: true }], default: "sq_1", answer: "sq_3" },
+    { kind: "pick", flow: "main", group: "g_shuf", selector: "sequence", children: [{ id: "sh_1", eligible: true }, { id: "sh_2", eligible: true }], default: "sh_1", answer: "" },
+    { kind: "pick", flow: "main", group: "g_best", selector: "sequence", children: [{ id: "bm_any", eligible: true }, { id: "bm_rich", eligible: false }], default: "bm_any", answer: "bm_rich" },
+    { kind: "pick", flow: "main", group: "g_shut", selector: "sequence", children: [{ id: "sx_1", eligible: false }, { id: "sx_2", eligible: false }], default: "", answer: "sx_2" },
+  ],
+  expectedTranscript: [
+    { type: "text", id: "SQ3", text: "third" },
+    { type: "text", id: "BM_RICH", text: "the rich one" },
+    { type: "text", id: "SX2", text: "shut two" },
+    { type: "end" },
+  ],
+} satisfies SteerFixture;
+
+const steerFailingCondition = {
+  name: "steer: a condition that fails to evaluate defaults to false, and can be steered true",
+  project: steerProject,
+  scenes: [oneBlock("s", [
+    { id: "sn_bad", type: "snippet", condition: "10 / @zero > 1", beats: [{ id: "BAD", kind: "text" }] },
+    { id: "sn_end", type: "snippet", jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { BAD: "reached anyway" })],
+  answers: [true],
+  expectedPoints: [
+    { kind: "gate", flow: "main", node: "sn_bad", where: "run", source: "10 / @zero > 1", default: false, answer: true },
+  ],
+  expectedTranscript: [
+    { type: "text", id: "BAD", text: "reached anyway" },
+    { type: "end" },
+  ],
+} satisfies SteerFixture;
+
+const steerListening = {
+  name: "steer: a steerer that only listens changes nothing",
+  project: steerProject,
+  scenes: [oneBlock("s", [
+    { id: "sn_a", type: "snippet", condition: "@met", beats: [{ id: "A", kind: "text" }] },
+    { id: "g", type: "group", selector: "branch", children: [
+      { id: "sn_hi", type: "snippet", condition: "@gold > 10", beats: [{ id: "HI", kind: "text" }] },
+      { id: "sn_low", type: "snippet", beats: [{ id: "LOW", kind: "text" }] },
+    ] },
+    { id: "sn_end", type: "snippet", jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { A: "a", HI: "high", LOW: "low" })],
+  answers: [],
+  expectedPoints: [
+    { kind: "gate", flow: "main", node: "sn_a", where: "run", source: "@met", default: false, answer: false },
+    { kind: "pick", flow: "main", group: "g", selector: "branch", children: [{ id: "sn_hi", eligible: false }, { id: "sn_low", eligible: true }], default: "sn_low", answer: "sn_low" },
+  ],
+  expectedTranscript: [
+    { type: "text", id: "LOW", text: "low" },
+    { type: "end" },
+  ],
+  expectedLog: [
+    { type: "select", flow: "main", seq: 0, scene: "s", group: "b_s", selector: "run", children: [{ id: "sn_a", eligible: false }, { id: "g", eligible: true }], picked: "g" },
+    { type: "select", flow: "main", seq: 1, scene: "s", group: "g", selector: "branch", children: [{ id: "sn_hi", eligible: false }, { id: "sn_low", eligible: true }], picked: "sn_low" },
+    { type: "jump", flow: "main", seq: 2, scene: "s", to: "END", mode: "jump" },
+  ],
+} satisfies SteerFixture;
+
+const steerLogged = {
+  name: "steer: the log says what was steered, before the entry it changed",
+  project: steerProject,
+  scenes: [oneBlock("s", [
+    { id: "sn_a", type: "snippet", condition: "@met", beats: [{ id: "A", kind: "text" }] },
+    { id: "g_ask", type: "group", selector: "choice", children: [
+      { id: "o_met", type: "group", condition: "@met", prompt: { id: "P_met", kind: "text" }, children: [
+        { id: "sn_met", type: "snippet", beats: [{ id: "MET", kind: "text" }] }] },
+      { id: "o_plain", type: "group", prompt: { id: "P_plain", kind: "text" }, children: [
+        { id: "sn_plain", type: "snippet", beats: [{ id: "PLAIN", kind: "text" }] }] },
+    ] },
+    { id: "g", type: "group", selector: "branch", children: [
+      { id: "sn_hi", type: "snippet", condition: "@gold > 10", beats: [{ id: "HI", kind: "text" }] },
+      { id: "sn_low", type: "snippet", beats: [{ id: "LOW", kind: "text" }] },
+    ] },
+    { id: "sn_end", type: "snippet", jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { A: "a", P_met: "Greet", P_plain: "Leave", MET: "hello again", PLAIN: "bye", HI: "high", LOW: "low" })],
+  answers: [true, true, "sn_hi"],
+  choices: ["o_met"],
+  expectedPoints: [
+    { kind: "gate", flow: "main", node: "sn_a", where: "run", source: "@met", default: false, answer: true },
+    { kind: "gate", flow: "main", node: "o_met", where: "option", source: "@met", default: false, answer: true },
+    { kind: "pick", flow: "main", group: "g", selector: "branch", children: [{ id: "sn_hi", eligible: false }, { id: "sn_low", eligible: true }], default: "sn_low", answer: "sn_hi" },
+  ],
+  expectedTranscript: [
+    { type: "text", id: "A", text: "a" },
+    { type: "choice", groupId: "g_ask", options: [{ id: "o_met", eligible: true, prompt: { kind: "text", text: "Greet" } }, { id: "o_plain", eligible: true, prompt: { kind: "text", text: "Leave" } }] },
+    { type: "text", id: "MET", text: "hello again" },
+    { type: "text", id: "HI", text: "high" },
+    { type: "end" },
+  ],
+  expectedLog: [
+    { type: "steered", flow: "main", seq: 0, scene: "s", node: "sn_a", kind: "gate", default: false, answer: true },
+    { type: "steered", flow: "main", seq: 1, scene: "s", node: "o_met", kind: "gate", default: false, answer: true },
+    { type: "choice", flow: "main", seq: 2, scene: "s", group: "g_ask", options: [{ id: "o_met", eligible: true }, { id: "o_plain", eligible: true }] },
+    { type: "chose", flow: "main", seq: 3, scene: "s", group: "g_ask", option: "o_met" },
+    { type: "steered", flow: "main", seq: 4, scene: "s", node: "g", kind: "pick", default: "sn_low", answer: "sn_hi" },
+    { type: "select", flow: "main", seq: 5, scene: "s", group: "g", selector: "branch", children: [{ id: "sn_hi", eligible: false }, { id: "sn_low", eligible: true }], picked: "sn_hi" },
+    { type: "jump", flow: "main", seq: 6, scene: "s", to: "END", mode: "jump" },
+  ],
+} satisfies SteerFixture;
+
 export const cases: Fixtures = {
   expressions: [
     { name: "number comparison", src: "@hp > 5", scopes: { patter: { hp: 10 } }, expected: true },
@@ -4545,6 +4805,7 @@ export const cases: Fixtures = {
     asSaveFixture(scriptedChoiceFollowsLocale, "a save written by the JS reference at a pending choice keeps its options' ids, not their text"),
   ],
   logs: [decisionLog],
+  steers: [steerRun, steerOptions, steerFallback, steerRunsDry, steerBranch, steerSequences, steerFailingCondition, steerListening, steerLogged],
   describes: [describeEverything],
   outlines: [outlineEverything, outlineExtensions],
   audio: [audioManifest],

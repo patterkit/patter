@@ -634,7 +634,7 @@ namespace Patterkit.Patterplay
                 // condition does not hold. That skip IS the decision an author asks about,
                 // so the trace records the ones walked past, not only the one entered.
                 int from = frame.Index;
-                while (frame.Index < children.Count && !Eligible(children[frame.Index])) frame.Index++;
+                while (frame.Index < children.Count && !Eligible(children[frame.Index], "run")) frame.Index++;
                 if (_host.Tracing && frame.Index != from)
                 {
                     var seen = new List<(string, bool)>();
@@ -692,7 +692,7 @@ namespace Patterkit.Patterplay
             {
                 if (child.Fallback) { fallbacks.Add(child); continue; }
                 if (!child.Sticky && (_visitCounts.TryGetValue(child.Id, out var vc) ? vc : 0) >= 1) continue;
-                bool eligible = Eligible(child);
+                bool eligible = Eligible(child, "option");
                 bool hidden = child.SecretUntilEligible;
                 if (!eligible && hidden) continue;
                 options.Add(new SavedChoiceOption { Id = child.Id, Eligible = eligible, GameData = child.GameData });
@@ -712,7 +712,7 @@ namespace Patterkit.Patterplay
             }
             // No normal option can be taken. Auto-follow the fallback if it is eligible (its own condition
             // still applies).
-            var fallback = fallbacks.FirstOrDefault(Eligible);
+            var fallback = fallbacks.FirstOrDefault(f => Eligible(f, "fallback"));
             if (fallback != null) { EnterChild(fallback); return; }
             // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks
             // past it. The behaviour is unchanged; this makes the silent fall-through observable.
@@ -760,8 +760,9 @@ namespace Patterkit.Patterplay
         {
             // Each condition is evaluated ONCE: the verdicts and the eligible list come from the same pass.
             // Twice cost double, and a condition calling random() drew twice, so its verdict and the pick
-            // could disagree.
-            var considered = group.Children.Select(c => (c.Id, Eligible(c))).ToList();
+            // could disagree. A pick is one steering point, so its children's conditions are read here, not
+            // asked as gates.
+            var considered = group.Children.Select(c => (c.Id, Holds(c))).ToList();
             var eligible = new List<Node>();
             for (int k = 0; k < considered.Count; k++) if (considered[k].Item2) eligible.Add(group.Children[k]);
             string sel = group.Selector ?? "default";
@@ -775,21 +776,46 @@ namespace Patterkit.Patterplay
                     Children = considered, Picked = picked?.Id });
                 return picked;
             }
-            if (eligible.Count == 0) return Trace(null);
-            var st = SelectorStateFor(group);
-            switch (group.Selector)
+            Node picked = null;
+            if (eligible.Count > 0)
             {
-                case "branch": return Trace(eligible[0]);
-                case "sequence":
+                var st = SelectorStateFor(group);
+                switch (group.Selector)
                 {
-                    string order = group.Options?.Order ?? "sequential";
-                    string exhaust = group.Options?.Exhaust ?? "once";
-                    return Trace(order == "shuffle" ? PickShuffle(eligible, exhaust, st)
-                        : order == "specificity" ? PickSpecificity(eligible, exhaust, st)
-                        : PickSequential(eligible, exhaust, st));
+                    case "branch": picked = eligible[0]; break;
+                    case "sequence":
+                    {
+                        string order = group.Options?.Order ?? "sequential";
+                        string exhaust = group.Options?.Exhaust ?? "once";
+                        picked = order == "shuffle" ? PickShuffle(eligible, exhaust, st)
+                            : order == "specificity" ? PickSpecificity(eligible, exhaust, st)
+                            : PickSequential(eligible, exhaust, st);
+                        break;
+                    }
+                    default: return null;
                 }
-                default: return null;
             }
+            // Asked even when nothing is eligible: a bake may want a child whose condition is false.
+            if (_host.Steer != null && (group.Selector == "branch" || group.Selector == "sequence"))
+                picked = SteerPick(group, considered, picked);
+            return Trace(picked);
+        }
+
+        /// <summary>The steerer's answer to a pick, which replaces the selector's (it has already run, so its
+        /// cursor moved). An answer that isn't one of the group's children throws, as Choose with an unknown
+        /// id does.</summary>
+        private Node SteerPick(Node group, List<(string Id, bool Eligible)> verdicts, Node picked)
+        {
+            string fallback = picked?.Id ?? "";
+            string answer = _host.Steer.Pick(new PickPoint { Flow = Id, Group = group.Id, Selector = group.Selector,
+                Children = new List<(string Id, bool Eligible)>(verdicts), Default = fallback });
+            if (answer == null) throw new Exception($"steer: pick for {group.Id} answered null, not a child id or \"\"");
+            if (answer == fallback) return picked;
+            var child = answer == "" ? null : group.Children.FirstOrDefault(c => c.Id == answer);
+            if (answer != "" && child == null)
+                throw new Exception($"steer: pick for {group.Id} answered \"{answer}\", which isn't one of its children");
+            if (_host.Tracing) Emit(new LogEntry { Type = "steered", Node = group.Id, Kind = "pick", Default = fallback, Answer = answer });
+            return child;
         }
 
         private Node PickSequential(List<Node> eligible, string exhaust, SelectorState st)
@@ -948,11 +974,24 @@ namespace Patterkit.Patterplay
 
         /// <summary>Whether a node's condition holds. A condition that fails to evaluate counts as false (see
         /// PlayError).</summary>
-        private bool Eligible(Node node)
+        private bool Holds(Node node)
         {
             if (node.Condition == null) return true;
             try { return Truthy(EvalExpr(node.Condition)); }
             catch (Exception err) { ReportError("condition", node.Id, node.Condition, err); return false; }
+        }
+
+        /// <summary>Whether a run's child, a choice's option, or a choice's fallback is taken: its condition,
+        /// unless a steerer answers otherwise (asked only for a node that has a condition).</summary>
+        private bool Eligible(Node node, string where)
+        {
+            bool verdict = Holds(node);
+            if (_host.Steer == null || node.Condition == null) return verdict;
+            bool answer = _host.Steer.Gate(new GatePoint { Flow = Id, Node = node.Id, Where = where,
+                Source = node.Condition.Src ?? "", Default = verdict });
+            if (answer != verdict && _host.Tracing)
+                Emit(new LogEntry { Type = "steered", Node = node.Id, Kind = "gate", Default = verdict, Answer = answer });
+            return answer;
         }
 
         /// <summary>Report a content error the engine is playing through: to the game's OnError (or

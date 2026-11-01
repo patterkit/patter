@@ -367,6 +367,46 @@ export interface LogCase {
   expectedLog: ExpectedLogEntry[];
 }
 
+/**
+ * A steering case (corpus 12, design/proposals/patterplay-steering.md in patterkit): a play like a RuntimeCase's
+ * (the same choices contract: scripted, then the first eligible option), with a steerer on the engine that answers
+ * each point from `answers` in order (a boolean for a gate, a child id or "" for a pick) and, past the list's end,
+ * with the point's default. The runner records every point it was asked, with the answer it gave, and compares them
+ * with `expectedPoints`. With `expectedLog`, the play runs with `log` on and its engine log is compared too. The
+ * flow is opened as "main", and a case's `seed` is the engine's `seed`.
+ */
+export interface SteerCase {
+  name: string;
+  bundle: Bundle;
+  seed?: number;
+  start: { scene: string; block?: string };
+  choices?: string[];
+  answers: Array<boolean | string>;
+  expectedPoints: SteerPointRecord[];
+  expectedTranscript: TranscriptStep[];
+  expectedLog?: ExpectedLogEntry[];
+}
+
+/** One point a steering case's steerer was asked, as the point it was handed plus the answer it gave. */
+export type SteerPointRecord =
+  | { kind: "gate"; flow: string; node: string; where: "run" | "option" | "fallback"; source: string; default: boolean; answer: boolean }
+  | { kind: "pick"; flow: string; group: string; selector: "branch" | "sequence"; children: { id: string; eligible: boolean }[]; default: string; answer: string };
+
+/** An authored steering fixture (source form; compiled by buildCorpus into a SteerCase). */
+export interface SteerFixture {
+  name: string;
+  project: ProjectFile;
+  scenes: Scene[];
+  locales?: LocaleFile[];
+  seed?: number;
+  start?: { scene?: string; block?: string };
+  choices?: string[];
+  answers: Array<boolean | string>;
+  expectedPoints: SteerPointRecord[];
+  expectedTranscript: TranscriptStep[];
+  expectedLog?: ExpectedLogEntry[];
+}
+
 /** One expected engine-log entry: the reference's `EngineLogEntry`, as JSON. */
 export type ExpectedLogEntry = { type: string; flow: string; seq: number; scene?: string } & Record<string, unknown>;
 
@@ -379,6 +419,7 @@ export interface Corpus {
   gameData: GameDataCase[];
   saves: SaveCase[];
   logs: LogCase[];
+  steers: SteerCase[];
   describes: DescribeCase[];
   outlines: OutlineCase[];
   audio: AudioCase[];
@@ -563,6 +604,7 @@ export interface Fixtures {
   gameData: GameDataFixture[];
   saves: SaveFixture[];
   logs: LogFixture[];
+  steers: SteerFixture[];
   describes: DescribeFixture[];
   outlines: DescribeFixture[];
   audio: AudioCase[];

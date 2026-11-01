@@ -477,6 +477,9 @@ namespace patter
     ///   jump:       to, mode
     ///   write:      target, value, prev (hasPrev false when there was none)
     ///   diagnostic: a problem reported and played through (see PlayError): kind, node, source, message
+    ///   steered:    a steerer's answer that overruled the engine (see Steerer), logged before the entry it
+    ///               changed: node (the gated node, or for a pick the group), kind ("gate" or "pick"), def and
+    ///               answer (booleans for a gate; child ids for a pick, "" for none)
     struct LogEntry
     {
         std::string type;
@@ -506,6 +509,59 @@ namespace patter
         /// A diagnostic's expression source text, when the bundle carries it.
         std::string source;
         std::string message;
+        /// A steered entry's default and answer (JS `default` and `answer`): a Bool for a gate, a Str for a pick.
+        PatterValue def;
+        PatterValue answer;
+    };
+
+    /// A condition the flow has reached (see Steerer::gate).
+    struct GatePoint
+    {
+        /// The flow's id.
+        std::string flow;
+        /// The snippet, group, or option whose condition this is.
+        std::string node;
+        /// "run" (a run's child, skipped if false), "option" (a choice's option, greyed or hidden), or
+        /// "fallback" (a choice's fallback).
+        std::string where;
+        /// The condition's text, as authored ("" when the bundle doesn't carry it).
+        std::string source;
+        /// What the condition says now (JS `default`): false if it failed to evaluate (reported to onError as ever).
+        bool def = false;
+    };
+
+    /// A branch or sequence about to pick (see Steerer::pick).
+    struct PickPoint
+    {
+        /// The flow's id.
+        std::string flow;
+        /// The branch or sequence.
+        std::string group;
+        /// "branch" or "sequence".
+        std::string selector;
+        /// Every child, in authored order, with its condition's real verdict (id, eligible).
+        std::vector<std::pair<std::string, bool>> children;
+        /// The child the engine would pick (JS `default`), or "" for none.
+        std::string def;
+    };
+
+    /// A tool's hand on the flow's decisions (EngineOptions::steer): for a bake or a test that has to reach
+    /// content whatever the game's data says, never for play. Every decision on game data is one of two kinds,
+    /// and each has a function. Every answer is explicit: a steerer that only listens returns `point.def`, and a
+    /// function left empty answers the default for its kind. Steering changes no values: effects run as written,
+    /// and a later condition reads whatever the story has set. The same hook on every runtime (JS's Steerer).
+    /// The C++ engine only: there's no Blueprint form.
+    struct Steerer
+    {
+        /// A node's condition, as a run, a choice, or a fallback reaches it: return whether it holds. Asked only
+        /// for a node that has a condition. An option answered true is offered as eligible (a hidden one
+        /// included), and choose() takes it.
+        std::function<bool(const GatePoint&)> gate;
+        /// A branch or sequence about to pick one child: return the child's id to play, or "" for none. Asked
+        /// once per pick (its children's conditions aren't also asked as gates), after the selector has run, so
+        /// its cursor moves as it would have. An id that isn't one of the group's children throws
+        /// std::runtime_error, as choose() with an unknown id does.
+        std::function<std::string(const PickPoint&)> pick;
     };
 
     /// The engine-level live tap (Engine::onTrace): every flow's decisions, each with the flow it happened in.
@@ -536,6 +592,8 @@ namespace patter
         /// eligible fallback - so the silent fall-through is observable, as on every runtime
         /// (onDryChoice in JS). Live feedback, distinct from the log's `dry` entry.
         std::function<void(const std::string&)> onDryChoice;
+        /// The tooling steerer (EngineOptions::steer); each empty function answers the default.
+        Steerer steer;
         /// Where a problem the engine carried on past is reported (see PlayError). Unset: nowhere but the
         /// log, as a std-only core has no console of its own to warn on.
         std::function<void(const PlayError&)> onError;
@@ -714,6 +772,10 @@ namespace patter
         /// Fired with the choice's group id whenever a choice runs dry. Unaffected by `log`
         /// and useful with it off: live feedback, not an audit read afterwards.
         std::function<void(const std::string&)> onDryChoice;
+        /// Tooling only (a bake, a test): steer every decision the flow makes on game data, its conditions and
+        /// its branch and sequence picks, and hear each one as it's passed (see Steerer). Never set it in a
+        /// shipped game. Left empty, nothing changes. Kept by hotSwap. The C++ engine only: no Blueprint form.
+        Steerer steer;
         /// Called with each problem the engine reported and carried on past (see PlayError): a condition
         /// that failed and counted as false, an effect that failed and was skipped, a Best-match part that
         /// failed and scored as false, a set-up problem (reported as the constructor ends), a load whose
@@ -1924,7 +1986,7 @@ namespace patter
                 // A `run` container walks its children in order, skipping the ones whose
                 // condition does not hold. That skip IS the decision an author asks about.
                 const int from = frame.index;
-                while (frame.index < static_cast<int>(children->size()) && !eligible((*children)[frame.index].get())) frame.index++;
+                while (frame.index < static_cast<int>(children->size()) && !eligible((*children)[frame.index].get(), "run")) frame.index++;
                 if (host_->tracing && frame.index != from)
                 {
                     LogEntry e; e.type = "select"; e.group = frame.containerId; e.selector = "run";
@@ -1990,7 +2052,7 @@ namespace patter
                     auto it = visitCounts_.find(child->id);
                     if (it != visitCounts_.end() && it->second >= 1) continue;
                 }
-                bool elig = eligible(child);
+                bool elig = eligible(child, "option");
                 if (!elig && child->secretUntilEligible) continue;
                 options.push_back({ child->id, elig, child->gameData });   // prompts are built as it's delivered
                 byId[child->id] = child;
@@ -2016,7 +2078,7 @@ namespace patter
             }
             // No normal option can be taken. Auto-follow the fallback if it is eligible (its own condition
             // still applies).
-            for (const Node* f : fallbacks) if (eligible(f)) { enterChild(f); return; }
+            for (const Node* f : fallbacks) if (eligible(f, "fallback")) { enterChild(f); return; }
             // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks
             // past it. The behaviour is unchanged; this makes the silent fall-through observable.
             if (host_->tracing) { LogEntry e; e.type = "dry"; e.group = group->id; emit(std::move(e)); }
@@ -2061,9 +2123,10 @@ namespace patter
         {
             std::vector<const Node*> elig;
             std::vector<std::pair<std::string, bool>> considered;
+            // A pick is one steering point, so its children's conditions are read here, not asked as gates.
             for (const auto& c : group->children)
             {
-                const bool ok = eligible(c.get());
+                const bool ok = holds(c.get());
                 considered.emplace_back(c->id, ok);
                 if (ok) elig.push_back(c.get());
             }
@@ -2083,18 +2146,49 @@ namespace patter
                 emit(std::move(e));
                 return picked;
             };
-            if (elig.empty()) return trace(nullptr);
-            SelectorState& st = selectorStateFor(group);
-            if (group->selector == "branch") return trace(elig.front());
-            if (group->selector == "sequence")
+            const bool picks = group->selector == "branch" || group->selector == "sequence";
+            const Node* picked = nullptr;
+            if (!elig.empty())
             {
-                std::string order = group->options && !group->options->order.empty() ? group->options->order : "sequential";
-                std::string exhaust = group->options && !group->options->exhaust.empty() ? group->options->exhaust : "once";
-                return trace(order == "shuffle" ? pickShuffle(elig, exhaust, st)
-                    : order == "specificity" ? pickSpecificity(elig, exhaust, st)
-                    : pickSequential(elig, exhaust, st));
+                if (!picks) return nullptr;   // run / choice / default are handled in enterChild, not here
+                SelectorState& st = selectorStateFor(group);
+                if (group->selector == "branch") picked = elig.front();
+                else
+                {
+                    std::string order = group->options && !group->options->order.empty() ? group->options->order : "sequential";
+                    std::string exhaust = group->options && !group->options->exhaust.empty() ? group->options->exhaust : "once";
+                    picked = order == "shuffle" ? pickShuffle(elig, exhaust, st)
+                        : order == "specificity" ? pickSpecificity(elig, exhaust, st)
+                        : pickSequential(elig, exhaust, st);
+                }
             }
-            return nullptr;   // run / choice / default are handled in enterChild, not here
+            // Asked even when nothing is eligible: a bake may want a child whose condition is false.
+            if (picks && host_->steer.pick) picked = steerPick(group, considered, picked);
+            return trace(picked);
+        }
+        // The steerer's answer to a pick, which replaces the selector's (it has already run, so its cursor moved).
+        const Node* steerPick(const Node* group, const std::vector<std::pair<std::string, bool>>& verdicts, const Node* picked)
+        {
+            PickPoint point;
+            point.flow = id_; point.group = group->id; point.selector = group->selector;
+            point.children = verdicts;
+            point.def = picked ? picked->id : std::string();
+            const std::string fallback = point.def;
+            const std::string answer = host_->steer.pick(point);
+            if (answer == fallback) return picked;
+            const Node* child = nullptr;
+            if (!answer.empty())
+            {
+                for (const auto& c : group->children) if (c->id == answer) { child = c.get(); break; }
+                if (!child) throw std::runtime_error("steer: pick for " + group->id + " answered \"" + answer + "\", which isn't one of its children");
+            }
+            if (host_->tracing)
+            {
+                LogEntry e; e.type = "steered"; e.node = group->id; e.kind = "pick";
+                e.def = PatterValue::Str(fallback); e.answer = PatterValue::Str(answer);
+                emit(std::move(e));
+            }
+            return child;
         }
         const Node* pickSequential(std::vector<const Node*>& elig, const std::string& exhaust, SelectorState& st)
         {
@@ -2263,7 +2357,7 @@ namespace patter
             }
         }
         // Whether a node's condition holds. A condition that fails to evaluate counts as false (see PlayError).
-        bool eligible(const Node* node)
+        bool holds(const Node* node)
         {
             if (!node->condition) return true;
             try { return truthy(evalExpr(*node->condition)); }
@@ -2272,6 +2366,23 @@ namespace patter
                 reportError("condition", node->id, node->condition.get(), ex.what());
                 return false;
             }
+        }
+        // Whether a run's child, a choice's option, or a choice's fallback is taken: its condition, unless a
+        // steerer answers otherwise (asked only for a node that has a condition).
+        bool eligible(const Node* node, const char* where)
+        {
+            const bool verdict = holds(node);
+            if (!host_->steer.gate || !node->condition) return verdict;
+            GatePoint point;
+            point.flow = id_; point.node = node->id; point.where = where; point.source = node->condition->src; point.def = verdict;
+            const bool answer = host_->steer.gate(point);
+            if (answer != verdict && host_->tracing)
+            {
+                LogEntry e; e.type = "steered"; e.node = node->id; e.kind = "gate";
+                e.def = PatterValue::Bool(verdict); e.answer = PatterValue::Bool(answer);
+                emit(std::move(e));
+            }
+            return answer;
         }
         // Report a content error the engine is playing through: to the host's onError, and to the log.
         void reportError(const std::string& kind, const std::string& node, const Expression* expr, const std::string& message)
@@ -2623,6 +2734,7 @@ namespace patter
             // By POINTER, so a flow appends to the engine's stream without holding the engine.
             host_.engineLog = &engineLog_;
             host_.onDryChoice = options.onDryChoice;
+            host_.steer = options.steer;
             host_.onError = options.onError;
             host_.onRefit = options.onRefit;
             host_.emitIds = bundle.localisation.mode == "ids" && !bundle.localisation.sourceDebug;

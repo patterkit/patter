@@ -59,7 +59,7 @@ is shown, and a line with a recording lasts as long as the recording. `speechUni
 syllables, shut beats, and pauses the estimate is made of, for a game to move a mouth by, and
 `countSyllables(text, locale)` the syllable count.
 
-`new Engine(bundle, options)` takes `{ rng?, seed?, locale?, hostScopes?, registry?, replayPromptOnChoose?, closedCaptions?, onError?, onRefit?, onDryChoice?, log? }`
+`new Engine(bundle, options)` takes `{ rng?, seed?, locale?, hostScopes?, registry?, replayPromptOnChoose?, closedCaptions?, onError?, onRefit?, onDryChoice?, steer?, log? }`
 (any other key is reported to `onError` as a `setup` problem):
 - `hostScopes` binds the scopes your game owns, by token, each `{ get(name), set?(name, value) }`: for World
   Properties, `hostScopes: { world: { get, set } }`. Leave `world` unbound and the runtime self-backs `@world`
@@ -71,6 +71,14 @@ syllables, shut beats, and pauses the estimate is made of, for a game to move a 
   each fallback reported.
 - A string the active locale is missing falls back to the default-locale source,
   flagged `<Untranslated: {id}> {source}` so a partial translation is impossible to miss.
+- `steer` is for tools, such as a bake or a test, never for a shipped game. It's a steerer,
+  `{ gate?(point): boolean, pick?(point): string }`, that decides every choice the flow makes on game data and hears
+  each one as it's passed. `gate` is asked for each condition a run, a choice option, or a fallback reaches (the
+  point names the node, `where` it is, its `source`, and its `default`), and an option it answers true is offered as
+  eligible, a hidden one included. `pick` is asked once each time a branch or sequence picks, with every child's real
+  verdict and the `default` pick, and returns a child's id or `""` for none. A steerer that only listens returns
+  `point.default`, and a method left out answers the default. Steering changes no values, and with `log` on, an
+  answer that overrules the engine adds a `steered` entry.
 
 Switch language mid-game with **`engine.setLocale("fr")`** (`engine.locale` is the locale in use, and
 `engine.locales` the bundle's `{ default, included }`): subsequent beats, a pending choice's options,

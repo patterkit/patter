@@ -35,6 +35,8 @@
     <Compile Include="DryChoiceChecks.cs" />
     <!-- The corpus's decision-log cases, and OnTrace held to them. -->
     <Compile Include="LogChecks.cs" />
+    <!-- The corpus's steering cases, and a port of the JS steer tests. -->
+    <Compile Include="SteerChecks.cs" />
     <!-- The corpus's describe cases. -->
     <Compile Include="DescribeChecks.cs" />
     <!-- The corpus's outline cases (GetOutline, GetBeatSequence). -->

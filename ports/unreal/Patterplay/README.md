@@ -133,6 +133,19 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   report, a save keeps it (a load doesn't report it again), and `Goto("END")` ends the flow plainly. In
   C++, the core's `patter::StepResult::reason` is `patter::FlowEndReason::RanDry` and the report's kind is
   `"dry-choice"`. A dry choice that play carries on past stays silent.
+- **Steering, for tools** (C++ only): `patter::EngineOptions::steer` is a tooling hook beside `onDryChoice`, for
+  a bake or a test that has to reach content whatever the game's data says. Never set it in a shipped game, and
+  there's no Blueprint form. It's a `patter::Steerer`, a struct of two `std::function`s. `gate` takes a
+  `patter::GatePoint` (the `flow`, the `node`, `where` it is: `"run"`, `"option"`, or `"fallback"`, its condition's
+  `source`, and `def`, what the condition says now) and returns whether it holds. It's asked only for a node that
+  has a condition, and an option it answers true is offered as eligible, a hidden one included. `pick` takes a
+  `patter::PickPoint` (the `flow`, the `group`, its `selector`: `"branch"` or `"sequence"`, every child's id with
+  its real verdict, and `def`, the child the engine would pick, `""` for none) and returns a child's id, or `""`
+  for none. It's asked once each time a branch or sequence picks, after its selector has run, and an id that isn't
+  one of the group's children throws `std::runtime_error`, as `choose()` with an unknown id does. A steerer that
+  only listens returns `point.def`, and an empty function answers the default. Steering changes no values, a hot
+  swap keeps the steerer, and with the log on (or an `onTrace` handler), an answer that overrules the engine adds
+  a `steered` entry before the entry it changed.
 - **Locales**: `Locale()` is the locale in use and `Locales()` the bundle's default and included locales.
   `SetLocale` (and the `Locale` option) resolves by one rule on every runtime: case and `_` / `-` don't
   matter, then the language alone (`fr` for `fr-FR`), then the default, each fallback reported. A pending

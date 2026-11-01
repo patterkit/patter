@@ -114,6 +114,9 @@ namespace Patterkit.Patterplay.TestHost
                     if (e.Source != null) o["source"] = e.Source;
                     o["message"] = e.Message;
                     break;
+                case "steered":
+                    o["node"] = e.Node; o["kind"] = e.Kind; o["default"] = e.Default; o["answer"] = e.Answer;
+                    break;
             }
             return o;
         }

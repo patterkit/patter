@@ -53,6 +53,13 @@ func _initialize() -> void:
 	var lg := _run_logs(root["logs"])
 	print("logs: %d/%d  (decision logs, and on_trace streaming the same decisions)" % [lg, root["logs"].size()])
 	_expect_all("logs", lg, root["logs"].size())
+	if not root.has("steers"):
+		push_error("corpus has no steers section")
+		quit(2)
+		return
+	var st := _run_steers(root["steers"])
+	print("steers: %d/%d  (a tool's steerer answering every gate and pick)" % [st, root["steers"].size()])
+	_expect_all("steers", st, root["steers"].size())
 	if not root.has("describes"):
 		push_error("corpus has no describes section")
 		quit(2)
@@ -686,6 +693,81 @@ func _play_log_case(c: Dictionary, log_on: bool) -> Dictionary:
 		if e.get("flow", "") == "main":
 			logged.append(e)
 	return { "log": logged, "traced": traced, "after_stop": traced.size() - before }
+
+
+# -- steers --------------------------------------------------------------------
+
+## A steering case's steerer (the reference's runSteerCase): it answers each point from the case's
+## answers in order, then with the point's default, and records every point with the answer it gave.
+class CaseSteerer extends RefCounted:
+	var answers: Array
+	var points: Array = []
+
+	func _init(a: Array) -> void:
+		answers = a.duplicate()
+
+	func gate(point: Dictionary) -> bool:
+		var answer: bool = bool(answers.pop_front()) if not answers.is_empty() else point["default"]
+		_record("gate", point, answer)
+		return answer
+
+	func pick(point: Dictionary) -> String:
+		var answer: String = str(answers.pop_front()) if not answers.is_empty() else point["default"]
+		_record("pick", point, answer)
+		return answer
+
+	func _record(kind: String, point: Dictionary, answer) -> void:
+		var rec := {"kind": kind}
+		rec.merge(point.duplicate(true))
+		rec["answer"] = answer
+		points.append(rec)
+
+
+# Each steering case played as a runtime case is (scripted choices, then the first eligible option), with
+# the steerer on the engine; the points it was asked, the transcript, and (when the case expects one, the
+# play then running with the log on) the engine log must all match. The case's seed is the engine's seed,
+# and on_error is swallowed.
+func _run_steers(arr: Array) -> int:
+	var pass_count := 0
+	for c in arr:
+		var name: String = c["name"]
+		var steerer := CaseSteerer.new(c["answers"])
+		var options := {"on_error": func(_e): pass, "steer": steerer}
+		if c.has("seed"):
+			options["seed"] = c["seed"]
+		if c.has("expectedLog"):
+			options["log"] = true
+		var engine := PatterEngine.new(c["bundle"], options)
+		var start: Dictionary = c["start"]
+		var flow := engine.open_flow("main", start["scene"], start.get("block", ""))
+		var scripted: Array = (c.get("choices", []) as Array).duplicate()
+		var transcript: Array = []
+		for i in 1000:
+			var step := flow.advance()
+			transcript.append(_transcript_step(step, _ids_only(c["bundle"])))
+			if step["type"] == "end":
+				break
+			if step["type"] == "choice":
+				var pick := ""
+				if not scripted.is_empty():
+					pick = scripted.pop_front()
+				else:
+					for o in step["options"]:
+						if o["eligible"]:
+							pick = o["id"]
+							break
+				if pick == "":
+					break
+				flow.choose(pick)
+		if not _deep_equal(steerer.points, c["expectedPoints"]):
+			_fail("steers", name, "points mismatch\n    expected %s\n    got      %s" % [JSON.stringify(c["expectedPoints"]), JSON.stringify(steerer.points)])
+		elif not _deep_equal(transcript, c["expectedTranscript"]):
+			_fail("steers", name, "transcript mismatch\n    expected %s\n    got      %s" % [JSON.stringify(c["expectedTranscript"]), JSON.stringify(transcript)])
+		elif c.has("expectedLog") and not _deep_equal(engine.log(), c["expectedLog"]):
+			_fail("steers", name, "log mismatch\n    expected %s\n    got      %s" % [JSON.stringify(c["expectedLog"]), JSON.stringify(engine.log())])
+		else:
+			pass_count += 1
+	return pass_count
 
 
 # -- outlines and audio ----------------------------------------------------------

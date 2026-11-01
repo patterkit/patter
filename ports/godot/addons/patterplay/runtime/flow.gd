@@ -57,6 +57,12 @@ var _eval_ctx: Dictionary
 var _dialect: Dictionary = PatterDialect.dialect()
 ## Why the last advance() or choose() was refused, or "" when it wasn't: see last_error().
 var _last_error := ""
+## A steerer's answer that wasn't one was refused during the settle under way: the steerer is asked nothing
+## more, and the settle stops at its next transition (see _steer_refuse).
+var _steer_refused := false
+## A steerer's refused answer that no advance() has reported yet: one refused while open_flow, choose(), or
+## goto settled the flow. The next advance() reports it (see _steer_refuse).
+var _steer_error := ""
 
 
 func _init(host: FlowHost, seed_value: float) -> void:
@@ -428,6 +434,7 @@ func _begin(scene_id: String = "", block_id: String = "") -> void:
 	_active_snippet = null
 	_beat_index = 0
 	_clear_pending()
+	_steer_error = ""
 	_started = true
 
 	var bundle: Dictionary = _host.bundle
@@ -462,6 +469,12 @@ func advance() -> Dictionary:
 		_refuse("flow has not been started")
 		return {"type": "end", "reason": "ended"}
 	_touch()
+	if _steer_error != "":
+		# A steerer's answer refused as the flow last settled (in open_flow, choose(), or goto): this is the
+		# advance that reports it, and it delivers nothing.
+		_last_error = _steer_error
+		_steer_error = ""
+		return {"type": "end", "reason": "ended"}
 	if _pending_prompt_beat != null:
 		var b = _pending_prompt_beat
 		var shown = _pending_prompt_shown
@@ -471,6 +484,7 @@ func advance() -> Dictionary:
 		return _prompt_result(b, shown) if shown != null else _beat_result(b)
 	_settle()
 	if _last_error != "":
+		_steer_error = ""   # reported by this advance, not held for the next
 		return {"type": "end", "reason": "ended"}   # refused part way: last_error() says why
 	if not _flow_ended and _active_snippet == null and _pending == null:
 		_flow_ended = true
@@ -709,8 +723,16 @@ func _scene_set(n: String, v) -> String:
 # -- settle / entry ------------------------------------------------------------
 
 func _settle() -> void:
+	_steer_refused = false
+	_settle_steps()
+	_steer_refused = false   # a choice re-offered outside a settle (a restore) asks the steerer afresh
+
+
+func _settle_steps() -> void:
 	var transitions := 0
 	while true:
+		if _steer_refused:
+			return   # a steerer's answer was refused: advance() says so, as a refused choose() does
 		transitions += 1
 		if transitions > 10000:
 			_refuse("flow did not settle after 10000 transitions - likely a jump cycle with no deliverable content")
@@ -742,7 +764,7 @@ func _settle() -> void:
 		# does not hold. That skip IS the decision an author asks about, so the trace
 		# records the ones walked past, not only the one entered.
 		var _from: int = frame["index"]
-		while frame["index"] < children.size() and not _eligible(children[frame["index"]]):
+		while frame["index"] < children.size() and not _eligible(children[frame["index"]], "run"):
 			frame["index"] += 1
 		if _host.tracing and frame["index"] != _from:
 			var seen: Array = []
@@ -814,7 +836,7 @@ func _setup_choice(group: Dictionary) -> void:
 			continue
 		if not child.get("sticky", false) and _visit_counts.get(child["id"], 0) >= 1:
 			continue
-		var elig := _eligible(child)
+		var elig := _eligible(child, "option")
 		if not elig and child.get("secretUntilEligible", false):
 			continue
 		# Which option, and whether it can be taken: its prompt is built when the choice is delivered.
@@ -837,7 +859,7 @@ func _setup_choice(group: Dictionary) -> void:
 		_pending = {"group_id": group["id"], "options": options, "by_id": by_id, "shown": {}}
 		return
 	for f in fallbacks:
-		if _eligible(f):
+		if _eligible(f, "fallback"):
 			_enter_child(f)
 			return
 	# Nothing takeable and no eligible fallback: the choice runs dry and the flow walks past
@@ -902,8 +924,9 @@ func _enter_target(to: String, mode: String) -> void:
 func _select_child(group: Dictionary):
 	var eligible: Array = []
 	var verdicts: Array = []
+	# A pick is one steering point, so its children's conditions are read here, not asked as gates.
 	for c in group.get("children", []):
-		var ok := _eligible(c)
+		var ok := _holds(c)
 		verdicts.append({"id": c["id"], "eligible": ok})
 		if ok:
 			eligible.append(c)
@@ -921,20 +944,71 @@ func _select_child(group: Dictionary):
 			ev["exhaust"] = o.get("exhaust", "once")
 		_emit(ev)
 		return picked
-	if eligible.is_empty():
-		return trace.call(null)
-	var st := _selector_state_for(group)
-	if sel == "branch":
-		return trace.call(eligible[0])
-	if sel == "sequence":
-		var order: String = o.get("order", "sequential")
-		var exhaust: String = o.get("exhaust", "once")
-		if order == "shuffle":
-			return trace.call(_pick_shuffle(eligible, exhaust, st))
-		if order == "specificity":
-			return trace.call(_pick_specificity(eligible, exhaust, st))
-		return trace.call(_pick_sequential(eligible, exhaust, st))
-	return null   # run / choice / default are handled in _enter_child, not here
+	var picked = null
+	if not eligible.is_empty():
+		var st := _selector_state_for(group)
+		if sel == "branch":
+			picked = eligible[0]
+		elif sel == "sequence":
+			var order: String = o.get("order", "sequential")
+			var exhaust: String = o.get("exhaust", "once")
+			if order == "shuffle":
+				picked = _pick_shuffle(eligible, exhaust, st)
+			elif order == "specificity":
+				picked = _pick_specificity(eligible, exhaust, st)
+			else:
+				picked = _pick_sequential(eligible, exhaust, st)
+		else:
+			return null   # run / choice / default are handled in _enter_child, not here
+	# Asked even when nothing is eligible: a bake may want a child whose condition is false.
+	if (sel == "branch" or sel == "sequence") and _steerer_has("pick"):
+		picked = _steer_pick(group, sel, verdicts, picked)
+	return trace.call(picked)
+
+
+## The steerer's answer to a pick, which replaces the selector's (it has already run, so its cursor moved).
+## An answer that isn't a String, or names a child the group doesn't have, is refused as choose() refuses an
+## unknown option (push_error, kept for last_error()), and the selector's pick stands.
+func _steer_pick(group: Dictionary, sel: String, verdicts: Array, picked):
+	var fallback: String = picked["id"] if picked != null else ""
+	var answer = _host.steer.pick({"flow": id, "group": group["id"], "selector": sel,
+		"children": verdicts.duplicate(true), "default": fallback})
+	if not (answer is String or answer is StringName):
+		_steer_refuse("steer: pick for %s answered %s, not a child id or \"\"" % [group["id"], str(answer)])
+		return picked
+	var ans := str(answer)
+	if ans == fallback:
+		return picked
+	var child = null
+	if ans != "":
+		for c in group.get("children", []):
+			if c["id"] == ans:
+				child = c
+				break
+		if child == null:
+			_steer_refuse("steer: pick for %s answered \"%s\", which isn't one of its children" % [group["id"], ans])
+			return picked
+	if _host.tracing:
+		_emit({"type": "steered", "node": group["id"], "kind": "pick", "default": fallback, "answer": ans})
+	return child
+
+
+## Whether the steerer is there, still asked in this settle, and has the method `m` (a method it doesn't
+## have answers the point's default).
+func _steerer_has(m: String) -> bool:
+	var s = _host.steer
+	return s != null and not _steer_refused and is_instance_valid(s) and (s as Object).has_method(m)
+
+
+## Refuse a steerer's answer that isn't one: GDScript can't throw, so it fails as choose() with an unknown
+## id does here (push_error, kept for last_error()). The steerer is asked nothing more in this settle, which
+## stops at its next transition, and the advance() under way returns {"type": "end", "reason": "ended"}.
+## Refused while open_flow, choose(), or goto settled the flow, it's held, and the next advance() returns
+## that end and says why, so a game driving advance() always sees it.
+func _steer_refuse(message: String) -> void:
+	_steer_refused = true
+	_steer_error = message
+	_refuse(message)
 
 
 func _pick_sequential(eligible: Array, exhaust: String, st: Dictionary):
@@ -1130,8 +1204,27 @@ func _run_effects(effects: Array, owner: String) -> void:
 			_emit(ev)
 
 
+## Whether a run's child, a choice's option, or a choice's fallback is taken: its condition, unless a
+## steerer answers otherwise (asked only for a node that has a condition). `where` is "run", "option", or
+## "fallback". An answer that isn't a bool is refused (see _steer_refuse) and the condition's verdict stands.
+func _eligible(node: Dictionary, where: String) -> bool:
+	var verdict := _holds(node)
+	if not node.has("condition") or not _steerer_has("gate"):
+		return verdict
+	var cond = node["condition"]
+	var src = cond.get("src") if cond is Dictionary else null
+	var answer = _host.steer.gate({"flow": id, "node": node["id"], "where": where,
+		"source": str(src) if src != null else "", "default": verdict})
+	if not (answer is bool):
+		_steer_refuse("steer: gate for %s answered %s, not true or false" % [node["id"], str(answer)])
+		return verdict
+	if answer != verdict and _host.tracing:
+		_emit({"type": "steered", "node": node["id"], "kind": "gate", "default": verdict, "answer": answer})
+	return answer
+
+
 ## Whether a node's condition holds. A condition that fails to evaluate counts as false, and is reported.
-func _eligible(node: Dictionary) -> bool:
+func _holds(node: Dictionary) -> bool:
 	if not node.has("condition"):
 		return true
 	var v = _eval_expr(node["condition"])

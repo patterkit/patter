@@ -378,7 +378,56 @@ export type TraceEvent =
   | { type: "write"; target: string; value: ScalarValue; prev?: ScalarValue }
   /** Content the engine could not evaluate and played through (see {@link PlayError}): a condition
    *  counted as false, an effect skipped, or a Best-match part scored as false. */
-  | { type: "diagnostic"; kind: PlayError["kind"]; node: string; source?: string; message: string };
+  | { type: "diagnostic"; kind: PlayError["kind"]; node: string; source?: string; message: string }
+  /** A steerer's answer that overruled the engine (see {@link Steerer}), logged before the entry it changed, so
+   *  a select or choice entry that contradicts its conditions explains itself. `node` is the gated node, or for
+   *  a pick the group; a pick's `default` and `answer` are child ids, "" for none. */
+  | { type: "steered"; node: string; kind: "gate" | "pick"; default: boolean | string; answer: boolean | string };
+
+/**
+ * A tool's hand on the flow's decisions (`EngineOptions.steer`): for a bake or a test that has to reach content
+ * whatever the game's data says, never for play. Every decision on game data is one of two kinds, and each has a
+ * method. Every answer is explicit: a steerer that only listens returns `point.default`, and a method left out
+ * answers the default for its kind. Steering changes no values: effects run as written, and a later condition
+ * reads whatever the story has set. The same hook on every runtime.
+ */
+export interface Steerer {
+  /** A node's condition, as a run, a choice, or a fallback reaches it: return whether it holds. Asked only for
+   *  a node that has a condition. An option answered true is offered as eligible (a hidden one included), and
+   *  `choose()` takes it. */
+  gate?(point: GatePoint): boolean;
+  /** A branch or sequence about to pick one child: return the child's id to play, or "" for none. Asked once
+   *  per pick (its children's conditions aren't also asked as gates), after the selector has run, so its cursor
+   *  moves as it would have. An id that isn't one of the group's children throws. */
+  pick?(point: PickPoint): string;
+}
+
+/** A condition the flow has reached (see {@link Steerer.gate}). */
+export interface GatePoint {
+  /** The flow's id. */
+  flow: string;
+  /** The snippet, group, or option whose condition this is. */
+  node: string;
+  /** A run's child (skipped if false), a choice's option (greyed or hidden), or a choice's fallback. */
+  where: "run" | "option" | "fallback";
+  /** The condition's text, as authored ("" when the bundle doesn't carry it). */
+  source: string;
+  /** What the condition says now: false if it failed to evaluate (reported to `onError` as ever). */
+  default: boolean;
+}
+
+/** A branch or sequence about to pick (see {@link Steerer.pick}). */
+export interface PickPoint {
+  /** The flow's id. */
+  flow: string;
+  /** The branch or sequence. */
+  group: string;
+  selector: "branch" | "sequence";
+  /** Every child, in authored order, with its condition's real verdict. */
+  children: { id: string; eligible: boolean }[];
+  /** The child the engine would pick, or "" for none. */
+  default: string;
+}
 
 /**
  * A problem the engine reported and carried on past. Content can fail at run time in ways the compiler cannot
@@ -464,6 +513,10 @@ export interface EngineOptions {
    *  unchanged; this only makes the fall-through observable. The coverage harness uses it to flag choices
    *  that ran dry. Leave it unset in shipped games (zero cost). */
   onDryChoice?: (groupId: string) => void;
+  /** Tooling only (a bake, a test): steer every decision the flow makes on game data, its conditions and its
+   *  branch and sequence picks, and hear each one as it's passed (see {@link Steerer}). Never set it in a
+   *  shipped game. Unset, nothing changes. */
+  steer?: Steerer;
   /** Called with each problem the engine reported and carried on past (see {@link PlayError}): a condition
    *  that failed and counted as false, an effect that failed and was skipped, a set-up problem (reported as
    *  the constructor ends), a load whose place has gone. Unset, each is written to `console.warn`, so none is
@@ -637,6 +690,8 @@ interface FlowHost {
    *  fallback - so it falls through and the flow continues past it. Zero cost when unset; the coverage
    *  harness passes it to surface silent fall-throughs. Not a gameplay signal (the behaviour is unchanged). */
   onDryChoice?: (groupId: string) => void;
+  /** The tooling steerer (EngineOptions.steer), when one was given in a usable shape. */
+  steer?: Steerer;
   /** Where a problem the engine carried on past is reported (see PlayError). */
   onError: (error: PlayError) => void;
   /** Say what the registry's refitting loads have put back since it last said (EngineOptions.onRefit). */
@@ -813,6 +868,7 @@ export class Engine {
       journal: null,
       customRng: options.rng,
       onDryChoice: options.onDryChoice,
+      steer: usableSteerer(options.steer, setup),
       onError: options.onError ?? ((e) => console.warn(
         e.kind === "setup" ? `Patterplay: ${e.message}`
           : e.kind === "save" ? `Patterplay: flow '${e.flow}': ${e.message}`
@@ -2064,7 +2120,7 @@ export class Flow {
       // the one it entered. selectChild covers branch/sequence; this covers the default,
       // which is what a block is.
       const from = frame.index;
-      while (frame.index < children.length && !this.eligible(children[frame.index]!)) frame.index++;
+      while (frame.index < children.length && !this.eligible(children[frame.index]!, "run")) frame.index++;
       if (this.host.tracing && frame.index !== from) {
         this.emit({
           type: "select", group: frame.containerId, selector: "run",
@@ -2479,7 +2535,7 @@ export class Flow {
       // so it stays available as long as its condition passes. Consumption is the existing per-flow
       // visit count, so it persists through save/restore for free.
       if (child.sticky !== true && (this.visitCounts.get(child.id) ?? 0) >= 1) continue;
-      const eligible = this.eligible(child);
+      const eligible = this.eligible(child, "option");
       const hidden = child.secretUntilEligible === true;
       if (!eligible && hidden) continue; // secret while ineligible; otherwise an ineligible option shows greyed
       options.push({ id: child.id, eligible, ...(child.gameData !== undefined ? { gameData: child.gameData } : {}) });
@@ -2501,7 +2557,7 @@ export class Flow {
     // applies); otherwise the choice GATHERS - it contributes nothing and the run continues past it
     // (a dry choice falls through rather than deadlocking; the validator warns about choices that can
     // run dry with no fallback).
-    const fallback = fallbacks.find((f) => this.eligible(f));
+    const fallback = fallbacks.find((f) => this.eligible(f, "fallback"));
     if (fallback) { this.enterChild(fallback); return; }
     // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks past it. The
     // behaviour is unchanged; the opt-in diagnostics hook makes this silent fall-through observable.
@@ -2558,7 +2614,8 @@ export class Flow {
   private selectChild(group: CompiledGroup): SelectableNode | null {
     // Each condition is evaluated ONCE: the verdicts and the eligible list come from the same pass. Twice
     // cost double, and a condition calling random() drew twice, so its verdict and the pick could disagree.
-    const verdicts = group.children.map((c) => ({ id: c.id, eligible: this.eligible(c) }));
+    // A pick is one steering point, so its children's conditions are read here, not asked as gates.
+    const verdicts = group.children.map((c) => ({ id: c.id, eligible: this.holds(c) }));
     const eligible = group.children.filter((_, i) => verdicts[i]!.eligible);
     const order = group.options?.order ?? "sequential";
     const exhaust = group.options?.exhaust ?? "once";
@@ -2574,23 +2631,43 @@ export class Flow {
       return picked;
     };
 
-    if (eligible.length === 0) return trace(null);
-    const st = this.selectorState(group);
+    let picked: SelectableNode | null = null;
+    if (eligible.length > 0) {
+      const st = this.selectorState(group);
+      switch (group.selector) {
+        case "branch":
+          picked = eligible[0]!;
+          break;
 
-    switch (group.selector) {
-      case "branch":
-        return trace(eligible[0]!);
+        case "sequence":
+          picked = order === "shuffle" ? this.pickShuffle(eligible, exhaust, st)
+            : order === "specificity" ? this.pickSpecificity(eligible, exhaust, st)
+            : this.pickSequential(eligible, exhaust, st);
+          break;
 
-      case "sequence":
-        return trace(order === "shuffle" ? this.pickShuffle(eligible, exhaust, st)
-          : order === "specificity" ? this.pickSpecificity(eligible, exhaust, st)
-          : this.pickSequential(eligible, exhaust, st));
-
-      case "run":
-      case "choice":
-      default:
-        return null; // run / choice / default are handled in enterChild, not here
+        case "run":
+        case "choice":
+        default:
+          return null; // run / choice / default are handled in enterChild, not here
+      }
     }
+    // Asked even when nothing is eligible: a bake may want a child whose condition is false.
+    if (this.host.steer?.pick && (group.selector === "branch" || group.selector === "sequence")) {
+      picked = this.steerPick(group, group.selector, verdicts, picked);
+    }
+    return trace(picked);
+  }
+
+  /** The steerer's answer to a pick, which replaces the selector's (it has already run, so its cursor moved). */
+  private steerPick(group: CompiledGroup, selector: "branch" | "sequence", verdicts: { id: string; eligible: boolean }[], picked: SelectableNode | null): SelectableNode | null {
+    const fallback = picked?.id ?? "";
+    const answer = this.host.steer!.pick!({ flow: this.id, group: group.id, selector, children: verdicts.map((v) => ({ ...v })), default: fallback });
+    if (typeof answer !== "string") throw new Error(`steer: pick for ${group.id} answered ${String(answer)}, not a child id or ""`);
+    if (answer === fallback) return picked;
+    const child = answer === "" ? null : group.children.find((c) => c.id === answer);
+    if (child === undefined) throw new Error(`steer: pick for ${group.id} answered "${answer}", which isn't one of its children`);
+    if (this.host.tracing) this.emit({ type: "steered", node: group.id, kind: "pick", default: fallback, answer });
+    return child;
   }
 
   /** `sequence` with `order: "sequential"` - walk children in authored order. */
@@ -2756,10 +2833,22 @@ export class Flow {
   }
 
   /** Whether a node's condition holds. A condition that fails to evaluate counts as false (see PlayError). */
-  private eligible(node: SelectableNode): boolean {
+  private holds(node: SelectableNode): boolean {
     if (!node.condition) return true;
     try { return truthy(this.evalExpr(node.condition)); }
     catch (err) { this.reportError("condition", node.id, node.condition, err); return false; }
+  }
+
+  /** Whether a run's child, a choice's option, or a choice's fallback is taken: its condition, unless a steerer
+   *  answers otherwise (asked only for a node that has a condition). */
+  private eligible(node: SelectableNode, where: GatePoint["where"]): boolean {
+    const verdict = this.holds(node);
+    const gate = this.host.steer?.gate;
+    if (!gate || !node.condition) return verdict;
+    const answer = gate({ flow: this.id, node: node.id, where, source: node.condition.src ?? "", default: verdict });
+    if (typeof answer !== "boolean") throw new Error(`steer: gate for ${node.id} answered ${String(answer)}, not true or false`);
+    if (answer !== verdict && this.host.tracing) this.emit({ type: "steered", node: node.id, kind: "gate", default: verdict, answer });
+    return answer;
   }
 
   /** Report a content error the engine is playing through: to the host's onError, and to the log. */
@@ -3199,8 +3288,21 @@ function toDecl(decl: PropertyDecl): ScopeDeclaration {
 
 /** Every key `EngineOptions` takes: another is reported (`setup`), since a plain-JS caller has no type check. */
 const ENGINE_OPTIONS = new Set([
-  "rng", "seed", "locale", "hostScopes", "registry", "replayPromptOnChoose", "closedCaptions", "onDryChoice", "onError", "onRefit", "log",
+  "rng", "seed", "locale", "hostScopes", "registry", "replayPromptOnChoose", "closedCaptions", "onDryChoice", "steer", "onError", "onRefit", "log",
 ]);
+
+/** The `steer` option if it's a steerer: an object whose `gate` and `pick`, where given, are functions. Anything
+ *  else is reported (`setup`) and ignored, so a mistyped steerer never half-steers a run. */
+function usableSteerer(steer: unknown, setup: Array<{ node: string; message: string }>): Steerer | undefined {
+  if (steer === undefined || steer === null) return undefined;
+  const s = steer as Record<string, unknown>;
+  const ok = typeof steer === "object"
+    && (s.gate === undefined || typeof s.gate === "function")
+    && (s.pick === undefined || typeof s.pick === "function");
+  if (ok) return steer as Steerer;
+  setup.push({ node: "steer", message: `the engine option "steer" isn't a steerer (an object with gate and pick methods), so it's ignored` });
+  return undefined;
+}
 
 /** How a requested locale resolved (see `resolveLocale`): the locale in use, the string table it reads (none: every
  *  string falls back to the default locale, marked untranslated), and what to report when it isn't an exact match. */

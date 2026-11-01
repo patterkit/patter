@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
 import { describeBundle, Engine } from "@patterkit/runtime";
-import { buildCorpus, serializeCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, runAudioCase, runDurationCase, runSpeechCase, cases } from "../src/index.js";
+import { buildCorpus, serializeCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, runSteerCase, runAudioCase, runDurationCase, runSpeechCase, cases } from "../src/index.js";
 
 const corpus = buildCorpus(cases);
 const corpusPath = fileURLToPath(new URL("../corpus.json", import.meta.url));
@@ -90,6 +90,17 @@ describe("decision-log cases (the engine log, and onTrace streaming the same dec
       const decisions = c.expectedLog.map(({ seq: _seq, scene: _scene, ...e }) => e);
       expect(tracedOn).toEqual(decisions);
       expect(tracedOff).toEqual(decisions);
+    });
+  }
+});
+
+describe("steering cases (a tool's steerer answering every gate and pick)", () => {
+  for (const c of corpus.steers) {
+    it(c.name, () => {
+      const { points, transcript, log } = runSteerCase(c);
+      expect(points).toEqual(c.expectedPoints);
+      expect(transcript).toEqual(c.expectedTranscript);
+      if (c.expectedLog) expect(log).toEqual(c.expectedLog);
     });
   }
 });

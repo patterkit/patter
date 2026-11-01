@@ -76,6 +76,10 @@ namespace Patterkit.Patterplay.TestHost
             int lg = RunLogs(logsArr);
             Console.WriteLine($"  [logs] decision logs, and OnTrace streaming the same decisions: {lg}/{logsArr.GetArrayLength()}");
             if (lg != logsArr.GetArrayLength()) Fail("logs", "section total", $"{lg} of {logsArr.GetArrayLength()} passed");
+            if (!root.TryGetProperty("steers", out var steersArr)) { Console.Error.WriteLine("corpus has no steers section (corpus 12)"); return 2; }
+            int st = RunSteers(steersArr);
+            Console.WriteLine($"  [steers] a steerer's answers at each gate and pick, the points it was asked, and the log: {st}/{steersArr.GetArrayLength()}");
+            if (st != steersArr.GetArrayLength()) Fail("steers", "section total", $"{st} of {steersArr.GetArrayLength()} passed");
             if (!root.TryGetProperty("describes", out var describesArr)) { Console.Error.WriteLine("corpus has no describes section"); return 2; }
             int ds = RunDescribes(describesArr);
             Console.WriteLine($"  [describes] the bundle description every runtime gives: {ds}/{describesArr.GetArrayLength()}");
@@ -116,6 +120,7 @@ namespace Patterkit.Patterplay.TestHost
             RunSpeakerLabelChecks();
             RunPlayErrorChecks();
             RunDryChoiceChecks();
+            RunSteerChecks();
             RunOldSaveRuleChecks();
             RunFoundationsChecks();
             RunRunnerChecks();

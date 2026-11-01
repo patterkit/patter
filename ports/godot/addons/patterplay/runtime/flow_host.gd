@@ -124,6 +124,9 @@ var caption_character: String = "SFX"
 ## dry, no takeable option and no eligible fallback, so the silent fall-through is observable. The
 ## game's Callable as given, or null. Live feedback, distinct from the log's `dry` entry.
 var on_dry_choice = null
+## Tooling only (a bake, a test): the "steer" option, an Object with gate(point) -> bool and pick(point) ->
+## String methods (either may be left out), when it was given in a usable shape; else null. JS's steer.
+var steer = null
 ## Problems the engine reported and carried on past (a condition that failed and counted as false, an
 ## effect that failed and was skipped, a Best-match part that failed and scored as false, how the engine
 ## was set up, a load whose place has gone): the game's Callable as given, taking {flow, kind, node,

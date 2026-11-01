@@ -155,6 +155,17 @@ scene** - import, open the scene, press Play, nothing to set up:
   plain `Ended`. The thin runner passes it on: `PatterRunner.Ended` is an `Action<FlowEndReason>`, and
   `PatterRunnerBehaviour.OnEnded` a `UnityEvent<FlowEndReason>`, so a game can tell a story that ran out from
   one that finished.
+- **Steering, for tools only** (a bake or a test, never a shipped game): `EngineOptions.Steer` takes an
+  `ISteerer`, which decides every choice the flow makes on game data and hears each one as it's passed.
+  `Gate(GatePoint)` is asked for each condition a run, a choice option, or a fallback reaches (the point names
+  the `Node`, `Where` it is, its `Source`, and its `Default`), and an option it answers true is offered as
+  eligible, a hidden one included, so `Choose` takes it. `Pick(PickPoint)` is asked once each time a branch or
+  sequence picks, with every child's real verdict and the `Default` pick, and returns a child's id or `""` for
+  none (an id that isn't one of the group's children throws, as `Choose` does). A steerer that only listens
+  returns `point.Default`. Both methods have default implementations that answer the default, so a class that
+  only cares about one kind implements just that one. Steering changes no values, a `HotSwap` keeps it, and with
+  `Log` on, an answer that overrules the engine adds a `steered` entry before the entry it changed. Like
+  `OnDryChoice`, it's a tooling hook: leave it unset in a game.
 - **Set one flow aside**: `engine.CaptureFlow(id)` returns its part of a save as a `FlowState` (its
   position, PRNG, visits, selectors, and its own property values, without its id). Close the flow after
   capturing, keep the state as JSON with `PatterSave.SaveFlowState` / `ReadFlowState`, and

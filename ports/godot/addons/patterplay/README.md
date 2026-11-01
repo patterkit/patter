@@ -160,6 +160,19 @@ In `demo/` (delete the folder freely):
   refusal (`""` when written; a value that doesn't fit its declaration, or a name the content doesn't
   declare, is refused), and `advance()` and `choose()` keep theirs for `flow.last_error()`, cleared by the
   next success. Each is also `push_error`'d.
+- **Tooling hooks, never for a shipped game**: `on_dry_choice`, a Callable, hears the group id of each choice
+  that runs dry. `steer` is for a tool, such as a bake or a test, that has to reach content whatever the game's
+  data says. It's an Object with a `gate(point) -> bool` method and a `pick(point) -> String` method, and it
+  decides every choice the flow makes on game data, hearing each one as it's passed. `gate` is asked for each
+  condition a run, a choice option, or a fallback reaches (the point's `"node"`, `"where"` it is, its
+  `"source"`, and its `"default"`), and an option it answers true is offered as eligible, a hidden one included.
+  `pick` is asked once each time a branch or sequence picks, with every child's real verdict in `"children"`
+  and the `"default"` pick, and returns a child's id or `""` for none. A steerer that only listens returns
+  `point["default"]`, and a method it doesn't have answers the default. Steering changes no values, and with
+  `log` on, an answer that overrules the engine adds a `steered` entry. A `steer` that isn't an Object (or whose
+  `gate` or `pick` isn't a method) is reported as a `"setup"` problem and ignored. An answer of the wrong type,
+  or a pick naming a child the group doesn't have, is refused as `choose()` refuses an unknown option: that
+  `advance()` returns `{"type": "end", "reason": "ended"}`, and `flow.last_error()` says why.
 - **Copies and read-only values**: the Game Data and tags a step, an option, an outline, or a lookup hands
   you are your own copies, so editing them changes nothing the engine says next. Extension values are the
   bundle's own: read them, never edit them.
