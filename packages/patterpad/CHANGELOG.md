@@ -6,6 +6,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **Patterplay 0.40.0 inside.** The runtime gains a steering hook for tools; nothing changes in Patterpad itself.
+
 ## [0.42.0] - 2026-10-31
 
 ### Added
