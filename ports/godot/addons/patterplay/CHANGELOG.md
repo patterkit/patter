@@ -6,6 +6,14 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Steering an engine that's already made.** `engine.set_steer(steerer)` sets the steerer on a live engine, as the
+  `steer` option does when it's made, and `set_steer(null)` clears it. It takes effect from the next decision a flow
+  makes, and `hot_swap` keeps whichever is set. Something that isn't a steerer is reported (`"setup"`) and leaves the
+  engine unsteered. For tools whose engine a game's director has already built, in place of reaching into the
+  engine's internals. The conformance corpus is version 13.
+
 ## [0.40.0] - 2026-11-01
 
 ### Added

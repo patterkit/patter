@@ -170,7 +170,10 @@ In `demo/` (delete the folder freely):
   and the `"default"` pick, and returns a child's id or `""` for none. A steerer that only listens returns
   `point["default"]`, and a method it doesn't have answers the default. Steering changes no values, and with
   `log` on, an answer that overrules the engine adds a `steered` entry. A `steer` that isn't an Object (or whose
-  `gate` or `pick` isn't a method) is reported as a `"setup"` problem and ignored. An answer of the wrong type,
+  `gate` or `pick` isn't a method) is reported as a `"setup"` problem and ignored. On an engine that's already
+  made (one a game's director built, say), `engine.set_steer(steerer)` sets it and `engine.set_steer(null)` clears
+  it, from the next decision a flow makes; one that isn't a steerer is reported the same way and leaves the engine
+  unsteered. An answer of the wrong type,
   or a pick naming a child the group doesn't have, is refused as `choose()` refuses an unknown option: that
   `advance()` returns `{"type": "end", "reason": "ended"}`, and `flow.last_error()` says why.
 - **Copies and read-only values**: the Game Data and tags a step, an option, an outline, or a lookup hands

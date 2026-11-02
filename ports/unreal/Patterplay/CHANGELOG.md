@@ -7,6 +7,13 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Steering an engine that's already made (C++ only).** `patter::Engine::setSteer(Steerer)` sets the steerer on a
+  live engine, as `EngineOptions::steer` does when it's made, and `setSteer({})` clears it. It takes effect from the
+  next decision a flow makes, and `hotSwap` keeps whichever is set. For tools whose engine a game's director has
+  already built. The conformance corpus is version 13.
+
 ## [0.40.0] - 2026-11-01
 
 ### Added

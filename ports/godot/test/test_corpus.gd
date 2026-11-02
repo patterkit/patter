@@ -732,12 +732,18 @@ func _run_steers(arr: Array) -> int:
 	for c in arr:
 		var name: String = c["name"]
 		var steerer := CaseSteerer.new(c["answers"])
-		var options := {"on_error": func(_e): pass, "steer": steerer}
+		# With setLater (corpus 13), the engine is made unsteered and the steerer set on it before the flow opens.
+		var later: bool = c.get("setLater", false)
+		var options := {"on_error": func(_e): pass}
+		if not later:
+			options["steer"] = steerer
 		if c.has("seed"):
 			options["seed"] = c["seed"]
 		if c.has("expectedLog"):
 			options["log"] = true
 		var engine := PatterEngine.new(c["bundle"], options)
+		if later:
+			engine.set_steer(steerer)
 		var start: Dictionary = c["start"]
 		var flow := engine.open_flow("main", start["scene"], start.get("block", ""))
 		var scripted: Array = (c.get("choices", []) as Array).duplicate()

@@ -373,12 +373,14 @@ export interface LogCase {
  * each point from `answers` in order (a boolean for a gate, a child id or "" for a pick) and, past the list's end,
  * with the point's default. The runner records every point it was asked, with the answer it gave, and compares them
  * with `expectedPoints`. With `expectedLog`, the play runs with `log` on and its engine log is compared too. The
- * flow is opened as "main", and a case's `seed` is the engine's `seed`.
+ * flow is opened as "main", and a case's `seed` is the engine's `seed`. With `setLater` (corpus 13), the engine is
+ * made without the `steer` option and the steerer is set on it with `setSteer` before the flow is opened.
  */
 export interface SteerCase {
   name: string;
   bundle: Bundle;
   seed?: number;
+  setLater?: boolean;
   start: { scene: string; block?: string };
   choices?: string[];
   answers: Array<boolean | string>;
@@ -399,6 +401,7 @@ export interface SteerFixture {
   scenes: Scene[];
   locales?: LocaleFile[];
   seed?: number;
+  setLater?: boolean;
   start?: { scene?: string; block?: string };
   choices?: string[];
   answers: Array<boolean | string>;

@@ -515,7 +515,7 @@ export interface EngineOptions {
   onDryChoice?: (groupId: string) => void;
   /** Tooling only (a bake, a test): steer every decision the flow makes on game data, its conditions and its
    *  branch and sequence picks, and hear each one as it's passed (see {@link Steerer}). Never set it in a
-   *  shipped game. Unset, nothing changes. */
+   *  shipped game. Unset, nothing changes. Set or clear it later with `engine.setSteer(...)`. */
   steer?: Steerer;
   /** Called with each problem the engine reported and carried on past (see {@link PlayError}): a condition
    *  that failed and counted as false, an effect that failed and was skipped, a set-up problem (reported as
@@ -992,7 +992,7 @@ export class Engine {
     const locale = this.requestedLocale;
     // The fallback (`reported`) stands in for a replacement that has made its set-up reports: it makes none.
     const make = (reported = false): Engine => new Engine(bundle, {
-      ...this.creationOptions, ...(locale !== undefined ? { locale } : {}),
+      ...this.creationOptions, ...(locale !== undefined ? { locale } : {}), steer: this.host.steer,
       registry: this.host.registry, [OWNS_REGISTRY]: this.host.ownsRegistry, [SETUP_REPORTED]: reported,
     } as InternalOptions);
     // On a game's registry, this engine's own values are parked again to be REFITTED as the replacement claims
@@ -1037,6 +1037,19 @@ export class Engine {
    */
   setClosedCaptions(on: boolean): void {
     this.host.captionsOn = on;
+  }
+
+  /**
+   * Tooling only (a bake, a test): set or clear the steerer (see {@link Steerer}) on an engine that's already made,
+   * as the `steer` option does at construction. It takes effect from the next decision any of its flows makes; a
+   * {@link hotSwap} replacement keeps it. `null` clears it. Anything that isn't a steerer is reported (`setup`) and
+   * leaves the engine unsteered, as the option does. Never call it in a shipped game.
+   */
+  setSteer(steerer: Steerer | null): void {
+    if (steerer === null || steerer === undefined) { this.host.steer = undefined; return; }
+    const setup: Array<{ node: string; message: string }> = [];
+    this.host.steer = usableSteerer(steerer, setup, "setSteer was given something that isn't a steerer (an object with gate and pick methods), so the engine is left unsteered");
+    for (const { node, message } of setup) this.reportSetup(node, message);
   }
 
   /**
@@ -3293,14 +3306,15 @@ const ENGINE_OPTIONS = new Set([
 
 /** The `steer` option if it's a steerer: an object whose `gate` and `pick`, where given, are functions. Anything
  *  else is reported (`setup`) and ignored, so a mistyped steerer never half-steers a run. */
-function usableSteerer(steer: unknown, setup: Array<{ node: string; message: string }>): Steerer | undefined {
+function usableSteerer(steer: unknown, setup: Array<{ node: string; message: string }>,
+  message = `the engine option "steer" isn't a steerer (an object with gate and pick methods), so it's ignored`): Steerer | undefined {
   if (steer === undefined || steer === null) return undefined;
   const s = steer as Record<string, unknown>;
   const ok = typeof steer === "object"
     && (s.gate === undefined || typeof s.gate === "function")
     && (s.pick === undefined || typeof s.pick === "function");
   if (ok) return steer as Steerer;
-  setup.push({ node: "steer", message: `the engine option "steer" isn't a steerer (an object with gate and pick methods), so it's ignored` });
+  setup.push({ node: "steer", message });
   return undefined;
 }
 

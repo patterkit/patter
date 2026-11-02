@@ -774,7 +774,8 @@ namespace patter
         std::function<void(const std::string&)> onDryChoice;
         /// Tooling only (a bake, a test): steer every decision the flow makes on game data, its conditions and
         /// its branch and sequence picks, and hear each one as it's passed (see Steerer). Never set it in a
-        /// shipped game. Left empty, nothing changes. Kept by hotSwap. The C++ engine only: no Blueprint form.
+        /// shipped game. Left empty, nothing changes. Kept by hotSwap; set or clear it later with setSteer. The
+        /// C++ engine only: no Blueprint form.
         Steerer steer;
         /// Called with each problem the engine reported and carried on past (see PlayError): a condition
         /// that failed and counted as false, an effect that failed and was skipped, a Best-match part that
@@ -2932,6 +2933,8 @@ namespace patter
             // Built in the locale this one was asked for, so the new bundle's locales resolve it, as the
             // constructor reports.
             if (requestedLocale_) options.locale = *requestedLocale_;
+            // The steerer in use now (setSteer may have changed the option's), so the replacement keeps it.
+            options.steer = host_.steer;
             const HotSwapTag tag{ host_.ownsRegistry };
             // On a game's registry, this engine's own values are parked again to be REFITTED as the
             // replacement claims them: the edit may have deleted a stage, an enum value or a flag one of them
@@ -2981,6 +2984,12 @@ namespace patter
         // cues + surrounding whitespace stripped; narration / prompts / etc. untouched. A presentation
         // toggle reaching every open flow at once; not save state.
         void setClosedCaptions(bool on) { host_.captionsOn = on; }
+
+        /// Tooling only (a bake, a test): set or clear the steerer (see Steerer) on an engine that's already made,
+        /// as EngineOptions::steer does at construction. It takes effect from the next decision any of its flows
+        /// makes; hotSwap's replacement keeps it. An empty Steerer (`{}`) clears it. Never call it in a shipped
+        /// game. The C++ engine only: there's no Blueprint form. Parity with the JS runtime's setSteer.
+        void setSteer(Steerer steerer) { host_.steer = std::move(steerer); }
 
         /// The run's decisions, in order, each naming the flow it happened in. Empty unless
         /// the engine was built with EngineOptions::log. A flow's own log stays flow-local;

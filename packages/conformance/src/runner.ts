@@ -18,7 +18,7 @@ import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
 import { Engine, effectiveGameData, estimateLineDuration, speechUnits, countSyllables, extensionDecls, extensionsOf, gameDataFields } from "@patterkit/runtime";
-import type { Checkpoint, EngineOptions, HostScope, LoadMisfit, PlayError, StepResult } from "@patterkit/runtime";
+import type { Checkpoint, EngineOptions, HostScope, LoadMisfit, PlayError, StepResult, Steerer } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, FlowState, GameData, SaveEnvelope } from "@patterkit/model";
@@ -540,30 +540,33 @@ export function runLogCase(c: LogCase, maxSteps = 200): { log: unknown[]; traced
 /**
  * Play a steering case: a steerer answers each point from the case's `answers` in order, then with the point's
  * default, and every point is recorded with its answer. The engine log is returned when the case expects one
- * (the play then runs with `log` on). A condition that fails to evaluate is reported, not printed.
+ * (the play then runs with `log` on). A condition that fails to evaluate is reported, not printed. With `setLater`,
+ * the steerer is set with `setSteer` on the made engine instead of given as the option.
  */
 export function runSteerCase(c: SteerCase, maxSteps = 1000): { points: SteerPointRecord[]; transcript: TranscriptStep[]; log?: unknown[] } {
   const answers = [...c.answers];
   const points: SteerPointRecord[] = [];
+  const steer: Steerer = {
+    gate: (p) => {
+      const next = answers.shift();
+      const answer = next === undefined ? p.default : next as boolean;
+      points.push({ kind: "gate", ...p, answer });
+      return answer;
+    },
+    pick: (p) => {
+      const next = answers.shift();
+      const answer = next === undefined ? p.default : next as string;
+      points.push({ kind: "pick", ...p, answer });
+      return answer;
+    },
+  };
   const engine = new Engine(c.bundle, {
     ...(c.seed !== undefined ? { seed: c.seed } : {}),
     ...(c.expectedLog ? { log: true } : {}),
     onError: () => {},
-    steer: {
-      gate: (p) => {
-        const next = answers.shift();
-        const answer = next === undefined ? p.default : next as boolean;
-        points.push({ kind: "gate", ...p, answer });
-        return answer;
-      },
-      pick: (p) => {
-        const next = answers.shift();
-        const answer = next === undefined ? p.default : next as string;
-        points.push({ kind: "pick", ...p, answer });
-        return answer;
-      },
-    },
+    ...(c.setLater ? {} : { steer }),
   });
+  if (c.setLater) engine.setSteer(steer);
   const flow = engine.openFlow("main", { scene: c.start.scene, ...(c.start.block ? { block: c.start.block } : {}) });
   const choices = [...(c.choices ?? [])];
   const transcript: TranscriptStep[] = [];

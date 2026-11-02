@@ -33,6 +33,14 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Steering an engine that's already made.** `engine.setSteer(steerer)` sets the steerer on a live engine, as the
+  `steer` option does when it's made, and `engine.setSteer(null)` clears it. It takes effect from the next decision a
+  flow makes, and a hot swap keeps whichever is set. Something that isn't a steerer is reported (`setup`) and leaves
+  the engine unsteered. For tools whose engine a game's director has already built. The conformance corpus is
+  version 13 (a steering case's `setLater`).
+
 ## [0.40.0] - 2026-11-01
 
 ### Added

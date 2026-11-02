@@ -55,8 +55,10 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  12: steering (patterkit design/proposals/patterplay-steering.md). The section `steers`: a tool's steerer on the
  *  engine (`steer`), answering each condition a run, a choice or a fallback reaches and each branch and sequence
  *  pick, and the log entry `steered`. No earlier expectation changed.
+ *  13: a steering case's `setLater`: the steerer is set on an engine that's already made (`setSteer`), not given
+ *  as the option. The case `steerSetLater`. No earlier expectation changed.
  */
-export const CORPUS_VERSION = 12;
+export const CORPUS_VERSION = 13;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at
@@ -175,6 +177,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     name: f.name,
     bundle: exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales }),
     ...(f.seed !== undefined ? { seed: f.seed } : {}),
+    ...(f.setLater ? { setLater: true } : {}),
     start: { scene: f.start?.scene ?? f.scenes[0]!.id, ...(f.start?.block ? { block: f.start.block } : {}) },
     ...(f.choices ? { choices: f.choices } : {}),
     answers: f.answers,

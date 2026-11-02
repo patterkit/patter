@@ -90,7 +90,8 @@ namespace Patterkit.Patterplay
         /// <summary>Tooling only (a bake, a test): steer every decision the flow makes on game data, its
         /// conditions and its branch and sequence picks, and hear each one as it's passed (see
         /// <see cref="ISteerer"/>). Never set it in a shipped game. Unset, nothing changes. A HotSwap
-        /// replacement keeps it. Parity with the JS runtime's steer.</summary>
+        /// replacement keeps it. Set or clear it later with Engine.SetSteer. Parity with the JS runtime's
+        /// steer.</summary>
         public ISteerer Steer;
         /// <summary>Called with each problem the engine reported and carried on past (see <see cref="PlayError"/>):
         /// a condition that failed and counted as false, an effect that failed and was skipped, a part of a
@@ -919,6 +920,7 @@ namespace Patterkit.Patterplay
             Engine CarryOver(Engine next)
             {
                 next.SetClosedCaptions(_host.CaptionsOn);
+                next.SetSteer(_host.Steer);
                 return next;
             }
             // The replacement registers on the SAME registry, and a standalone engine's replacement is still
@@ -981,6 +983,12 @@ namespace Patterkit.Patterplay
         /// reaches every open flow at once and isn't part of save state.
         /// </summary>
         public void SetClosedCaptions(bool on) => _host.CaptionsOn = on;
+
+        /// <summary>Tooling only (a bake, a test): set or clear the steerer (see <see cref="ISteerer"/>) on an engine
+        /// that's already made, as <see cref="EngineOptions.Steer"/> does at construction. It takes effect from the
+        /// next decision any of its flows makes; a HotSwap replacement keeps it. Null clears it. Never call it in a
+        /// shipped game. Parity with the JS runtime's setSteer.</summary>
+        public void SetSteer(ISteerer steerer) => _host.Steer = steerer;
 
         /// <summary>Open (and start) a named flow; re-opening a name replaces it. Throws on an address that
         /// does not resolve (an unknown scene, or a block that is not in the named scene), before anything

@@ -4555,6 +4555,12 @@ const steerBranch = {
   ],
 } satisfies SteerFixture;
 
+const steerSetLater = {
+  ...steerBranch,
+  name: "steer: a steerer set on an engine that's already made steers it as the option does",
+  setLater: true,
+} satisfies SteerFixture;
+
 const steerSequences = {
   name: "steer: each order of sequence picked to a later child or to none, and one with nothing eligible picked",
   project: steerProject,
@@ -4805,7 +4811,7 @@ export const cases: Fixtures = {
     asSaveFixture(scriptedChoiceFollowsLocale, "a save written by the JS reference at a pending choice keeps its options' ids, not their text"),
   ],
   logs: [decisionLog],
-  steers: [steerRun, steerOptions, steerFallback, steerRunsDry, steerBranch, steerSequences, steerFailingCondition, steerListening, steerLogged],
+  steers: [steerRun, steerOptions, steerFallback, steerRunsDry, steerBranch, steerSequences, steerFailingCondition, steerListening, steerLogged, steerSetLater],
   describes: [describeEverything],
   outlines: [outlineEverything, outlineExtensions],
   audio: [audioManifest],

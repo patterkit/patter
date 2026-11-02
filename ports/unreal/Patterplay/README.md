@@ -145,7 +145,9 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   one of the group's children throws `std::runtime_error`, as `choose()` with an unknown id does. A steerer that
   only listens returns `point.def`, and an empty function answers the default. Steering changes no values, a hot
   swap keeps the steerer, and with the log on (or an `onTrace` handler), an answer that overrules the engine adds
-  a `steered` entry before the entry it changed.
+  a `steered` entry before the entry it changed. On an engine that's already made (one a game's director built,
+  say), `engine.setSteer(steerer)` sets it and `engine.setSteer({})` clears it, from the next decision a flow
+  makes.
 - **Locales**: `Locale()` is the locale in use and `Locales()` the bundle's default and included locales.
   `SetLocale` (and the `Locale` option) resolves by one rule on every runtime: case and `_` / `-` don't
   matter, then the language alone (`fr` for `fr-FR`), then the default, each fallback reported. A pending

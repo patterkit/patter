@@ -6,6 +6,13 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Steering an engine that's already made.** `Engine.SetSteer(ISteerer)` sets the steerer on a live engine, as
+  `EngineOptions.Steer` does when it's made, and `SetSteer(null)` clears it. It takes effect from the next decision a
+  flow makes, and a `HotSwap` keeps whichever is set. For tools whose engine a game's director has already built,
+  in place of reaching into the engine's internals. The conformance corpus is version 13.
+
 ## [0.40.0] - 2026-11-01
 
 ### Added

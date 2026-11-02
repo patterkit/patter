@@ -196,6 +196,9 @@ const API = [
   { on: "Engine", js: "setClosedCaptions", unity: "SetClosedCaptions", godot: "set_closed_captions", unreal: "setClosedCaptions", bp: "SetClosedCaptions" },
   { on: "Engine", js: "hotSwap", unity: "HotSwap", godot: "hot_swap", unreal: "hotSwap", bp: "HotSwap" },
   { on: "Engine", js: "replaceStrings", unity: "ReplaceStrings", godot: "replace_strings", unreal: "replaceStrings", bp: "ReplaceStrings" },
+  // --- tooling ---------------------------------------------------------------
+  { on: "Engine", js: "setSteer", unity: "SetSteer", godot: "set_steer", unreal: "setSteer", bp: null,
+    why: "steering is for a bake or a test, which is editor C++, and a multicast delegate can't return an answer" },
 ];
 
 const sources = Object.fromEntries(

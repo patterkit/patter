@@ -1,5 +1,5 @@
 {
-  "version": 12,
+  "version": 13,
   "expressions": [
     {
       "name": "number comparison",
@@ -32539,6 +32539,254 @@
           "scene": "s",
           "to": "END",
           "mode": "jump"
+        }
+      ]
+    },
+    {
+      "name": "steer: a steerer set on an engine that's already made steers it as the option does",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0grsnen",
+          "structureHash": "0r8p9av"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "met",
+            "type": "boolean",
+            "default": false
+          },
+          {
+            "name": "gold",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "zero",
+            "type": "number",
+            "default": 0
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "s",
+            "blocks": [
+              {
+                "id": "b_s",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g_1",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_hi",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@gold > 10",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "sv",
+                              "patter",
+                              "gold"
+                            ],
+                            [
+                              "n",
+                              10
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "HI",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_mid",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@gold >= 0",
+                          "ast": [
+                            "bin",
+                            ">=",
+                            [
+                              "sv",
+                              "patter",
+                              "gold"
+                            ],
+                            [
+                              "n",
+                              0
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "MID",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_low",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "LOW",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_2",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_yes",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@met",
+                          "ast": [
+                            "sv",
+                            "patter",
+                            "met"
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "YES",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_no",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "NO",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_end",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "END_T",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "HI": "high",
+            "MID": "mid",
+            "LOW": "low",
+            "YES": "yes",
+            "NO": "no",
+            "END_T": "done"
+          }
+        }
+      },
+      "setLater": true,
+      "start": {
+        "scene": "s"
+      },
+      "answers": [
+        "sn_hi",
+        ""
+      ],
+      "expectedPoints": [
+        {
+          "kind": "pick",
+          "flow": "main",
+          "group": "g_1",
+          "selector": "branch",
+          "children": [
+            {
+              "id": "sn_hi",
+              "eligible": false
+            },
+            {
+              "id": "sn_mid",
+              "eligible": true
+            },
+            {
+              "id": "sn_low",
+              "eligible": true
+            }
+          ],
+          "default": "sn_mid",
+          "answer": "sn_hi"
+        },
+        {
+          "kind": "pick",
+          "flow": "main",
+          "group": "g_2",
+          "selector": "branch",
+          "children": [
+            {
+              "id": "sn_yes",
+              "eligible": false
+            },
+            {
+              "id": "sn_no",
+              "eligible": true
+            }
+          ],
+          "default": "sn_no",
+          "answer": ""
+        }
+      ],
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "HI",
+          "text": "high"
+        },
+        {
+          "type": "text",
+          "id": "END_T",
+          "text": "done"
+        },
+        {
+          "type": "end"
         }
       ]
     }

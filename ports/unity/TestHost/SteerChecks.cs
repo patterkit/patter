@@ -57,9 +57,11 @@ namespace Patterkit.Patterplay.TestHost
                     var bundle = _loader(c.GetProperty("bundle"));
                     bool logged = c.TryGetProperty("expectedLog", out var expectedLog);
                     var steerer = new ListSteerer(c.GetProperty("answers").EnumerateArray());
-                    var opts = new EngineOptions { Log = logged, OnError = _ => { }, Steer = steerer };
+                    bool later = c.TryGetProperty("setLater", out var sl) && sl.GetBoolean();
+                    var opts = new EngineOptions { Log = logged, OnError = _ => { }, Steer = later ? null : steerer };
                     if (c.TryGetProperty("seed", out var seed)) opts.Seed = seed.GetDouble();
                     var engine = new Engine(bundle, opts);
+                    if (later) engine.SetSteer(steerer);
                     var start = c.GetProperty("start");
                     var flow = engine.OpenFlow("main", start.GetProperty("scene").GetString(),
                         start.TryGetProperty("block", out var bl) ? bl.GetString() : null);
@@ -130,7 +132,7 @@ namespace Patterkit.Patterplay.TestHost
         {
             int before = _fails;
             Guarded("steer", SteerChecks);
-            if (_fails == before) Console.WriteLine("  [steer] an unknown or null pick throws as Choose does, a method left out answers the default, a hot swap keeps the steerer");
+            if (_fails == before) Console.WriteLine("  [steer] an unknown or null pick throws as Choose does, a method left out answers the default, a hot swap keeps the steerer, SetSteer sets and clears it");
         }
 
         private static void SteerChecks()
@@ -185,6 +187,30 @@ namespace Patterkit.Patterplay.TestHost
                 var engine = new Engine(bundle, new EngineOptions { Steer = new BothSteerer { GateAnswer = true, PickAnswer = "sn_yes" } });
                 var t = Texts(engine.HotSwap(bundle));
                 Check("steer: a hot swap keeps the steerer", t.SequenceEqual(new[] { "a", "yes" }), Show(t));
+            }
+            {
+                var engine = new Engine(bundle);
+                var t = Texts(engine);
+                engine.SetSteer(new BothSteerer { GateAnswer = true, PickAnswer = "sn_yes" });
+                var steered = Texts(engine);
+                engine.SetSteer(null);
+                var cleared = Texts(engine);
+                Check("steer: SetSteer steers an engine that's already made, and null clears it",
+                    t.SequenceEqual(new[] { "no" }) && steered.SequenceEqual(new[] { "a", "yes" }) && cleared.SequenceEqual(new[] { "no" }),
+                    Show(t) + " " + Show(steered) + " " + Show(cleared));
+            }
+            {
+                var engine = new Engine(bundle, new EngineOptions { Steer = new GateOnly { Answer = true } });
+                engine.SetSteer(new PickOnly { Answer = "sn_yes" });
+                var replaced = Texts(engine);
+                engine.SetSteer(null);
+                var swappedClear = Texts(engine.HotSwap(bundle));
+                var later = new Engine(bundle);
+                later.SetSteer(new BothSteerer { GateAnswer = true, PickAnswer = "sn_yes" });
+                var swappedSet = Texts(later.HotSwap(bundle));
+                Check("steer: SetSteer replaces the option's steerer, and a hot swap keeps the one set last",
+                    replaced.SequenceEqual(new[] { "yes" }) && swappedClear.SequenceEqual(new[] { "no" }) && swappedSet.SequenceEqual(new[] { "a", "yes" }),
+                    Show(replaced) + " " + Show(swappedClear) + " " + Show(swappedSet));
             }
         }
     }

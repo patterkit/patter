@@ -710,7 +710,12 @@ static SteerRun playSteerCase(const JsonValue& c)
         run->points.push(o);
         return answer;
     };
+    // With setLater (corpus 13), the engine is made unsteered and the steerer is set on it before the flow opens.
+    const JsonValue* later = c.find("setLater");
+    Steerer steer;
+    if (later && later->b) std::swap(steer, opts.steer);
     Engine engine(bundle, opts);
+    if (later && later->b) engine.setSteer(std::move(steer));
     const JsonValue& start = c.at("start");
     std::string startBlock;
     if (const JsonValue* bl = start.find("block")) startBlock = bl->str;
@@ -3439,6 +3444,36 @@ static void runSteerCases()
         std::unique_ptr<Engine> next = engine.hotSwap(bundle);
         const std::string got = texts(*next);
         need(got == "a,yes", "after the hot swap: " + got);
+    });
+    steerCase("setSteer steers an engine that's already made, and an empty steerer clears it", [&]
+    {
+        Engine engine(bundle, EngineOptions{});
+        const std::string before = texts(engine);
+        Steerer s;
+        s.gate = [](const GatePoint&) { return true; };
+        s.pick = [](const PickPoint&) { return std::string("sn_yes"); };
+        engine.setSteer(s);
+        const std::string steeredNow = texts(engine);
+        engine.setSteer({});
+        const std::string cleared = texts(engine);
+        need(before == "no" && steeredNow == "a,yes" && cleared == "no", before + " / " + steeredNow + " / " + cleared);
+    });
+    steerCase("setSteer replaces the option's steerer, and a hot swap keeps the one set last", [&]
+    {
+        Steerer gate; gate.gate = [](const GatePoint&) { return true; };
+        Engine engine(bundle, steered(gate));
+        Steerer pick; pick.pick = [](const PickPoint&) { return std::string("sn_yes"); };
+        engine.setSteer(pick);
+        const std::string replaced = texts(engine);
+        engine.setSteer({});
+        std::unique_ptr<Engine> cleared = engine.hotSwap(bundle);
+        const std::string swappedClear = texts(*cleared);
+        Engine later(bundle, EngineOptions{});
+        Steerer both = pick; both.gate = gate.gate;
+        later.setSteer(both);
+        std::unique_ptr<Engine> next = later.hotSwap(bundle);
+        const std::string swappedSet = texts(*next);
+        need(replaced == "yes" && swappedClear == "no" && swappedSet == "a,yes", replaced + " / " + swappedClear + " / " + swappedSet);
     });
     steerCase("a steered answer reaches onTrace with the log off, before the entry it changed", [&]
     {

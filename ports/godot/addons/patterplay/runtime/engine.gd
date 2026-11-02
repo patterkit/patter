@@ -206,7 +206,7 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 ## The "steer" option if it's a steerer: an Object whose `gate` and `pick`, where it has members by those
 ## names, are methods. Anything else (not an Object, or a `gate` or `pick` property that isn't a method) is
 ## reported ("setup") and ignored, so a mistyped steerer never half-steers a run. JS's usableSteerer.
-func _usable_steerer(steer) -> Object:
+func _usable_steerer(steer, message := 'the engine option "steer" isn\'t a steerer (an object with gate and pick methods), so it\'s ignored') -> Object:
 	if steer == null:
 		return null
 	var ok: bool = steer is Object and is_instance_valid(steer)
@@ -216,7 +216,7 @@ func _usable_steerer(steer) -> Object:
 				ok = false
 	if ok:
 		return steer
-	_setup.append(["steer", 'the engine option "steer" isn\'t a steerer (an object with gate and pick methods), so it\'s ignored'])
+	_setup.append(["steer", message])
 	return null
 
 
@@ -802,6 +802,7 @@ func hot_swap(bundle: Dictionary) -> PatterEngine:
 	var opts := _creation_options.duplicate()
 	opts["registry"] = _host.registry
 	opts[_OWNS_REGISTRY] = _host.owns_registry
+	opts["steer"] = _host.steer   # the steerer in use now (set_steer may have changed the option's)
 	opts.erase(_SETUP_REPORTED)   # a fallback's own replacement reports again
 	# Built in the locale this one was asked for, so the new bundle's locales resolve it, as the
 	# constructor reports.
@@ -882,6 +883,17 @@ func closed_captions() -> bool:
 # every open flow at once; not save state.
 func set_closed_captions(on: bool) -> void:
 	_host.captions_on = on
+
+
+## Tooling only (a bake, a test): set or clear the steerer on an engine that's already made, as the "steer"
+## option does at construction. It takes effect from the next decision any of its flows makes; a hot_swap
+## replacement keeps it. null clears it. Anything that isn't a steerer is reported ("setup") and leaves the
+## engine unsteered, as the option does. Never call it in a shipped game. JS's setSteer.
+func set_steer(steerer) -> void:
+	_host.steer = _usable_steerer(steerer, "set_steer was given something that isn't a steerer (an object with gate and pick methods), so the engine is left unsteered")
+	for s in _setup:
+		_report_setup(s[0], s[1])
+	_setup = []
 
 
 ## Read a shared property by ref: a `@patter` global, a host scope, or any scope another engine

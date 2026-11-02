@@ -78,7 +78,9 @@ syllables, shut beats, and pauses the estimate is made of, for a game to move a 
   eligible, a hidden one included. `pick` is asked once each time a branch or sequence picks, with every child's real
   verdict and the `default` pick, and returns a child's id or `""` for none. A steerer that only listens returns
   `point.default`, and a method left out answers the default. Steering changes no values, and with `log` on, an
-  answer that overrules the engine adds a `steered` entry.
+  answer that overrules the engine adds a `steered` entry. On an engine that's already made (one a game's director
+  built, say), `engine.setSteer(steerer)` sets it and `engine.setSteer(null)` clears it, from the next decision a
+  flow makes; a hot swap keeps whichever is set.
 
 Switch language mid-game with **`engine.setLocale("fr")`** (`engine.locale` is the locale in use, and
 `engine.locales` the bundle's `{ default, included }`): subsequent beats, a pending choice's options,

@@ -122,6 +122,37 @@ func _initialize() -> void:
 	r = _play(first.hot_swap(bundle))
 	_expect(r["texts"] == ["a", "yes"], "a hot swap keeps the steerer: " + str(r))
 
+	# set_steer steers an engine that's already made, and null clears it.
+	var made := PatterEngine.new(bundle)
+	var before := _play(made)
+	made.set_steer(Steer.new(func(_p): return true, func(_p): return "sn_yes"))
+	var steered := _play(made)
+	made.set_steer(null)
+	var cleared := _play(made)
+	_expect(before["texts"] == ["no"] and steered["texts"] == ["a", "yes"] and cleared["texts"] == ["no"],
+		"set_steer sets and clears: %s %s %s" % [str(before), str(steered), str(cleared)])
+
+	# set_steer replaces the option's steerer, and a hot swap keeps the one set last.
+	var opted := PatterEngine.new(bundle, {"steer": GateOnly.new()})
+	opted.set_steer(PickOnly.new())
+	var replaced := _play(opted)
+	opted.set_steer(null)
+	var swapped_clear := _play(opted.hot_swap(bundle))
+	var later := PatterEngine.new(bundle)
+	later.set_steer(Steer.new(func(_p): return true, func(_p): return "sn_yes"))
+	var swapped_set := _play(later.hot_swap(bundle))
+	_expect(replaced["texts"] == ["yes"] and swapped_clear["texts"] == ["no"] and swapped_set["texts"] == ["a", "yes"],
+		"set_steer replaces, and a hot swap keeps the one set last: %s %s %s" % [str(replaced), str(swapped_clear), str(swapped_set)])
+
+	# set_steer given something that isn't a steerer reports it and leaves the engine unsteered.
+	for steer in [42, {"gate": "always"}, PickProperty.new()]:
+		var errors: Array = []
+		var engine := PatterEngine.new(bundle, {"steer": GateOnly.new(), "on_error": func(e): errors.append(e)})
+		engine.set_steer(steer)
+		r = _play(engine)
+		_expect(errors.size() == 1 and errors[0]["kind"] == "setup" and errors[0]["node"] == "steer" and r["texts"] == ["no"],
+			"set_steer of the wrong shape (%s) is reported and unsteers: %s %s" % [str(steer), str(errors), str(r)])
+
 	print("test_steer: ALL PASS" if _fails == 0 else "test_steer: %d FAILED" % _fails)
 	quit(1 if _fails > 0 else 0)
 

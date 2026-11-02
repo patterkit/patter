@@ -63,4 +63,34 @@ describe("steer", () => {
     const engine = new Engine(bundle, { steer: { gate: () => true, pick: () => "sn_yes" } });
     expect(texts(engine.hotSwap(bundle))).toEqual(["a", "yes"]);
   });
+
+  it("setSteer steers an engine that's already made, and null clears it", () => {
+    const engine = new Engine(bundle);
+    expect(texts(engine)).toEqual(["no"]);
+    engine.setSteer({ gate: () => true, pick: () => "sn_yes" });
+    expect(texts(engine)).toEqual(["a", "yes"]);
+    engine.setSteer(null);
+    expect(texts(engine)).toEqual(["no"]);
+  });
+
+  it("setSteer replaces a steerer the option gave, and a hot swap keeps the one set last", () => {
+    const engine = new Engine(bundle, { steer: { gate: () => true } });
+    engine.setSteer({ pick: () => "sn_yes" });
+    expect(texts(engine)).toEqual(["yes"]);
+    engine.setSteer(null);
+    expect(texts(engine.hotSwap(bundle))).toEqual(["no"]);
+    const steered = new Engine(bundle);
+    steered.setSteer({ gate: () => true, pick: () => "sn_yes" });
+    expect(texts(steered.hotSwap(bundle))).toEqual(["a", "yes"]);
+  });
+
+  it("setSteer given something that isn't a steerer reports it and leaves the engine unsteered", () => {
+    for (const steer of [42, { gate: "always" }, { pick: 1 }]) {
+      const errors: PlayError[] = [];
+      const engine = new Engine(bundle, { steer: { gate: () => true }, onError: (e) => errors.push(e) });
+      engine.setSteer(steer as unknown as Steerer);
+      expect(errors).toEqual([expect.objectContaining({ kind: "setup", node: "steer" })]);
+      expect(texts(engine)).toEqual(["no"]);
+    }
+  });
 });

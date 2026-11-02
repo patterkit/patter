@@ -164,8 +164,10 @@ scene** - import, open the scene, press Play, nothing to set up:
   none (an id that isn't one of the group's children throws, as `Choose` does). A steerer that only listens
   returns `point.Default`. Both methods have default implementations that answer the default, so a class that
   only cares about one kind implements just that one. Steering changes no values, a `HotSwap` keeps it, and with
-  `Log` on, an answer that overrules the engine adds a `steered` entry before the entry it changed. Like
-  `OnDryChoice`, it's a tooling hook: leave it unset in a game.
+  `Log` on, an answer that overrules the engine adds a `steered` entry before the entry it changed. On an engine
+  that's already made (one a game's director built, say), `engine.SetSteer(steerer)` sets it and
+  `engine.SetSteer(null)` clears it, from the next decision a flow makes. Like `OnDryChoice`, it's a tooling hook:
+  leave it unset in a game.
 - **Set one flow aside**: `engine.CaptureFlow(id)` returns its part of a save as a `FlowState` (its
   position, PRNG, visits, selectors, and its own property values, without its id). Close the flow after
   capturing, keep the state as JSON with `PatterSave.SaveFlowState` / `ReadFlowState`, and
