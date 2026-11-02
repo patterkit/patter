@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.42.2] - 2026-11-02
+
 ### Changed
 
 - **Patterplay 0.41.0 inside.** The runtime's steering hook for tools can now be set on an engine that's already
