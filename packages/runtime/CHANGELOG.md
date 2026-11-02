@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-02
+
 ### Added
 
 - **Steering an engine that's already made.** `engine.setSteer(steerer)` sets the steerer on a live engine, as the

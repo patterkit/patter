@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-02
+
 ### Added
 
 - **Steering an engine that's already made.** `Engine.SetSteer(ISteerer)` sets the steerer on a live engine, as

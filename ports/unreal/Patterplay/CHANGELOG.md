@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-02
+
 ### Added
 
 - **Steering an engine that's already made (C++ only).** `patter::Engine::setSteer(Steerer)` sets the steerer on a
