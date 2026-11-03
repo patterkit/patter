@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-11-03
+
 ### Added
 
 - **Which Patterplay this is.** `PATTERPLAY_VERSION` is the runtime's version, as in its `package.json`, and

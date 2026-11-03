@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-11-03
+
 ### Added
 
 - **The Patterplay version, and a check against it.** `patter::PatterplayVersion` (Blueprint:

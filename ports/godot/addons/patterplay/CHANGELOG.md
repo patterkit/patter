@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-11-03
+
 ### Added
 
 - **Which Patterplay this is.** `PatterplayVersion.CURRENT` is the runtime's version, as in its `plugin.cfg`, and

@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-11-03
+
 ### Added
 
 - **The Patterplay version, in code.** `PatterplayVersion.Current` is this runtime's version, as in its package
