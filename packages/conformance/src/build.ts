@@ -57,8 +57,10 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  pick, and the log entry `steered`. No earlier expectation changed.
  *  13: a steering case's `setLater`: the steerer is set on an engine that's already made (`setSteer`), not given
  *  as the option. The case `steerSetLater`. No earlier expectation changed.
+ *  14: the section `versions`: whether a version is in a range (`versionInRange`), the check an extension makes
+ *  against the Patterplay it finds. No earlier expectation changed.
  */
-export const CORPUS_VERSION = 13;
+export const CORPUS_VERSION = 14;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at
@@ -201,7 +203,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     };
   });
 
-  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, steers, describes, outlines, audio: fixtures.audio, durations: fixtures.durations, speech: fixtures.speech };
+  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, steers, describes, outlines, audio: fixtures.audio, durations: fixtures.durations, speech: fixtures.speech, versions: fixtures.versions };
 }
 
 // The corpus as the committed corpus.json text. Every case's inputs (`bundle`, `bundleB`, `envelope`) write a

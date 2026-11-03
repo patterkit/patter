@@ -198,5 +198,9 @@ scene** - import, open the scene, press Play, nothing to set up:
   language, then to the default, and is reported; `engine.Locale` is the one in use, and
   `engine.Locales` the bundle's.
   See [the localisation guide](https://patterkit.dev/play/localisation/).
+- **Which Patterplay this is**: `PatterplayVersion.Current` is this runtime's version, as in its `package.json`. An
+  extension that ships apart from Patterplay checks it at start-up with
+  `PatterplayVersion.InRange(PatterplayVersion.Current, "0.41.0", "0.42.0")` (at least the first version, below the
+  second).
 
 Changes per release: [CHANGELOG.md](CHANGELOG.md).

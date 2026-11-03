@@ -9,6 +9,8 @@
 // ---------------------------------------------------------------------------
 
 export { Engine, Flow, Checkpoint } from "./engine.js";
+// What this runtime is, and the check an extension makes against it at start-up.
+export { PATTERPLAY_VERSION, versionInRange } from "./version.js";
 // A quality's ladder over a bare list of stages, as the Storylet Engine's runtime exports them: for a game
 // holding a ladder itself. Engine and Flow take a quality's ref instead.
 export { stageIndex, compareStages, nextStage } from "@wildwinter/expr";

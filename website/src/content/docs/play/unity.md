@@ -274,6 +274,13 @@ To set one flow aside instead, `engine.CaptureFlow(id)` returns its part of a sa
 `engine.RestoreFlow(newId, state)` opens it again later; `PatterSave.SaveFlowState` and `ReadFlowState` turn a
 state into JSON and back. See [Taking one flow out](/play/integration/#taking-one-flow-out).
 
+## Which Patterplay is this?
+
+**`PatterplayVersion.Current`** is the runtime's version, as in its package manifest (`"0.41.0"`). An extension that
+ships apart from Patterplay checks it at start-up with
+**`PatterplayVersion.InRange(PatterplayVersion.Current, "0.41.0", "0.42.0")`**: at least the first version and below
+the second, by semantic-version order. Every runtime has the same pair.
+
 ## Next
 
 - [The play loop](/play/concepts/) is the shared model.

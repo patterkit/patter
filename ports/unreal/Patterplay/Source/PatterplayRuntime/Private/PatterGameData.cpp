@@ -3,6 +3,7 @@
 #include "PatterBundle.h"
 #include "PatterLog.h"
 #include "Patter/Bundle.h"
+#include "Patter/Version.h"
 #include "PatterConvert.h"
 
 using namespace PatterConvert;
@@ -272,4 +273,14 @@ TArray<FPatterSpeechUnit> UPatterGameData::SpeechUnits(const FString& Text, cons
 double UPatterGameData::CountSyllables(const FString& Text, const FString& Locale)
 {
 	return patter::countSyllables(Std(Text), Std(Locale));
+}
+
+FString UPatterGameData::GetPatterplayVersion()
+{
+	return Ue(patter::PatterplayVersion);
+}
+
+bool UPatterGameData::PatterplayVersionInRange(const FString& Version, const FString& Min, const FString& MaxExclusive)
+{
+	return patter::versionInRange(Std(Version), Std(Min), Std(MaxExclusive));
 }

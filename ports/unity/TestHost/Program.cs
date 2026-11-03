@@ -100,6 +100,10 @@ namespace Patterkit.Patterplay.TestHost
             int spc = RunSpeech(speechArr);
             Console.WriteLine($"  [speech] the units a line is spoken in, and its syllable count: {spc}/{speechArr.GetArrayLength()}");
             if (spc != speechArr.GetArrayLength()) Fail("speech", "section total", $"{spc} of {speechArr.GetArrayLength()} passed");
+            if (!root.TryGetProperty("versions", out var versionsArr)) { Console.Error.WriteLine("corpus has no versions section (corpus 14)"); return 2; }
+            int vr = RunVersions(versionsArr);
+            Console.WriteLine($"  [versions] the version check an extension makes at start-up: {vr}/{versionsArr.GetArrayLength()}");
+            if (vr != versionsArr.GetArrayLength()) Fail("versions", "section total", $"{vr} of {versionsArr.GetArrayLength()} passed");
 
             // Verify the Unity JSON save/load: replay the scripted cases routing saveLoad through
             // PatterSave's JSON string round-trip.

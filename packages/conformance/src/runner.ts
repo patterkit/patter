@@ -17,13 +17,13 @@ import { evaluate, deserialiseAst, makePrng } from "@wildwinter/expr";
 import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
-import { Engine, effectiveGameData, estimateLineDuration, speechUnits, countSyllables, extensionDecls, extensionsOf, gameDataFields } from "@patterkit/runtime";
+import { Engine, effectiveGameData, estimateLineDuration, speechUnits, countSyllables, extensionDecls, extensionsOf, gameDataFields, versionInRange } from "@patterkit/runtime";
 import type { Checkpoint, EngineOptions, HostScope, LoadMisfit, PlayError, StepResult, Steerer } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, FlowState, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
-  AudioCase, DurationCase, SpeechCase, TranscriptSpoken, LogCase, SteerCase, SteerPointRecord,
+  AudioCase, DurationCase, SpeechCase, VersionCase, TranscriptSpoken, LogCase, SteerCase, SteerPointRecord,
   ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptOption, TranscriptPrompt, TranscriptStep,
 } from "./types.js";
 
@@ -596,4 +596,9 @@ export function runDurationCase(c: DurationCase): number {
 /** A speech case's units and syllable count, by the reference's speechUnits and countSyllables. */
 export function runSpeechCase(c: SpeechCase): { units: SpeechCase["units"]; syllables: number } {
   return { units: speechUnits(c.text, c.locale), syllables: countSyllables(c.text, c.locale) };
+}
+
+/** Whether a version case's version is in its range, by the reference's versionInRange. */
+export function runVersionCase(c: VersionCase): boolean {
+  return versionInRange(c.version, c.min, c.maxExclusive);
 }

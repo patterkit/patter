@@ -8,7 +8,7 @@
 // corpus.json; the test asserts the reference engine reproduces every value.
 // ---------------------------------------------------------------------------
 
-import type { DescribeFixture, DurationCase, SpeechCase, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, SteerFixture, TranscriptStep } from "./types.js";
+import type { DescribeFixture, DurationCase, SpeechCase, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, SteerFixture, TranscriptStep, VersionCase } from "./types.js";
 import type { Bundle, CompiledGroup, CompiledSnippet, Group, ProjectFile, LocaleFile, SaveGame, Scene, Snippet } from "@patterkit/model";
 import { castStringKey, qualifierStringKey, speakerLabelKey, SPEAKER_PATTERN_KEY } from "@patterkit/model";
 import type { ExtensionShard } from "@patterkit/model";
@@ -4690,6 +4690,37 @@ const steerLogged = {
   ],
 } satisfies SteerFixture;
 
+// --- whether a version is in a range (corpus 14) ------------------------------------------------------------
+// versionInRange(version, min, maxExclusive): at least min and below maxExclusive, by semantic-version precedence.
+// It's the check Patterstage and Pattershot make against the Patterplay they find, so every runtime agrees on it.
+const versionCase = (name: string, version: string, min: string, maxExclusive: string, expected: boolean): VersionCase =>
+  ({ name, version, min, maxExclusive, expected });
+const versionCases: VersionCase[] = [
+  versionCase("the bottom of the range is in it", "0.41.0", "0.41.0", "0.42.0", true),
+  versionCase("a patch inside the range", "0.41.7", "0.41.0", "0.42.0", true),
+  versionCase("the top of the range is outside it", "0.42.0", "0.41.0", "0.42.0", false),
+  versionCase("below the range", "0.40.9", "0.41.0", "0.42.0", false),
+  versionCase("numbers compare as numbers, not text", "0.41.10", "0.41.9", "0.42.0", true),
+  versionCase("a major version above the range", "1.0.0", "0.41.0", "0.42.0", false),
+  versionCase("a range across a major version", "1.2.3", "0.41.0", "2.0.0", true),
+  versionCase("a prerelease comes before its release", "0.41.0-beta.1", "0.41.0", "0.42.0", false),
+  versionCase("so a prerelease of the top is below it", "0.42.0-rc.1", "0.41.0", "0.42.0", true),
+  versionCase("prerelease numbers compare as numbers", "1.0.0-beta.11", "1.0.0-beta.2", "1.0.0", true),
+  versionCase("a numeric prerelease part comes before a word", "1.0.0-1", "1.0.0-alpha", "1.0.0", false),
+  versionCase("prerelease words compare by their characters", "1.0.0-beta", "1.0.0-alpha", "1.0.0-rc", true),
+  versionCase("a longer prerelease comes after its prefix", "1.0.0-alpha.1", "1.0.0-alpha", "1.0.0-alpha.2", true),
+  versionCase("build metadata is ignored", "0.42.0+build.5", "0.41.0", "0.42.0", false),
+  versionCase("build metadata on the bottom is ignored too", "0.41.0", "0.41.0+abc", "0.42.0", true),
+  versionCase("an empty range holds nothing", "0.41.0", "0.41.0", "0.41.0", false),
+  versionCase("an empty version isn't in range", "", "0.0.0", "99.0.0", false),
+  versionCase("a version needs all three numbers", "0.41", "0.0.0", "99.0.0", false),
+  versionCase("a v in front isn't a version", "v0.41.0", "0.0.0", "99.0.0", false),
+  versionCase("numbers of any length compare exactly", "0.41.90071992547409931", "0.41.90071992547409930", "0.42.0", true),
+  versionCase("leading zeros don't change a number", "0.041.0", "0.41.0", "0.42.0", true),
+  versionCase("prerelease numbers equal but for leading zeros are equal", "1.0.0-rc.07.1", "1.0.0-rc.7", "1.0.0-rc.7.2", true),
+  versionCase("a range end that isn't a version", "0.41.0", "0.41.0", "next", false),
+];
+
 export const cases: Fixtures = {
   expressions: [
     { name: "number comparison", src: "@hp > 5", scopes: { patter: { hp: 10 } }, expected: true },
@@ -4817,4 +4848,5 @@ export const cases: Fixtures = {
   audio: [audioManifest],
   durations: durationCases,
   speech: speechCases,
+  versions: versionCases,
 };

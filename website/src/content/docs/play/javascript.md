@@ -178,6 +178,12 @@ const inspector = createPropertyInspector(engine, { container: document.body });
 Edits write through `engine.setProperty`, so a change takes effect on the next beat, handy for poking at
 values while you playtest. Leave it out of your shipping build.
 
+## Which Patterplay is this?
+
+**`PATTERPLAY_VERSION`** is the runtime's version, as in its package (`"0.41.0"`). An extension that ships apart from
+Patterplay checks it at start-up with **`versionInRange(PATTERPLAY_VERSION, "0.41.0", "0.42.0")`**: at least the
+first version and below the second, by semantic-version order. Every runtime has the same pair.
+
 ## Going deeper
 
 This page gets you playing. For the full method-by-method reference: `advance`,

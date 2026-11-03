@@ -428,6 +428,7 @@ export interface Corpus {
   audio: AudioCase[];
   durations: DurationCase[];
   speech: SpeechCase[];
+  versions: VersionCase[];
 }
 
 /**
@@ -477,6 +478,19 @@ export interface SpeechCase {
   locale?: string;
   units: { kind: "syllable" | "closed" | "pause"; weight: number; start: number; end: number }[];
   syllables: number;
+}
+
+/**
+ * A version case (corpus 14): whether `version` is at least `min` and below `maxExclusive` (`versionInRange`), by
+ * semantic-version precedence, with build metadata ignored and a prerelease before its release. Anything that
+ * isn't a version is out of range.
+ */
+export interface VersionCase {
+  name: string;
+  version: string;
+  min: string;
+  maxExclusive: string;
+  expected: boolean;
 }
 
 /**
@@ -613,6 +627,7 @@ export interface Fixtures {
   audio: AudioCase[];
   durations: DurationCase[];
   speech: SpeechCase[];
+  versions: VersionCase[];
 }
 
 /** An authored describe fixture (source form; compiled by buildCorpus into a DescribeCase). */

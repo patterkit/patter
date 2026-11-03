@@ -33,6 +33,16 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Which Patterplay this is.** `PATTERPLAY_VERSION` is the runtime's version, as in its `package.json`, and
+  `versionInRange(version, min, maxExclusive)` says whether a version is at least `min` and below `maxExclusive`, by
+  semantic-version order (a prerelease before its release, build metadata ignored, and anything that isn't a
+  version out of range). An extension that ships apart from Patterplay, such as Patterstage or Pattershot, checks
+  the Patterplay it's running on at start-up: `versionInRange(PATTERPLAY_VERSION, "0.41.0", "0.42.0")`. Unity,
+  Unreal, and Godot have the same pair. `npm run bump:play` writes the version, and a check fails if it drifts from
+  the manifests. The conformance corpus is version 14, with the section `versions`.
+
 ## [0.41.0] - 2026-11-02
 
 ### Added

@@ -7,6 +7,16 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **The Patterplay version, and a check against it.** `patter::PatterplayVersion` (Blueprint:
+  `UPatterGameData::GetPatterplayVersion`) is this runtime's version, as in its `.uplugin`, and
+  `patter::versionInRange(Version, Min, MaxExclusive)` (Blueprint: `UPatterGameData::PatterplayVersionInRange`) says
+  whether a version is at least `Min` and below `MaxExclusive`, by semantic-version precedence. It's false when any
+  of the three isn't a version. An extension such as Patterstage or Pattershot checks
+  `patter::versionInRange(patter::PatterplayVersion, "0.41.0", "0.42.0")` at start-up, since a `.uplugin` can't
+  declare the range of Patterplay versions it needs. The conformance corpus is version 14.
+
 ## [0.41.0] - 2026-11-02
 
 ### Added

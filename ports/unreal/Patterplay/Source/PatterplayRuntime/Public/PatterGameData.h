@@ -153,4 +153,16 @@ public:
 	 *  Locale as for SpeechUnits. The core's patter::countSyllables. */
 	UFUNCTION(BlueprintPure, Category = "Patterplay|Timing", meta = (AdvancedDisplay = "Locale"))
 	static double CountSyllables(const FString& Text, const FString& Locale = TEXT(""));
+
+	/** This runtime's version, as in its .uplugin's VersionName ("0.41.0"). An extension (Patterstage,
+	 *  Pattershot) checks it at start-up with PatterplayVersionInRange. The core's patter::PatterplayVersion. */
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Version")
+	static FString GetPatterplayVersion();
+
+	/** Whether Version is at least Min and below MaxExclusive, by semantic-version precedence (build metadata
+	 *  after + is ignored, and a prerelease comes before its release). False when any of the three isn't a
+	 *  version. An extension built for Patterplay 0.41 checks GetPatterplayVersion against "0.41.0" and
+	 *  "0.42.0". The core's patter::versionInRange. */
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Version")
+	static bool PatterplayVersionInRange(const FString& Version, const FString& Min, const FString& MaxExclusive);
 };

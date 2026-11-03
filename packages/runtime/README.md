@@ -93,6 +93,10 @@ strings: `step.text` is the beat **ID**, and `step.characterName` and `step.qual
 your game localises the IDs in its own system, then applies `{@ref}` replacement with **`flow.interpolate(yourString)`**. See the
 [Localisation guide](https://patterkit.dev/play/localisation/) for both modes across all four runtimes.
 
+`PATTERPLAY_VERSION` is this runtime's version, as in its `package.json`. An extension that ships apart from
+Patterplay checks it at start-up with `versionInRange(PATTERPLAY_VERSION, "0.41.0", "0.42.0")` (at least the first
+version, below the second).
+
 ## Drop-in (`<script>`)
 
 `patterplay.min.js` is a single self-contained, minified IIFE - every dependency

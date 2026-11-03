@@ -3,7 +3,7 @@
 // getters, addresses, scene and block tags and Game Data, every open flow, and OpenFlow with a block and
 // a seed; an option's prompt as one value, the flags that tell an unset speaker from an empty one,
 // StepFor, a beat's step before it plays, EstimateLineDuration, how long a line with no recording lasts, the
-// SpeechUnits and CountSyllables it's built on, and a step's spoken fields.
+// SpeechUnits and CountSyllables it's built on, a step's spoken fields, and the Patterplay version and its range check.
 // Runs via
 //   -ExecCmds="Automation RunTests Patterplay.Blueprint"
 
@@ -15,6 +15,7 @@
 #include "PatterEngine.h"
 #include "PatterGameData.h"
 #include "PatterAudioResolver.h"
+#include "Patter/Version.h"
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 
@@ -100,6 +101,10 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("EstimateLineDuration: the longest"), UPatterGameData::EstimateLineDuration(Chant), 18.0);
 	TestEqual(TEXT("CountSyllables: a silent final e in English"), UPatterGameData::CountSyllables(Lamps, TEXT("en")), 12.0);
 	TestEqual(TEXT("CountSyllables: consonant + le isn't silent"), UPatterGameData::CountSyllables(TEXT("table"), TEXT("en")), 2.0);
+	TestEqual(TEXT("GetPatterplayVersion: the core's version"), UPatterGameData::GetPatterplayVersion(), FString(UTF8_TO_TCHAR(patter::PatterplayVersion)));
+	TestTrue(TEXT("PatterplayVersionInRange: a patch inside the range"), UPatterGameData::PatterplayVersionInRange(TEXT("0.41.7"), TEXT("0.41.0"), TEXT("0.42.0")));
+	TestFalse(TEXT("PatterplayVersionInRange: the top of the range is outside it"), UPatterGameData::PatterplayVersionInRange(TEXT("0.42.0"), TEXT("0.41.0"), TEXT("0.42.0")));
+	TestFalse(TEXT("PatterplayVersionInRange: a text that isn't a version"), UPatterGameData::PatterplayVersionInRange(TEXT("latest"), TEXT("0.41.0"), TEXT("0.42.0")));
 	// An emoji weighs nothing, and counts once in the offsets: Ah [2, 4), the comma [4, 5), no [6, 8).
 	const TArray<FPatterSpeechUnit> Units = UPatterGameData::SpeechUnits(TEXT("\U0001F319 Ah, no."), TEXT("en"));
 	TestEqual(TEXT("SpeechUnits: two syllables and the pause between"), Units.Num(), 3);

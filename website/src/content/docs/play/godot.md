@@ -276,6 +276,13 @@ To sanity-check a build before you ship it, in the EXPORTED game rather than the
 print(FileAccess.file_exists("res://story.patterc"))   # must print true
 ```
 
+## Which Patterplay is this?
+
+**`PatterplayVersion.CURRENT`** is this runtime's version, as in its `plugin.cfg` (`"0.41.0"`). An extension that
+ships apart from Patterplay checks it at start-up with
+**`PatterplayVersion.in_range(PatterplayVersion.CURRENT, "0.41.0", "0.42.0")`**: at least the first version and
+below the second, by semantic-version order. Every runtime has the same pair.
+
 ## Next
 
 - [The play loop](/play/concepts/) is the shared model.

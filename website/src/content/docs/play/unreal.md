@@ -76,6 +76,12 @@ other step and on a replayed prompt.
 `OpenFlow` with an empty scene, or a flow's `Reset`, starts at the project's start scene (and block), the
 one the writer set; a project that sets none starts at its first scene.
 
+`patter::PatterplayVersion` (Blueprint: `Get Patterplay Version`) is this runtime's version, as in its
+`.uplugin`. An extension that ships apart from Patterplay, such as Patterstage or Pattershot, checks at start-up
+that the Patterplay it finds is one it was built for: `patter::versionInRange(patter::PatterplayVersion, "0.41.0",
+"0.42.0")` (Blueprint: `Patterplay Version In Range`, `UPatterGameData::PatterplayVersionInRange`) is true from
+0.41.0 up to, but not including, 0.42.0.
+
 Blueprint can't catch what the engine throws, so a refused call says so in the open. A flow keeps the reason
 its last `Advance`, `AdvanceToStop`, `Choose`, `Goto`, or `Reset` was refused in **`GetLastError`** (empty when
 it wasn't, and cleared by the next one that succeeds). Each `SetProperty*` returns `""` when the write

@@ -75,6 +75,11 @@ units it's spoken in: syllables, beats with the mouth shut, and pauses, each an 
 length, the recording's or the estimate's, each taking its weight's share, and the mouth keeps time with the
 estimate. `UPatterGameData::CountSyllables` (C++ `patter::countSyllables`) gives the syllable count alone.
 
+`patter::PatterplayVersion` (Blueprint: `GetPatterplayVersion`) is this runtime's version, as in its
+`.uplugin`. An extension that ships apart from Patterplay, such as Patterstage or Pattershot, checks at start-up
+that the Patterplay it finds is one it was built for: `patter::versionInRange(patter::PatterplayVersion, "0.41.0",
+"0.42.0")` (Blueprint: `PatterplayVersionInRange`) is true from 0.41.0 up to, but not including, 0.42.0.
+
 A text step with `bAction` set is action: a direction for whoever stages the scene, such as "Mara turns
 away.", that the player never sees. A dialogue scene's text is action unless the project localises it, so
 its `Text` is the source in every locale. Stage it (or log it) rather than showing it. An option's prompt is

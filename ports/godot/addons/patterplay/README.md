@@ -131,6 +131,10 @@ In `demo/` (delete the folder freely):
   `PatterBundle.extensions_of(bundle, kind, address)` reads any node's values off the bundle: `"project"`
   (no address), `"scene"`, `"block"` (`"scene/block"`), or a `"snippet"`, `"option"`, `"line"`, `"text"` or
   `"gameEvent"` by id.
+- **Which Patterplay this is**: `PatterplayVersion.CURRENT` is this runtime's version, as in its
+  `plugin.cfg` (`"0.41.0"`). An extension that ships apart from Patterplay checks it at start-up with
+  `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "0.41.0", "0.42.0")`: at least the first version and
+  below the second, by semantic-version order. Every runtime has the same pair.
 - **Your game's state and one registry per game**: bind `@world` to your own store with the
   `host_scopes` option, or hand the engine your game's `PatterScopeRegistry` with the `registry`
   option so every engine in the game shares one set of properties and one save. Without a registry

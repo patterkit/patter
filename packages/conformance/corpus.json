@@ -1,5 +1,5 @@
 {
-  "version": 13,
+  "version": 14,
   "expressions": [
     {
       "name": "number comparison",
@@ -36867,6 +36867,169 @@
         }
       ],
       "syllables": 4
+    }
+  ],
+  "versions": [
+    {
+      "name": "the bottom of the range is in it",
+      "version": "0.41.0",
+      "min": "0.41.0",
+      "maxExclusive": "0.42.0",
+      "expected": true
+    },
+    {
+      "name": "a patch inside the range",
+      "version": "0.41.7",
+      "min": "0.41.0",
+      "maxExclusive": "0.42.0",
+      "expected": true
+    },
+    {
+      "name": "the top of the range is outside it",
+      "version": "0.42.0",
+      "min": "0.41.0",
+      "maxExclusive": "0.42.0",
+      "expected": false
+    },
+    {
+      "name": "below the range",
+      "version": "0.40.9",
+      "min": "0.41.0",
+      "maxExclusive": "0.42.0",
+      "expected": false
+    },
+    {
+      "name": "numbers compare as numbers, not text",
+      "version": "0.41.10",
+      "min": "0.41.9",
+      "maxExclusive": "0.42.0",
+      "expected": true
+    },
+    {
+      "name": "a major version above the range",
+      "version": "1.0.0",
+      "min": "0.41.0",
+      "maxExclusive": "0.42.0",
+      "expected": false
+    },
+    {
+      "name": "a range across a major version",
+      "version": "1.2.3",
+      "min": "0.41.0",
+      "maxExclusive": "2.0.0",
+      "expected": true
+    },
+    {
+      "name": "a prerelease comes before its release",
+      "version": "0.41.0-beta.1",
+      "min": "0.41.0",
+      "maxExclusive": "0.42.0",
+      "expected": false
+    },
+    {
+      "name": "so a prerelease of the top is below it",
+      "version": "0.42.0-rc.1",
+      "min": "0.41.0",
+      "maxExclusive": "0.42.0",
+      "expected": true
+    },
+    {
+      "name": "prerelease numbers compare as numbers",
+      "version": "1.0.0-beta.11",
+      "min": "1.0.0-beta.2",
+      "maxExclusive": "1.0.0",
+      "expected": true
+    },
+    {
+      "name": "a numeric prerelease part comes before a word",
+      "version": "1.0.0-1",
+      "min": "1.0.0-alpha",
+      "maxExclusive": "1.0.0",
+      "expected": false
+    },
+    {
+      "name": "prerelease words compare by their characters",
+      "version": "1.0.0-beta",
+      "min": "1.0.0-alpha",
+      "maxExclusive": "1.0.0-rc",
+      "expected": true
+    },
+    {
+      "name": "a longer prerelease comes after its prefix",
+      "version": "1.0.0-alpha.1",
+      "min": "1.0.0-alpha",
+      "maxExclusive": "1.0.0-alpha.2",
+      "expected": true
+    },
+    {
+      "name": "build metadata is ignored",
+      "version": "0.42.0+build.5",
+      "min": "0.41.0",
+      "maxExclusive": "0.42.0",
+      "expected": false
+    },
+    {
+      "name": "build metadata on the bottom is ignored too",
+      "version": "0.41.0",
+      "min": "0.41.0+abc",
+      "maxExclusive": "0.42.0",
+      "expected": true
+    },
+    {
+      "name": "an empty range holds nothing",
+      "version": "0.41.0",
+      "min": "0.41.0",
+      "maxExclusive": "0.41.0",
+      "expected": false
+    },
+    {
+      "name": "an empty version isn't in range",
+      "version": "",
+      "min": "0.0.0",
+      "maxExclusive": "99.0.0",
+      "expected": false
+    },
+    {
+      "name": "a version needs all three numbers",
+      "version": "0.41",
+      "min": "0.0.0",
+      "maxExclusive": "99.0.0",
+      "expected": false
+    },
+    {
+      "name": "a v in front isn't a version",
+      "version": "v0.41.0",
+      "min": "0.0.0",
+      "maxExclusive": "99.0.0",
+      "expected": false
+    },
+    {
+      "name": "numbers of any length compare exactly",
+      "version": "0.41.90071992547409931",
+      "min": "0.41.90071992547409930",
+      "maxExclusive": "0.42.0",
+      "expected": true
+    },
+    {
+      "name": "leading zeros don't change a number",
+      "version": "0.041.0",
+      "min": "0.41.0",
+      "maxExclusive": "0.42.0",
+      "expected": true
+    },
+    {
+      "name": "prerelease numbers equal but for leading zeros are equal",
+      "version": "1.0.0-rc.07.1",
+      "min": "1.0.0-rc.7",
+      "maxExclusive": "1.0.0-rc.7.2",
+      "expected": true
+    },
+    {
+      "name": "a range end that isn't a version",
+      "version": "0.41.0",
+      "min": "0.41.0",
+      "maxExclusive": "next",
+      "expected": false
     }
   ]
 }

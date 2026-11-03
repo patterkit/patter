@@ -25,6 +25,7 @@
 #include "Patter/BundleJson.h"
 #include "Patter/Audio.h"
 #include "Patter/Runner.h"
+#include "Patter/Version.h"
 #include "../Patterplay/Source/PatterplayRuntime/Private/Tests/PatterBundleReaderCase.h"   // shared with the plugin's test
 #include "RegistryCorpus.h"   // the shared registry corpus runner, vendored from ../expr
 
@@ -1027,6 +1028,25 @@ static int runDurations(const JsonValue& arr)
             else fail("durations", name, "expected " + std::to_string(want) + ", got " + std::to_string(got));
         }
         catch (const std::exception& ex) { fail("durations", name, ex.what()); }
+    }
+    return pass;
+}
+
+// The corpus's version cases (corpus 14): each through the core's versionInRange, held to the reference's answer.
+static int runVersions(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            const bool got = versionInRange(c.at("version").str, c.at("min").str, c.at("maxExclusive").str);
+            const bool want = c.at("expected").b;
+            if (got == want) ++pass;
+            else fail("versions", name, std::string("expected ") + (want ? "true" : "false") + ", got " + (got ? "true" : "false"));
+        }
+        catch (const std::exception& ex) { fail("versions", name, ex.what()); }
     }
     return pass;
 }
@@ -4107,6 +4127,11 @@ int main(int argc, char** argv)
     int su = runSpeech(*speechArr);
     std::cout << "  [speech] the units a line is spoken in, and its syllables: " << su << "/" << speechArr->arr.size() << "\n";
     if (su != static_cast<int>(speechArr->arr.size())) fail("speech", "section total", std::to_string(su) + " of " + std::to_string(speechArr->arr.size()) + " passed");
+    const JsonValue* versionsArr = root.find("versions");
+    if (!versionsArr) { std::cerr << "corpus has no versions section\n"; return 2; }
+    int vr = runVersions(*versionsArr);
+    std::cout << "  [versions] whether a Patterplay version is in an extension's range: " << vr << "/" << versionsArr->arr.size() << "\n";
+    if (vr != static_cast<int>(versionsArr->arr.size())) fail("versions", "section total", std::to_string(vr) + " of " + std::to_string(versionsArr->arr.size()) + " passed");
     runInspectorSmoke();
     runOneRegistry();
     runFlowStateCases();

@@ -6,6 +6,16 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Which Patterplay this is.** `PatterplayVersion.CURRENT` is the runtime's version, as in its `plugin.cfg`, and
+  `PatterplayVersion.in_range(version, min, max_exclusive)` says whether a version is at least `min` and below
+  `max_exclusive`, by semantic-version order (a prerelease before its release, build metadata ignored, and anything
+  that isn't a version out of range). An extension that ships apart from Patterplay, such as Patterstage or
+  Pattershot, checks the Patterplay it's running on at start-up:
+  `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "0.41.0", "0.42.0")`. JS, Unity, and Unreal have the same
+  pair. `npm run bump:play` writes the version. The conformance corpus is version 14, with the section `versions`.
+
 ## [0.41.0] - 2026-11-02
 
 ### Added

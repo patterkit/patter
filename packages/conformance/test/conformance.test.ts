@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
 import { describeBundle, Engine } from "@patterkit/runtime";
-import { buildCorpus, serializeCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, runSteerCase, runAudioCase, runDurationCase, runSpeechCase, cases } from "../src/index.js";
+import { buildCorpus, serializeCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, runSteerCase, runAudioCase, runDurationCase, runSpeechCase, runVersionCase, cases } from "../src/index.js";
 
 const corpus = buildCorpus(cases);
 const corpusPath = fileURLToPath(new URL("../corpus.json", import.meta.url));
@@ -143,6 +143,14 @@ describe("speech cases (the units a line is spoken in, every runtime)", () => {
   for (const c of corpus.speech) {
     it(c.name, () => {
       expect(runSpeechCase(c)).toEqual({ units: c.units, syllables: c.syllables });
+    });
+  }
+});
+
+describe("version cases (whether a version is in a range, every runtime)", () => {
+  for (const c of corpus.versions) {
+    it(c.name, () => {
+      expect(runVersionCase(c)).toBe(c.expected);
     });
   }
 });

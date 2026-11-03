@@ -26,13 +26,13 @@ const read = (rel) => (existsSync(resolve(root, rel)) ? readFileSync(resolve(roo
 /** The surfaces we hold to parity. `bp` (the Unreal Blueprint wrapper) is the API Unreal USERS see. */
 const SURFACES = {
   js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/index.ts", "packages/runtime/src/engine.ts", "packages/runtime/src/describe.ts", "packages/runtime/src/gamedata.ts", "packages/play-helpers/src/bundle-inspector.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts", "packages/play-helpers/src/runner.ts"] },
-  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/Bundle.cs", "ports/unity/Patterplay/Runtime/GameDataHelpers.cs", "ports/unity/Patterplay/Runtime/BundleDescription.cs", "ports/unity/Patterplay/Editor/PatterBundleAssetEditor.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs", "ports/unity/Patterplay/Runtime/PatterRunner.cs"] },
+  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/Bundle.cs", "ports/unity/Patterplay/Runtime/GameDataHelpers.cs", "ports/unity/Patterplay/Runtime/BundleDescription.cs", "ports/unity/Patterplay/Editor/PatterBundleAssetEditor.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs", "ports/unity/Patterplay/Runtime/PatterRunner.cs", "ports/unity/Patterplay/Runtime/PatterplayVersion.cs"] },
   godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/bundle.gd", "ports/godot/addons/patterplay/runtime/describe.gd", "ports/godot/addons/patterplay/editor/patter_bundle_inspector_plugin.gd", "ports/godot/addons/patterplay/runtime/logger.gd",
       // The vendored shared core the logger extends: diff_state and friends are declared
       // there and inherited, and the addon ships both files.
       "ports/godot/addons/patterplay/runtime/expr/state_logger.gd",
-      "ports/godot/addons/patterplay/runtime/save.gd", "ports/godot/addons/patterplay/runtime/runner.gd"] },
-  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Bundle.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Speech.h", "ports/unreal/Patterplay/Source/PatterplayEditor/Private/PatterBundleDetails.cpp", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Runner.h"] },
+      "ports/godot/addons/patterplay/runtime/save.gd", "ports/godot/addons/patterplay/runtime/runner.gd", "ports/godot/addons/patterplay/runtime/patterplay_version.gd"] },
+  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Bundle.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Speech.h", "ports/unreal/Patterplay/Source/PatterplayEditor/Private/PatterBundleDetails.cpp", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Runner.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Version.h"] },
   bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterSave.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterGameData.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterRunnerComponent.h"] },
 };
 
@@ -197,6 +197,12 @@ const API = [
   { on: "Engine", js: "hotSwap", unity: "HotSwap", godot: "hot_swap", unreal: "hotSwap", bp: "HotSwap" },
   { on: "Engine", js: "replaceStrings", unity: "ReplaceStrings", godot: "replace_strings", unreal: "replaceStrings", bp: "ReplaceStrings" },
   // --- tooling ---------------------------------------------------------------
+  // --- the version ----------------------------------------------------------
+  // The check an extension makes against the Patterplay it finds, corpus-gated by the `versions` section. A free
+  // function where the language has them, a static on PatterplayVersion where it doesn't, and Blueprint's on its
+  // function library (UPatterGameData), beside GetPatterplayVersion. The version constant itself is held to the
+  // manifests by check-runtime-lockstep.mjs.
+  { on: "Version", js: "versionInRange", unity: "InRange", godot: "in_range", unreal: "versionInRange", bp: "PatterplayVersionInRange" },
   { on: "Engine", js: "setSteer", unity: "SetSteer", godot: "set_steer", unreal: "setSteer", bp: null,
     why: "steering is for a bake or a test, which is editor C++, and a multicast delegate can't return an answer" },
 ];

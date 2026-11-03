@@ -101,6 +101,13 @@ func _initialize() -> void:
 	var spc := _run_speech(root["speech"])
 	print("speech: %d/%d  (a line's speech units and syllable count)" % [spc, root["speech"].size()])
 	_expect_all("speech", spc, root["speech"].size())
+	if not root.has("versions"):
+		push_error("corpus has no versions section")
+		quit(2)
+		return
+	var vr := _run_versions(root["versions"])
+	print("versions: %d/%d  (PatterplayVersion.in_range, by semantic-version precedence)" % [vr, root["versions"].size()])
+	_expect_all("versions", vr, root["versions"].size())
 	_run_describe_smoke()
 	_run_host_scope_writable_check()
 
@@ -824,6 +831,20 @@ func _run_durations(arr: Array) -> int:
 			pass_count += 1
 		else:
 			_fail("durations", name, "expected %s, got %s" % [want, got])
+	return pass_count
+
+
+# Each version, min, and maxExclusive through PatterplayVersion.in_range, held to the reference's answer.
+func _run_versions(arr: Array) -> int:
+	var pass_count := 0
+	for c in arr:
+		var name: String = c["name"]
+		var got := PatterplayVersion.in_range(c["version"], c["min"], c["maxExclusive"])
+		var want: bool = c["expected"]
+		if got == want:
+			pass_count += 1
+		else:
+			_fail("versions", name, "expected %s, got %s" % [want, got])
 	return pass_count
 
 

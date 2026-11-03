@@ -9,6 +9,7 @@
 //        ports/unity/Patterplay/package.json            "version"
 //        ports/unreal/Patterplay/Patterplay.uplugin     "VersionName" (+ bumps "Version")
 //        ports/godot/addons/patterplay/plugin.cfg       version=
+//      and into each runtime's version constant, the one game code reads (scripts/lib/patterplay-version-constants.mjs)
 //      (ports/unreal/PatterplayDemo is a versionless sample .uproject riding the same zip)
 //      and raises the floors of the JS runtime's ranges on @patterkit/model and
 //      @patterkit/dialect to the versions in this workspace
@@ -32,6 +33,7 @@
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { VERSION_CONSTANTS, writeVersionConstant } from "./lib/patterplay-version-constants.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const version = process.argv[2];
@@ -138,6 +140,10 @@ edit("ports/godot/addons/patterplay/plugin.cfg", (s, rel) => {
   if (!/^version="[^"]*"$/m.test(s)) throw new Error(`${rel}: no version= line found`);
   return s.replace(/^version="[^"]*"$/m, `version="${version}"`);
 });
+
+// Each runtime's version constant, the one game code reads (PATTERPLAY_VERSION, PatterplayVersion.Current,
+// patter::PatterplayVersion, PatterplayVersion.CURRENT). The lockstep check fails when one differs from the manifests.
+for (const c of VERSION_CONSTANTS) edit(c.rel, (s) => writeVersionConstant(s, c, version));
 
 // --- 1b. the lockfile ------------------------------------------------------------
 

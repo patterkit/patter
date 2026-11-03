@@ -6,6 +6,16 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **The Patterplay version, in code.** `PatterplayVersion.Current` is this runtime's version, as in its package
+  manifest, and `PatterplayVersion.InRange(version, min, maxExclusive)` is true when `version` is at least `min` and
+  below `maxExclusive` by semantic-version precedence (a prerelease comes before its release, and build metadata is
+  ignored), false when any of the three isn't a version. An extension (Patterstage, Pattershot) checks the Patterplay
+  it finds at start-up with `PatterplayVersion.InRange(PatterplayVersion.Current, "0.41.0", "0.42.0")`, the same
+  check on every engine, since Unreal's and Godot's plugin files can't declare a version range. The conformance
+  corpus is version 14.
+
 ## [0.41.0] - 2026-11-02
 
 ### Added
