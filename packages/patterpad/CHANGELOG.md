@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **Patterkit, with a lowercase k.** The suite is written Patterkit now, beside Patterpad and Patterplay: the About
+  box's wordmark and credits, and the Help menu's Patterkit Documentation Home.
+- **Patterplay 0.42.0 inside.** Each runtime now says its own version, for extensions to check; nothing changes in
+  Patterpad itself.
+
 ## [0.42.2] - 2026-11-02
 
 ### Changed
