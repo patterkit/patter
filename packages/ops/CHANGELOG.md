@@ -1,5 +1,12 @@
 # @patterkit/ops
 
+## 0.26.5
+
+### Patch Changes
+
+- 56463da: The playable HTML page's runtime is refreshed for Patterplay's version constant and `versionInRange`. Nothing in the page changes.
+- b01c967: Uses `@patterkit/runtime` 0.42.0, the Patterplay 0.42.0 release.
+
 ## 0.26.4
 
 ### Patch Changes
