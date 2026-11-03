@@ -1,6 +1,6 @@
 // Generated from patterkit/site-chrome; do not edit here, edit the source and run sync
 export default {
-  "brand": "PatterKit",
+  "brand": "Patterkit",
   "product": "Patter",
   "docsHome": "getting-started/",
   "wrapClass": "pt-wrap",
@@ -9,7 +9,7 @@ export default {
   "extensionTestingCredit": "{name} is in testing and will be released soon. Made by <a href=\"https://ian.wildwinter.net\" rel=\"author\">Ian Thomas</a>.",
   "landing": {
     "mark": "<svg viewBox=\"8 25 124 112\" width=\"33\" height=\"30\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\"><g transform=\"translate(36.7,6) rotate(270 50 50)\"><path fill=\"#214f4b\" d=\"M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z\"></path></g><g transform=\"translate(3.3,56) rotate(90 50 50)\"><path fill=\"#d2603e\" d=\"M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z\"></path></g></svg>",
-    "wordmark": "Patter<span>Kit</span>",
+    "wordmark": "Patter<span>kit</span>",
     "nav": [
       {
         "label": "Patterpad",

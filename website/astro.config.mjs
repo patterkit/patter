@@ -50,7 +50,7 @@ export default defineConfig({
           frames: { frameBoxShadowCssValue: "none" },
         },
       },
-      // PatterKit brand: square mark as the favicon, the wordmark as the header logo
+      // Patterkit brand: square mark as the favicon, the wordmark as the header logo
       // (light/dark variants - the wordmark uses fixed dark ink that needs lightening
       // for the dark theme). replacesTitle swaps the plain "Patter" text for the mark.
       favicon: "/favicon.svg",
@@ -58,7 +58,7 @@ export default defineConfig({
         light: "./src/assets/patterkit-wordmark.svg",
         dark: "./src/assets/patterkit-wordmark-dark.svg",
         replacesTitle: true,
-        alt: "PatterKit",
+        alt: "Patterkit",
       },
       head: [
         // Favicon fallbacks beside the SVG above: Safari doesn't do SVG favicons at

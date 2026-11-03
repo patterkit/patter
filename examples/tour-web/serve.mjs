@@ -3,7 +3,7 @@
 // Two layouts, detected automatically:
 //   - the RELEASE ZIP carries a local ./assets folder (tour.patterc; no audio - playback is the
 //     host's call), so everything serves from this folder alone;
-//   - inside the PatterKit repo there is no local ./assets, so the shared tour assets serve
+//   - inside the Patterkit repo there is no local ./assets, so the shared tour assets serve
 //     straight out of the repo (no copies):
 //       /assets/tour.patterc  -> ../projects/patter-dist/tour.patterc
 //       /assets/audio/*       -> ../projects/audio/*   (patteraudio.json + the scratch takes)

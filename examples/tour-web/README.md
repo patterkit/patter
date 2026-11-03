@@ -22,7 +22,7 @@ The zip ships **without audio files** (how you load and play audio is your platf
 tour plays silently; the resolver wiring is all still there. To hear it, drop a Patter audio
 folder (`patteraudio.json` + takes) at `assets/audio/`.
 
-## From the PatterKit repo
+## From the Patterkit repo
 
 ```sh
 node build.mjs     # bundle tour.ts -> dist/tour.js (esbuild, straight from workspace source)

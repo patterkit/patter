@@ -19,7 +19,7 @@ import { EXAMPLES } from "../shared/examples.js";
 const NAMED = namedMenuItems({
   appName: "Patterpad",
   docsUrl: "https://patterkit.dev/patterpad/overview/",
-  suiteName: "PatterKit", // the shell's default is "Patter", the language; the site home is the suite's
+  suiteName: "Patterkit", // the shell's default is "Patter", the language; the site home is the suite's
   suiteDocsUrl: "https://patterkit.dev/",
 });
 import { manualCheckForUpdates } from "@wildwinter/app-shell/updater";

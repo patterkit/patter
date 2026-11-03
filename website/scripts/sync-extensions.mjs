@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Copy each PatterKit extension's docs into this site as its own section.
+// Copy each Patterkit extension's docs into this site as its own section.
 //
 //   node scripts/sync-extensions.mjs
 //       every extension pinned in extensions.json, from its docs zip on the release
@@ -9,7 +9,7 @@
 //   node scripts/sync-extensions.mjs --clean
 //       remove everything a sync wrote, leaving the site as it is with nothing synced
 //
-// An extension is a PatterKit product built on Patter but downloaded and licensed apart from it:
+// An extension is a Patterkit product built on Patter but downloaded and licensed apart from it:
 // Patterstage first. Its pages are written in its own repository, beside its code, and ship as a
 // zip on each public release. This site takes the pinned version, so the docs on patterkit.dev
 // always match a release. The contract, with Ian's rulings, is patterkit/design/extension-docs.md.

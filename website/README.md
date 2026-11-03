@@ -24,7 +24,7 @@ npm run build    # static output in ./dist
 
 ## Extension sections
 
-PatterKit's extensions (Patterstage first) are downloaded and licensed apart from Patter, and their docs
+Patterkit's extensions (Patterstage first) are downloaded and licensed apart from Patter, and their docs
 are written in their own repositories. `extensions.json` pins each one's version, and
 `scripts/sync-extensions.mjs` copies that release's docs into `src/content/docs/<slug>/`, with a licence
 banner on every page, a sidebar group after Patter's own, and a hash manifest that `check-docs.mjs`

@@ -6,7 +6,7 @@
 #
 # The bundle ships INSIDE the addon (demo/tour.patterc), so the demo runs straight from the
 # downloaded zip. Audio files are NOT bundled (playback is your platform call): inside the
-# PatterKit repo the demo picks up the shared scratch takes from examples/projects/audio
+# Patterkit repo the demo picks up the shared scratch takes from examples/projects/audio
 # automatically; anywhere else it plays silently unless you point _audio_base at your own
 # Patter audio folder.
 #
@@ -47,7 +47,7 @@ func _ready() -> void:
 	_runner.choice.connect(func(step: Dictionary) -> void: _show_choices(step["options"]))
 	_runner.ended.connect(_on_ended)
 
-	# Audio is optional and NOT bundled: inside the PatterKit repo the shared scratch takes are
+	# Audio is optional and NOT bundled: inside the Patterkit repo the shared scratch takes are
 	# picked up automatically; elsewhere, point _audio_base at your own Patter audio folder.
 	if _audio_base == "":
 		_audio_base = ProjectSettings.globalize_path("res://").path_join("../../examples/projects/audio")

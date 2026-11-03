@@ -24,7 +24,7 @@ writers / producers / game programmers, and the format reference.
 | [`ports/`](ports) | The native Patterplay runtimes: Unity (C#), Unreal (C++), Godot (GDScript), each with a bundled demo and held to the shared test suite. |
 | [`website/`](website) | The [patterkit.dev](https://patterkit.dev) documentation site (Astro + Starlight). |
 | [`examples/`](examples) | Example projects (the *Interactive Tour*), a browser player, and the JS drop-in demo. |
-| [`branding/`](branding) | The PatterKit marks, wordmarks, and app icons. |
+| [`branding/`](branding) | The Patterkit marks, wordmarks, and app icons. |
 
 ## Packages (`@patterkit/*`)
 

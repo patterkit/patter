@@ -4,7 +4,7 @@
   "private": true,
   "description": "Patterpad - the writer-first editor for Patter dialogue projects.",
   "author": {
-    "name": "PatterKit",
+    "name": "Patterkit",
     "url": "https://patterkit.dev"
   },
   "type": "module",

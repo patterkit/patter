@@ -14,7 +14,7 @@
 //
 // Audio files are NOT bundled (playback is your platform call); point AudioRoot at any Patter
 // audio folder to hear each line's winning take via the patteraudio.json resolver (UPatterAudioResolver).
-// Inside the PatterKit repo the shared scratch takes are picked up automatically.
+// Inside the Patterkit repo the shared scratch takes are picked up automatically.
 
 #pragma once
 
@@ -50,7 +50,7 @@ public:
 	FString BundleFile = TEXT("Demos/tour.patterc");
 
 	// Optional: a Patter audio folder (holds patteraudio.json + takes). Absolute, or relative to
-	// the project directory. Empty = try the PatterKit repo's shared takes, else play silently.
+	// the project directory. Empty = try the Patterkit repo's shared takes, else play silently.
 	UPROPERTY(EditAnywhere, Category = "Patterplay")
 	FString AudioRoot;
 

@@ -5,7 +5,7 @@ sidebar:
   label: Contact
 ---
 
-PatterKit is made by Ian Thomas. To get in touch, email
+Patterkit is made by Ian Thomas. To get in touch, email
 [ian@storytools.se](mailto:ian@storytools.se).
 
 Write about anything to do with Patter: a question the docs don't answer, feedback on Patterpad or

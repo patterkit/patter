@@ -131,7 +131,7 @@ void ATourDemoActor::BeginPlay()
 	}
 
 	// The manifest is optional: without it the tour plays silently. Empty AudioRoot probes the
-	// PatterKit repo's shared takes (this project sits at ports/unreal/PatterplayDemo there);
+	// Patterkit repo's shared takes (this project sits at ports/unreal/PatterplayDemo there);
 	// in the release zip that folder simply doesn't exist.
 	FString Root = AudioRoot.IsEmpty() ? TEXT("../../../examples/projects/audio") : AudioRoot;
 	Root = FPaths::IsRelative(Root) ? FPaths::ConvertRelativePathToFull(FPaths::ProjectDir(), Root) : Root;

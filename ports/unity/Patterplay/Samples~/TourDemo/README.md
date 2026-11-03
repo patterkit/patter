@@ -22,7 +22,7 @@ The sample ships **without audio files**: how you load and play audio is your pl
 the runtime deliberately only *resolves* takes (`patteraudio.json` → `PatterAudioResolver` →
 a path; playback stays yours). The demo still shows the full wiring: point its **Audio Root**
 field at any Patter audio folder (one holding `patteraudio.json` + takes) and each line plays its
-winning take through `UnityWebRequestMultimedia` + an `AudioSource`. The PatterKit repo carries
+winning take through `UnityWebRequestMultimedia` + an `AudioSource`. The Patterkit repo carries
 scratch takes for the tour under `examples/projects/audio` if you want to hear it end to end.
 Leave the field empty and the tour plays silently.
 

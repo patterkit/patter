@@ -10,7 +10,7 @@ dev server. This is the "Patterplay JS" drop-in distribution.
 `patterplay-js-<version>.zip`): just open `index.html` in a browser. Everything it needs
 sits beside it.
 
-**From the PatterKit repo**:
+**From the Patterkit repo**:
 
 ```sh
 npm run build -w @patterkit/runtime   # produces packages/runtime/dist/patterplay.min.js

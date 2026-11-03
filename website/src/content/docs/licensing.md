@@ -21,7 +21,7 @@ Patter name and mark, and info on licenses for the third-party components bundle
 > And selfishly, it's a warm feeling to know one more team didn't have to go through the
 > dialogue-writing-pipeline pain that made me build this in the first place.
 >
-> <cite>Ian Thomas, PatterKit</cite>
+> <cite>Ian Thomas, Patterkit</cite>
 
 ## A line of text is plenty
 
@@ -93,7 +93,7 @@ credit lines as a text file. **[Download the badge kit (zip)](/badges/patter-mad
 
 ## The name and the mark
 
-The MIT licence covers the code in the Patter repo. The Patter and PatterKit names, the drop mark and these badges
+The MIT licence covers the code in the Patter repo. The Patter and Patterkit names, the drop mark and these badges
 aren't covered by it, so here's the plain-English version.
 
 ### Yes, please do
@@ -107,8 +107,8 @@ aren't covered by it, so here's the plain-English version.
 
 - Recolour, redraw, stretch, or rebuild the mark, or set the wordmark in another typeface.
 - Use the mark as your own product, studio, or app icon.
-- Imply that PatterKit endorses, sponsors, or has reviewed your project.
-- Put Patter or PatterKit in your product name, company name or domain.
+- Imply that Patterkit endorses, sponsors, or has reviewed your project.
+- Put Patter or Patterkit in your product name, company name or domain.
 - Sell the badges, or the tools, as a product of your own.
 
 Something not covered here, or a use you're not sure about? Ask, and the answer will probably be yes:

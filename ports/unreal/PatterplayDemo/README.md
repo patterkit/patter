@@ -52,6 +52,6 @@ and the runtime deliberately only *resolves* takes (`patteraudio.json` →
 `UPatterAudioResolver::Resolve` → a path; playback stays yours). The tour actor still shows the
 full wiring: point its **Audio Root** at any Patter audio folder and each line plays its
 winning take through a minimal PCM16 WAV loader (a real game would route resolved paths
-into its own audio pipeline instead). Inside the PatterKit repo the shared scratch takes
+into its own audio pipeline instead). Inside the Patterkit repo the shared scratch takes
 under `examples/projects/audio` are picked up automatically; in the zip that folder does
 not exist and the tour plays silently.

@@ -4836,7 +4836,7 @@ window.patter.onMenu((cmd) => {
     appName: "Patterpad",
     version: cmd.slice("about:".length),
     blurb: "A writer-first editor for branching game dialogue.",
-    credits: "Part of PatterKit. Open source under the MIT licence.\nMade by Ian Thomas.",
+    credits: "Part of Patterkit. Open source under the MIT licence.\nMade by Ian Thomas.",
     wordmark: PATTERKIT_WORDMARK,
     links: [
       { label: "patterkit.dev", url: "https://patterkit.dev" },
