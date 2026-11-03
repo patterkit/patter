@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.42.3] - 2026-11-03
+
 ### Changed
 
 - **Patterkit, with a lowercase k.** The suite is written Patterkit now, beside Patterpad and Patterplay: the About
