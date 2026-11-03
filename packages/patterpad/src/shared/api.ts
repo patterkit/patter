@@ -852,7 +852,7 @@ export interface PlayStep {
   /** The speaker qualifier's gameId (`os`) and its resolved shown name (`O.S.`). */
   qualifier?: string;
   qualifierName?: string;
-  /** The name to show for the speaker, resolved by the runtime (locale-aware): the display name, or with a
+  /** The name to show for the speaker, resolved by the runtime (locale-aware): the character name, or with a
    *  qualifier the speaker pattern filled in (`TAM (O.S.)`) or the pair's own label. Absent in an IDs-only
    *  build. */
   speakerLabel?: string;

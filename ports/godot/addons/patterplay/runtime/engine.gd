@@ -1325,11 +1325,11 @@ func get_cast() -> Array:
 	return names
 
 
-# A scene's cast: the character token of every speaker with a line anywhere in it, deduped, in
+# A scene's cast: the character ID of every speaker with a line anywhere in it, deduped, in
 # first-appearance order. Static, like get_outline(): it walks the authored structure, so a speaker
 # behind a condition, inside any group, or voicing a choice prompt counts - this is who CAN speak in
 # the scene, not who a given playthrough heard. Empty for an unknown ref or a scene with no dialogue.
-# Tokens, not display names: read those off a delivered step.
+# Character IDs, not character names: read those off a delivered step.
 func cast_for_scene(scene_ref: String) -> Array:
 	var cast: Array = []
 	var scene_id := _resolve_scene_ref(scene_ref)

@@ -63,7 +63,7 @@ export function characterColour(name: string, stored?: unknown): string {
   return CHAR_PALETTE[isColourSlot(stored) ? stored : colourIndex(name)]!;
 }
 
-/** The stored colour slot of each cast member who has one, by script name (for `characterColour`). */
+/** The stored colour slot of each cast member who has one, by character ID (for `characterColour`). */
 export function castColours(cast: readonly { name: string; colour?: number }[] | undefined): Map<string, number> {
   return new Map((cast ?? []).filter((c) => isColourSlot(c.colour)).map((c) => [c.name, c.colour!]));
 }

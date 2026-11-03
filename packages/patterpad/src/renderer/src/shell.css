@@ -734,7 +734,7 @@ input::placeholder, textarea::placeholder {
 .gd-status-line .gd-markers { flex: 0 0 auto; flex-wrap: nowrap; padding-left: 0; gap: 9.5px; }
 .gd-status-line .sp-colour-btn { flex: 0 0 auto; }
 .world-driver-values { flex: 1 1 128px; min-width: 0; }
-/* Cast: name + display name + actor share the line (notes go in the expander). */
+/* Cast: character ID + character name + actor share the line (notes go in the expander). */
 .set-rowline .cast-field { flex: 1 1 0; min-width: 64px; }
 /* Qualifiers tab: the Game ID is a code value, so it reads in the mono face beside the name. */
 .set-rowline .qual-gameid { flex: 0 0 132px; width: 132px; font-family: var(--font-mono); }

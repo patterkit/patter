@@ -1523,7 +1523,7 @@ func _resolve_character_name(beat: Dictionary):
 	if not beat.has("character"):
 		return null
 	if _host.emit_ids:
-		return null  # IDs-only: omit the display name; the game maps the `character` token
+		return null  # IDs-only: omit the character name; the game maps the character ID
 	return _character_name_of(_host, str(beat["character"]))
 
 

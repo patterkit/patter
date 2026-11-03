@@ -147,7 +147,7 @@ The Excel export shows it as a **Status** column:
 - **stale**: it has a translation, but the **source line was edited after it was translated**, so it
   needs re-checking against the new wording.
 
-The names translated beside the lines go stale the same way: changing a character's display name, a
+The names translated beside the lines go stale the same way: changing a character name, a
 qualifier's name, the speaker pattern, or a character's own label with a qualifier in **Project Settings**
 flags that string's translations.
 
@@ -185,7 +185,7 @@ script shows, so a translator knows a line is a thought or heard over a radio:
 | JSON | `context.qualifier` on the entry |
 
 It's context only, never text to translate, and it's never read back on import. The qualifier
-**names** themselves (`V.O.`, `RADIO`) are translated with the cast's display names, as
+**names** themselves (`V.O.`, `RADIO`) are translated with the cast's character names, as
 `qualifier:vo`-style strings beside the `cast:` ones, for the qualifiers your lines use.
 
 Two more strings sit beside them when your lines use a qualifier (see
@@ -216,7 +216,7 @@ alongside that character's lines:
 The field is **free text**, because three genders don't cover every language: it auto-suggests the
 everyday values (*male*, *female*, *neuter*) plus any others already used in the cast, so you can name
 a common, animate, or inanimate gender while keeping spellings consistent. Whatever you type is passed
-to translators verbatim. It rides the character's own dialogue and their display name. Text, which has no
+to translators verbatim. It rides the character's own dialogue and their character name. Text, which has no
 speaker, and characters left blank carry nothing, so you only send what you actually know.
 
 Gender is **export-only context**: it is regenerated from the cast on every export, never read back

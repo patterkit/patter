@@ -17,7 +17,7 @@ importing back, and staleness, is the project team's side, on the
 |---|---|---|
 | What the `.patterc` carries | every locale's strings, inline | **no** strings |
 | What the runtime returns for a line | the resolved **text** for the active locale | the line's **ID** |
-| Character display name | resolved (localised) | **omitted**, you get the `character` token |
+| Character name | resolved (localised) | **omitted**, you get the character ID in `character` |
 | `{@property}` interpolation | done by the runtime | you call `flow.interpolate(text)` yourself |
 | Switch language at runtime | `engine.setLocale("fr")`, live | your loc system's job |
 | Who owns translations | the bundle | **your game's** localisation system |
@@ -66,7 +66,7 @@ nothing, since your game localises the text.
 ## IDs-only: your game does it
 
 `step.text` is the **beat ID** and `step.characterName` is **omitted** (you still get
-`step.character`, the stable token). A speaker qualifier's `step.qualifierName` is omitted too,
+`step.character`, the character ID). A speaker qualifier's `step.qualifierName` is omitted too,
 and `step.qualifier` (its `gameId`) is still there; so is `step.speakerLabel`, which your game builds from
 the same strings the export gives it: `speaker:<CHARACTER>:<qualifier>` when it exists, else
 `speaker:pattern` with `{name}` and `{qualifier}` filled in. Look the text up yourself, then apply `{@property}`

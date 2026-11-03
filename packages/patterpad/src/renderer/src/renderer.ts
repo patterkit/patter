@@ -3744,7 +3744,7 @@ async function openLocalisation(): Promise<void> {
   if (!project) return; // nothing open
   const s = await window.patter.readSettings();
   if (!s) return;
-  const frame = dialogFrame({ title: "Localisation", sub: "Export strings for translation, then import the translated file back. Character display names are included.", className: "loc-dialog" });
+  const frame = dialogFrame({ title: "Localisation", sub: "Export strings for translation, then import the translated file back. Character names are included.", className: "loc-dialog" });
   const formatSel = el("select", "insp-select");
   formatSel.append(new Option("gettext PO / POT", "po"), new Option("Excel (.xlsx)", "xlsx"), new Option("JSON", "json"));
   const localeSel = el("select", "insp-select");

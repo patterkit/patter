@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // The Excel localisation format (spec §14): one sheet per scene (+ an `@project`
-// sheet for display names), columns ID / Source / Translation / Comments / Status
+// sheet for character names), columns ID / Source / Translation / Comments / Status
 // / Gender / Qualifier. A view of the LocCatalog, like loc-format.ts's JSON/PO. exceljs is
 // lazy-loaded (heavy; only this path needs it), mirroring report-xlsx.ts.
 //

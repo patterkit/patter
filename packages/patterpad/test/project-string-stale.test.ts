@@ -1,5 +1,5 @@
 // A project-level string's translations go stale when its source changes in Project Settings, as a changed
-// line's do: a cast display name, a qualifier's name, the speaker pattern, or a character's own label with a
+// line's do: a character name, a qualifier's name, the speaker pattern, or a character's own label with a
 // qualifier. The save stamps the string's `modifiedAt` in `_project.patterx`, and the next localisation export
 // flags the translation. Only a translated string is stamped, and a qualifier rename moves ids without making
 // anything stale.

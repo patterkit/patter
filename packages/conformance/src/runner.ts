@@ -414,7 +414,7 @@ function padField(v: unknown): number {
 }
 
 /** A speaker's label as a transcript records it: only where it differs from what a line with no qualifier shows
- *  (nothing in IDs-only mode or with no speaker, else the display name, else the token), so a transcript names
+ *  (nothing in IDs-only mode or with no speaker, else the character name, else the character ID), so a transcript names
  *  it where a qualifier or a pair's own label changes it. A runtime that drops a label it should carry records a
  *  marker rather than nothing. */
 function labelField(character: string | undefined, characterName: string | undefined, speakerLabel: string | undefined, idsOnly: boolean): string | undefined {
@@ -439,7 +439,7 @@ export function normaliseStep(r: StepResult, idsOnly = false, spoken = false): T
     case "line": {
       const s: TranscriptStep = { type: "line", id: r.id, text: r.text };
       if (r.character !== undefined) s.character = r.character;
-      if (r.characterName !== undefined) s.characterName = r.characterName; // locale-resolved display name
+      if (r.characterName !== undefined) s.characterName = r.characterName; // locale-resolved character name
       if (r.direction !== undefined) s.direction = r.direction;
       if (r.qualifier !== undefined) s.qualifier = r.qualifier;             // speaker qualifier gameId
       if (r.qualifierName !== undefined) s.qualifierName = r.qualifierName; // and its locale-resolved name

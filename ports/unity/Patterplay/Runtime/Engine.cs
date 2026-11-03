@@ -511,7 +511,7 @@ namespace Patterkit.Patterplay
         }
 
         /// <summary>A character's shown name: the `cast:&lt;name&gt;` string (see <see cref="Localised"/>), else the
-        /// cast's display name; null when neither gives one.</summary>
+        /// cast's character name; null when neither gives one.</summary>
         public string CharacterNameOf(string character, bool source = false)
         {
             if (character == null) return null;
@@ -1187,11 +1187,11 @@ namespace Patterkit.Patterplay
             return names;
         }
 
-        /// <summary>A scene's cast: the character token of every speaker with a line anywhere in it,
+        /// <summary>A scene's cast: the character ID of every speaker with a line anywhere in it,
         /// deduped, in first-appearance order. Static, like GetOutline: it walks the authored structure,
         /// so a speaker behind a condition, inside any group, or voicing a choice prompt counts - this is
         /// who CAN speak in the scene, not who a given playthrough heard. Empty for an unknown ref or a
-        /// scene with no dialogue. Tokens, not display names: read those off a delivered step.</summary>
+        /// scene with no dialogue. Character IDs, not character names: read those off a delivered step.</summary>
         public List<string> CastForScene(string sceneRef)
         {
             var id = ResolveSceneRef(sceneRef);

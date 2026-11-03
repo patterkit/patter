@@ -46,7 +46,7 @@ describe("the Cast tab's Shown with fields", () => {
       ["Shown with O.S.", "", "You (O.S.)", undefined],
       ["Shown with RADIO", "You, on the radio", "You (RADIO)", "No lines use this."],
     ]);
-    expect(shownWith(tam!).map((f) => [f.caption, f.field.placeholder])).toEqual([["Shown with O.S.", "TAM (O.S.)"]]); // no display name: the token
+    expect(shownWith(tam!).map((f) => [f.caption, f.field.placeholder])).toEqual([["Shown with O.S.", "TAM (O.S.)"]]); // no character name: the character ID
     expect(shownWith(bo!)).toEqual([]); // no qualified lines, nothing new
   });
 
@@ -64,13 +64,13 @@ describe("the Cast tab's Shown with fields", () => {
     expect(h.value()[1]).toEqual({ name: "TAM", qualifierLabels: { os: "Tam, off" } });
   });
 
-  it("the placeholder follows the display name, the pattern, and the qualifier's name", () => {
+  it("the placeholder follows the character name, the pattern, and the qualifier's name", () => {
     const host = document.createElement("div");
     const src = source("{qualifier}: {name}");
     const h = mountCast(host, cast(), src);
     const row = rowsOf(host)[0]!;
     expect(shownWith(row)[1]!.field.placeholder).toBe("O.S.: You");
-    input(row.querySelector<HTMLInputElement>(".cast-field")!, "Player One"); // the display name
+    input(row.querySelector<HTMLInputElement>(".cast-field")!, "Player One"); // the character name
     expect(shownWith(row)[1]!.field.placeholder).toBe("O.S.: Player One");
     src.setPattern("");
     h.refreshLabels();

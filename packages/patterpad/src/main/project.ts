@@ -225,7 +225,7 @@ function changedSourceStringIds(prevLocSource: string | null, nextLocSource: str
   return Object.keys(after).filter((id) => after[id] !== before[id]);
 }
 
-/** The edit trail for project-level strings a settings save changes: a display name, a qualifier's name, the
+/** The edit trail for project-level strings a settings save changes: a character name, a qualifier's name, the
  *  speaker pattern, or a character's own label with a qualifier whose SOURCE text changed gets a fresh
  *  `modifiedAt` in `_project.patterx`, so its translations go stale on the next localisation export, as a
  *  changed line's do. Only strings some language has translated are stamped (nothing to go stale otherwise).
@@ -3420,7 +3420,7 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
       const at = writes.findIndex((x) => x.path === w.path);
       if (at >= 0) writes[at] = w; else writes.push(w);
     }
-    // A display name, qualifier name, speaker pattern, or pair label changed in the source language makes its
+    // A character name, qualifier name, speaker pattern, or pair label changed in the source language makes its
     // translations stale: stamp it, in the same batch (replacing a rename's write of the same shard).
     const stamp = projectStringStamp(next, renames, writes, castRenames);
     if (stamp) {

@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // The localisation engine (spec §14): extractLoc produces the format-neutral
 // catalog (source + translation + loc-channel comments + staleness + the
-// @project cast display names); applyLoc writes translations back + stamps
+// @project character names); applyLoc writes translations back + stamps
 // localisedAt. Round-trip: export fr -> translate -> import -> re-export sees it.
 // ---------------------------------------------------------------------------
 
@@ -23,7 +23,7 @@ function makeProject(): string {
     locales: { default: "en", all: ["en", "fr"] },
     localiseDialogueText: true, // T1 is shown text here; action-text.test.ts covers the default
     // ANNA declares a grammatical gender (translator context); BO leaves it unspecified.
-    cast: [{ name: "ANNA", displayName: "Anna", gender: "female" }, { name: "BO" }], // BO has no display name -> no @project entry
+    cast: [{ name: "ANNA", displayName: "Anna", gender: "female" }, { name: "BO" }], // BO has no character name -> no @project entry
   });
 
   // s1: a line (ANNA), a line by an ungendered speaker (BO), a text beat, and a choice with one prompted option.
@@ -102,7 +102,7 @@ describe("extractLoc", () => {
 describe("applyLoc", () => {
   it("writes translations back (scene + @project shards) + stamps localisedAt, and round-trips", () => {
     const cat = extractLoc(loaded, { locale: "fr" });
-    // Translate the previously-missing narration and the display name.
+    // Translate the previously-missing narration and the character name.
     for (const e of cat.entries) {
       if (e.id === "T1") e.translation = "Narration FR";
       if (e.id === "cast:ANNA") e.translation = "Anne";

@@ -1,4 +1,4 @@
-// The cast popup - a "field with dropdown" for the character token. The cue is no
+// The cast popup - a "field with dropdown" for the character ID. The cue is no
 // longer typeable text: the speaker is a UNIT you pick, replace, or add. Whenever
 // the cursor is in a cue, this popup owns a search buffer; typing FILTERS the cast
 // (it never edits the committed name), the list narrows, and an "Add" row appears

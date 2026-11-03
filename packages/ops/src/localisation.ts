@@ -17,7 +17,7 @@
 // (`LocaleFile.textAction`), so a scene that changes kind is reported, never silent.
 //
 // Population mirrors report.ts's localisation set (written-line ids with source
-// text), PLUS the project-level cast display names (the `@project` shard, keyed
+// text), PLUS the project-level character names (the `@project` shard, keyed
 // `cast:<NAME>`, seeded from CastMember.displayName), the speaker qualifiers' names
 // (`qualifier:<gameId>`), and the speaker labels (`speaker:pattern`, and
 // `speaker:<NAME>:<gameId>` for a pair a writer overrode). Localiser comments are the
@@ -38,7 +38,7 @@ import type { PlannedWrite } from "./write.js";
 import { resolveDocumentation } from "./documentation.js";
 import { INTERP_RE, MARKUP_RE } from "./script-doc.js";
 
-/** One localisable string. `id` is the beat id (or `cast:<NAME>` for a display name, `qualifier:<gameId>` for a
+/** One localisable string. `id` is the beat id (or `cast:<NAME>` for a character name, `qualifier:<gameId>` for a
  *  speaker qualifier's name, `speaker:pattern` for the speaker pattern, `speaker:<NAME>:<gameId>` for a
  *  character's own label with a qualifier). */
 export interface LocEntry {
@@ -201,7 +201,7 @@ export function actionTextChanges(loaded: LoadedProject, opts: { locale?: string
 
 
 /**
- * The source text of every project-level string the project defines, by id: each cast display name
+ * The source text of every project-level string the project defines, by id: each character name
  * (`cast:<NAME>`), each qualifier's name (`qualifier:<gameId>`), the speaker pattern (`speaker:pattern`), and
  * each character's own label with a qualifier (`speaker:<NAME>:<gameId>`). A string's source is the default
  * locale's `@project` shard value where it has one, else what the project file authors. Not filtered by what
@@ -285,7 +285,7 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
     }
   }
 
-  // Project-level cast display names (the `@project` shard, seeded from displayName).
+  // Project-level character names (the `@project` shard, seeded from displayName).
   for (const c of loaded.project.cast ?? []) {
     if (!c.displayName) continue;
     const id = castStringKey(c.name);
@@ -295,7 +295,7 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
   }
 
   // Project-level speaker qualifier names (`qualifier:<gameId>`), for the qualifiers the lines use, seeded
-  // from the authored name as a cast display name is from its displayName.
+  // from the authored name as a character name is from its displayName.
   for (const q of usedQualifiers(loaded.project, loaded.scenes)) {
     const id = qualifierStringKey(q.gameId);
     const src = projectSources[id] ?? q.name;

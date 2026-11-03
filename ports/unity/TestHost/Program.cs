@@ -1468,7 +1468,7 @@ namespace Patterkit.Patterplay.TestHost
 
         /// <summary>A speaker's label as a transcript records it (runner.ts labelField): only where it differs
         /// from what a line with no qualifier shows (nothing in IDs-only mode or with no speaker, else the display
-        /// name, else the token), so a transcript names it where a qualifier or a pair's own label changes it. A
+        /// name, else the character ID), so a transcript names it where a qualifier or a pair's own label changes it. A
         /// runtime that drops a label it should carry records a marker rather than nothing.</summary>
         private static string LabelField(string character, string characterName, string speakerLabel, bool idsOnly)
         {

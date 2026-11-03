@@ -472,7 +472,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
 	TArray<FString> GetCast() const;
 
-	// A scene's cast: the character token of every speaker with a line anywhere in it, deduped, in
+	// A scene's cast: the character ID of every speaker with a line anywhere in it, deduped, in
 	// first-appearance order. Static: a speaker behind a condition, inside any group, or voicing a
 	// choice prompt counts - who CAN speak here, not who this playthrough heard. SceneRef is an
 	// internal id or a gameId address; empty for an unknown ref or a scene with no dialogue.

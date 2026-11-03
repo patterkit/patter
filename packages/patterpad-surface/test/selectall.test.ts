@@ -62,7 +62,7 @@ describe("Cmd-A selects the field, not the document", () => {
     expect(selectFrom("L1", "say")).toEqual({ handled: true, selected: "We don't get many new faces." });
   });
 
-  it("from the CUE: the line's words, never the character token", () => {
+  it("from the CUE: the line's words, never the character ID", () => {
     // The character is a token the cast popup owns, so "select all" in the cue means the dialogue.
     const r = selectFrom("L1", "cue");
     expect(r).toEqual({ handled: true, selected: "We don't get many new faces." });

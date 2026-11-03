@@ -3,7 +3,7 @@
 // the script is displayed (the screenplay cue, the voice script's own column, playable HTML, the CLI's
 // transcript) and rides as read-only translator context, while `TAM` and `TAM (O.S.)` stay one character
 // for every count and grouping. Its shown name is a project-level string (`qualifier:<gameId>`) that
-// round-trips through every loc format as a cast display name does.
+// round-trips through every loc format as a character name does.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";

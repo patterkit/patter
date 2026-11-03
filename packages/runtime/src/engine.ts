@@ -199,9 +199,9 @@ export type FlowEndReason = "ended" | "ran-dry";
 export interface BeatInfo {
   id: string;
   kind: "line" | "text" | "gameEvent";
-  /** Speaker token (line only). */
+  /** The speaker's character ID (line only). */
   character?: string;
-  /** Resolved display name for `character` (source locale), if the cast declares one. */
+  /** Resolved character name for `character` (source locale), if the cast declares one. */
   characterName?: string;
   /** Performance direction (line only). */
   direction?: string;
@@ -622,7 +622,7 @@ interface FlowHost {
   emitEngine: (flow: string, event: TraceEvent, scene?: string) => void;
   bundle: Bundle;
   /** IDs-only build (`localisation.mode === "ids"`, no source-debug): the engine emits each beat's ID as
-   *  its text and omits character display names, leaving localisation to the game (use `flow.interpolate`
+   *  its text and omits character names, leaving localisation to the game (use `flow.interpolate`
    *  to apply `{@ref}` property replacement to a string the game looked up itself). */
   emitIds: boolean;
   strings: Record<string, string>;
@@ -1265,11 +1265,11 @@ export class Engine {
   }
 
   /**
-   * A scene's cast: the `character` token of every speaker with a line anywhere in it, deduped, in
+   * A scene's cast: the character ID of every speaker with a line anywhere in it, deduped, in
    * first-appearance order. Static, like {@link getOutline}: it walks the authored structure, so a
    * speaker behind a condition, inside any group, or voicing a choice prompt counts - this is who CAN
    * speak in the scene, not who a given playthrough heard. Empty for an unknown ref, or a scene with no
-   * dialogue. Tokens, not display names: resolve those through the delivered step (`characterName`),
+   * dialogue. Character IDs, not character names: resolve those through the delivered step (`characterName`),
    * which is what follows `setLocale`.
    */
   castForScene(sceneRef: string): string[] {
@@ -3074,11 +3074,11 @@ export class Flow {
   }
 
   /** A character's player-facing name: the `cast:<name>` string in the active locale, else the default
-   *  locale, else the authoring `displayName`. Undefined when the character has no display name at all
-   *  (the host falls back to the `character` token itself). */
+   *  locale, else the authoring `displayName`. Undefined when the character has no character name at all
+   *  (the host falls back to the character ID in `character` itself). */
   private resolveCharacterName(character: string | undefined): string | undefined {
     if (character === undefined) return undefined;
-    if (this.host.emitIds) return undefined; // IDs-only: omit the display name; the game maps the `character` token
+    if (this.host.emitIds) return undefined; // IDs-only: omit the character name; the game maps the character ID
     const key = castStringKey(character);
     return this.host.strings[key] ?? this.host.defaultStrings[key] ?? this.host.castDisplay.get(character);
   }

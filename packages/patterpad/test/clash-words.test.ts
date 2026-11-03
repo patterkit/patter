@@ -83,7 +83,7 @@ describe("where a clash is", () => {
       p({ properties: [gold(9)], cast: [ann("Anna")], sceneOrder: ["b", "c", "a", "d", "e"], sceneFolders: [{ id: "f", name: "F" }, { id: "g", name: "G" }], sceneFolder: { scn_tavern: "g" } }),
     );
     const where = Object.fromEntries(out.map((r) => [r.clash.path, r.clash.where]));
-    expect(where).toEqual({ "properties[gold]": "Property @gold", "cast[Ann].displayName": "Ann's display name", sceneOrder: "Scene order", "sceneFolder.scn_tavern": "The folder for The Tavern" });
+    expect(where).toEqual({ "properties[gold]": "Property @gold", "cast[Ann].displayName": "Ann's character name", sceneOrder: "Scene order", "sceneFolder.scn_tavern": "The folder for The Tavern" });
     expect(out.find((r) => r.clash.path === "properties[gold]")!.clash.ours).toBe("name: gold, default: 5, type: number");
     expect(out.find((r) => r.clash.path === "properties[gold]")!.target).toEqual({ kind: "properties", name: "gold" });
     expect(out.find((r) => r.clash.path === "cast[Ann].displayName")!.target).toEqual({ kind: "settings", tab: "cast", row: "Ann" });

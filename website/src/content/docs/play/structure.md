@@ -97,7 +97,7 @@ pipeline, or a character-portrait pre-loader actually wants:
 - **`castForScene(sceneRef)`** returns the speakers with a line anywhere in that scene.
 - **`castForBlock(sceneRef, blockRef)`** returns the same, scoped to one block.
 
-All three return the **character token** (the `character` a line beat carries), not a display name.
+All three return the **character ID** (the `character` a line beat carries), not a character name.
 Scene and block refs may be an internal id **or** a [gameId address](/format/gamedata-and-addressing/),
 so `castForScene("tavern")` works as well as `castForScene("scn_tavern")`.
 
@@ -129,7 +129,7 @@ The caption speaker (`SFX` by default, see [closed captions](/play/closed-captio
 like any other, so it appears where it has lines. Filter it out yourself if you are building a casting
 sheet rather than a caption pipeline.
 
-To turn a token into a player-facing name, read `speakerLabel` (or `characterName`) off a delivered
+To turn a character ID into a player-facing name, read `speakerLabel` (or `characterName`) off a delivered
 step: that resolves through the active locale and follows [`setLocale`](/play/localisation/), which a static list cannot.
 
 ## Notes

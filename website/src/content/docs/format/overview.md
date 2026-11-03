@@ -63,7 +63,7 @@ one, the Game Data schema, resolved addresses, and a content hash.
 
 Authoring context is deliberately left behind. A [cast member's](/setup/cast/) notes,
 grammatical gender, and the **voice actor's name** belong to your team, your translators, and
-your recording pipeline; only the script name and display name are compiled in. A game you ship
+your recording pipeline; only the character ID and character name are compiled in. A game you ship
 therefore carries no real person's name, and no private notes about a character.
 
 The bundle is what you ship, and what every [Patterplay runtime](/play/overview/)

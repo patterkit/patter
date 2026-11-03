@@ -737,8 +737,8 @@ const hiddenOption = {
 } satisfies RuntimeFixture;
 
 // --- a choice as the host receives it: the group id and each option's structured prompt -----------
-// Every shape a prompt takes: a line with a speaker who has a display name and a direction, a line whose
-// speaker has no display name (so no characterName), a text prompt that interpolates, a bare-snippet
+// Every shape a prompt takes: a line with a speaker who has a character name and a direction, a line whose
+// speaker has no character name (so no characterName), a text prompt that interpolates, a bare-snippet
 // option whose first content line stands in for its prompt, and an option with no prompt beat and no
 // content line at all (so no prompt). The group is not called "g", so a runtime that invents the id fails.
 const choicePrompts = {
@@ -767,7 +767,7 @@ const choicePrompts = {
   expectedTranscript: [
     { type: "choice", groupId: "g_door", options: [
       { id: "o_ask", prompt: { kind: "line", text: "Who's there?", character: "ANNA", characterName: "Anna", direction: "quietly" }, eligible: true, gameData: { icon: "ear" } },
-      { id: "o_shout", prompt: { kind: "line", text: "Open up!", character: "BO" }, eligible: true },  // no display name -> no characterName
+      { id: "o_shout", prompt: { kind: "line", text: "Open up!", character: "BO" }, eligible: true },  // no character name -> no characterName
       { id: "o_pay", prompt: { kind: "text", text: "Pay 3 coins" }, eligible: true },                  // a text prompt interpolates
       { id: "o_bare", prompt: { kind: "line", text: "Hello?", character: "ANNA", characterName: "Anna" }, eligible: true }, // first content line
       { id: "o_mute", eligible: true },                                                                 // nothing to show: no prompt
@@ -1770,7 +1770,7 @@ const localeActive = {
   locales: [
     loc("s", { L_anna: "Hi", T_fb: "english fallback" }),            // en (default)
     loc("s", { L_anna: "Salut" }, "fr"),                            // fr: L_anna translated, T_fb absent
-    loc("@project", { [castStringKey("ANNA")]: "Annette" }, "fr"),  // fr cast display name
+    loc("@project", { [castStringKey("ANNA")]: "Annette" }, "fr"),  // fr character name
   ],
   locale: "fr",
   expectedTranscript: [
@@ -1782,7 +1782,7 @@ const localeActive = {
 } satisfies RuntimeFixture;
 
 // IDs-only build (spec §11): the .patterc ships NO strings, so the engine emits each beat's ID as its
-// text and OMITS the character display name - the game localises it from its own loc system. The
+// text and OMITS the character name - the game localises it from its own loc system. The
 // `character` token is still emitted (the game maps it). `{@ref}` interpolation is the game's job too
 // (via flow.interpolate), so the runtime does not pre-render it.
 const idsMode = {
@@ -2796,7 +2796,7 @@ const scriptedReplayShown = {
 // --- speaker fields set to the empty string ------------------------------------------------------------
 // A line's and a line prompt's `character`, `characterName`, and `direction` are kept when they are set to
 // "" and absent only when unset: an empty value is a value. `direction: ""` and `character: ""` on a beat
-// come through as "". A display name resolves through the cast strings (active locale, then default
+// come through as "". A character name resolves through the cast strings (active locale, then default
 // locale) and then the cast's `displayName`, and the first that EXISTS wins, so an empty cast string
 // gives `characterName: ""` rather than falling through to the next. An empty `displayName` is not a name,
 // though: it gives no `characterName`. A `character: ""` is a speaker token like any other, so its name

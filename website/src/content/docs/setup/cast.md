@@ -1,30 +1,30 @@
 ---
 title: Cast
-description: Set up the character roster, with script names, translatable display names, grammatical gender, actors, notes, and cue colours.
+description: Set up the character roster, with character IDs, translatable character names, grammatical gender, actors, notes, and character colours.
 sidebar:
   label: Cast
 ---
 
 The cast is the project's character roster, in **Project Settings ▸ Cast**. Each entry has a
-**script name**, the cue a writer types (`BARKEEP:`), which is the character's stable identity.
-An optional **display name** is the name the player sees, and it can be **translated** (so
+**character ID**, what a writer types before a line (`BARKEEP:`), which is the character's stable identity.
+An optional **character name** is the name the player sees, and it can be **translated** (so
 `BARKEEP` shows as "The Barkeep" in English and "Le tavernier" in French). A **grammatical
 gender**, sent to translators, is free text (blank means not specified), with auto-suggest for
 the everyday values (male / female / neuter) plus any others already used in the cast, so a
 project can name whatever gender a language needs while keeping spellings consistent. **Notes**
-and an **actor** are optional, for production. The **cue colour** is drawn from the name rather
+and an **actor** are optional, for production. The **character colour** is drawn from the character ID rather
 than picked, so the same character is the same colour everywhere: in the editor, the play
 window, and the readable script alike. Rename a character and they keep their colour: the
 project file remembers it for them (a cast member's `colour`, a slot in the palette).
 
 Gender, notes, and actor sit behind the ▸ expander on each row.
 
-You don't have to fill the cast in first. When a writer types a new cue, the character **joins
-the roster automatically**. Set it up ahead of time only when you want display names, notes, or
-actors ready before writing starts. The script name is what runs through the story; the display
+You don't have to fill the cast in first. When a writer types a new character ID, the character **joins
+the roster automatically**. Set it up ahead of time only when you want character names, notes, or
+actors ready before writing starts. The character ID is what runs through the story; the character
 name is presentation, chosen per language.
 
-Three things here feed the rest of production. Display names are translated as part of
+Three things here feed the rest of production. Character names are translated as part of
 [Languages & translation](/setup/languages/), the **grammatical gender** travels with every
 localisation export so a gendered language can inflect that character's lines (see
 [Localisation](/production/localisation/#who-is-speaking-grammatical-gender)), and the **actor**
@@ -32,8 +32,8 @@ you assign feeds the [voice-recording pipeline](/production/audio/).
 
 ## What reaches the game
 
-Only the **script name** and the **display name** are compiled into the published `.patterc`
-bundle. Grammatical gender, notes, the actor's name, and the cue colour are project-side context for translators
+Only the **character ID** and the **character name** are compiled into the published `.patterc`
+bundle. Grammatical gender, notes, the actor's name, and the character colour are project-side context for translators
 and the production team; they are deliberately left out, so a game you ship never contains a real
 person's name or a writer's private notes about a character.
 
@@ -59,13 +59,13 @@ which your game's code relies on. Renaming `V.O.` to `VO` changes the name a gam
 its code switches on. A new qualifier's Game ID is made from its name until you edit it, and changing
 a Game ID updates every line that uses it.
 
-A qualifier's name is translated like a display name, for the qualifiers your lines use (see
+A qualifier's name is translated like a character name, for the qualifiers your lines use (see
 [Localisation](/production/localisation/)). Only those qualifiers are compiled into the `.patterc`,
 with their Game ID and name; the description is for writers.
 
 ### How a qualified speaker is shown
 
-The game shows a qualified line's speaker as the display name and the qualifier together: `PLAYER` with
+The game shows a qualified line's speaker as the character name and the qualifier together: `PLAYER` with
 `V.O.` shows as **You (V.O.)**. That needs nothing from you. How the two go together is the project's
 **speaker pattern**, `{name} ({qualifier})`, set once in **Project Settings ▸ Qualifiers**.
 
@@ -75,7 +75,7 @@ player's thoughts show as **Your thoughts**. A field appears for each qualifier 
 use; leave it blank to keep the pattern. A label whose lines are gone keeps its field, marked as unused,
 until you clear it.
 
-Translators see the pattern and any pair labels beside the display names, so each language can change
+Translators see the pattern and any pair labels beside the character names, so each language can change
 the order or the punctuation once, and translate a pair label like any other phrase:
 
 | String | English | French |

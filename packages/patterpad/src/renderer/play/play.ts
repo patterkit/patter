@@ -271,7 +271,7 @@ function appendStep(step: PlayStep): HTMLElement {
   const div = document.createElement("div");
   div.className = `pline ${step.kind}${step.action ? " action" : ""}`;
   if (step.kind === "line") {
-    // The speaker's label as the runtime resolved it, localised: the display name, or with a qualifier the
+    // The speaker's label as the runtime resolved it, localised: the character name, or with a qualifier the
     // speaker pattern filled in (TAM (O.S.)) or the pair's own label. This window never builds one itself.
     const cue = document.createElement("span"); cue.className = "pcue";
     cue.textContent = step.speakerLabel ?? step.characterName ?? step.character ?? "";

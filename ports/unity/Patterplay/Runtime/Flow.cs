@@ -1193,7 +1193,7 @@ namespace Patterkit.Patterplay
 
         private string ResolveCharacterName(string character)
         {
-            if (_host.EmitIds) return null; // IDs-only: omit the display name; the game maps the `character` token
+            if (_host.EmitIds) return null; // IDs-only: omit the character name; the game maps the character ID
             return _host.CharacterNameOf(character);
         }
 

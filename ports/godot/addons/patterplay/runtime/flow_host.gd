@@ -36,7 +36,7 @@ var engine_log: Array = []
 var engine_log_seq: int = 0
 var bundle: Dictionary = {}
 ## IDs-only build (localisation mode "ids", no source-debug): the engine emits each beat's ID as its
-## text and omits character display names, leaving localisation to the game.
+## text and omits character names, leaving localisation to the game.
 var emit_ids: bool = false
 var strings: Dictionary = {}
 ## The DEFAULT locale's string table: the fallback for a key the active locale is missing.

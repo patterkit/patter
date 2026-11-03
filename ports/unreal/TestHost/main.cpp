@@ -148,7 +148,7 @@ static bool isIdsOnly(const Bundle& bundle)
 }
 
 // A speaker's label as a transcript records it: only where it differs from what a line with no qualifier shows
-// (nothing in IDs-only mode or with no speaker, else the display name, else the token), so a transcript names it
+// (nothing in IDs-only mode or with no speaker, else the character name, else the character ID), so a transcript names it
 // where a qualifier or a pair's own label changes it. A runtime that drops a label it should carry records a
 // marker rather than nothing. Set on `o` only when recorded. The JS runner's labelField.
 static void setLabelField(JsonValue& o, bool hasCharacter, const std::string& character, bool hasCharacterName, const std::string& characterName,
@@ -3795,7 +3795,7 @@ static void runDescribeSmoke()
 
 // Structure introspection (Engine::getOutline / getBeatSequence) on a hand-built scene -> block -> choice
 // group -> snippets -> beats. The corpus's outlines section holds the shape to the reference; this keeps
-// what that case does not reach, a cast display name read into characterName.
+// what that case does not reach, a character name read into characterName.
 // Patter extension values as text, the form the Blueprint layer hands a game: jsonText writes the tree in
 // document order with JS numbers, parseJsonText reads it back, and a save leaves an option's values out
 // (they're read off the bundle on load, which the corpus's saveLoad case pins).

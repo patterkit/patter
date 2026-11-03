@@ -251,7 +251,7 @@ runner.on("line", (step) => {
 
 Do the same in the `text` handler.
 
-**Show the speaker differently.** `step.speakerLabel` is the speaker's display name (with any
+**Show the speaker differently.** `step.speakerLabel` is the speaker's character name (with any
 [qualifier](/setup/cast/#speaker-qualifiers), such as `TAM (O.S.)`), and `step.character` is their
 name in the cast. Use `step.character` as a class to give each character a colour of their own.
 

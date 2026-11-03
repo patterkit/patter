@@ -2592,7 +2592,7 @@ namespace patter
         bool resolveCharacterName(const Beat& beat, std::string& out)
         {
             if (!beat.hasCharacter) return false;
-            if (host_->emitIds) return false; // IDs-only: omit the display name; the game maps the `character` token
+            if (host_->emitIds) return false; // IDs-only: omit the character name; the game maps the character ID
             const std::string* name = host_->characterName(beat.character);
             if (!name) return false;
             out = *name; return true;
@@ -3260,11 +3260,11 @@ namespace patter
             return names;
         }
 
-        // A scene's cast: the character token of every speaker with a line anywhere in it, deduped, in
+        // A scene's cast: the character ID of every speaker with a line anywhere in it, deduped, in
         // first-appearance order. Static, like getOutline: it walks the authored structure, so a speaker
         // behind a condition, inside any group, or voicing a choice prompt counts - this is who CAN speak
         // in the scene, not who a given playthrough heard. Empty for an unknown ref or a scene with no
-        // dialogue. Tokens, not display names: read those off a delivered step.
+        // dialogue. Character IDs, not character names: read those off a delivered step.
         // Kept once worked out, by scene id: Blueprint's CastForScene is a pure node, so it is asked again for
         // every pin wired to it, and the walk is the whole scene. An engine's structure never changes (a hot
         // swap builds a new engine), so the answer can't go stale.

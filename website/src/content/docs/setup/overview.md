@@ -25,7 +25,7 @@ here explain *why* you would set each thing up and how it affects writers.
 `@patter`, `@scene`, and `@world` properties the story reads and writes, and the **Game Data**
 your game reads back off each beat.
 
-[Cast](/setup/cast/) is the character roster, with display names that can be translated.
+[Cast](/setup/cast/) is the character roster, with character names that can be translated.
 
 [Languages & translation](/setup/languages/) covers the languages you ship in and the
 export/import round-trip that keeps writers on the source language.

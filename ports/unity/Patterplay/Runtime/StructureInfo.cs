@@ -14,7 +14,7 @@ namespace Patterkit.Patterplay
         public string Id;
         public string Kind;            // line | text | gameEvent
         public string Character;       // line only
-        public string CharacterName;   // resolved display name (source locale), if the cast declares one
+        public string CharacterName;   // resolved character name (source locale), if the cast declares one
         public string Direction;       // line only
         public string Qualifier;       // speaker qualifier gameId (line only), e.g. `vo`
         public string QualifierName;   // the qualifier's shown name (source locale), e.g. `V.O.`

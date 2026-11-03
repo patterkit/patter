@@ -51,7 +51,7 @@ first, then keeps a copy in the project (see
 [Sharing scopes with the game's other tools](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools)).
 **File ▸ Share Scopes with Other Tools** sets that sharing up.
 
-The **Cast** tab lists your characters, each with a script name, an optional display name
+The **Cast** tab lists your characters, each with a character ID, an optional character name
 for translation, and an actor. Expand a row (▸) for **Grammatical gender**, free text
 (blank means not specified) with auto-suggest for the everyday values (male / female /
 neuter) and any others already used in the cast, sent to translators so a gendered

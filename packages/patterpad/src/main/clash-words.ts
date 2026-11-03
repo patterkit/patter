@@ -255,6 +255,9 @@ const PROJECT_WORDS: Record<string, string> = {
   estimating: "Estimating settings", export: "Publish settings",
 };
 
+/** A cast member's fields as the Cast tab names them, where the key alone wouldn't. */
+const CAST_WORDS: Record<string, string> = { name: "character ID", displayName: "character name" };
+
 function placeProject(ctx: ClashContext, path: string): Placed {
   const segs = clashPathSegments(path);
   const head = segs[0]?.key ?? path;
@@ -269,7 +272,7 @@ function placeProject(ctx: ClashContext, path: string): Placed {
     if (order || !key) return { where: "Cast order", target: settings("cast") };
     const field = segs[2]?.key;
     if (field === "qualifierLabels" && segs[3]) return { where: `${key}'s label with ${segs[3].key}`, target: settings("cast", key) };
-    return { where: field ? `${key}'s ${words(field)}` : `Cast member ${key}`, target: settings("cast", key) };
+    return { where: field ? `${key}'s ${CAST_WORDS[field] ?? words(field)}` : `Cast member ${key}`, target: settings("cast", key) };
   }
   if (head === "gameDataFields") {
     const field = segs[2]?.key;

@@ -50,7 +50,7 @@ describe("PO / POT round-trip", () => {
 
   it("carries the speaker's grammatical gender as an extracted comment", () => {
     const po = catalogToPo(catalog);
-    expect(po).toContain("#. Gender: female");            // ANNA's line + her display name
+    expect(po).toContain("#. Gender: female");            // ANNA's line + her character name
     expect(po.match(/#\. Gender: /g)).toHaveLength(2);    // ...and only those two: BO / narration get none
     // The POT template carries it too - a translator sizing up the job needs it before any translating.
     const template: LocCatalog = { ...catalog, locale: undefined, entries: catalog.entries.map((e) => ({ ...e, translation: "", stale: false })) };

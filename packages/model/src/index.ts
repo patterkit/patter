@@ -511,7 +511,7 @@ export type GrammaticalGender = string;
 export const COMMON_GENDERS = ["male", "female", "neuter"] as const;
 
 export interface CastMember {
-  /** Canonical speaker name (matched by a beat's `character`); language-neutral key. */
+  /** The character ID (matched by a beat's `character`); language-neutral key. */
   name: string;
   /** Localised player-facing name - a localisation id (project-level strings). */
   displayName?: string;
@@ -536,7 +536,7 @@ export interface CastMember {
 
 /** A speaker qualifier (a screenplay's character extension): `V.O.`, `O.S.`, `RADIO`, or the project's own.
  *  A line stores the `gameId`; the `name` is what the cue, Play, and the scripts show, and is localised as a
- *  cast display name is (`qualifierStringKey`). */
+ *  character name is (`qualifierStringKey`). */
 export interface SpeakerQualifier {
   /** What code switches on, and what a line stores. Unique in the project; hyphen-slug form (`gameIdify`). */
   gameId: string;
@@ -1125,7 +1125,7 @@ export function castStringKey(name: string): string {
 }
 
 /** The project-level loc-string key for a speaker qualifier's shown name, e.g. `qualifier:vo`. Resolved as a
- *  cast display name is: the active locale, then the default locale, then the authored `name`. */
+ *  character name is: the active locale, then the default locale, then the authored `name`. */
 export function qualifierStringKey(gameId: string): string {
   return `qualifier:${gameId}`;
 }

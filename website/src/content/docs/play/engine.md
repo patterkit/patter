@@ -123,8 +123,8 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 | `"end"` | `reason`: `"ended"`, or `"ran-dry"` (see below) |
 
 `text` is interpolated for you (against current property values), except on voiced
-lines, which are static. `characterName` is the localised display name; if a character
-has none, it's absent and you fall back to the `character` token. **`qualifier`** is the line's
+lines, which are static. `characterName` is the localised character name; if a character
+has none, it's absent and you fall back to the character ID in `character`. **`qualifier`** is the line's
 [speaker qualifier](/setup/cast/#speaker-qualifiers), by its `gameId` (`"vo"`, `"os"`,
 `"radio"`, or one of the project's own), and **`qualifierName`** is its shown name (`V.O.`),
 localised as `characterName` is. Both are absent when the line has none, and on a line
@@ -133,7 +133,7 @@ localised as `characterName` is. Both are absent when the line has none, and on 
 
 **`speakerLabel`** is the name to show for the speaker, localised and ready to display: `You (V.O.)`, or
 the label the writer gave that character with that qualifier ("Your thoughts"), or with no qualifier
-the display name (the `character` token when there's none). Show it as the speaker's name rather than
+the character name (the character ID when there's none). Show it as the speaker's name rather than
 putting `characterName` and `qualifierName` together yourself: how they combine is the writer's and the
 translator's (see [How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)). It's
 absent when the line has no speaker, on a silenced line, and in IDs-only mode.

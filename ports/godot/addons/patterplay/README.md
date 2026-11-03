@@ -37,7 +37,7 @@ Render each step into your own dialogue UI; on a `"choice"`, present `step["opti
 has a `prompt` whose `"text"` is the label, and an `eligible` flag) and call `flow.choose(id)`
 with the player's pick.
 
-A `"line"` step names its speaker with `character` (the cast token) and `characterName` (the shown
+A `"line"` step names its speaker with `character` (the character ID) and `characterName` (the shown
 name), and carries `direction` when set. A line with a speaker qualifier (`TAM (O.S.)`) also carries
 `qualifier`, the qualifier's `gameId` (`"os"`) for your game to switch on, and `qualifierName`, its
 shown name (`"O.S."`) in the active language. A line prompt on a choice option carries the same fields.
@@ -46,7 +46,7 @@ To show who's speaking, use `speakerLabel`, the speaker's label in the active la
 the name and the qualifier together yourself: word order and punctuation differ by language, and a writer
 can give a pair its own label. With a qualifier it's that character's own label for the pair when the
 project gives one (`"Your thoughts"`), else the project's speaker pattern filled in (`"You (V.O.)"` by
-default); with none, it's the shown name (the `character` token when the cast gives no name). It's absent
+default); with none, it's the shown name (the character ID when the cast gives no character name). It's absent
 when the line has no speaker, when closed captions silence it, and in an IDs-only build. A replayed prompt
 and a saved choice keep it, and `get_outline()` and `get_beat_sequence()` give it in the source language.
 

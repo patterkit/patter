@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// Locale-aware character display names (spec §14). A line step carries both the
+// Locale-aware character names (spec §14). A line step carries both the
 // canonical `character` token (for host logic) and a resolved `characterName`:
 // the `cast:<NAME>` string in the active locale, else the default locale, else
-// the authoring `displayName`; undefined when the character has no display name.
+// the authoring `displayName`; undefined when the character has no character name.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";

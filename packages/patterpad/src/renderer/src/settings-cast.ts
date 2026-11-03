@@ -1,5 +1,5 @@
-// The Cast editor (Project Settings > Cast tab). The master cast: each member has a canonical name
-// (matched by a beat's speaker), an optional player-facing display name, a grammatical gender for
+// The Cast editor (Project Settings > Cast tab). The master cast: each member has a character ID
+// (matched by a beat's speaker), an optional player-facing character name, a grammatical gender for
 // translators, free-text production notes, and its own label with a qualifier where the speaker pattern
 // shouldn't apply ("Shown with V.O."), one field for each qualifier its lines use. value() returns a clean
 // list (blank names pruned) for the save round-trip, and renames() the members whose name changed, which
@@ -57,14 +57,14 @@ export function mountCast(host: HTMLElement, initial: CastMember[], labels?: Cas
   };
 
   const memberRow = (m: CastMember, i: number): HTMLElement => {
-    // Main line: the canonical name, the player-facing display name, and the voice actor. Notes (longer
+    // Main line: the character ID, the player-facing character name, and the voice actor. Notes (longer
     // free text) tuck behind the ▸ expander.
-    // The canonical name is stored in CAPITALS (the house style for cue tokens): upper-case any imported
-    // lower-case name on display, and live as the author types (caret preserved). Display name + actor are
+    // The character ID is stored in CAPITALS (the house style for character IDs): upper-case any imported
+    // lower-case ID on display, and live as the author types (caret preserved). Character name + actor are
     // player- / actor-facing, so they keep their typed case.
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
     m.name = m.name.toUpperCase();
-    name.type = "text"; name.placeholder = "Name"; name.dataset.tip = "The canonical name. A line's speaker must match it."; name.value = m.name; name.spellcheck = false;
+    name.type = "text"; name.placeholder = "Character ID"; name.dataset.tip = "What a writer types before a line. A line's speaker must match it."; name.value = m.name; name.spellcheck = false;
     name.addEventListener("input", () => {
       const s = name.selectionStart, e = name.selectionEnd;
       name.value = name.value.toUpperCase(); // length is preserved, so the caret restores cleanly
@@ -74,7 +74,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[], labels?: Cas
     guard.track(name);
 
     const display = el("input", "gd-input cast-field") as HTMLInputElement;
-    display.type = "text"; display.placeholder = "Display name"; display.dataset.tip = "Player-facing name (optional)."; display.value = m.displayName ?? "";
+    display.type = "text"; display.placeholder = "Character name"; display.dataset.tip = "The name the player sees, translated (optional)."; display.value = m.displayName ?? "";
     const shownWith = labelFields(m);
     display.addEventListener("input", () => { m.displayName = display.value.trim() || undefined; shownWith.repaint(); });
     const actor = el("input", "gd-input cast-field") as HTMLInputElement;

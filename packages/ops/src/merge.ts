@@ -351,7 +351,7 @@ function mergeEditRecord(o: Obj, t: Obj): Obj {
  */
 const DECLS = keyedBy("name", ATOMIC, { order: "preserve" });
 
-/** A cast member both sides changed merges field by field, so one side's display name and the other's notes
+/** A cast member both sides changed merges field by field, so one side's character name and the other's notes
  *  both land, and its own labels with qualifiers (`qualifierLabels`) merge per qualifier, so only the same
  *  pair labelled two ways is a conflict. A member one side removed and the other changed is a conflict over
  *  the whole member. */
