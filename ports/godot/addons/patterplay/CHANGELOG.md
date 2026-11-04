@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-11-04
+
 ### Added
 
 - **A syllable's vowel.** Each `"syllable"` unit from `PatterBundle.speech_units` now has a `"vowel"` where its

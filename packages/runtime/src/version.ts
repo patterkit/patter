@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 /** This runtime's version, as in its package manifest. Written by `npm run bump:play`; never edit it by hand. */
-export const PATTERPLAY_VERSION = "0.43.0";
+export const PATTERPLAY_VERSION = "0.44.0";
 
 type Parsed = { core: [string, string, string]; pre: string[] };
 

@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-11-04
+
 ### Added
 
 - **Each syllable says its vowel.** `speechUnits(text, locale)` gives a `syllable` unit a `vowel` now: `"a"`, `"e"`,

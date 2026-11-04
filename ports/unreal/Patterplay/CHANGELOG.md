@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-11-04
+
 ### Added
 
 - **A syllable's vowel.** Each syllable from `patter::speechUnits` now carries its `vowel` (`FPatterSpeechUnit::Vowel`

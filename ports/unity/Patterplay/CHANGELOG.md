@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-11-04
+
 ### Added
 
 - **A syllable's vowel, for a mouth shape.** Each `Syllable` unit from `Bundle.SpeechUnits` now carries its `Vowel`:

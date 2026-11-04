@@ -7,7 +7,7 @@ class_name PatterplayVersion
 
 
 ## This runtime's version, as in its plugin.cfg. Written by `npm run bump:play`; never edit it by hand.
-const CURRENT := "0.43.0"
+const CURRENT := "0.44.0"
 
 # The JS reference's pattern, with \z for its $ (PCRE's $ would also match before a final newline).
 const _SEMVER := "^(\\d+)\\.(\\d+)\\.(\\d+)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?\\z"
