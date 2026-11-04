@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/cli",
-  "version": "0.14.8",
+  "version": "0.14.9",
   "description": "The `patter` CLI: validate, format, export, play, test coverage, localise, and merge Patter projects.",
   "type": "module",
   "license": "MIT",
@@ -29,8 +29,8 @@
     "build:standalone:others": "node scripts/build-standalone.mjs --targets=linux-x64,linux-arm64,windows-x64"
   },
   "dependencies": {
-    "@patterkit/core": "0.12.0",
-    "@patterkit/ops": "0.26.5",
+    "@patterkit/core": "0.12.1",
+    "@patterkit/ops": "0.26.6",
     "@wildwinter/simple-vc-lib": "^0.5.2",
     "@wildwinter/toolkit": "^0.4.0"
   }
