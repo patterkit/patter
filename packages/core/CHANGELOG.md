@@ -1,5 +1,12 @@
 # @patterkit/core
 
+## 0.12.2
+
+### Patch Changes
+
+- Updated dependencies [c78b591]
+  - @patterkit/model@0.26.0
+
 ## 0.12.1
 
 ### Patch Changes
