@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-11-04
+
 ### Added
 
 - **Play in game.** Patterpad can ask the running game to start a block now: a `play` message on the debug link,

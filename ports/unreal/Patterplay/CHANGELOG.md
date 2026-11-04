@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-11-04
+
 ### Added
 
 - **The live-bundle apply step in the C++ core.** `patter::applyLiveBundle(Engine, Current, Next)` (`Patter/LiveBundle.h`)
