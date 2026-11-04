@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-11-04
+
 ### Changed
 
 - **Patterplay 0.44.0 inside.** Its speech units now say each syllable's vowel, for games and tools that move a
