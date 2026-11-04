@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-11-04
+
 ### Added
 
 - **Play in game.** With a game on the Live Link, right-click a block (or use its ⋯ menu) and pick **Play in game**, or
