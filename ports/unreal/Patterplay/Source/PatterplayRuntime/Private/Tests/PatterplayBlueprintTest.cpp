@@ -92,7 +92,7 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	// --- how long a line with no recording lasts: an FString reaches the core's rule whole ---------------
 	// (UTF-16 in, so an emoji's surrogate pair is one code point; the corpus holds the core to every case.)
 	const FString Lamps = TEXT("The lamps are lit along the harbour wall tonight.");
-	TestEqual(TEXT("EstimateLineDuration: the shortest"), UPatterGameData::EstimateLineDuration(TEXT("Ah.")), 1.5);
+	TestEqual(TEXT("EstimateLineDuration: the shortest"), UPatterGameData::EstimateLineDuration(TEXT("Ah.")), 0.5);
 	TestEqual(TEXT("EstimateLineDuration: 4 syllables a second"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en")), 3.0);
 	TestEqual(TEXT("EstimateLineDuration: the project's own rate"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en"), 3.0), 4.0);
 	TestEqual(TEXT("EstimateLineDuration: a rate that isn't positive is the default"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en"), -1.0), 3.0);
@@ -113,7 +113,13 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("SpeechUnits: a syllable after the emoji, in code points"), Units[0].Kind == EPatterSpeechUnitKind::Syllable && Units[0].Start == 2 && Units[0].End == 4 && Units[0].Weight == 1.0);
 		TestTrue(TEXT("SpeechUnits: the comma, a short pause"), Units[1].Kind == EPatterSpeechUnitKind::Pause && Units[1].Start == 4 && Units[1].End == 5 && Units[1].Weight == 1.0);
 		TestTrue(TEXT("SpeechUnits: the full stop at the end is dropped"), Units[2].Kind == EPatterSpeechUnitKind::Syllable && Units[2].Start == 6 && Units[2].End == 8);
+		TestEqual(TEXT("SpeechUnits: a syllable's vowel"), Units[0].Vowel, FString(TEXT("a")));
+		TestEqual(TEXT("SpeechUnits: a pause has no vowel"), Units[1].Vowel, FString());
+		TestEqual(TEXT("SpeechUnits: the second syllable's vowel"), Units[2].Vowel, FString(TEXT("o")));
 	}
+	// A vowel outside ASCII comes through UTF-8 whole: the Hangul block U+C5B4's vowel is U+0259 (schwa).
+	const TArray<FPatterSpeechUnit> Schwa = UPatterGameData::SpeechUnits(TEXT("\uC5B4"), TEXT("ko"));
+	TestTrue(TEXT("SpeechUnits: a Hangul block's vowel, schwa"), Schwa.Num() == 1 && Schwa[0].Vowel == FString(TEXT("\u0259")));
 
 	// --- the audio resolver joins its base and a take, keeping a base that is a root --------------------
 	const FString Manifest = TEXT(R"({"clips": {"L": {"file": "final/L.wav"}}})");

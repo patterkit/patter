@@ -20,19 +20,35 @@
 //   one pause, the stronger; a pause before the first syllable or after the last is dropped (the line's padAfter
 //   is the pause after it), as is a `.` or `,` between digits (3.5, 1,000).
 //
+// Each syllable says its vowel where the script does (`vowel`, for a mouth shape at the syllable's peak), by the
+// generated table: its first strong vowel, else its first weak one (speech-table.ts says which are weak).
+// - Latin: the first vowel of its vowel group, its accent dropped; æ and œ are e, ø is o, and y is i unless a vowel
+//   follows it ("yes" is e). A u after q is weak ("que" is e). Rough for English, close for languages spelt as spoken.
+// - Cyrillic: the vowel letter (я a, ё o, ю u, е э є e, ы і ї i).
+// - Kana: the kana's vowel row, a small kana's over the kana before it (きゃ is a); ん has none.
+// - Hangul: the block's medial vowel; ㅓ ㅕ ㅝ are ə.
+// - Arabic: the written short vowel (the tanwin likewise); none when it isn't written.
+// - Thai: the vowel sign, a fuller one over a leading vowel (เ-ีย is i).
+// - Han, digits, and any other script: none.
+//
 // Offsets are code points, so every runtime agrees whatever its string encoding.
 
-import { SPEECH_RANGES, SpeechClass as K } from "./speech-table.js";
+import { SPEECH_RANGES, SPEECH_VOWELS, SPEECH_VOWEL_WEAK, SPEECH_VOWEL_RANGES, SPEECH_HANGUL_VOWELS, SpeechClass as K } from "./speech-table.js";
 
 /** What a speech unit is: a syllable (the mouth opens), a beat with the mouth shut (っ), or a pause. */
 export type SpeechUnitKind = "syllable" | "closed" | "pause";
 
-/** One unit of a line as it would be spoken. `start` and `end` are code-point offsets into the text, end exclusive. */
+/** A syllable's vowel, for a mouth shape: ə is a vowel the script shows that isn't one of the five. */
+export type SpeechVowel = "a" | "e" | "i" | "o" | "u" | "ə";
+
+/** One unit of a line as it would be spoken. `start` and `end` are code-point offsets into the text, end exclusive.
+ *  `vowel` is a syllable's vowel where the script says it, absent otherwise (and on a pause or a shut beat). */
 export interface SpeechUnit {
   kind: SpeechUnitKind;
   weight: number;
   start: number;
   end: number;
+  vowel?: SpeechVowel;
 }
 
 /** A digit's weight: most read as one or two syllables. */
@@ -56,6 +72,33 @@ function classOf(cp: number): number {
     else return at(SPEECH_RANGES, mid * 3 + 2);
   }
   return K.NONE;
+}
+
+/** A code point's vowel code (speech-table.ts): Hangul's from its block, the rest by binary search of the table. */
+function vowelCodeOf(cp: number): number {
+  if (cp >= 0xAC00 && cp <= 0xD7A3) return at(SPEECH_HANGUL_VOWELS, Math.floor((cp - 0xAC00) / 28) % 21);
+  let lo = 0, hi = SPEECH_VOWEL_RANGES.length / 3 - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (cp < at(SPEECH_VOWEL_RANGES, mid * 3)) hi = mid - 1;
+    else if (cp > at(SPEECH_VOWEL_RANGES, mid * 3 + 1)) lo = mid + 1;
+    else return at(SPEECH_VOWEL_RANGES, mid * 3 + 2);
+  }
+  return 0;
+}
+
+/** The vowel of a syllable from [start, end): its first strong vowel, else its first weak one, else none. A u after
+ *  q is weak ("que", "quick"). */
+function vowelIn(cps: number[], start: number, end: number): SpeechVowel | undefined {
+  let weak = 0;
+  for (let j = start; j < end; j++) {
+    let code = vowelCodeOf(at(cps, j));
+    if (code === 0) continue;
+    if ((at(cps, j) === 0x75 || at(cps, j) === 0x55) && j > start && (at(cps, j - 1) === 0x71 || at(cps, j - 1) === 0x51)) code |= SPEECH_VOWEL_WEAK;
+    if ((code & SPEECH_VOWEL_WEAK) === 0) return SPEECH_VOWELS[code] as SpeechVowel;
+    if (weak === 0) weak = code & ~SPEECH_VOWEL_WEAK;
+  }
+  return weak === 0 ? undefined : SPEECH_VOWELS[weak] as SpeechVowel;
 }
 
 /** A locale's language, lower case: `en-GB`, `en_gb`, and `EN` are all `en`. */
@@ -215,7 +258,13 @@ export function speechUnits(text: string, locale?: string): SpeechUnit[] {
       i++; // nothing: a symbol, an emoji, a stray mark or apostrophe
     }
   }
-  return tidyPauses(units);
+  const out = tidyPauses(units);
+  for (const u of out) {
+    if (u.kind !== "syllable") continue;
+    const vowel = vowelIn(cps, u.start, u.end);
+    if (vowel !== undefined) u.vowel = vowel;
+  }
+  return out;
 }
 
 /** Whether the letter before the marks ending at `j` is Thai. */

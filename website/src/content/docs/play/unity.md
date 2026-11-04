@@ -90,8 +90,8 @@ none. The [timing rules](/play/engine/#step-shapes) say how to play it, and
 how long a line with no recording lasts: `SpokenText` is the line in the project's main language, the one
 it's spoken in, whatever language is shown (null in an IDs-only bundle), and `EstimateRate` the project's
 syllables a second for an estimate. `Bundle.SpeechUnits(text, locale)` gives the syllables, shut beats, and
-pauses it's made of (each a `SpeechUnit` with `Kind`, `Weight`, `Start`, and `End`), to lay over a line's
-length and move a mouth, and `Bundle.CountSyllables(text, locale)` the count. A `Text` step with
+pauses it's made of (each a `SpeechUnit` with `Kind`, `Weight`, `Start`, `End`, and a syllable's `Vowel`, or null
+where the script doesn't say), to lay over a line's length and move a mouth, and `Bundle.CountSyllables(text, locale)` the count. A `Text` step with
 `Action` set is [action](/play/engine/#step-shapes), a direction for whoever stages the scene: stage
 it, or let it pass, but don't show it as on-screen text. `Action` is false on shown text and on a
 replayed prompt.

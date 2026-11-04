@@ -7,6 +7,16 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A syllable's vowel.** Each syllable from `patter::speechUnits` now carries its `vowel` (`FPatterSpeechUnit::Vowel`
+  in Blueprint): `a`, `e`, `i`, `o`, `u`, or `ə` where the script says it, for a mouth shape at the syllable's peak,
+  and empty on pauses, shut beats, and syllables whose script doesn't say (Han, digits, and Arabic with no vowels written). It's
+  read from the generated table every runtime carries: Latin's first vowel, Cyrillic's vowel letter, a kana's row,
+  a Hangul block's medial vowel, Arabic's written short vowel, and Thai's vowel sign. Nothing else about the units
+  changes: their kinds, weights, offsets, and timing are as before. The TestHost passes conformance corpus 16, which
+  checks the vowels.
+
 ## [0.43.0] - 2026-11-04
 
 ### Added

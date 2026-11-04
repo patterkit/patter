@@ -472,16 +472,20 @@ export interface DurationCase {
   expected: number;
 }
 
+/** A syllable's vowel (corpus 16): ə is a vowel the script shows that isn't one of the five. */
+export type SpeechVowel = "a" | "e" | "i" | "o" | "u" | "ə";
+
 /**
  * A speech case (corpus 11): a line broken into the units it would be spoken in (`speechUnits`), each its kind,
  * weight, and code-point offsets, and its syllable count (`countSyllables`). `locale` is the language the line is
- * spoken in. A runner compares the units exactly, and the count to within 1e-9.
+ * spoken in. A runner compares the units exactly, and the count to within 1e-9. Since corpus 16 a syllable carries
+ * its `vowel` where the script says it, absent otherwise; a runner compares it too, absent with absent.
  */
 export interface SpeechCase {
   name: string;
   text: string;
   locale?: string;
-  units: { kind: "syllable" | "closed" | "pause"; weight: number; start: number; end: number }[];
+  units: { kind: "syllable" | "closed" | "pause"; weight: number; start: number; end: number; vowel?: SpeechVowel }[];
   syllables: number;
 }
 

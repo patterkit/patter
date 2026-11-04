@@ -33,6 +33,19 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Each syllable says its vowel.** `speechUnits(text, locale)` gives a `syllable` unit a `vowel` now: `"a"`, `"e"`,
+  `"i"`, `"o"`, `"u"`, or `"ə"` for a vowel the script shows that isn't one of the five. Move a mouth to a shape at
+  each syllable's peak with it. It's absent on pauses and shut beats, and where the script doesn't say (Han, digits,
+  and scripts outside the set). Latin takes the first vowel of the syllable's vowel group with its accent dropped,
+  which is rough for English and close for languages spelt as they're spoken; Cyrillic the vowel letter; kana its
+  vowel row; Hangul the block's medial vowel; Arabic the written short vowel; Thai the vowel sign. Every runtime
+  reads the same generated table, so they agree. Nothing else about the units changes, so no timing moves. New type
+  `SpeechVowel`.
+- The conformance corpus is version 16: its speech cases carry each syllable's vowel, with new cases for the vowel
+  rules.
+
 ## [0.43.0] - 2026-11-04
 
 ### Added

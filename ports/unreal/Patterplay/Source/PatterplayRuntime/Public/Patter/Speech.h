@@ -19,6 +19,17 @@
 //   an ellipsis) 2. Punctuation in a row is one pause, the stronger; a pause before the first syllable or after the
 //   last is dropped (the line's padAfter is the pause after it), as is a `.` or `,` between digits (3.5, 1,000).
 //
+// Each syllable says its vowel where the script does (`vowel`, for a mouth shape at the syllable's peak), by the
+// generated table: its first strong vowel, else its first weak one (SpeechTable.h says which are weak).
+// - Latin: the first vowel of its vowel group, its accent dropped; æ and œ are e, ø is o, and y is i unless a vowel
+//   follows it ("yes" is e). A u after q is weak ("que" is e). Rough for English, close for languages spelt as spoken.
+// - Cyrillic: the vowel letter (я a, ё o, ю u, е э є e, ы і ї i).
+// - Kana: the kana's vowel row, a small kana's over the kana before it (きゃ is a); ん has none.
+// - Hangul: the block's medial vowel; ㅓ ㅕ ㅝ are ə.
+// - Arabic: the written short vowel (the tanwin likewise); none when it isn't written.
+// - Thai: the vowel sign, a fuller one over a leading vowel (เ-ีย is i).
+// - Han, digits, and any other script: none.
+//
 // Text is UTF-8; offsets are code points (a character outside the Basic Multilingual Plane counts once), so every
 // runtime agrees whatever its string encoding.
 #pragma once
@@ -36,13 +47,15 @@ namespace patter
     enum class SpeechUnitKind { Syllable, Closed, Pause };
 
     /** One unit of a line as it would be spoken. `start` and `end` are code-point offsets into the text, end
-     *  exclusive. */
+     *  exclusive. `vowel` is a syllable's vowel where the script says it, UTF-8: "a", "e", "i", "o", "u", or "ə" (a
+     *  vowel the script shows that isn't one of the five). It's empty otherwise, and on a pause or a shut beat. */
     struct SpeechUnit
     {
         SpeechUnitKind kind = SpeechUnitKind::Syllable;
         double weight = 1;
         int start = 0;
         int end = 0;
+        std::string vowel;
     };
 
     /** A digit's weight: most read as one or two syllables. */
@@ -98,6 +111,39 @@ namespace patter
                 else return kSpeechRanges[mid * 3 + 2];
             }
             return K::None;
+        }
+
+        /** A code point's vowel code (SpeechTable.h): Hangul's from its block, the rest by binary search of the
+         *  table. */
+        inline int vowelCodeOf(int cp)
+        {
+            if (cp >= 0xAC00 && cp <= 0xD7A3) return kSpeechHangulVowels[((cp - 0xAC00) / 28) % 21];
+            long lo = 0, hi = static_cast<long>(kSpeechVowelRangeCount) - 1;
+            while (lo <= hi)
+            {
+                const long mid = (lo + hi) >> 1;
+                if (cp < kSpeechVowelRanges[mid * 3]) hi = mid - 1;
+                else if (cp > kSpeechVowelRanges[mid * 3 + 1]) lo = mid + 1;
+                else return kSpeechVowelRanges[mid * 3 + 2];
+            }
+            return 0;
+        }
+
+        /** The vowel of a syllable from [start, end): its first strong vowel, else its first weak one, else none
+         *  (empty). A u after q is weak ("que", "quick"). */
+        inline std::string vowelIn(const std::vector<int>& cps, long start, long end)
+        {
+            int weak = 0;
+            for (long j = start; j < end; j++)
+            {
+                const int cp = at(cps, j);
+                int code = vowelCodeOf(cp);
+                if (code == 0) continue;
+                if ((cp == 0x75 || cp == 0x55) && j > start && (at(cps, j - 1) == 0x71 || at(cps, j - 1) == 0x51)) code |= kSpeechVowelWeak;
+                if ((code & kSpeechVowelWeak) == 0) return kSpeechVowels[code];
+                if (weak == 0) weak = code & ~kSpeechVowelWeak;
+            }
+            return weak == 0 ? std::string() : std::string(kSpeechVowels[weak]);
         }
 
         /** A locale's language, lower case: `en-GB`, `en_gb`, and `EN` are all `en`. */
@@ -416,7 +462,13 @@ namespace patter
                 i++; // nothing: a symbol, an emoji, a stray mark or apostrophe
             }
         }
-        return tidyPauses(units);
+        std::vector<SpeechUnit> out = tidyPauses(units);
+        for (SpeechUnit& u : out)
+        {
+            if (u.kind != SpeechUnitKind::Syllable) continue;
+            u.vowel = vowelIn(cps, u.start, u.end);
+        }
+        return out;
     }
 
     /** A speech unit kind as the JS reference names it: "syllable", "closed", or "pause". */

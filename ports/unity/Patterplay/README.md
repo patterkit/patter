@@ -95,6 +95,8 @@ To move a mouth, `Bundle.SpeechUnits(text, locale)` breaks a line into the units
 `SpeechUnit` is a `Syllable` (the mouth opens), a `Closed` beat (the mouth shut), or a `Pause`, with a `Weight`
 and its `Start` and `End` offsets in the text, counted in code points. Lay them over the line's length, its
 recording's or the estimate's, in proportion to their weights, and the mouth and the timing agree.
+A syllable's `Vowel` is "a", "e", "i", "o", "u", or "ə" where the script says it, for a mouth shape at its peak,
+and null where it doesn't (Han, digits, unvowelled Arabic, and any other script), as it is on a pause or a shut beat.
 `Bundle.CountSyllables(text, locale)` gives the syllable count, pauses aside.
 
 A text step with `Action` set is action: a direction for whoever stages the scene, such as "MARA turns

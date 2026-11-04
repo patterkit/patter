@@ -288,10 +288,12 @@ static func estimate_line_duration(text: String, locale: String = "", syllables_
 
 ## A line broken into the units it would be spoken in: its syllables, its beats with the mouth shut, and its
 ## pauses, in order, each {"kind": "syllable" | "closed" | "pause", "weight": float, "start": int, "end": int},
-## the offsets in code points (end exclusive). Lay them over a line's length (its recording's, or
+## the offsets in code points (end exclusive), and a syllable's "vowel" ("a", "e", "i", "o", "u", or "ə", a vowel
+## the script shows that isn't one of the five) where the script says it, the key absent otherwise. Lay them over a line's length (its recording's, or
 ## estimate_line_duration's) to move a mouth: a syllable opens it, "closed" (っ) and a pause keep it shut.
 ## `locale` is the language the line is spoken in (the project's main language, a step's "spokenLocale"); it
-## decides English's and French's silent e, and Japanese kanji.
+## decides English's and French's silent e, and Japanese kanji. A syllable's vowel can pick a mouth shape at its
+## peak.
 static func speech_units(text: String, locale: String = "") -> Array:
 	return PatterSpeech.units(text, locale)
 

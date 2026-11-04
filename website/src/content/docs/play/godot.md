@@ -57,7 +57,7 @@ how long a line with no recording lasts: `"spokenText"` is the line in the proje
 it's spoken in, whatever language is shown (absent in an IDs-only bundle), and `"estimateRate"` the
 project's syllables a second for an estimate. `PatterBundle.speech_units(text, locale)` gives the
 syllables, shut beats, and pauses it's made of (each a dictionary of `"kind"`, `"weight"`, `"start"`, and
-`"end"`), to lay over a line's length and move a mouth, and `PatterBundle.count_syllables(text, locale)`
+`"end"`, and a syllable's `"vowel"` where the script says it), to lay over a line's length and move a mouth, and `PatterBundle.count_syllables(text, locale)`
 the count. A `"text"` step
 with `step["action"]` set to `true` is [action](/play/engine/#step-shapes), a direction for whoever
 stages the scene: stage it, or let it pass, but don't show it as on-screen text. The key is absent on

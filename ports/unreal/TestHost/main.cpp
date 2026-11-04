@@ -1053,7 +1053,8 @@ static int runVersions(const JsonValue& arr)
 }
 
 // The corpus's speech cases (corpus 11): each text (UTF-8) through the core's speechUnits, every unit's kind, weight,
-// and code-point offsets matched exactly, and its countSyllables to within 1e-9.
+// and code-point offsets matched exactly, and its countSyllables to within 1e-9. Since corpus 16 a syllable's vowel
+// too: an empty vowel is left out, so it matches a case's absent one, and the units must match key for key.
 static int runSpeech(const JsonValue& arr)
 {
     int pass = 0;
@@ -1073,11 +1074,15 @@ static int runSpeech(const JsonValue& arr)
                 o.set("weight", JsonValue::Num(u.weight));
                 o.set("start", JsonValue::Num(u.start));
                 o.set("end", JsonValue::Num(u.end));
+                if (!u.vowel.empty()) o.set("vowel", JsonValue::Str(u.vowel));
                 units.push(o);
             }
             const double syllables = countSyllables(c.at("text").str, loc);
             const double want = c.at("syllables").num;
-            if (!matchValue(units, c.at("units"))) fail("speech", name, "units: expected " + dump(c.at("units")) + ", got " + dump(units));
+            // matchValue checks only the expected keys, so a vowel the case hasn't got would slip by: count them.
+            bool sameKeys = units.arr.size() == c.at("units").arr.size();
+            for (std::size_t k = 0; sameKeys && k < units.arr.size(); ++k) sameKeys = units.arr[k].obj.size() == c.at("units").arr[k].obj.size();
+            if (!sameKeys || !matchValue(units, c.at("units"))) fail("speech", name, "units: expected " + dump(c.at("units")) + ", got " + dump(units));
             else if (std::fabs(syllables - want) > 1e-9) fail("speech", name, "syllables: expected " + std::to_string(want) + ", got " + std::to_string(syllables));
             else ++pass;
         }

@@ -337,7 +337,7 @@ export function isContentlessBeat(beat: Beat, hasText: boolean): boolean {
 
 export { gameIdify, isValidGameId };
 export { speechUnits, countSyllables, SPEECH_DIGIT_WEIGHT, SPEECH_KANJI_WEIGHT, SPEECH_PAUSE_SHORT_WEIGHT, SPEECH_PAUSE_LONG_WEIGHT } from "./speech.js";
-export type { SpeechUnit, SpeechUnitKind } from "./speech.js";
+export type { SpeechUnit, SpeechUnitKind, SpeechVowel } from "./speech.js";
 
 // ---------------------------------------------------------------------------
 // Property names (design: `@wildwinter/app-shell` src/property-names.ts, which

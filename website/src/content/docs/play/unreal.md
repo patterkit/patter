@@ -66,7 +66,7 @@ recording lasts: pass it the step's `SpokenText`, `SpokenLocale`, and `EstimateR
 in the project's main language, the one it's spoken in, whatever language is shown (`bHasSpokenText` is false
 in an IDs-only bundle), and `EstimateRate` the project's syllables a second for an estimate. `Speech Units`
 gives the syllables, shut beats, and pauses it's made of (each an `FPatterSpeechUnit` with `Kind`, `Weight`,
-`Start`, and `End`), to lay over a line's length and move a mouth, and `Count Syllables` the count. `Start`
+`Start`, `End`, and a syllable's `Vowel`, empty where the script doesn't say), to lay over a line's length and move a mouth, and `Count Syllables` the count. `Start`
 and `End` count code points, so an emoji is one, though it takes two characters in an `FString`. A `Text`
 step with `bAction` set
 (`action` on the C++ `StepResult`) is [action](/play/engine/#step-shapes), a direction for whoever

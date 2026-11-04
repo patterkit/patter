@@ -6,6 +6,14 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A syllable's vowel, for a mouth shape.** Each `Syllable` unit from `Bundle.SpeechUnits` now carries its `Vowel`:
+  "a", "e", "i", "o", "u", or "ə" (a vowel the script shows that isn't one of the five), or null where the script
+  doesn't say (Han, digits, unvowelled Arabic, and any script outside the set). It's null on a pause and a shut beat
+  too. Latin, Cyrillic, kana, Hangul, written Arabic vowels, and Thai all say it. Nothing else about the units has
+  changed: their kinds, weights, offsets, and timing are as before. Corpus 16.
+
 ## [0.43.0] - 2026-11-04
 
 ### Added

@@ -862,7 +862,7 @@ func _run_speech(arr: Array) -> int:
 			for j in got.size():
 				var g: Dictionary = got[j]
 				var w: Dictionary = want[j]
-				if g["kind"] != w["kind"] or float(g["weight"]) != float(w["weight"]) or int(g["start"]) != int(w["start"]) or int(g["end"]) != int(w["end"]):
+				if g["kind"] != w["kind"] or float(g["weight"]) != float(w["weight"]) or int(g["start"]) != int(w["start"]) or int(g["end"]) != int(w["end"]) or String(g.get("vowel", "")) != String(w.get("vowel", "")) or g.has("vowel") != w.has("vowel"):
 					same = false
 					break
 		var syllables := PatterBundle.count_syllables(c["text"], locale)

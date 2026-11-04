@@ -22,6 +22,17 @@
 #   one pause, the stronger; a pause before the first syllable or after the last is dropped (the line's padAfter
 #   is the pause after it), as is a `.` or `,` between digits (3.5, 1,000).
 #
+# Each syllable says its vowel where the script does ("vowel", for a mouth shape at the syllable's peak), by the
+# generated table: its first strong vowel, else its first weak one (speech_table.gd says which are weak).
+# - Latin: the first vowel of its vowel group, its accent dropped; æ and œ are e, ø is o, and y is i unless a vowel
+#   follows it ("yes" is e). A u after q is weak ("que" is e). Rough for English, close for languages spelt as spoken.
+# - Cyrillic: the vowel letter (я a, ё o, ю u, е э є e, ы і ї i).
+# - Kana: the kana's vowel row, a small kana's over the kana before it (きゃ is a); ん has none.
+# - Hangul: the block's medial vowel; ㅓ ㅕ ㅝ are ə.
+# - Arabic: the written short vowel (the tanwin likewise); none when it isn't written.
+# - Thai: the vowel sign, a fuller one over a leading vowel (เ-ีย is i).
+# - Han, digits, and any other script: none.
+#
 # Offsets are code points (a Godot String holds one per character), so every runtime agrees whatever its encoding.
 class_name PatterSpeech
 
@@ -50,6 +61,42 @@ static func class_of(cp: int) -> int:
 		else:
 			return ranges[mid * 3 + 2]
 	return K.NONE
+
+
+## A code point's vowel code (speech_table.gd): Hangul's from its block, the rest by binary search of the table.
+static func vowel_code_of(cp: int) -> int:
+	if cp >= 0xAC00 and cp <= 0xD7A3:
+		return K.HANGUL_VOWELS[((cp - 0xAC00) / 28) % 21]
+	var ranges := K.VOWEL_RANGES
+	var lo := 0
+	var hi := ranges.size() / 3 - 1
+	while lo <= hi:
+		var mid := (lo + hi) >> 1
+		if cp < ranges[mid * 3]:
+			hi = mid - 1
+		elif cp > ranges[mid * 3 + 1]:
+			lo = mid + 1
+		else:
+			return ranges[mid * 3 + 2]
+	return 0
+
+
+## The vowel of a syllable from [start, end): its first strong vowel, else its first weak one, else "" (none). A u
+## after q is weak ("que", "quick").
+static func _vowel_in(cps: PackedInt32Array, start: int, end: int) -> String:
+	var weak := 0
+	for j in range(start, end):
+		var cp := cps[j]
+		var code := vowel_code_of(cp)
+		if code == 0:
+			continue
+		if (cp == 0x75 or cp == 0x55) and j > start and (cps[j - 1] == 0x71 or cps[j - 1] == 0x51):
+			code |= K.VOWEL_WEAK
+		if code & K.VOWEL_WEAK == 0:
+			return K.VOWELS[code]
+		if weak == 0:
+			weak = code & ~K.VOWEL_WEAK
+	return K.VOWELS[weak] if weak != 0 else ""
 
 
 ## A locale's language, lower case: `en-GB`, `en_gb`, and `EN` are all `en`.
@@ -95,7 +142,8 @@ static func _markup_end(cps: PackedInt32Array, i: int) -> int:
 
 ## A line broken into the units it would be spoken in, in order, each
 ## {"kind": "syllable" | "closed" | "pause", "weight": float, "start": int, "end": int}, offsets in code points,
-## end exclusive. `locale` is the language the line is spoken in (the project's main language, not the one being
+## end exclusive, and a syllable's "vowel" ("a", "e", "i", "o", "u", or "ə") where the script says it, the key
+## absent otherwise (and on a pause or a shut beat). `locale` is the language the line is spoken in (the project's main language, not the one being
 ## shown); it decides English's and French's silent e, and Japanese kanji, which also apply when the line has any
 ## kana in it.
 static func units(text: String, locale: String = "") -> Array:
@@ -217,7 +265,14 @@ static func units(text: String, locale: String = "") -> Array:
 			i = end
 		else:
 			i += 1  # nothing: a symbol, an emoji, a stray mark or apostrophe
-	return _tidy_pauses(out)
+	var tidied := _tidy_pauses(out)
+	for u: Dictionary in tidied:
+		if u["kind"] != "syllable":
+			continue
+		var vowel := _vowel_in(cps, u["start"], u["end"])
+		if vowel != "":
+			u["vowel"] = vowel
+	return tidied
 
 
 ## How many syllables a line would be spoken in: its syllables' and shut beats' weights, pauses aside.

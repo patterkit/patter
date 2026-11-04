@@ -1,5 +1,5 @@
 {
-  "version": 15,
+  "version": 16,
   "expressions": [
     {
       "name": "number comparison",
@@ -35056,73 +35056,85 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 3
+          "end": 3,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 4,
-          "end": 9
+          "end": 9,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 10,
-          "end": 13
+          "end": 13,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 14,
-          "end": 17
+          "end": 17,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 18,
-          "end": 19
+          "end": 19,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 19,
-          "end": 23
+          "end": 23,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 24,
-          "end": 27
+          "end": 27,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 28,
-          "end": 30
+          "end": 30,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 30,
-          "end": 35
+          "end": 35,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 36,
-          "end": 40
+          "end": 40,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 41,
-          "end": 43
+          "end": 43,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 43,
-          "end": 48
+          "end": 48,
+          "vowel": "i"
         }
       ],
       "syllables": 12
@@ -35135,79 +35147,92 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 3
+          "end": 3,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 4,
-          "end": 9
+          "end": 9,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 10,
-          "end": 11
+          "end": 11,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 11,
-          "end": 13
+          "end": 13,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 14,
-          "end": 17
+          "end": 17,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 18,
-          "end": 19
+          "end": 19,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 19,
-          "end": 23
+          "end": 23,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 24,
-          "end": 27
+          "end": 27,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 28,
-          "end": 30
+          "end": 30,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 30,
-          "end": 35
+          "end": 35,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 36,
-          "end": 40
+          "end": 40,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 41,
-          "end": 43
+          "end": 43,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 43,
-          "end": 48
+          "end": 48,
+          "vowel": "i"
         }
       ],
       "syllables": 13
@@ -35221,19 +35246,22 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 1
+          "end": 1,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 4
+          "end": 4,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 4,
-          "end": 7
+          "end": 7,
+          "vowel": "e"
         },
         {
           "kind": "pause",
@@ -35245,31 +35273,36 @@
           "kind": "syllable",
           "weight": 1,
           "start": 9,
-          "end": 10
+          "end": 10,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 11,
-          "end": 13
+          "end": 13,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 13,
-          "end": 17
+          "end": 17,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 18,
-          "end": 20
+          "end": 20,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 20,
-          "end": 24
+          "end": 24,
+          "vowel": "e"
         },
         {
           "kind": "pause",
@@ -35281,19 +35314,22 @@
           "kind": "syllable",
           "weight": 1,
           "start": 26,
-          "end": 27
+          "end": 27,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 28,
-          "end": 31
+          "end": 31,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 31,
-          "end": 34
+          "end": 34,
+          "vowel": "e"
         }
       ],
       "syllables": 11
@@ -35307,43 +35343,50 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 3
+          "end": 3,
+          "vowel": "u"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 4,
-          "end": 9
+          "end": 9,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 10,
-          "end": 15
+          "end": 15,
+          "vowel": "u"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 16,
-          "end": 20
+          "end": 20,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 21,
-          "end": 24
+          "end": 24,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 25,
-          "end": 27
+          "end": 27,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 27,
-          "end": 33
+          "end": 33,
+          "vowel": "e"
         }
       ],
       "syllables": 7
@@ -35357,67 +35400,78 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 1
+          "end": 1,
+          "vowel": "u"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 1,
-          "end": 3
+          "end": 3,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 4,
-          "end": 6
+          "end": 6,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 6,
-          "end": 9
+          "end": 9,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 10,
-          "end": 13
+          "end": 13,
+          "vowel": "u"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 13,
-          "end": 15
+          "end": 15,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 16,
-          "end": 20
+          "end": 20,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 21,
-          "end": 24
+          "end": 24,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 25,
-          "end": 27
+          "end": 27,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 27,
-          "end": 29
+          "end": 29,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 29,
-          "end": 33
+          "end": 33,
+          "vowel": "e"
         }
       ],
       "syllables": 11
@@ -35431,13 +35485,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 4
+          "end": 4,
+          "vowel": "e"
         },
         {
           "kind": "pause",
@@ -35449,7 +35505,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 6,
-          "end": 11
+          "end": 11,
+          "vowel": "a"
         },
         {
           "kind": "pause",
@@ -35461,25 +35518,29 @@
           "kind": "syllable",
           "weight": 1,
           "start": 13,
-          "end": 14
+          "end": 14,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 14,
-          "end": 16
+          "end": 16,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 16,
-          "end": 19
+          "end": 19,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 19,
-          "end": 23
+          "end": 23,
+          "vowel": "i"
         },
         {
           "kind": "pause",
@@ -35491,7 +35552,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 25,
-          "end": 29
+          "end": 29,
+          "vowel": "e"
         }
       ],
       "syllables": 8
@@ -35505,7 +35567,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 5
+          "end": 5,
+          "vowel": "o"
         },
         {
           "kind": "pause",
@@ -35517,7 +35580,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 7,
-          "end": 12
+          "end": 12,
+          "vowel": "e"
         },
         {
           "kind": "pause",
@@ -35529,13 +35593,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 14,
-          "end": 16
+          "end": 16,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 16,
-          "end": 25
+          "end": 25,
+          "vowel": "o"
         }
       ],
       "syllables": 4
@@ -35549,31 +35615,36 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 1
+          "end": 1,
+          "vowel": "u"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 1,
-          "end": 4
+          "end": 4,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 5,
-          "end": 8
+          "end": 8,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 9,
-          "end": 12
+          "end": 12,
+          "vowel": "u"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 12,
-          "end": 15
+          "end": 15,
+          "vowel": "e"
         },
         {
           "kind": "pause",
@@ -35585,13 +35656,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 17,
-          "end": 21
+          "end": 21,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 21,
-          "end": 23
+          "end": 23,
+          "vowel": "e"
         }
       ],
       "syllables": 7
@@ -35605,31 +35678,36 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 6
+          "end": 6,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 7,
-          "end": 9
+          "end": 9,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 9,
-          "end": 12
+          "end": 12,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 13,
-          "end": 17
+          "end": 17,
+          "vowel": "a"
         }
       ],
       "syllables": 5
@@ -35643,13 +35721,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 1
+          "end": 1,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 1,
-          "end": 4
+          "end": 4,
+          "vowel": "i"
         },
         {
           "kind": "pause",
@@ -35661,19 +35741,22 @@
           "kind": "syllable",
           "weight": 1,
           "start": 6,
-          "end": 7
+          "end": 7,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 7,
-          "end": 10
+          "end": 10,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 10,
-          "end": 14
+          "end": 14,
+          "vowel": "u"
         }
       ],
       "syllables": 5
@@ -35725,13 +35808,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 3
+          "end": 3,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 6
+          "end": 6,
+          "vowel": "e"
         },
         {
           "kind": "pause",
@@ -35743,19 +35828,22 @@
           "kind": "syllable",
           "weight": 1,
           "start": 8,
-          "end": 11
+          "end": 11,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 12,
-          "end": 14
+          "end": 14,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 14,
-          "end": 16
+          "end": 16,
+          "vowel": "a"
         },
         {
           "kind": "pause",
@@ -35767,31 +35855,36 @@
           "kind": "syllable",
           "weight": 1,
           "start": 18,
-          "end": 20
+          "end": 20,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 20,
-          "end": 21
+          "end": 21,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 22,
-          "end": 24
+          "end": 24,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 24,
-          "end": 26
+          "end": 26,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 26,
-          "end": 28
+          "end": 28,
+          "vowel": "a"
         }
       ],
       "syllables": 10
@@ -35805,37 +35898,43 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 1
+          "end": 1,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 1,
-          "end": 4
+          "end": 4,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 5,
-          "end": 6
+          "end": 6,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 7,
-          "end": 8
+          "end": 8,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 8,
-          "end": 11
+          "end": 11,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 12,
-          "end": 17
+          "end": 17,
+          "vowel": "u"
         }
       ],
       "syllables": 6
@@ -35935,7 +36034,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 1,
-          "end": 2
+          "end": 2,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
@@ -35947,13 +36047,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 4
+          "end": 4,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 4,
-          "end": 5
+          "end": 5,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
@@ -35965,25 +36067,29 @@
           "kind": "syllable",
           "weight": 1,
           "start": 6,
-          "end": 7
+          "end": 7,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 7,
-          "end": 8
+          "end": 8,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 8,
-          "end": 9
+          "end": 9,
+          "vowel": "u"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 9,
-          "end": 10
+          "end": 10,
+          "vowel": "a"
         }
       ],
       "syllables": 13
@@ -36003,7 +36109,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 1,
-          "end": 2
+          "end": 2,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
@@ -36015,7 +36122,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 4
+          "end": 4,
+          "vowel": "i"
         }
       ],
       "syllables": 6
@@ -36034,7 +36142,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 1,
-          "end": 2
+          "end": 2,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
@@ -36046,7 +36155,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 4
+          "end": 4,
+          "vowel": "i"
         }
       ],
       "syllables": 6
@@ -36060,25 +36170,29 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 3
+          "end": 3,
+          "vowel": "u"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 4
+          "end": 4,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 4,
-          "end": 5
+          "end": 5,
+          "vowel": "a"
         },
         {
           "kind": "closed",
@@ -36090,43 +36204,50 @@
           "kind": "syllable",
           "weight": 1,
           "start": 6,
-          "end": 7
+          "end": 7,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 7,
-          "end": 8
+          "end": 8,
+          "vowel": "u"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 8,
-          "end": 9
+          "end": 9,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 9,
-          "end": 10
+          "end": 10,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 10,
-          "end": 11
+          "end": 11,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 11,
-          "end": 12
+          "end": 12,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 12,
-          "end": 13
+          "end": 13,
+          "vowel": "u"
         }
       ],
       "syllables": 12
@@ -36140,13 +36261,15 @@
           "kind": "syllable",
           "weight": 2,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 3
+          "end": 3,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
@@ -36164,13 +36287,15 @@
           "kind": "syllable",
           "weight": 2,
           "start": 5,
-          "end": 7
+          "end": 7,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 2,
           "start": 7,
-          "end": 9
+          "end": 9,
+          "vowel": "i"
         }
       ],
       "syllables": 8
@@ -36184,19 +36309,22 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 3
+          "end": 3,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 4
+          "end": 4,
+          "vowel": "o"
         },
         {
           "kind": "pause",
@@ -36220,7 +36348,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 8,
-          "end": 9
+          "end": 9,
+          "vowel": "a"
         }
       ],
       "syllables": 5
@@ -36234,7 +36363,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "a"
         },
         {
           "kind": "closed",
@@ -36246,7 +36376,8 @@
           "kind": "syllable",
           "weight": 2,
           "start": 3,
-          "end": 5
+          "end": 5,
+          "vowel": "o"
         }
       ],
       "syllables": 4
@@ -36260,31 +36391,36 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 1
+          "end": 1,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 1,
-          "end": 2
+          "end": 2,
+          "vowel": "ə"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 3
+          "end": 3,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 4
+          "end": 4,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 4,
-          "end": 5
+          "end": 5,
+          "vowel": "o"
         },
         {
           "kind": "pause",
@@ -36296,31 +36432,36 @@
           "kind": "syllable",
           "weight": 1,
           "start": 7,
-          "end": 8
+          "end": 8,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 8,
-          "end": 9
+          "end": 9,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 9,
-          "end": 10
+          "end": 10,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 10,
-          "end": 11
+          "end": 11,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 11,
-          "end": 12
+          "end": 12,
+          "vowel": "a"
         }
       ],
       "syllables": 10
@@ -36348,31 +36489,36 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 6
+          "end": 6,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 6,
-          "end": 9
+          "end": 9,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 10,
-          "end": 12
+          "end": 12,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 12,
-          "end": 16
+          "end": 16,
+          "vowel": "u"
         }
       ],
       "syllables": 5
@@ -36480,19 +36626,22 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 3
+          "end": 3,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 6
+          "end": 6,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 6,
-          "end": 10
+          "end": 10,
+          "vowel": "a"
         },
         {
           "kind": "pause",
@@ -36504,19 +36653,22 @@
           "kind": "syllable",
           "weight": 1,
           "start": 11,
-          "end": 13
+          "end": 13,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 13,
-          "end": 15
+          "end": 15,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 15,
-          "end": 18
+          "end": 18,
+          "vowel": "a"
         }
       ],
       "syllables": 6
@@ -36530,7 +36682,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 5
+          "end": 5,
+          "vowel": "i"
         },
         {
           "kind": "pause",
@@ -36548,7 +36701,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 8,
-          "end": 12
+          "end": 12,
+          "vowel": "u"
         },
         {
           "kind": "pause",
@@ -36578,13 +36732,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 17,
-          "end": 20
+          "end": 20,
+          "vowel": "u"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 20,
-          "end": 23
+          "end": 23,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
@@ -36596,7 +36752,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 24,
-          "end": 27
+          "end": 27,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
@@ -36686,13 +36843,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 8
+          "end": 8,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
@@ -36710,7 +36869,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 13,
-          "end": 19
+          "end": 19,
+          "vowel": "o"
         },
         {
           "kind": "pause",
@@ -36722,7 +36882,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 21,
-          "end": 23
+          "end": 23,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
@@ -36752,7 +36913,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 30,
-          "end": 32
+          "end": 32,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
@@ -36828,7 +36990,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 4
+          "end": 4,
+          "vowel": "a"
         },
         {
           "kind": "pause",
@@ -36840,7 +37003,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 8,
-          "end": 12
+          "end": 12,
+          "vowel": "a"
         },
         {
           "kind": "pause",
@@ -36852,13 +37016,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 15,
-          "end": 18
+          "end": 18,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 18,
-          "end": 21
+          "end": 21,
+          "vowel": "i"
         }
       ],
       "syllables": 4
@@ -36872,7 +37038,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 7
+          "end": 7,
+          "vowel": "e"
         },
         {
           "kind": "pause",
@@ -36884,7 +37051,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 9,
-          "end": 13
+          "end": 13,
+          "vowel": "e"
         }
       ],
       "syllables": 2
@@ -36898,31 +37066,36 @@
           "kind": "syllable",
           "weight": 1,
           "start": 3,
-          "end": 7
+          "end": 7,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 12,
-          "end": 15
+          "end": 15,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 19,
-          "end": 23
+          "end": 23,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 38,
-          "end": 42
+          "end": 42,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 54,
-          "end": 55
+          "end": 55,
+          "vowel": "a"
         },
         {
           "kind": "syllable",
@@ -36948,13 +37121,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 4
+          "end": 4,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 5,
-          "end": 7
+          "end": 7,
+          "vowel": "u"
         },
         {
           "kind": "pause",
@@ -36966,7 +37141,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 9,
-          "end": 12
+          "end": 12,
+          "vowel": "a"
         },
         {
           "kind": "pause",
@@ -36978,31 +37154,36 @@
           "kind": "syllable",
           "weight": 1,
           "start": 19,
-          "end": 22
+          "end": 22,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 23,
-          "end": 27
+          "end": 27,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 28,
-          "end": 30
+          "end": 30,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 31,
-          "end": 34
+          "end": 34,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 35,
-          "end": 38
+          "end": 38,
+          "vowel": "e"
         }
       ],
       "syllables": 8
@@ -37016,13 +37197,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 5
+          "end": 5,
+          "vowel": "o"
         },
         {
           "kind": "pause",
@@ -37034,13 +37217,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 8,
-          "end": 11
+          "end": 11,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 11,
-          "end": 15
+          "end": 15,
+          "vowel": "e"
         },
         {
           "kind": "pause",
@@ -37052,7 +37237,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 17,
-          "end": 20
+          "end": 20,
+          "vowel": "a"
         },
         {
           "kind": "pause",
@@ -37064,7 +37250,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 22,
-          "end": 26
+          "end": 26,
+          "vowel": "e"
         }
       ],
       "syllables": 6
@@ -37078,13 +37265,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 5
+          "end": 5,
+          "vowel": "e"
         }
       ],
       "syllables": 2
@@ -37098,37 +37287,43 @@
           "kind": "syllable",
           "weight": 1,
           "start": 1,
-          "end": 2
+          "end": 2,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 6
+          "end": 6,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 6,
-          "end": 11
+          "end": 11,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 11,
-          "end": 14
+          "end": 14,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 14,
-          "end": 18
+          "end": 18,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 18,
-          "end": 22
+          "end": 22,
+          "vowel": "e"
         }
       ],
       "syllables": 6
@@ -37142,13 +37337,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 0,
-          "end": 2
+          "end": 2,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 2,
-          "end": 5
+          "end": 5,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
@@ -37166,7 +37363,8 @@
           "kind": "syllable",
           "weight": 1,
           "start": 7,
-          "end": 8
+          "end": 8,
+          "vowel": "o"
         },
         {
           "kind": "syllable",
@@ -37178,19 +37376,22 @@
           "kind": "syllable",
           "weight": 1,
           "start": 9,
-          "end": 10
+          "end": 10,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 10,
-          "end": 11
+          "end": 11,
+          "vowel": "i"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 11,
-          "end": 12
+          "end": 12,
+          "vowel": "a"
         }
       ],
       "syllables": 11
@@ -37204,13 +37405,15 @@
           "kind": "syllable",
           "weight": 1,
           "start": 1,
-          "end": 4
+          "end": 4,
+          "vowel": "e"
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 5,
-          "end": 8
+          "end": 8,
+          "vowel": "a"
         },
         {
           "kind": "pause",
@@ -37222,16 +37425,385 @@
           "kind": "syllable",
           "weight": 1,
           "start": 11,
+          "end": 13,
+          "vowel": "o"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 15,
+          "vowel": "a"
+        }
+      ],
+      "syllables": 4
+    },
+    {
+      "name": "Latin: y before a vowel isn't the vowel, and a u after q is weak",
+      "text": "Yes, you, my yacht; they queen que quiero.",
+      "locale": "en",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 3,
+          "vowel": "e"
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 3,
+          "end": 4
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 5,
+          "end": 8,
+          "vowel": "o"
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 10,
+          "end": 12,
+          "vowel": "i"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 18,
+          "vowel": "a"
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 18,
+          "end": 19
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 20,
+          "end": 24,
+          "vowel": "e"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 25,
+          "end": 30,
+          "vowel": "e"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 31,
+          "end": 34,
+          "vowel": "e"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 35,
+          "end": 39,
+          "vowel": "i"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 39,
+          "end": 41,
+          "vowel": "o"
+        }
+      ],
+      "syllables": 9
+    },
+    {
+      "name": "Cyrillic: я a, ё o, ю u, э e",
+      "text": "Я ёж, юла, это.",
+      "locale": "ru",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 1,
+          "vowel": "a"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 4,
+          "vowel": "o"
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 4,
+          "end": 5
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 7,
+          "vowel": "u"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 9,
+          "vowel": "a"
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 9,
+          "end": 10
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 12,
+          "vowel": "e"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 12,
+          "end": 14,
+          "vowel": "o"
+        }
+      ],
+      "syllables": 6
+    },
+    {
+      "name": "Hangul: the block's medial vowel, and ㅓ ㅕ ㅝ are ə",
+      "text": "어머니 원 의사 으",
+      "locale": "ko",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 1,
+          "vowel": "ə"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 1,
+          "end": 2,
+          "vowel": "ə"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 3,
+          "vowel": "i"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 5,
+          "vowel": "ə"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 7,
+          "vowel": "i"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 7,
+          "end": 8,
+          "vowel": "a"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 10,
+          "vowel": "i"
+        }
+      ],
+      "syllables": 7
+    },
+    {
+      "name": "Arabic: the tanwin say their vowels",
+      "text": "عَلَيْكُمْ كِتَابٌ",
+      "locale": "ar",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2,
+          "vowel": "a"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 2,
+          "end": 4,
+          "vowel": "a"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 4,
+          "end": 10,
+          "vowel": "u"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 13,
+          "vowel": "i"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 15,
+          "vowel": "a"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 15,
+          "end": 18,
+          "vowel": "u"
+        }
+      ],
+      "syllables": 6
+    },
+    {
+      "name": "Thai: a fuller sign says the vowel over a leading one",
+      "text": "เรียน ไป แกะ เขา",
+      "locale": "th",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 5,
+          "vowel": "i"
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 5,
+          "end": 6
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 8,
+          "vowel": "a"
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 12,
+          "vowel": "e"
+        },
+        {
+          "kind": "pause",
+          "weight": 1,
+          "start": 12,
           "end": 13
         },
         {
           "kind": "syllable",
           "weight": 1,
           "start": 13,
-          "end": 15
+          "end": 16,
+          "vowel": "a"
         }
       ],
       "syllables": 4
+    },
+    {
+      "name": "kana: a small kana says the vowel, and ん has none",
+      "text": "きゃ ファ ちょっと ん ヴ",
+      "locale": "ja",
+      "units": [
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 0,
+          "end": 2,
+          "vowel": "a"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 3,
+          "end": 5,
+          "vowel": "a"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 6,
+          "end": 8,
+          "vowel": "o"
+        },
+        {
+          "kind": "closed",
+          "weight": 1,
+          "start": 8,
+          "end": 9
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 9,
+          "end": 10,
+          "vowel": "o"
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 11,
+          "end": 12
+        },
+        {
+          "kind": "syllable",
+          "weight": 1,
+          "start": 13,
+          "end": 14,
+          "vowel": "u"
+        }
+      ],
+      "syllables": 7
     }
   ],
   "versions": [

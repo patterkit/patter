@@ -266,6 +266,7 @@ TArray<FPatterSpeechUnit> UPatterGameData::SpeechUnits(const FString& Text, cons
 		Unit.Weight = U.weight;
 		Unit.Start = U.start;
 		Unit.End = U.end;
+		Unit.Vowel = Ue(U.vowel);
 	}
 	return Out;
 }

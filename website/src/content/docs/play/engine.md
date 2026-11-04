@@ -188,6 +188,13 @@ for Latin, vowel letters for Cyrillic, one a character for Chinese, one a mora f
 kanji in Japanese), one a block for Hangul, written short vowels or about one per two letters for Arabic, and
 vowels for Thai. Any other script is counted at about one per three letters.
 
+A syllable also says its **`vowel`** where the script does: `"a"`, `"e"`, `"i"`, `"o"`, `"u"`, or `"ə"` for a vowel
+that isn't one of the five. Pick a mouth shape for each syllable's peak by it, opening from and closing to a
+neutral shape at its edges. It's exact for kana and Hangul, the written vowel for Cyrillic, Arabic (when the short
+vowels are written), and Thai, and the first vowel letter for Latin scripts, which is close for languages spelt as
+they're spoken and rough for English. It's absent on pauses and shut beats, and for Chinese, digits, and scripts
+outside the set, so fall back to a plain open and shut there.
+
 A **`ChoiceOption`** is `{ id, prompt?, eligible, gameData? }`: ineligible options are still present
 (greyed) unless they're secret; pass `id` to `choose()`. Its `prompt` is `{ kind, text, padAfter }`,
 where `kind` is `"line"` or `"text"` and `padAfter` is the pause before the reply, for a game that voices

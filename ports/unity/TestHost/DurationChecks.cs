@@ -52,10 +52,12 @@ namespace Patterkit.Patterplay.TestHost
                         {
                             var u = units[j];
                             string kind = u.Kind == SpeechUnitKind.Syllable ? "syllable" : u.Kind == SpeechUnitKind.Closed ? "closed" : "pause";
+                            string vowel = w.TryGetProperty("vowel", out var wv) ? wv.GetString() : null; // corpus 16: absent is null
                             if (kind != w.GetProperty("kind").GetString() || u.Weight != w.GetProperty("weight").GetDouble()
-                                || u.Start != w.GetProperty("start").GetInt32() || u.End != w.GetProperty("end").GetInt32())
+                                || u.Start != w.GetProperty("start").GetInt32() || u.End != w.GetProperty("end").GetInt32()
+                                || u.Vowel != vowel)
                             {
-                                problem = $"unit {j}: expected {w.GetRawText()}, got {{kind:{kind}, weight:{u.Weight}, start:{u.Start}, end:{u.End}}}";
+                                problem = $"unit {j}: expected {w.GetRawText()}, got {{kind:{kind}, weight:{u.Weight}, start:{u.Start}, end:{u.End}, vowel:{u.Vowel ?? "none"}}}";
                                 break;
                             }
                             j++;

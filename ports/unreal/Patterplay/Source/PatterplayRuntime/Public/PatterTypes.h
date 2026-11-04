@@ -55,6 +55,11 @@ struct FPatterSpeechUnit
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	int32 End = 0;
+
+	/** A syllable's vowel where the script says it, for a mouth shape: "a", "e", "i", "o", "u", or "ə" (a vowel the
+	 *  script shows that isn't one of the five). Empty otherwise, and on a pause or a shut beat. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Vowel;
 };
 
 /** Why a flow ended: an End step's EndReason (the JS runtime's FlowEndReason, "ended" | "ran-dry"). */

@@ -83,6 +83,12 @@ too) carries how it's spoken:
 syllables alone. The locale is the language the line is spoken in: it decides English's and French's silent e,
 and that a kanji weighs two.
 
+A syllable also has a `"vowel"` where its script says one: `"a"`, `"e"`, `"i"`, `"o"`, `"u"`, or `"ə"` (a vowel
+the script shows that isn't one of the five, such as Korean ㅓ). Use it to pick a mouth shape at the syllable's
+peak. The key's absent on a pause, a `"closed"` beat, and a syllable whose script doesn't say (Han, digits,
+unvowelled Arabic, and scripts outside the set), so read it with `unit.get("vowel", "")`. It's rough for
+English and close for languages spelt as they're spoken.
+
 A `"text"` step with `action: true` is action: a direction for whoever stages the scene, never shown to the
 player. It's a dialogue scene's text when the project doesn't localise it, and its text is the source in
 every locale. The key is absent on shown text, and a replayed prompt is never action.

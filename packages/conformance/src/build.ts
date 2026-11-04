@@ -62,8 +62,11 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  15: the scripted op `applyLiveBundle`: the tier a pushed bundle applies at (`expectKind`, "text" or "structure"),
  *  picked by the runtime's own apply step. And the shortest a line with no recording lasts is half a second, a
  *  speaking time, not 1.5 (a reading time, now SUBTITLE_READING_MIN): the duration cases at the floor re-pinned.
+ *  16: a speech case's syllables carry their `vowel` (a, e, i, o, u, or ə) where the script says it, for a mouth
+ *  shape; absent on a pause, a shut beat, and a syllable whose script doesn't say. New cases for the vowel rules.
+ *  No unit, weight, offset, or duration changed.
  */
-export const CORPUS_VERSION = 15;
+export const CORPUS_VERSION = 16;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at

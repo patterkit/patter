@@ -8,7 +8,7 @@
 // corpus.json; the test asserts the reference engine reproduces every value.
 // ---------------------------------------------------------------------------
 
-import type { DescribeFixture, DurationCase, SpeechCase, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, SteerFixture, TranscriptStep, VersionCase } from "./types.js";
+import type { DescribeFixture, DurationCase, SpeechCase, SpeechVowel, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, SteerFixture, TranscriptStep, VersionCase } from "./types.js";
 import type { Bundle, CompiledGroup, CompiledSnippet, Group, ProjectFile, LocaleFile, SaveGame, Scene, Snippet } from "@patterkit/model";
 import { castStringKey, qualifierStringKey, speakerLabelKey, SPEAKER_PATTERN_KEY } from "@patterkit/model";
 import type { ExtensionShard } from "@patterkit/model";
@@ -3973,10 +3973,11 @@ const durationCases: DurationCase[] = [
 // and its code-point offsets (design/proposals/syllable-counter.md); countSyllables sums the syllables' and shut
 // beats' weights. A game or Patterstage lays the same units over a line's length to move a mouth. Each case lists
 // its units as the text they cover, in order: `|` marks a short pause and `||` a long one, `_` a shut beat, and
-// `*w` a weight other than 1.
-function speech(name: string, text: string, locale: string | undefined, pieces: string[]): SpeechCase {
+// `*w` a weight other than 1. Then each syllable's vowel, one a syllable in order, `-` where it has none.
+function speech(name: string, text: string, locale: string | undefined, pieces: string[], vowels: string): SpeechCase {
   const cps = [...text];
-  let from = 0;
+  const vowelList = [...vowels];
+  let from = 0, syllableAt = 0;
   const units = pieces.map((piece) => {
     let kind: SpeechCase["units"][number]["kind"] = "syllable", weight = 1, body = piece;
     if (body.startsWith("||")) { kind = "pause"; weight = 2; body = body.slice(2); }
@@ -3989,54 +3990,64 @@ function speech(name: string, text: string, locale: string | undefined, pieces: 
     while (start + len <= cps.length && cps.slice(start, start + len).join("") !== body) start++;
     if (start + len > cps.length) throw new Error(`speech case "${name}": "${body}" isn't in the line after offset ${from}`);
     from = start + len;
-    return { kind, weight, start, end: start + len };
+    if (kind !== "syllable") return { kind, weight, start, end: start + len };
+    const vowel = vowelList[syllableAt++];
+    if (vowel === undefined) throw new Error(`speech case "${name}": fewer vowels than syllables`);
+    return { kind, weight, start, end: start + len, ...(vowel !== "-" ? { vowel: vowel as SpeechVowel } : {}) };
   });
+  if (syllableAt !== vowelList.length) throw new Error(`speech case "${name}": more vowels than syllables`);
   const syllables = units.reduce((total, u) => total + (u.kind === "pause" ? 0 : u.weight), 0);
   return { name, text, ...(locale !== undefined ? { locale } : {}), units, syllables };
 }
 const speechCases: SpeechCase[] = [
-  speech("an empty line has no units", "", undefined, []),
-  speech("English: a group of vowels a syllable, and a lone final e silent", "The lamps are lit along the harbour wall tonight.", "en", ["The", "lamps", "are", "lit", "a", "long", "the", "ha", "rbour", "wall", "to", "night"]),
-  speech("with no locale there's no silent e", "The lamps are lit along the harbour wall tonight.", undefined, ["The", "lamps", "a", "re", "lit", "a", "long", "the", "ha", "rbour", "wall", "to", "night"]),
-  speech("English keeps a consonant and le, and a comma is a short pause", "A table, a little bottle, a cradle.", "en-GB", ["A", "ta", "ble", "|,", "a", "li", "ttle", "bo", "ttle", "|,", "a", "cra", "dle"]),
-  speech("French: a lone final e or es is silent", "Une lampe brûle dans les fenêtres.", "fr_FR", ["Une", "lampe", "brûle", "dans", "les", "fe", "nêtres"]),
-  speech("the silent e is English's and French's alone", "Une lampe brûle dans les fenêtres.", "de", ["U", "ne", "la", "mpe", "brû", "le", "dans", "les", "fe", "nê", "tres"]),
-  speech("accented and other Latin vowels count as vowels", "Café, naïve, Ærøskøbing, cœur.", "en", ["Ca", "fé", "|,", "naïve", "|,", "Æ", "rø", "skø", "bing", "|,", "cœur"]),
-  speech("an apostrophe joins a word", "Don't, l'eau, rock’n’roll.", "en", ["Don't", "|,", "l'eau", "|,", "ro", "ck’n’roll"]),
-  speech("German umlauts and \u00df", "Über die Brücke, Straße.", "de", ["Ü", "ber", "die", "Brü", "cke", "|,", "Stra", "ße"]),
-  speech("Polish accented letters", "Zażółć gęślą jaźń.", "pl", ["Za", "żółć", "gę", "ślą", "jaźń"]),
-  speech("Turkish dotless and dotted i are vowels", "Işık, İstanbul.", "tr", ["I", "şık", "|,", "İ", "sta", "nbul"]),
-  speech("a word with no vowel is one syllable", "Hmm. Brr. Grr!", "en", ["Hmm", "||.", "Brr", "||.", "Grr"]),
-  speech("Cyrillic: one syllable a vowel letter, and a question mark is a long pause", "Привет, как дела? Моя собака.", "ru", ["При", "вет", "|,", "как", "де", "ла", "||?", "Мо", "я", "со", "ба", "ка"]),
-  speech("Ukrainian \u0456 \u0457 \u0454 are vowels, and \u0439 isn't", "Їжак і єнот йдуть.", "uk", ["Ї", "жак", "і", "є", "нот", "йдуть"]),
-  speech("Han: one syllable a character, with CJK punctuation", "你好，世界。今天天气很好。", "zh-Hans", ["你", "好", "|，", "世", "界", "||。", "今", "天", "天", "气", "很", "好"]),
-  speech("Japanese: kanji about two, kana one a mora", "港の灯りが見えますか。", "ja", ["港*2", "の", "灯*2", "り", "が", "見*2", "え", "ま", "す", "か"]),
-  speech("kana in the line makes it Japanese whatever the locale", "港の灯り", "zh", ["港*2", "の", "灯*2", "り"]),
-  speech("kana makes it Japanese with no locale too", "港の灯り", undefined, ["港*2", "の", "灯*2", "り"]),
-  speech("small kana merge with the one before, and \u3063 is a shut beat", "きょうはがっこうへいきます。", "ja", ["きょ", "う", "は", "が", "_っ", "こ", "う", "へ", "い", "き", "ま", "す"]),
-  speech("\u30fc holds the kana before it for another beat", "ラーメン、コーヒー！", "ja", ["ラー*2", "メ", "ン", "|、", "コー*2", "ヒー*2"]),
-  speech("a small kana or \u3063 with nothing before stands alone, and a lone \u30fc says nothing", "ファイト、ッ、ーあ", "ja", ["ファ", "イ", "ト", "|、", "_ッ", "|、", "あ"]),
-  speech("halfwidth katakana, its voicing mark, and its \u30fc", "ｶﾞｯｺｰ", "ja", ["ｶﾞ", "_ｯ", "ｺｰ*2"]),
-  speech("Hangul: one syllable a block", "안녕하세요, 반갑습니다.", "ko", ["안", "녕", "하", "세", "요", "|,", "반", "갑", "습", "니", "다"]),
-  speech("lone Hangul letters count as another script's", "ㅋㅋㅋ", "ko", ["ㅋㅋㅋ"]),
-  speech("Arabic: one syllable a written short vowel", "مَرْحَبًا بِكُمْ", "ar", ["مَ", "رْحَ", "بًا", "بِ", "كُمْ"]),
-  speech("Arabic with no vowels written: one syllable per two letters, and \u061f is a long pause", "مرحبا بكم في المدينة؟", "ar", ["مر", "حب", "ا", "بك", "م", "في", "ال", "مد", "ين", "ة"]),
-  speech("a tatweel stretches a word and says nothing", "ـمـرحـبـا", "ar", ["مـر", "حـبـ", "ا"]),
-  speech("Thai: one syllable a vowel, and a space between Thai words a short pause", "สวัสดีครับ ภาษาไทย", "th", ["สวั", "สดี", "ครับ", "| ", "ภา", "ษา", "ไทย"]),
-  speech("Thai: a leading vowel takes the signs after it, and consonants with no vowel hold one per two", "เรียน ขอบคุณ ถนน กรุงเทพมหานคร", "th", ["เรียน", "| ", "ขอ", "บคุณ", "| ", "ถน", "น", "| ", "กรุ", "งเท", "พ", "มหา", "นคร"]),
-  speech("a script outside the set: one syllable per three letters", "Γεια σου κόσμε.", "el", ["Γει", "α", "σου", "κόσ", "με"]),
-  speech("Devanagari is outside the set too, and \u0964 is a long pause", "नमस्ते दुनिया।", "hi", ["नमस", "्ते", "दुन", "िया"]),
-  speech("a digit weighs 1.5, and a full stop or comma inside a number is part of it", "It costs 3.5 pounds, or 1,000 in 2026.", "en", ["It", "costs", "3*1.5", "5*1.5", "pounds", "|,", "or", "1*1.5", "0*1.5", "0*1.5", "0*1.5", "in", "2*1.5", "0*1.5", "2*1.5", "6*1.5"]),
-  speech("Arabic-Indic digits weigh 1.5", "١٢٣ ٤٥", "ar", ["١*1.5", "٢*1.5", "٣*1.5", "٤*1.5", "٥*1.5"]),
-  speech("punctuation in a row is one pause, the stronger, and the last is dropped", "Wait... what?! Really?", "en", ["Wait", "||...", "what", "||?!", "Rea", "lly"]),
-  speech("a pause before the first syllable is dropped", "...Well, then.", "en", ["Well", "|,", "then"]),
-  speech("formatting tags and entities say nothing", "<b>Bold</b> and <i>soft</i> &amp; <bi>both</bi> &#38; a < b > c.", "en", ["Bold", "and", "soft", "both", "a", "b", "c"]),
-  speech("emoji and symbols say nothing, and a pause runs over them", "Look up, Tam: 🌙 🌊, the moon on the sea", "en", ["Look", "up", "|,", "Tam", "|: 🌙 🌊,", "the", "moon", "on", "the", "sea"]),
-  speech("a dash, a semicolon, and a colon are short pauses", "Hello — goodbye; and: then.", "en", ["He", "llo", "|—", "goo", "dbye", "|;", "and", "|:", "then"]),
-  speech("an e and a combining accent is an accented e, never silent", "e\u0301te\u0301", "fr", ["e\u0301", "te\u0301"]),
-  speech("a soft hyphen joins a word", "\u00ADIn\u00ADcom\u00ADpre\u00ADhen\u00ADsi\u00ADble", "en", ["I", "n\u00ADco", "m\u00ADpre", "\u00ADhe", "n\u00ADsi", "\u00ADble"]),
-  speech("scripts change mid-word", "Hello世界こんにちは", "en", ["He", "llo", "世*2", "界*2", "こ", "ん", "に", "ち", "は"]),
-  speech("Spanish opening marks say nothing", "¿Qué tal? ¡Hola!", "es", ["Qué", "tal", "||?", "Ho", "la"]),
+  speech("an empty line has no units", "", undefined, [], ""),
+  speech("English: a group of vowels a syllable, and a lone final e silent", "The lamps are lit along the harbour wall tonight.", "en", ["The", "lamps", "are", "lit", "a", "long", "the", "ha", "rbour", "wall", "to", "night"], "eaaiaoeaoaoi"),
+  speech("with no locale there's no silent e", "The lamps are lit along the harbour wall tonight.", undefined, ["The", "lamps", "a", "re", "lit", "a", "long", "the", "ha", "rbour", "wall", "to", "night"], "eaaeiaoeaoaoi"),
+  speech("English keeps a consonant and le, and a comma is a short pause", "A table, a little bottle, a cradle.", "en-GB", ["A", "ta", "ble", "|,", "a", "li", "ttle", "bo", "ttle", "|,", "a", "cra", "dle"], "aaeaieoeaae"),
+  speech("French: a lone final e or es is silent", "Une lampe brûle dans les fenêtres.", "fr_FR", ["Une", "lampe", "brûle", "dans", "les", "fe", "nêtres"], "uauaeee"),
+  speech("the silent e is English's and French's alone", "Une lampe brûle dans les fenêtres.", "de", ["U", "ne", "la", "mpe", "brû", "le", "dans", "les", "fe", "nê", "tres"], "ueaeueaeeee"),
+  speech("accented and other Latin vowels count as vowels", "Café, naïve, Ærøskøbing, cœur.", "en", ["Ca", "fé", "|,", "naïve", "|,", "Æ", "rø", "skø", "bing", "|,", "cœur"], "aeaeooie"),
+  speech("an apostrophe joins a word", "Don't, l'eau, rock’n’roll.", "en", ["Don't", "|,", "l'eau", "|,", "ro", "ck’n’roll"], "oeoo"),
+  speech("German umlauts and \u00df", "Über die Brücke, Straße.", "de", ["Ü", "ber", "die", "Brü", "cke", "|,", "Stra", "ße"], "ueiueae"),
+  speech("Polish accented letters", "Zażółć gęślą jaźń.", "pl", ["Za", "żółć", "gę", "ślą", "jaźń"], "aoeaa"),
+  speech("Turkish dotless and dotted i are vowels", "Işık, İstanbul.", "tr", ["I", "şık", "|,", "İ", "sta", "nbul"], "iiiau"),
+  speech("a word with no vowel is one syllable", "Hmm. Brr. Grr!", "en", ["Hmm", "||.", "Brr", "||.", "Grr"], "---"),
+  speech("Cyrillic: one syllable a vowel letter, and a question mark is a long pause", "Привет, как дела? Моя собака.", "ru", ["При", "вет", "|,", "как", "де", "ла", "||?", "Мо", "я", "со", "ба", "ка"], "ieaeaoaoaa"),
+  speech("Ukrainian \u0456 \u0457 \u0454 are vowels, and \u0439 isn't", "Їжак і єнот йдуть.", "uk", ["Ї", "жак", "і", "є", "нот", "йдуть"], "iaieou"),
+  speech("Han: one syllable a character, with CJK punctuation", "你好，世界。今天天气很好。", "zh-Hans", ["你", "好", "|，", "世", "界", "||。", "今", "天", "天", "气", "很", "好"], "----------"),
+  speech("Japanese: kanji about two, kana one a mora", "港の灯りが見えますか。", "ja", ["港*2", "の", "灯*2", "り", "が", "見*2", "え", "ま", "す", "か"], "-o-ia-eaua"),
+  speech("kana in the line makes it Japanese whatever the locale", "港の灯り", "zh", ["港*2", "の", "灯*2", "り"], "-o-i"),
+  speech("kana makes it Japanese with no locale too", "港の灯り", undefined, ["港*2", "の", "灯*2", "り"], "-o-i"),
+  speech("small kana merge with the one before, and \u3063 is a shut beat", "きょうはがっこうへいきます。", "ja", ["きょ", "う", "は", "が", "_っ", "こ", "う", "へ", "い", "き", "ま", "す"], "ouaaoueiiau"),
+  speech("\u30fc holds the kana before it for another beat", "ラーメン、コーヒー！", "ja", ["ラー*2", "メ", "ン", "|、", "コー*2", "ヒー*2"], "ae-oi"),
+  speech("a small kana or \u3063 with nothing before stands alone, and a lone \u30fc says nothing", "ファイト、ッ、ーあ", "ja", ["ファ", "イ", "ト", "|、", "_ッ", "|、", "あ"], "aioa"),
+  speech("halfwidth katakana, its voicing mark, and its \u30fc", "ｶﾞｯｺｰ", "ja", ["ｶﾞ", "_ｯ", "ｺｰ*2"], "ao"),
+  speech("Hangul: one syllable a block", "안녕하세요, 반갑습니다.", "ko", ["안", "녕", "하", "세", "요", "|,", "반", "갑", "습", "니", "다"], "aəaeoaaiia"),
+  speech("lone Hangul letters count as another script's", "ㅋㅋㅋ", "ko", ["ㅋㅋㅋ"], "-"),
+  speech("Arabic: one syllable a written short vowel", "مَرْحَبًا بِكُمْ", "ar", ["مَ", "رْحَ", "بًا", "بِ", "كُمْ"], "aaaiu"),
+  speech("Arabic with no vowels written: one syllable per two letters, and \u061f is a long pause", "مرحبا بكم في المدينة؟", "ar", ["مر", "حب", "ا", "بك", "م", "في", "ال", "مد", "ين", "ة"], "----------"),
+  speech("a tatweel stretches a word and says nothing", "ـمـرحـبـا", "ar", ["مـر", "حـبـ", "ا"], "---"),
+  speech("Thai: one syllable a vowel, and a space between Thai words a short pause", "สวัสดีครับ ภาษาไทย", "th", ["สวั", "สดี", "ครับ", "| ", "ภา", "ษา", "ไทย"], "aiaaaa"),
+  speech("Thai: a leading vowel takes the signs after it, and consonants with no vowel hold one per two", "เรียน ขอบคุณ ถนน กรุงเทพมหานคร", "th", ["เรียน", "| ", "ขอ", "บคุณ", "| ", "ถน", "น", "| ", "กรุ", "งเท", "พ", "มหา", "นคร"], "i-u--ue-a-"),
+  speech("a script outside the set: one syllable per three letters", "Γεια σου κόσμε.", "el", ["Γει", "α", "σου", "κόσ", "με"], "-----"),
+  speech("Devanagari is outside the set too, and \u0964 is a long pause", "नमस्ते दुनिया।", "hi", ["नमस", "्ते", "दुन", "िया"], "----"),
+  speech("a digit weighs 1.5, and a full stop or comma inside a number is part of it", "It costs 3.5 pounds, or 1,000 in 2026.", "en", ["It", "costs", "3*1.5", "5*1.5", "pounds", "|,", "or", "1*1.5", "0*1.5", "0*1.5", "0*1.5", "in", "2*1.5", "0*1.5", "2*1.5", "6*1.5"], "io--oo----i----"),
+  speech("Arabic-Indic digits weigh 1.5", "١٢٣ ٤٥", "ar", ["١*1.5", "٢*1.5", "٣*1.5", "٤*1.5", "٥*1.5"], "-----"),
+  speech("punctuation in a row is one pause, the stronger, and the last is dropped", "Wait... what?! Really?", "en", ["Wait", "||...", "what", "||?!", "Rea", "lly"], "aaei"),
+  speech("a pause before the first syllable is dropped", "...Well, then.", "en", ["Well", "|,", "then"], "ee"),
+  speech("formatting tags and entities say nothing", "<b>Bold</b> and <i>soft</i> &amp; <bi>both</bi> &#38; a < b > c.", "en", ["Bold", "and", "soft", "both", "a", "b", "c"], "oaooa--"),
+  speech("emoji and symbols say nothing, and a pause runs over them", "Look up, Tam: 🌙 🌊, the moon on the sea", "en", ["Look", "up", "|,", "Tam", "|: 🌙 🌊,", "the", "moon", "on", "the", "sea"], "ouaeooee"),
+  speech("a dash, a semicolon, and a colon are short pauses", "Hello — goodbye; and: then.", "en", ["He", "llo", "|—", "goo", "dbye", "|;", "and", "|:", "then"], "eooeae"),
+  speech("an e and a combining accent is an accented e, never silent", "e\u0301te\u0301", "fr", ["e\u0301", "te\u0301"], "ee"),
+  speech("a soft hyphen joins a word", "\u00ADIn\u00ADcom\u00ADpre\u00ADhen\u00ADsi\u00ADble", "en", ["I", "n\u00ADco", "m\u00ADpre", "\u00ADhe", "n\u00ADsi", "\u00ADble"], "ioeeie"),
+  speech("scripts change mid-word", "Hello世界こんにちは", "en", ["He", "llo", "世*2", "界*2", "こ", "ん", "に", "ち", "は"], "eo--o-iia"),
+  speech("Spanish opening marks say nothing", "¿Qué tal? ¡Hola!", "es", ["Qué", "tal", "||?", "Ho", "la"], "eaoa"),
+  speech("Latin: y before a vowel isn't the vowel, and a u after q is weak", "Yes, you, my yacht; they queen que quiero.", "en", ["Yes", "|,", "you", "|,", "my", "yacht", "|;", "they", "queen", "que", "quie", "ro"], "eoiaeeeio"),
+  speech("Cyrillic: \u044f a, \u0451 o, \u044e u, \u044d e", "Я ёж, юла, это.", "ru", ["Я", "ёж", "|,", "ю", "ла", "|,", "э", "то"], "aouaeo"),
+  speech("Hangul: the block's medial vowel, and \u3153 \u3155 \u315d are \u0259", "어머니 원 의사 으", "ko", ["어", "머", "니", "원", "의", "사", "으"], "əəiəiai"),
+  speech("Arabic: the tanwin say their vowels", "عَلَيْكُمْ كِتَابٌ", "ar", ["عَ", "لَ", "يْكُمْ", "كِ", "تَ", "ابٌ"], "aauiau"),
+  speech("Thai: a fuller sign says the vowel over a leading one", "เรียน ไป แกะ เขา", "th", ["เรียน", "| ", "ไป", "| ", "แกะ", "| ", "เขา"], "iaea"),
+  speech("kana: a small kana says the vowel, and \u3093 has none", "きゃ ファ ちょっと ん ヴ", "ja", ["きゃ", "ファ", "ちょ", "_っ", "と", "ん", "ヴ"], "aaoo-u"),
 ];
 
 // --- how a line is spoken (corpus 11) -------------------------------------------------------------------

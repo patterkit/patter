@@ -20,6 +20,17 @@
 //   one pause, the stronger; a pause before the first syllable or after the last is dropped (the line's PadAfter
 //   is the pause after it), as is a `.` or `,` between digits (3.5, 1,000).
 //
+// Each syllable says its vowel where the script does (Vowel, for a mouth shape at the syllable's peak), by the
+// generated table: its first strong vowel, else its first weak one (SpeechTable.cs says which are weak).
+// - Latin: the first vowel of its vowel group, its accent dropped; æ and œ are e, ø is o, and y is i unless a vowel
+//   follows it ("yes" is e). A u after q is weak ("que" is e). Rough for English, close for languages spelt as spoken.
+// - Cyrillic: the vowel letter (я a, ё o, ю u, е э є e, ы і ї i).
+// - Kana: the kana's vowel row, a small kana's over the kana before it (きゃ is a); ん has none.
+// - Hangul: the block's medial vowel; ㅓ ㅕ ㅝ are ə.
+// - Arabic: the written short vowel (the tanwin likewise); none when it isn't written.
+// - Thai: the vowel sign, a fuller one over a leading vowel (เ-ีย is i).
+// - Han, digits, and any other script: none.
+//
 // Offsets are code points, not UTF-16 chars: a surrogate pair counts once, so every runtime agrees.
 
 using System.Collections.Generic;
@@ -32,13 +43,19 @@ namespace Patterkit.Patterplay
     public enum SpeechUnitKind { Syllable, Closed, Pause }
 
     /// <summary>One unit of a line as it would be spoken (<see cref="Bundle.SpeechUnits"/>). <see cref="Start"/> and
-    /// <see cref="End"/> are code-point offsets into the text (a surrogate pair counts once), end exclusive.</summary>
+    /// <see cref="End"/> are code-point offsets into the text (a surrogate pair counts once), end exclusive.
+    /// <see cref="Vowel"/> is a syllable's vowel where the script says it, null otherwise (and on a pause or a shut
+    /// beat).</summary>
     public sealed class SpeechUnit
     {
         public SpeechUnitKind Kind;
         public double Weight;
         public int Start;
         public int End;
+        /// <summary>A syllable's vowel, for a mouth shape: "a", "e", "i", "o", "u", or "ə" (U+0259, a vowel the
+        /// script shows that isn't one of the five). Null on a pause, a shut beat, and a syllable whose script doesn't
+        /// say.</summary>
+        public string Vowel;
 
         public SpeechUnit(SpeechUnitKind kind, double weight, int start, int end)
         {
@@ -67,6 +84,39 @@ namespace Patterkit.Patterplay
                 else return r[mid * 3 + 2];
             }
             return K.None;
+        }
+
+        /// <summary>A code point's vowel code (SpeechTable.cs): Hangul's from its block, the rest by binary search of
+        /// the table.</summary>
+        private static int VowelCodeOf(int cp)
+        {
+            if (cp >= 0xAC00 && cp <= 0xD7A3) return Table.HangulVowels[((cp - 0xAC00) / 28) % 21];
+            int[] r = Table.VowelRanges;
+            int lo = 0, hi = r.Length / 3 - 1;
+            while (lo <= hi)
+            {
+                int mid = (lo + hi) >> 1;
+                if (cp < r[mid * 3]) hi = mid - 1;
+                else if (cp > r[mid * 3 + 1]) lo = mid + 1;
+                else return r[mid * 3 + 2];
+            }
+            return 0;
+        }
+
+        /// <summary>The vowel of a syllable from [start, end): its first strong vowel, else its first weak one, else
+        /// null. A u after q is weak ("que", "quick").</summary>
+        private static string VowelIn(int[] cps, int start, int end)
+        {
+            int weak = 0;
+            for (int j = start; j < end; j++)
+            {
+                int code = VowelCodeOf(cps[j]);
+                if (code == 0) continue;
+                if ((cps[j] == 0x75 || cps[j] == 0x55) && j > start && (cps[j - 1] == 0x71 || cps[j - 1] == 0x51)) code |= Table.VowelWeak;
+                if ((code & Table.VowelWeak) == 0) return Table.Vowels[code];
+                if (weak == 0) weak = code & ~Table.VowelWeak;
+            }
+            return weak == 0 ? null : Table.Vowels[weak];
         }
 
         /// <summary>A locale's language, lower case: `en-GB`, `en_gb`, and `EN` are all `en`.</summary>
@@ -284,7 +334,10 @@ namespace Patterkit.Patterplay
                     i++; // nothing: a symbol, an emoji, a stray mark or apostrophe
                 }
             }
-            return TidyPauses(units);
+            var output = TidyPauses(units);
+            foreach (var u in output)
+                if (u.Kind == SpeechUnitKind.Syllable) u.Vowel = VowelIn(cps, u.Start, u.End);
+            return output;
         }
 
         /// <summary>Whether the letter before the marks ending at `j` is Thai.</summary>

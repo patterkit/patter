@@ -6,6 +6,14 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A syllable's vowel.** Each `"syllable"` unit from `PatterBundle.speech_units` now has a `"vowel"` where its
+  script says one: `"a"`, `"e"`, `"i"`, `"o"`, `"u"`, or `"ə"` (a vowel that isn't one of the five), for a mouth
+  shape at the syllable's peak. It's read from Latin, Cyrillic, kana, Hangul, written Arabic short vowels, and
+  Thai, and it's absent on pauses, shut beats, and syllables whose script doesn't say. Nothing else about the
+  units has changed: their kinds, weights, offsets, and timing are the same.
+
 ## [0.43.0] - 2026-11-04
 
 ### Added

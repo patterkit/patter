@@ -75,7 +75,10 @@ To move a mouth, `UPatterGameData::SpeechUnits(Text, Locale)` (C++ `patter::spee
 units it's spoken in: syllables, beats with the mouth shut, and pauses, each an `FPatterSpeechUnit` with its
 `Kind`, `Weight`, and `Start` and `End` (code-point offsets, so an emoji counts once). Lay them over the line's
 length, the recording's or the estimate's, each taking its weight's share, and the mouth keeps time with the
-estimate. `UPatterGameData::CountSyllables` (C++ `patter::countSyllables`) gives the syllable count alone.
+estimate. A syllable's `Vowel` says which vowel it opens on, for a mouth shape at its peak: `a`, `e`, `i`, `o`,
+`u`, or `ə` (a vowel the script shows that isn't one of the five), and empty where the script doesn't say, as in
+Han, digits, and Arabic with no vowels written, and on pauses and shut beats. It's rough for English, and close for
+languages spelt as they're spoken. `UPatterGameData::CountSyllables` (C++ `patter::countSyllables`) gives the syllable count alone.
 
 `patter::PatterplayVersion` (Blueprint: `GetPatterplayVersion`) is this runtime's version, as in its
 `.uplugin`. An extension that ships apart from Patterplay, such as Patterstage or Pattershot, checks at start-up
