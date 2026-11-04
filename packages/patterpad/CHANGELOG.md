@@ -6,6 +6,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **Patterplay 0.44.0 inside.** Its speech units now say each syllable's vowel, for games and tools that move a
+  mouth; nothing changes in Patterpad itself, and lines are timed as before.
+
 ## [0.43.0] - 2026-11-04
 
 ### Added
