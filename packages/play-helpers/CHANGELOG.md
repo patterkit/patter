@@ -1,5 +1,17 @@
 # @patterkit/play-helpers
 
+## 0.13.0
+
+### Minor Changes
+
+- 2186d3a: Play in game: Patterpad can ask the running game to start a block now. `createDebugLink` takes an `onPlay` handler, which gets `{ id, sceneId, blockId, takeOver, build? }`, and the link gains `replyPlay(id, { started, reason?, detail? })` to answer, at once or later. With no `onPlay` the link answers `{ started: false, reason: "unhandled" }` itself. New types `PlayRequest` and `PlayResult`.
+
+### Patch Changes
+
+- 346b225: Uses `@patterkit/runtime` 0.43.0, the Patterplay 0.43.0 release.
+- Updated dependencies [2186d3a]
+  - @patterkit/model@0.25.0
+
 ## 0.12.4
 
 ### Patch Changes
