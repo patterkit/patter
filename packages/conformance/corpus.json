@@ -1,5 +1,5 @@
 {
-  "version": 14,
+  "version": 15,
   "expressions": [
     {
       "name": "number comparison",
@@ -13152,6 +13152,358 @@
               "type": "text",
               "id": "TL",
               "text": "went left"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "applyLiveBundle: a text-only edit keeps the structure, so the strings swap in place",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1u79agj",
+          "structureHash": "0dq624h"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "first",
+            "T2": "second"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1vyn1vz",
+          "structureHash": "0dq624h"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "first",
+            "T2": "second, reworded"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "first"
+            }
+          ]
+        },
+        {
+          "op": "applyLiveBundle",
+          "expectKind": "text"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "second, reworded"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "applyLiveBundle: a structural edit hot-swaps, and the edited bundle is then the one compared with",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0dbre6v",
+          "structureHash": "1jf2tky"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T3": "three"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1kv5epz",
+          "structureHash": "192i4sy"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn3",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T3": "three"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "one"
+            }
+          ]
+        },
+        {
+          "op": "applyLiveBundle",
+          "expectKind": "structure"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two"
+            }
+          ]
+        },
+        {
+          "op": "applyLiveBundle",
+          "expectKind": "text"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T3",
+              "text": "three"
             }
           ]
         },
@@ -34584,13 +34936,19 @@
     {
       "name": "an empty line lasts the shortest time",
       "text": "",
-      "expected": 1.5
+      "expected": 0.5
     },
     {
-      "name": "a short line is held for the shortest time",
-      "text": "Ah.",
+      "name": "a one-syllable line is held for the shortest time",
+      "text": "Ah",
       "locale": "en",
-      "expected": 1.5
+      "expected": 0.5
+    },
+    {
+      "name": "a short line lasts its syllables and its pause, quicker than a reading time",
+      "text": "Yes, sir.",
+      "locale": "en",
+      "expected": 0.75
     },
     {
       "name": "a line lasts its syllables at 4 a second",
@@ -34618,11 +34976,18 @@
       "expected": 6
     },
     {
-      "name": "the quickest rate, held for the shortest time",
+      "name": "the quickest rate",
       "text": "The lamps are lit along the harbour wall tonight.",
       "locale": "en",
       "syllablesPerSecond": 10,
-      "expected": 1.5
+      "expected": 1.2
+    },
+    {
+      "name": "the quickest rate, held for the shortest time",
+      "text": "No.",
+      "locale": "en",
+      "syllablesPerSecond": 10,
+      "expected": 0.5
     },
     {
       "name": "a rate of nothing is the default",

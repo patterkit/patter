@@ -6,6 +6,27 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Play in game.** Patterpad can ask the running game to start a block now: a `play` message on the debug link,
+  `{ t: "play", id, sceneId, blockId, takeOver, build? }`, that arrives through `PatterDebugLink.TryReceive` like a
+  pushed bundle. Read it with `PatterPlayInGame.TryParsePlay(raw, out PatterPlayRequest req)`, start the block however
+  your game plays conversations, and answer with `PatterDebugLink.ReplyPlay(req.Id, new PatterPlayResult { Started,
+  Reason, Detail })` from the main thread, at once or later. `Reason` is a short code (`busy`, `unknownBlock`,
+  `staleBuild`, or your own) and Patterpad words it. A game that drains the link but doesn't handle it should answer
+  `PatterPlayInGame.Unhandled`.
+
+### Changed
+
+- **A line with no recording can be quick.** `Bundle.EstimateLineDuration` now clamps to 0.5 to 18 seconds, not 1.5 to 18: the
+  shortest a line lasts is a speaking time, the least a spoken word plausibly takes, not a reading time, so an
+  unvoiced "No." answered by "Yes." no longer takes three seconds. The new `Bundle.SubtitleReadingMin` (1.5 seconds) is the least time a
+  line's text should stay on screen to be read: if you show lines as subtitles or overhead text, keep each one up at
+  least that long after a shorter line ends, overlapping the next if you must. The line itself still ends when it's
+  said. The conformance corpus re-pins its duration cases at the floor.
+- The conformance corpus is version 15: its new `applyLiveBundle` op holds that `PatterLiveBundle.ApplyLiveBundle` picks the same tier
+  (`"text"` or `"structure"`) as the other runtimes for the same pair of bundles.
+
 ## [0.42.0] - 2026-11-03
 
 ### Added

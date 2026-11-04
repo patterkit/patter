@@ -2440,6 +2440,51 @@ const scriptedHotSwapReword = {
   ],
 } satisfies ScriptedFixture;
 
+const scriptedApplyLiveBundleText = {
+  name: "applyLiveBundle: a text-only edit keeps the structure, so the strings swap in place",
+  project: project(),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn", type: "snippet", beats: [{ id: "T1", kind: "text" }, { id: "T2", kind: "text" }], jump: { to: "END" } },
+  ] }] }],
+  locales: [loc("s", { T1: "first", T2: "second" })],
+  scenesB: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn", type: "snippet", beats: [{ id: "T1", kind: "text" }, { id: "T2", kind: "text" }], jump: { to: "END" } },
+  ] }] }],
+  localesB: [loc("s", { T1: "first", T2: "second, reworded" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "first" }] },
+    { op: "applyLiveBundle", expectKind: "text" },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "second, reworded" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+const scriptedApplyLiveBundleStructure = {
+  name: "applyLiveBundle: a structural edit hot-swaps, and the edited bundle is then the one compared with",
+  project: project(),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn1", type: "snippet", beats: [{ id: "T1", kind: "text" }] },
+    { id: "sn2", type: "snippet", beats: [{ id: "T2", kind: "text" }] },
+  ] }] }],
+  locales: [loc("s", { T1: "one", T2: "two", T3: "three" })],
+  scenesB: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn1", type: "snippet", beats: [{ id: "T1", kind: "text" }] },
+    { id: "sn2", type: "snippet", beats: [{ id: "T2", kind: "text" }] },
+    { id: "sn3", type: "snippet", beats: [{ id: "T3", kind: "text" }] }, // added after the cursor
+  ] }] }],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "one" }] },
+    { op: "applyLiveBundle", expectKind: "structure" },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "two" }] },
+    // The engine now plays the edited bundle: pushed again, it's the same structure.
+    { op: "applyLiveBundle", expectKind: "text" },
+    { op: "advance", expect: [{ type: "text", id: "T3", text: "three" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
 const scriptedHotSwapInsert = {
   name: "hotSwap: a sibling inserted BEFORE the cursor neither replays nor shifts the resume point",
   project: project(),
@@ -3898,19 +3943,21 @@ const audioManifest = {
   ],
 };
 
-// --- how long a line lasts (corpus 9, re-pinned in 11) ----------------------------------------------
+// --- how long a line lasts (corpus 9, re-pinned in 11, and in 15 for the half-second floor) ---------------
 // A line with no recording lasts the total weight of its speech units (below) at the project's syllables a second,
-// 4 unless it sets its own, clamped to 1.5 to 18 seconds: the one rule every Patter tool and runtime times a line by
+// 4 unless it sets its own, clamped to 0.5 to 18 seconds: the one rule every Patter tool and runtime times a line by
 // (estimateLineDuration). A rate that isn't a positive number is the default.
 const harbourLine = "The lamps are lit along the harbour wall tonight."; // 12 syllables in English
 const durationCases: DurationCase[] = [
-  { name: "an empty line lasts the shortest time", text: "", expected: 1.5 },
-  { name: "a short line is held for the shortest time", text: "Ah.", locale: "en", expected: 1.5 },
+  { name: "an empty line lasts the shortest time", text: "", expected: 0.5 },
+  { name: "a one-syllable line is held for the shortest time", text: "Ah", locale: "en", expected: 0.5 },
+  { name: "a short line lasts its syllables and its pause, quicker than a reading time", text: "Yes, sir.", locale: "en", expected: 0.75 },
   { name: "a line lasts its syllables at 4 a second", text: harbourLine, locale: "en", expected: 3 },
   { name: "the locale is the language the line is spoken in", text: harbourLine, expected: 3.25 },
   { name: "a project's own rate", text: harbourLine, locale: "en", syllablesPerSecond: 5, expected: 2.4 },
   { name: "the slowest rate", text: harbourLine, locale: "en", syllablesPerSecond: 2, expected: 6 },
-  { name: "the quickest rate, held for the shortest time", text: harbourLine, locale: "en", syllablesPerSecond: 10, expected: 1.5 },
+  { name: "the quickest rate", text: harbourLine, locale: "en", syllablesPerSecond: 10, expected: 1.2 },
+  { name: "the quickest rate, held for the shortest time", text: "No.", locale: "en", syllablesPerSecond: 10, expected: 0.5 },
   { name: "a rate of nothing is the default", text: harbourLine, locale: "en", syllablesPerSecond: 0, expected: 3 },
   { name: "a rate below nothing is the default", text: harbourLine, locale: "en", syllablesPerSecond: -3, expected: 3 },
   { name: "pauses add their weight", text: "Wait... what?! Really?", locale: "en", expected: 2 },
@@ -4776,6 +4823,7 @@ export const cases: Fixtures = {
   scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedProjectStart, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedEscapedEmojiSaveLoad, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
+    scriptedApplyLiveBundleText, scriptedApplyLiveBundleStructure,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
     scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow,

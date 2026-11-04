@@ -119,6 +119,8 @@ In Unity, drain the link from your `Update()` (the socket runs on a worker threa
 In Unreal, set `Link->OnBundle`, which fires on the game thread. Load with
 `UPatterBundle::LoadFromString(Data)`, apply with `Engine->ApplyLiveBundle(NewBundle)` (the engine
 object and every `UPatterFlow` handle swap in place and stay valid), then `Link->SetBuild(Build)`.
+A C++ host that plays the core `patter::Engine` directly calls `patter::applyLiveBundle(Engine, Current, Next)`
+(`Patter/LiveBundle.h`) instead: it picks the tier by the same rule and hands back the engine to keep using.
 
 In Godot, connect the link's `bundle_pushed(build, data)` signal. Apply with
 `engine.apply_live_bundle(data)` (re-bind flow handles on a `"structure"` result), then
@@ -132,6 +134,54 @@ resolve an edit under the cursor identically.
 There are honest limits. Your game's own side-effects don't rewind (things already spawned stay spawned); text
 already in a transcript keeps the words the player saw; and an edit that changes how many random
 draws happen before the cursor naturally changes later draws.
+
+## Play in game
+
+With a game connected, a writer can jump straight into any conversation: right-click a block (its ⋯ menu)
+and pick **Play in game**, or put the caret in it and use **Play ▸ Play Block in Game**. Patterpad saves
+first, so the game has what the writer sees, then asks the running game to start that block now. **Play
+in game, taking over** asks the game to stop what the block's speakers are doing first, rather than turn
+the request down because they're busy. The game's answer shows in a note: the block started, or why it
+didn't.
+
+What "start this block" means is the game's to decide: which characters say the lines, whether the player
+takes part, what a busy speaker does. Patterplay hands the request over and carries the answer back.
+Patterstage does all of this for you. A game of your own handles it like this, in JavaScript:
+
+```js
+const link = createDebugLink({
+  build: engine.buildId,
+  onPlay: (req) => {                         // { id, sceneId, blockId, takeOver, build? }
+    if (req.build && req.build !== link.build) {
+      link.replyPlay(req.id, { started: false, reason: "staleBuild" });
+      return;
+    }
+    const started = startConversation(req.sceneId, req.blockId, req.takeOver); // your game's own
+    link.replyPlay(req.id, started
+      ? { started: true }
+      : { started: false, reason: "busy", detail: "Mara is talking." });
+  },
+});
+```
+
+Answer at once or a frame or more later, from the game thread; Patterpad waits a few seconds, and an
+answer after that is ignored. `reason` is a short code, and any code passes through: Patterpad has plain
+words for `busy`, `unknownBlock` (the game doesn't have that block), `staleBuild` (the game is on an older
+bundle), and `unhandled`, and shows any other code as it is. Put the specifics in `detail`. The ids are
+the bundle's opaque model ids, as everywhere on the link.
+
+In Unity, the request arrives through the same `TryReceive` drain as a pushed bundle:
+`if (PatterPlayInGame.TryParsePlay(raw, out var req)) { … _link.ReplyPlay(req.Id, new PatterPlayResult { Started = true }); }`.
+A Unity game that drains the link but doesn't handle Play in game should answer with
+`Reason = PatterPlayInGame.Unhandled`, so Patterpad isn't left waiting.
+
+In Unreal, set `Link->OnPlay`, which fires on the game thread with an `FPatterPlayRequest`, and answer
+with `Link->ReplyPlay(Request.Id, Result)`.
+
+In Godot, connect the link's `play_requested(request)` signal and answer with
+`link.reply_play(request.id, { "started": true })`.
+
+In JavaScript, Unreal, and Godot, a link with no handler answers `unhandled` itself.
 
 ## Wire in the debug half: follow the cursor
 
@@ -223,10 +273,18 @@ WebSocket:
 A choice frame sent again with `choiceId` set to the option taken marks that option in the editor.
 Every client's `observe` takes it as an optional last argument.
 
-One message travels the OTHER way, editor to game ([live bundle refresh](#live-bundle-refresh), above):
+Two messages travel the OTHER way, editor to game ([live bundle refresh](#live-bundle-refresh) and
+[Play in game](#play-in-game), above):
 
 ```json
 { "t": "bundle", "v": 1, "build": "<new bundle hash>", "data": "<the full .patterc JSON>" }
+{ "t": "play", "v": 1, "id": "<request id>", "sceneId": "<scene id>", "blockId": "<block id>", "takeOver": false, "build": "<bundle hash>" }
+```
+
+The game answers `play` with:
+
+```json
+{ "t": "played", "id": "<request id>", "started": false, "reason": "busy", "detail": "Mara is talking." }
 ```
 
 Send `hello` first; the editor reads the build + flow list from it before honouring any frames. The

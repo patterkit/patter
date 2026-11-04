@@ -60,6 +60,11 @@ export interface ActionMenu {
 // Host hook for "Play block" (opens the play window entering that block). Null = no Play-block item.
 let playBlockHandler: ((blockId: string) => void) | null = null;
 export function setPlayBlockHandler(fn: ((blockId: string) => void) | null): void { playBlockHandler = fn; }
+// Host hook for "Play in game" (the game on the Live Link starts that block). Null = no items; `available`
+// is asked as the menu opens, so the items show only while a game is connected.
+export interface PlayInGameHook { available: () => boolean; run: (blockId: string, takeOver: boolean) => void }
+let playInGameHook: PlayInGameHook | null = null;
+export function setPlayInGameHandler(hook: PlayInGameHook | null): void { playInGameHook = hook; }
 
 /** The id of the BLOCK that encloses the node at `pos` (walking up the doc), or null. */
 function enclosingBlockId(state: EditorView["state"], pos: number): string | null {
@@ -421,6 +426,18 @@ export function createActionMenu(): ActionMenu {
       pb.addEventListener("mouseenter", closeSub);
       onPick(pb, () => { const id = blockId; close(); playBlockHandler?.(id); });
       el.appendChild(pb);
+    }
+    // Play in game: the running game on the Live Link starts this block now; taking over first stops
+    // what its speakers are doing, rather than be turned down as busy.
+    if (playInGameHook && blockId && playInGameHook.available()) {
+      if (!(playBlockHandler && blockId)) el.appendChild(sepEl());
+      for (const takeOver of [false, true]) {
+        const b = document.createElement("button"); b.className = "action-mi has-icon";
+        b.append(iconNode("play", 12), takeOver ? "Play in game, taking over" : "Play in game");
+        b.addEventListener("mouseenter", closeSub);
+        onPick(b, () => { const id = blockId; close(); playInGameHook?.run(id, takeOver); });
+        el.appendChild(b);
+      }
     }
 
     // Documentation note + collaboration comment + rewrite suggestion + writing status on this chunk /

@@ -63,8 +63,10 @@ A line with a recording lasts as long as the recording. For one with no recordin
 `UPatterGameData::EstimateLineDuration(Step.SpokenText, Step.SpokenLocale, Step.EstimateRate)` (C++
 `patter::estimateLineDuration`) gives how long it lasts, in seconds: Patter's one rule, the same in every runtime
 and in Patterpad's Play window. It counts the line's syllables and the pauses at its punctuation, each weighed, at
-the project's syllables a second (`EstimateRate`, 4 unless the project sets its own), clamped to 1.5 to 18
-seconds. A line or text step carries what that needs: `SpokenText` is the line in the project's main language
+the project's syllables a second (`EstimateRate`, 4 unless the project sets its own), clamped to 0.5 to 18
+seconds. That's how long the line takes to say, not how long its text needs to be read: if you show it as a
+subtitle, keep the text up at least `patter::SUBTITLE_READING_MIN` (1.5 seconds) after a shorter line ends,
+overlapping the next line if you must. A line or text step carries what that needs: `SpokenText` is the line in the project's main language
 whatever language is being shown (interpolated, with caption cues left out, and empty for the caption
 character's lines), `SpokenLocale` that language, and `EstimateRate` the rate. An IDs-only build sets no
 `SpokenText` or `SpokenLocale` (`bHasSpokenText` is false), so pass your own text.

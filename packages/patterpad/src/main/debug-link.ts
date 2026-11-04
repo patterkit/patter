@@ -13,6 +13,11 @@
 //   bundle: { t:"bundle", v:1, build, data }   - SERVER -> client: live bundle refresh. `data` is the
 //           full .patterc JSON; the client picks the tier itself (strings-only vs full hot swap) by
 //           comparing structure hashes, applies it, and re-hellos with the new build.
+//   play  : { t:"play", v:1, id, sceneId, blockId, takeOver, build? } - SERVER -> client: Play in game,
+//           start this block now (takeOver: stop what its speakers are doing first). `build` is the
+//           project's bundle hash, so a game still on an older bundle can answer "staleBuild".
+//   played: { t:"played", id, started, reason?, detail? } - the game's answer. Any reason passes
+//           through; shared/play-in-game.ts has the plain words for the ones we know.
 
 //
 // The server itself (loopback, the Origin rule, one game at a time, the hello gate, the build judged, and
@@ -22,7 +27,7 @@
 // Which flow the editor follows (the most recent, or one picked in the editor, and the hand-over when the
 // followed flow closes) is shared/debug-follow.ts, which the browser preview's fake link drives too.
 
-import type { DebugStatus } from "../shared/api.js";
+import type { DebugStatus, PlayInGameAnswer } from "../shared/api.js";
 import { createFlowFollower, type DebugFrame } from "../shared/debug-follow.js";
 import { isLocalOrigin } from "@wildwinter/app-shell/util";
 import { createLiveLinkServer } from "@wildwinter/app-shell/live-link";
@@ -53,6 +58,11 @@ export interface DebugServer {
    *  connected / handshaken, or when the client already runs this exact build. The client applies it
    *  and re-hellos with the new build; until then the pill shows stale. */
   pushBundle(build: string, data: string): void;
+  /** Play in game: ask the connected game to start a block now, and resolve with its answer. Resolves
+   *  `noGame` when nothing is connected and `noAnswer` when the game says nothing in time. While the
+   *  game is still applying a just-pushed bundle it waits for it first, so the request isn't refused as
+   *  stale for a save the writer has just made. */
+  playInGame(req: { sceneId: string; blockId: string; takeOver: boolean }): Promise<PlayInGameAnswer>;
 }
 
 export interface DebugServerDeps {
@@ -65,6 +75,8 @@ export interface DebugServerDeps {
   /** Push the latest status to the renderer panel. */
   onStatus: (s: DebugStatus) => void;
   port?: number;
+  /** How long to wait for a game's answer, and for a just-pushed bundle to land first (ms). */
+  playTimeoutMs?: number;
 }
 
 export function createDebugServer(deps: DebugServerDeps): DebugServer {
@@ -72,6 +84,11 @@ export function createDebugServer(deps: DebugServerDeps): DebugServer {
   // follower shows has changed.
   let pushStatus = (): void => {};
   const follower = createFlowFollower({ onFrame: deps.onFrame, onChange: () => pushStatus() });
+  const playTimeout = deps.playTimeoutMs ?? 5000;
+  // Play in game requests awaiting the game's answer, by id. An answer after the timeout finds nothing.
+  const pending = new Map<string, (a: PlayInGameAnswer) => void>();
+  let nextPlayId = 1;
+  const answerAll = (a: PlayInGameAnswer): void => { for (const done of [...pending.values()]) done(a); };
 
   const server = createLiveLinkServer({
     port: deps.port ?? DEFAULT_PORT,
@@ -96,6 +113,15 @@ export function createDebugServer(deps: DebugServerDeps): DebugServer {
               if (typeof msg.flow === "string") follower.flowClose(msg.flow);
               break;
             }
+            case "played": {
+              if (typeof msg.id !== "string") break;
+              pending.get(msg.id)?.({
+                started: msg.started === true,
+                ...(typeof msg.reason === "string" && msg.reason !== "" ? { reason: msg.reason } : {}),
+                ...(typeof msg.detail === "string" && msg.detail !== "" ? { detail: msg.detail } : {}),
+              });
+              break;
+            }
             case "frame": {
               if (typeof msg.flow !== "string") break;
               follower.frame({
@@ -109,7 +135,7 @@ export function createDebugServer(deps: DebugServerDeps): DebugServer {
             }
           }
         },
-        reset: () => follower.clear(),
+        reset: () => { follower.clear(); answerAll({ started: false, reason: "noGame" }); },
         describe: () => follower.view(),
       };
     },
@@ -120,6 +146,25 @@ export function createDebugServer(deps: DebugServerDeps): DebugServer {
     status: () => server.status(),
     follow(flowId: string | null): void { follower.follow(flowId); },
     pushBundle: (build, data) => server.pushBundle(build, data),
+    async playInGame(req) {
+      const connectedBuild = (): string | null => { const st = server.status(); return st.state === "connected" ? st.build : null; };
+      if (connectedBuild() === null) return { started: false, reason: "noGame" };
+      // A save pushes a bundle and the game re-hellos once it has applied it: give it the chance.
+      const deadline = Date.now() + playTimeout;
+      while (connectedBuild() === "stale" && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
+      const id = `play-${nextPlayId++}`;
+      const build = deps.currentBuildHash();
+      return new Promise<PlayInGameAnswer>((resolve) => {
+        const timer = setTimeout(() => done({ started: false, reason: "noAnswer" }), playTimeout);
+        function done(a: PlayInGameAnswer): void { clearTimeout(timer); pending.delete(id); resolve(a); }
+        pending.set(id, done);
+        const sent = server.send({
+          t: "play", v: 1, id, sceneId: req.sceneId, blockId: req.blockId, takeOver: req.takeOver,
+          ...(build ? { build } : {}),
+        });
+        if (!sent) done({ started: false, reason: "noGame" });
+      });
+    },
     start: () => server.start(),
     stop: () => server.stop(),
   };

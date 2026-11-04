@@ -127,6 +127,7 @@ namespace Patterkit.Patterplay.TestHost
             RunSteerChecks();
             RunOldSaveRuleChecks();
             RunFoundationsChecks();
+            RunPlayInGameChecks();
             RunRunnerChecks();
 
             RunDescribeSmoke();
@@ -882,6 +883,9 @@ namespace Patterkit.Patterplay.TestHost
         /// <summary>The locale the running case last asked for (its `locale`, then each setLocale): what the
         /// PatterSave JSON pass builds a hotSwap's replacement in, as Engine.HotSwap does.</summary>
         private static string _askedLocale;
+        /// <summary>The running scripted case's EDITED bundle as JSON text (null when it has none): what an
+        /// applyLiveBundle op hands PatterLiveBundle, as Patterpad's push carries it.</summary>
+        private static string _bundleBText;
         /// <summary>Whether the running case records each line and text step's spoken fields (its `spoken`, corpus 11).</summary>
         private static bool _spoken;
 
@@ -928,6 +932,8 @@ namespace Patterkit.Patterplay.TestHost
                     var bundle = _loader(c.GetProperty("bundle"));
                     // The EDITED bundle a hotSwap op switches to (cross-bundle drift cases, §9.8).
                     var bundleB = c.TryGetProperty("bundleB", out var bb) ? _loader(bb) : null;
+                    // Its text, as Patterpad pushes it, for applyLiveBundle.
+                    _bundleBText = bundleB != null ? bb.GetRawText() : null;
                     long? seed = c.TryGetProperty("seed", out var sd) ? sd.GetInt64() : (long?)null;
                     var opts = new EngineOptions { Seed = seed };
                     ApplyEngineOptions(c, opts);
@@ -948,6 +954,7 @@ namespace Patterkit.Patterplay.TestHost
             Checkpoint checkpoint = null;
             StepResult handed = null; // what the last advance or stepFor handed the host, for `scribble`
             var captured = new Dictionary<string, FlowState>(); // captureFlow states, by name, for restoreFlow
+            Bundle playing = bundle; // the bundle the live engine plays, for applyLiveBundle's comparison
                     foreach (var op in script.EnumerateArray())
                     {
                         var chunk = new List<object>();
@@ -1093,6 +1100,19 @@ namespace Patterkit.Patterplay.TestHost
                                     // replacement on the same registry.
                                     engine = engine.HotSwap(bundleB);
                                 }
+                                playing = bundleB;
+                                break;
+                            }
+                            case "applyLiveBundle":
+                            {
+                                // The game-side apply step (corpus 15): PatterLiveBundle picks the tier, from the
+                                // pushed .patterc text and the bundle the engine plays.
+                                if (_bundleBText == null) throw new Exception("applyLiveBundle: the case has no bundleB");
+                                var r = PatterLiveBundle.ApplyLiveBundle(engine, playing, _bundleBText);
+                                string want = op.GetProperty("expectKind").GetString();
+                                if (r.Kind != want) throw new Exception($"applyLiveBundle: applied as \"{r.Kind}\", expected \"{want}\"");
+                                engine = r.Engine;
+                                playing = r.Bundle;
                                 break;
                             }
                             case "setLocale":
@@ -1367,6 +1387,7 @@ namespace Patterkit.Patterplay.TestHost
                         var extra = got.Where(k => !want.Contains(k));
                         throw new Exception($"re-serialised save has different key paths; missing: [{string.Join(", ", missing)}] extra: [{string.Join(", ", extra)}]");
                     }
+                    _bundleBText = null; // a save case has no edited bundle
                     var (ok, _) = RunScript(engine, bundle, null, opts, c.GetProperty("script"), name, "");
                     if (ok) pass++;
                 }

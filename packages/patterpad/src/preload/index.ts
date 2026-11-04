@@ -62,6 +62,7 @@ const api: PatterApi = {
   debugStop: () => ipcRenderer.invoke("debug:stop"),
   debugStatus: () => ipcRenderer.invoke("debug:status"),
   debugFollow: (flowId) => { void ipcRenderer.invoke("debug:follow", flowId); },
+  playInGame: (sceneId, blockId, takeOver) => ipcRenderer.invoke("debug:play-in-game", sceneId, blockId, takeOver),
   onDebugStatus: (handler) => { ipcRenderer.on("debug:status", (_e, status: import("../shared/api.js").DebugStatus) => handler(status)); },
   readSuggestions: (sceneId) => ipcRenderer.invoke("scene:readSuggestions", sceneId),
   saveSuggestions: (sceneId, suggestions) => ipcRenderer.invoke("scene:saveSuggestions", sceneId, suggestions),

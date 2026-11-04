@@ -21,6 +21,29 @@
 
 class IWebSocket;
 
+/** Play in game: the editor asked the running game to start a block now. Ids are the bundle's. */
+struct FPatterPlayRequest
+{
+	/** Echo it in ReplyPlay so the editor can match the answer to its request. */
+	FString Id;
+	FString SceneId;
+	FString BlockId;
+	/** Stop what the speakers are doing first, rather than turn the request down as busy. */
+	bool bTakeOver = false;
+	/** The editor's bundle hash, or empty: a game on another build can answer "staleBuild". */
+	FString Build;
+};
+
+/** The game's answer to an FPatterPlayRequest. */
+struct FPatterPlayResult
+{
+	bool bStarted = false;
+	/** Why it didn't start, as a short code: "busy", "unknownBlock", "staleBuild", or the game's own. Empty: none. */
+	FString Reason;
+	/** More, in plain words (which speaker is busy, which block was missing). Empty: none. */
+	FString Detail;
+};
+
 class PATTERPLAYRUNTIME_API FPatterDebugLink : public TSharedFromThis<FPatterDebugLink>
 {
 public:
@@ -45,6 +68,15 @@ public:
 	 *  then call SetBuild(Build) so the editor's pill flips back to in-sync. Fires on the game thread.
 	 *  Never fires with malformed payloads. No-op in Shipping (the whole link compiles out). */
 	TFunction<void(const FString& Build, const FString& Data)> OnBundle;
+
+	/** Play in game: the writer asked the game to start a block now. Answer with ReplyPlay(Request.Id, Result),
+	 *  at once or a frame or more later; an answer after the editor stopped waiting is ignored. Fires on the game
+	 *  thread. Unbound, the link answers { started: false, reason: "unhandled" } itself. Never fires with
+	 *  malformed payloads. No-op in Shipping. */
+	TFunction<void(const FPatterPlayRequest& Request)> OnPlay;
+
+	/** Answer a play request (see OnPlay). Call it from the game thread. A no-op once the link is closed. */
+	void ReplyPlay(const FString& Id, const FPatterPlayResult& Result);
 
 	/** After applying a pushed bundle: report the build now running (re-hellos, so the editor's
 	 *  match/stale pill updates and it stops re-pushing the same bundle). */

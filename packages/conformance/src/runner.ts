@@ -20,7 +20,7 @@ import { patterDialect } from "@patterkit/dialect";
 import { Engine, effectiveGameData, estimateLineDuration, speechUnits, countSyllables, extensionDecls, extensionsOf, gameDataFields, versionInRange } from "@patterkit/runtime";
 import type { Checkpoint, EngineOptions, HostScope, LoadMisfit, PlayError, StepResult, Steerer } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
-import { createAudioResolver } from "@patterkit/play-helpers";
+import { applyLiveBundle, createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, FlowState, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
   AudioCase, DurationCase, SpeechCase, VersionCase, TranscriptSpoken, LogCase, SteerCase, SteerPointRecord,
@@ -112,6 +112,7 @@ export function runScript(
   let checkpoint: Checkpoint | undefined;
   let handed: StepResult | undefined; // what the last advance or stepFor handed the host, for `scribble`
   const captured = new Map<string, FlowState>(); // captureFlow states, by name, for restoreFlow
+  let playing = ctx.bundle; // the bundle the live engine plays, for applyLiveBundle's comparison
   // A call the runtime must refuse: it throws, and the engine is as it was (still inside its checkpoint).
   const refused = (what: string, call: () => unknown): void => {
     const wasIn = engine.inCheckpoint;
@@ -199,7 +200,17 @@ export function runScript(
         // does the same three calls with its own save API. Drift resolves per §9.8.
         if (op.expectRefused) { refused("hotSwap", () => engine.hotSwap(ctx.bundleB ?? ctx.bundle)); break; }
         engine = engine.hotSwap(ctx.bundleB!);
+        playing = ctx.bundleB!;
         break;
+      case "applyLiveBundle": {
+        // The game-side apply step, as a game calls it: the pushed .patterc text, and the bundle the engine plays.
+        if (!ctx.bundleB) throw new Error("applyLiveBundle: the case has no bundleB");
+        const r = applyLiveBundle(engine, playing, JSON.stringify(ctx.bundleB));
+        if (r.kind !== op.expectKind) throw new Error(`applyLiveBundle: applied as "${r.kind}", expected "${op.expectKind}"`);
+        engine = r.engine;
+        playing = r.bundle;
+        break;
+      }
       case "setLocale":
         engine.setLocale(op.locale); // live language switch - subsequent beats render in the new locale
         break;

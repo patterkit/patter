@@ -126,6 +126,12 @@ link.flowOpened("main");
 engine restored from the old one (`kind: "structure"`). Wire it behind a dev flag - it is
 a development tool, not a shipping feature.
 
+**Play in game**: Patterpad can ask the running game to start a block now. Pass `onPlay`; it
+gets `{ id, sceneId, blockId, takeOver, build? }` and answers with
+`link.replyPlay(id, { started, reason?, detail? })`, then or a frame or more later. With no
+`onPlay`, the link answers `{ started: false, reason: "unhandled" }` itself. Details and the
+reason codes Patterpad words: [Play in game](https://patterkit.dev/play/live-debug/#play-in-game).
+
 ## Property inspector
 
 `createPropertyInspector(engine)` builds a small DOM panel of the engine's `@patter`

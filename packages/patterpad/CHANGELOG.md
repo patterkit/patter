@@ -6,6 +6,19 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Play in game.** With a game on the Live Link, right-click a block (or use its ⋯ menu) and pick **Play in game**, or
+  put the caret in it and use **Play > Play Block in Game**: Patterpad saves, then asks the running game to start that
+  block now. **Play in game, taking over** asks it to stop what the block's speakers are doing first. A note says
+  whether it started, and if not, why, in plain words.
+
+### Changed
+
+- **Quick unvoiced lines play quickly.** The Play window times a line with no recording by Patterplay's estimate,
+  whose shortest line is now half a second, not 1.5, so a short exchange such as "No." "Yes." plays at the pace it
+  would be said. Every line stays in the Play window's transcript as it plays, so nothing leaves the screen sooner.
+
 ## [0.42.3] - 2026-11-03
 
 ### Changed

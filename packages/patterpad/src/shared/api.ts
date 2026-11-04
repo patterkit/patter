@@ -958,6 +958,14 @@ export interface AudioEntry { status: string; path: string; textHash?: string }
  *  The link is loopback-only (127.0.0.1), so there's no pairing token: only local processes can reach it.
  *  Connected, it carries the follow state (shared/debug-follow.ts): the live flows, the one followed,
  *  whether that's the most recent or a flow picked in the editor, and each flow's current scene. */
+/** The running game's answer to Play in game. `reason` is a short code: the game's own (Patterstage's
+ *  busy, castMissing, and so on), or Patterpad's noGame / noAnswer; shared/play-in-game.ts words it. */
+export interface PlayInGameAnswer {
+  started: boolean;
+  reason?: string;
+  detail?: string;
+}
+
 export type DebugStatus =
   | { state: "off" }
   | { state: "error"; message: string }
@@ -1466,6 +1474,9 @@ export interface PatterApi {
   debugStop(): Promise<DebugStatus>;
   debugStatus(): Promise<DebugStatus>;
   debugFollow(flowId: string | null): void;
+  /** Play in game: ask the game on the Live Link to start this block now (`takeOver`: stop what its
+   *  speakers are doing first). Resolves with the game's answer. */
+  playInGame(sceneId: string, blockId: string, takeOver: boolean): Promise<PlayInGameAnswer>;
   onDebugStatus(handler: (status: DebugStatus) => void): void;
   /** Read a scene's "suggest a rewrite" proposals (review flow): open + resolved alike. */
   readSuggestions(sceneId: string): Promise<Suggestion[]>;

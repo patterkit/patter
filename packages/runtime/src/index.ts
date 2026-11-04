@@ -21,7 +21,7 @@ export type { Bundle } from "@patterkit/model";
 export { DEFAULT_PAD_AFTER } from "@patterkit/model";
 /** How long a line with no recording lasts, in seconds: the one rule every Patter tool and runtime times a line by,
  *  from the speech units it would be spoken in (also what a game lays over a line's length to move a mouth). */
-export { estimateLineDuration, speechUnits, countSyllables, DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND } from "@patterkit/model";
+export { estimateLineDuration, speechUnits, countSyllables, DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND, LINE_DURATION_MIN, LINE_DURATION_MAX, SUBTITLE_READING_MIN } from "@patterkit/model";
 export type { SpeechUnit, SpeechUnitKind } from "@patterkit/model";
 // The one rule for a scene reference (its gameId first, then its internal id), for a host or tool that has
 // to land where the engine will without constructing one: the Storylet Engine's pairing check, say.

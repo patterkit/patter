@@ -108,7 +108,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
   /** Audio Folders is on (and an audio root set), the one case Update Audio Manifest can do anything in. */
   audioFolders = false,
   /** The view extensions the open project offers (the Window menu). */
-  views?: ViewMenu): void {
+  views?: ViewMenu,
+  /** A game is connected on the Live Link, so Play Block in Game has somewhere to go. */
+  gameConnected = false): void {
   const send = (cmd: string): void => win.webContents.send("menu", cmd);
   const shownStatuses = panes.lineStatusShown ?? [];
   // One rule, the family's (Storyletter's review, 2026-10): every item that acts on a project is disabled
@@ -271,6 +273,10 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // "Live Link" = live bundle refresh INTO the game + the debugger-style cursor follow OUT of it.
         // Needs a project to link, but stays live while the link is on, so it can always be turned off.
         { ...PLAY_MENU.liveLink, type: "checkbox", checked: debugActive, enabled: hasProject || debugActive, click: () => send("debug-link") },
+        // Play in game: the running game on the Live Link starts the block at the caret now. Taking Over
+        // first stops what its speakers are doing, rather than be turned down as busy.
+        { label: "Play Block in Game", enabled: hasProject && gameConnected, click: () => send("play-in-game") },
+        { label: "Play Block in Game, Taking Over", enabled: hasProject && gameConnected, click: () => send("play-in-game-take-over") },
       ],
     },
     {

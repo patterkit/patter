@@ -38,8 +38,13 @@ namespace patter
     inline constexpr double DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND = 4.0;
     inline constexpr double ESTIMATE_SYLLABLES_PER_SECOND_MIN = 2.0;
     inline constexpr double ESTIMATE_SYLLABLES_PER_SECOND_MAX = 10.0;
-    inline constexpr double LINE_DURATION_MIN = 1.5;
+    // The shortest is a speaking time, the least a spoken word plausibly takes, not a reading time.
+    inline constexpr double LINE_DURATION_MIN = 0.5;
     inline constexpr double LINE_DURATION_MAX = 18.0;
+    // The least time a line's text should stay on screen to be read, in seconds, whether or not the line is that long:
+    // for a tool that shows a line as a subtitle or overhead text, which keeps it up at least this long after a shorter
+    // line ends, overlapping the next if it must. The line itself still ends when it's said (estimateLineDuration).
+    inline constexpr double SUBTITLE_READING_MIN = 1.5;
 
     /** How many syllables a line would be spoken in: its syllables' and shut beats' weights, pauses aside. `locale`
      *  is the language it's spoken in, as for speechUnits. */
@@ -52,7 +57,7 @@ namespace patter
 
     /** How long a line with no recording lasts, in seconds: the total weight of its speech units (its syllables
      *  and its pauses, speechUnits) at `syllablesPerSecond` (default 4, the project's `estimateSyllablesPerSecond`
-     *  when it sets one, a step's `estimateRate`), clamped to 1.5 to 18 seconds. `text` (UTF-8) and `locale` are
+     *  when it sets one, a step's `estimateRate`), clamped to 0.5 to 18 seconds. `text` (UTF-8) and `locale` are
      *  the line as it's spoken, in the project's main language (a step's `spokenText` and `spokenLocale`), never a
      *  translation being shown. This is the one rule every Patter tool and runtime times a line by, held to the
      *  same numbers by the conformance corpus. A rate that isn't a finite positive number is the default. A line

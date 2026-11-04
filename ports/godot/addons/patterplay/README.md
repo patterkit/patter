@@ -62,8 +62,10 @@ give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the
 line with a recording, the line lasts as long as the recording. For one without,
 `PatterBundle.estimate_line_duration(step["spokenText"], step["spokenLocale"], step["estimateRate"])` gives how
 long it lasts, in seconds: the weight of its syllables and its pauses at the project's syllables a second (4
-unless the project sets `estimateSyllablesPerSecond`), clamped to 1.5 to 18 seconds. It's Patter's one rule, the
-same in every runtime and in Patterpad's Play window.
+unless the project sets `estimateSyllablesPerSecond`), clamped to 0.5 to 18 seconds. It's Patter's one rule, the
+same in every runtime and in Patterpad's Play window. That's how long the line takes to say, not how long its text
+needs to be read: if you show it as a subtitle, keep the text up at least `PatterBundle.SUBTITLE_READING_MIN` (1.5
+seconds) after a shorter line ends, overlapping the next line if you must.
 
 So you can time a line and move a mouth by the same measure, every `"line"` and `"text"` step (a replayed prompt
 too) carries how it's spoken:

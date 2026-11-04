@@ -24,7 +24,7 @@ interface Harness {
   connected: () => DebugStatus | undefined;
 }
 
-async function startServer(buildHash: string | null): Promise<Harness> {
+async function startServer(buildHash: string | null, playTimeoutMs?: number): Promise<Harness> {
   const port = nextPort++;
   const frames: DebugFrame[] = [];
   const statuses: DebugStatus[] = [];
@@ -33,6 +33,7 @@ async function startServer(buildHash: string | null): Promise<Harness> {
   server = createDebugServer({
     port,
     currentBuildHash: () => buildHash,
+    ...(playTimeoutMs !== undefined ? { playTimeoutMs } : {}),
     onFrame: (f) => frames.push(f),
     onReset: () => { resets++; },
     onStatus: (s) => { statuses.push(s); const keep: typeof waiters = []; for (const w of waiters) { if (w.pred(s)) w.resolve(s); else keep.push(w); } waiters.length = 0; waiters.push(...keep); },
@@ -285,5 +286,39 @@ describe("the debug link refuses web pages", () => {
       ws.on("error", () => resolve(false));
     });
     expect(opened).toBe(true);
+  });
+});
+
+describe("Play in game over the live link", () => {
+  const req = { sceneId: "s1", blockId: "b1", takeOver: true };
+
+  it("sends the request with the project's build and resolves with the game's answer", async () => {
+    const h = await startServer("HASH_A");
+    const seen: unknown[] = [];
+    const link = createDebugLink({
+      build: "HASH_A", url: `ws://127.0.0.1:${h.port}`, WebSocket: WS,
+      onPlay: (r) => { seen.push(r); link.replyPlay(r.id, { started: false, reason: "busy", detail: "Mara is talking" }); },
+    });
+    await h.waitFor((s) => s.state === "connected");
+    const answer = await server!.playInGame(req);
+    expect(seen).toEqual([expect.objectContaining({ sceneId: "s1", blockId: "b1", takeOver: true, build: "HASH_A" })]);
+    expect(answer).toEqual({ started: false, reason: "busy", detail: "Mara is talking" });
+    link.close();
+  });
+
+  it("hears unhandled from a game that doesn't handle play", async () => {
+    const h = await startServer("HASH_A");
+    const link = await connect(h, "HASH_A");
+    expect(await server!.playInGame(req)).toEqual({ started: false, reason: "unhandled" });
+    link.close();
+  });
+
+  it("says noGame with nothing connected, and noAnswer when the game stays quiet", async () => {
+    const h = await startServer("HASH_A", 200);
+    expect(await server!.playInGame(req)).toEqual({ started: false, reason: "noGame" });
+    const link = createDebugLink({ build: "HASH_A", url: `ws://127.0.0.1:${h.port}`, WebSocket: WS, onPlay: () => { /* never answers */ } });
+    await h.waitFor((s) => s.state === "connected");
+    expect(await server!.playInGame(req)).toEqual({ started: false, reason: "noAnswer" });
+    link.close();
   });
 });

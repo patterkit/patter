@@ -7,6 +7,33 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **The live-bundle apply step in the C++ core.** `patter::applyLiveBundle(Engine, Current, Next)` (`Patter/LiveBundle.h`)
+  applies a bundle Patterpad pushed to an engine running `Current`: the same structure hash swaps the strings in place
+  and hands back the same engine (`"text"`), and any other is a hot swap onto a replacement engine with the run carried
+  over (`"structure"`). It returns a `patter::LiveBundleResult` (`engine`, `bundle`, `kind`) and throws what `hotSwap`
+  throws. A host that plays the core directly calls it rather than repeating the rule, and
+  `UPatterEngine::ApplyLiveBundle` now calls it too, so C++ has one rule, the same one as play-helpers'
+  `applyLiveBundle`, Unity's `PatterLiveBundle.ApplyLiveBundle`, and Godot's `apply_live_bundle`. The conformance
+  corpus is version 15: its new `applyLiveBundle` op holds that every runtime picks the same tier for the same pair of
+  bundles.
+- **Play in game.** Patterpad can ask the running game to start a block now: a `play` message on the debug link. Set
+  `FPatterDebugLink::OnPlay`, which fires on the game thread with an `FPatterPlayRequest` (`Id`, `SceneId`, `BlockId`,
+  `bTakeOver`, `Build`), start the block however your game plays conversations, and answer with
+  `ReplyPlay(Request.Id, FPatterPlayResult)` (`bStarted`, `Reason`, `Detail`), at once or later. `Reason` is a short
+  code (`busy`, `unknownBlock`, `staleBuild`, or your own) and Patterpad words it. With `OnPlay` unbound the link
+  answers `unhandled` itself.
+
+### Changed
+
+- **A line with no recording can be quick.** `patter::estimateLineDuration` (Blueprint: `UPatterGameData::EstimateLineDuration`) now clamps to 0.5 to 18 seconds, not 1.5 to 18: the
+  shortest a line lasts is a speaking time, the least a spoken word plausibly takes, not a reading time, so an
+  unvoiced "No." answered by "Yes." no longer takes three seconds. The new `patter::SUBTITLE_READING_MIN` (`Patter/Bundle.h`) (1.5 seconds) is the least time a
+  line's text should stay on screen to be read: if you show lines as subtitles or overhead text, keep each one up at
+  least that long after a shorter line ends, overlapping the next if you must. The line itself still ends when it's
+  said. The conformance corpus re-pins its duration cases at the floor.
+
 ## [0.42.0] - 2026-11-03
 
 ### Added

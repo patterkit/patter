@@ -83,7 +83,9 @@ A line with a recording lasts as long as the recording. For one without,
 `Bundle.EstimateLineDuration(step.SpokenText, step.SpokenLocale, step.EstimateRate.Value)` gives how long it
 lasts, in seconds: Patter's one rule, the same in every runtime and in Patterpad's Play window. It weighs the
 line's syllables and the pauses at its punctuation, and times them at the project's rate (4 syllables a second
-unless the project sets its own), between 1.5 and 18 seconds. A line or text step carries what it needs:
+unless the project sets its own), between 0.5 and 18 seconds. That's how long the line takes to say, not how long
+its text needs to be read: if you show it as a subtitle, keep the text up at least `Bundle.SubtitleReadingMin` (1.5
+seconds) after a shorter line ends, overlapping the next line if you must. A line or text step carries what it needs:
 `SpokenText` is the beat's string in the project's main language, whatever language is being shown
 (interpolated, with closed-caption cues left out, and empty for the caption character's lines), `SpokenLocale`
 is that language, and `EstimateRate` is the project's rate. In an IDs-only bundle `SpokenText` and

@@ -33,6 +33,25 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Play in game.** Patterpad can ask the running game to start a block now: a `play` message on the debug link.
+  Pass `onPlay` to play-helpers' `createDebugLink`; it gets `{ id, sceneId, blockId, takeOver, build? }`. Start the block
+  however your game plays conversations, and answer with `link.replyPlay(id, { started, reason?, detail? })`, at once or
+  later. `reason` is a short code (`busy`, `unknownBlock`, `staleBuild`, or your own) and Patterpad words it. With no
+  `onPlay` the link answers `unhandled` itself.
+
+### Changed
+
+- **A line with no recording can be quick.** `estimateLineDuration` now clamps to 0.5 to 18 seconds, not 1.5 to 18: the
+  shortest a line lasts is a speaking time, the least a spoken word plausibly takes, not a reading time, so an
+  unvoiced "No." answered by "Yes." no longer takes three seconds. The new `SUBTITLE_READING_MIN` (with `LINE_DURATION_MIN` and `LINE_DURATION_MAX`, now exported too) (1.5 seconds) is the least time a
+  line's text should stay on screen to be read: if you show lines as subtitles or overhead text, keep each one up at
+  least that long after a shorter line ends, overlapping the next if you must. The line itself still ends when it's
+  said. The conformance corpus re-pins its duration cases at the floor.
+- The conformance corpus is version 15: its new `applyLiveBundle` op holds that play-helpers' `applyLiveBundle` picks the same tier
+  (`"text"` or `"structure"`) as the other runtimes for the same pair of bundles.
+
 ## [0.42.0] - 2026-11-03
 
 ### Added

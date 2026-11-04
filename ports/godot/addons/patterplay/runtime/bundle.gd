@@ -253,9 +253,14 @@ const DEFAULT_PAD_AFTER := 0.6
 const DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND := 4.0
 const ESTIMATE_SYLLABLES_PER_SECOND_MIN := 2.0
 const ESTIMATE_SYLLABLES_PER_SECOND_MAX := 10.0
-## The shortest and longest a line with no recording lasts, in seconds.
-const LINE_DURATION_MIN := 1.5
+## The shortest and longest a line with no recording lasts, in seconds. The shortest is a speaking time, the least a
+## spoken word plausibly takes, not a reading time (see SUBTITLE_READING_MIN).
+const LINE_DURATION_MIN := 0.5
 const LINE_DURATION_MAX := 18.0
+## The least time a line's text should stay on screen to be read, in seconds, whether or not the line is that long:
+## for a tool that shows a line as a subtitle or overhead text, which keeps it up at least this long after a shorter
+## line ends, overlapping the next if it must. The line itself still ends when it's said (estimate_line_duration).
+const SUBTITLE_READING_MIN := 1.5
 
 ## A digit's weight in speech_units: most read as one or two syllables.
 const SPEECH_DIGIT_WEIGHT := 1.5
@@ -268,7 +273,7 @@ const SPEECH_PAUSE_LONG_WEIGHT := 2.0
 
 ## How long a line with no recording lasts, in seconds: the total weight of its speech units (its syllables and its
 ## pauses, speech_units) at `syllables_per_second` (default 4, the project's "estimateSyllablesPerSecond" when it
-## sets one, a line step's "estimateRate"), clamped to 1.5 to 18 seconds. `text` and `locale` are the line as it's
+## sets one, a line step's "estimateRate"), clamped to 0.5 to 18 seconds. `text` and `locale` are the line as it's
 ## spoken, in the project's main language (a line step's "spokenText" and "spokenLocale"), never a translation
 ## being shown. This is the one rule every Patter tool and runtime times a line by, held to the same numbers by the
 ## conformance corpus. A rate that isn't a positive number is the default. A line with a recording lasts as long as

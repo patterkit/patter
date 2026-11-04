@@ -133,7 +133,7 @@ public:
 	static bool NextStage(const FPatterGameDataField& Field, const FString& Stage, FString& OutStage);
 
 	/** How long a line with no recording lasts, in seconds: the total weight of its speech units (SpeechUnits:
-	 *  its syllables and its pauses) at SyllablesPerSecond, clamped to 1.5 to 18 seconds. Pass a step's
+	 *  its syllables and its pauses) at SyllablesPerSecond, clamped to 0.5 to 18 seconds. Pass a step's
 	 *  SpokenText, SpokenLocale, and EstimateRate: the line as it's spoken, in the project's main language, never
 	 *  a translation being shown. A rate that isn't a positive number is the default, 4. The one rule every Patter
 	 *  tool and runtime times a line by (the core's patter::estimateLineDuration). A line with a recording lasts

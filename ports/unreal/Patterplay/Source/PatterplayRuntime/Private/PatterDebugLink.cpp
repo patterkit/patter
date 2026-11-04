@@ -61,21 +61,45 @@ void FPatterDebugLink::Connect()
 		Self->Socket->Send(Self->HelloMessage());
 		Self->Flush();
 	});
-	// Live bundle refresh: the editor pushes {t:"bundle", build, data}. Validate the shape here so
-	// the host's OnBundle never sees a malformed payload; anything else the editor sends is ignored.
+	// Editor -> game: a live bundle refresh {t:"bundle", build, data}, or Play in game {t:"play", id,
+	// sceneId, blockId, takeOver, build?}. Validate the shape here so the host's handlers never see a
+	// malformed payload; anything else the editor sends is ignored.
 	Socket->OnMessage().AddLambda([Weak](const FString& Message)
 	{
 		TSharedPtr<FPatterDebugLink> Self = Weak.Pin();
-		if (!Self.IsValid() || !Self->OnBundle) return;
+		if (!Self.IsValid()) return;
 		TSharedPtr<FJsonObject> Msg;
 		const TSharedRef<TJsonReader<TCHAR>> Reader = TJsonReaderFactory<TCHAR>::Create(Message);
 		if (!FJsonSerializer::Deserialize(Reader, Msg) || !Msg.IsValid()) return;
-		FString Type, Build, Data;
-		if (Msg->TryGetStringField(TEXT("t"), Type) && Type == TEXT("bundle")
-			&& Msg->TryGetStringField(TEXT("build"), Build)
-			&& Msg->TryGetStringField(TEXT("data"), Data))
+		FString Type;
+		if (!Msg->TryGetStringField(TEXT("t"), Type)) return;
+		if (Type == TEXT("bundle"))
 		{
-			Self->OnBundle(Build, Data);
+			FString Build, Data;
+			if (Self->OnBundle && Msg->TryGetStringField(TEXT("build"), Build) && Msg->TryGetStringField(TEXT("data"), Data))
+			{
+				Self->OnBundle(Build, Data);
+			}
+		}
+		else if (Type == TEXT("play"))
+		{
+			FPatterPlayRequest Request;
+			if (!Msg->TryGetStringField(TEXT("id"), Request.Id) || Request.Id.IsEmpty()
+				|| !Msg->TryGetStringField(TEXT("sceneId"), Request.SceneId) || Request.SceneId.IsEmpty()
+				|| !Msg->TryGetStringField(TEXT("blockId"), Request.BlockId) || Request.BlockId.IsEmpty())
+			{
+				return;
+			}
+			Msg->TryGetBoolField(TEXT("takeOver"), Request.bTakeOver);
+			Msg->TryGetStringField(TEXT("build"), Request.Build);
+			if (!Self->OnPlay)
+			{
+				FPatterPlayResult Unhandled;
+				Unhandled.Reason = TEXT("unhandled");
+				Self->ReplyPlay(Request.Id, Unhandled);
+				return;
+			}
+			Self->OnPlay(Request);
 		}
 	});
 	// The editor is not listening, or it went away: go quiet for good, the way Unity's link does. Leaving
@@ -144,6 +168,18 @@ void FPatterDebugLink::Observe(const FString& FlowId, const FString& SceneId, co
 	{
 		Msg->SetStringField(TEXT("choiceId"), ChoiceId);
 	}
+	Post(SerializeJson(Msg));
+}
+
+void FPatterDebugLink::ReplyPlay(const FString& Id, const FPatterPlayResult& Result)
+{
+	if (Id.IsEmpty()) return;
+	TSharedRef<FJsonObject> Msg = MakeShared<FJsonObject>();
+	Msg->SetStringField(TEXT("t"), TEXT("played"));
+	Msg->SetStringField(TEXT("id"), Id);
+	Msg->SetBoolField(TEXT("started"), Result.bStarted);
+	if (!Result.Reason.IsEmpty()) Msg->SetStringField(TEXT("reason"), Result.Reason);
+	if (!Result.Detail.IsEmpty()) Msg->SetStringField(TEXT("detail"), Result.Detail);
 	Post(SerializeJson(Msg));
 }
 
@@ -232,6 +268,7 @@ void FPatterDebugLink::FlowOpened(const FString&) {}
 void FPatterDebugLink::FlowClosed(const FString&) {}
 void FPatterDebugLink::Observe(const FString&, const FString&, const FString&, const FString&, const FString&) {}
 void FPatterDebugLink::SetBuild(const FString&) {}
+void FPatterDebugLink::ReplyPlay(const FString&, const FPatterPlayResult&) {}
 void FPatterDebugLink::Close() {}
 FString FPatterDebugLink::State() const { return TEXT("closed"); } // Shipping: the link is compiled out
 

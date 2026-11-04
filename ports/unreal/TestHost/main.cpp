@@ -26,6 +26,7 @@
 #include "Patter/Audio.h"
 #include "Patter/Runner.h"
 #include "Patter/Version.h"
+#include "Patter/LiveBundle.h"
 #include "../Patterplay/Source/PatterplayRuntime/Private/Tests/PatterBundleReaderCase.h"   // shared with the plugin's test
 #include "RegistryCorpus.h"   // the shared registry corpus runner, vendored from ../expr
 
@@ -1132,6 +1133,7 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
     };
     const auto refusing = [](const JsonValue& op) { const JsonValue* r = op.find("expectRefused"); return r && r->isBool() && r->b; };
     std::map<std::string, patter::FlowState> captured; // captureFlow states, by name, for restoreFlow
+    const Bundle* playing = &bundle; // the bundle the live engine plays, for applyLiveBundle's comparison
     // What the last advance or stepFor handed the host, for `scribble`: its own copy, which it may deface.
     std::optional<StepResult> handed;
             for (const auto& op : script.arr)
@@ -1246,7 +1248,17 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                 {
                     if (refusing(op)) refused("hotSwap", [&] { engine->hotSwap(bundleB ? *bundleB : bundle); });
                     else if (!bundleB) throw std::runtime_error("hotSwap: the case has no bundleB");
-                    else engine = std::shared_ptr<Engine>(engine->hotSwap(*bundleB));
+                    else { engine = std::shared_ptr<Engine>(engine->hotSwap(*bundleB)); playing = bundleB; }
+                }
+                // The game-side apply step (corpus 15): the core's applyLiveBundle picks the tier.
+                else if (kind == "applyLiveBundle")
+                {
+                    if (!bundleB) throw std::runtime_error("applyLiveBundle: the case has no bundleB");
+                    patter::LiveBundleResult r = patter::applyLiveBundle(engine, *playing, *bundleB);
+                    const std::string& want = op.at("expectKind").str;
+                    if (r.kind != want) throw std::runtime_error("applyLiveBundle: applied as \"" + r.kind + "\", expected \"" + want + "\"");
+                    engine = r.engine;
+                    playing = r.bundle;
                 }
                 else if (kind == "setLocale") engine->setLocale(op.at("locale").str);
                 else if (kind == "setClosedCaptions") engine->setClosedCaptions(op.at("on").b);

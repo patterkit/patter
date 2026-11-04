@@ -73,6 +73,7 @@ import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are ma
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
 import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way for both apps
 import { isThemeChoice, stageGateNote, toast, type ToastKind } from "@wildwinter/app-shell";
+import { describePlayAnswer } from "../../shared/play-in-game.js";
 // The family's clash resolver (ruling Q21): the dialog and the banner are the shell's; the adapter is ours.
 import { openClashResolver, clashBanner, type ClashAdapter, type ClashResolver } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/clashes.css";
@@ -3148,6 +3149,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     onChange: () => { if (!mountingScene) { saver.touch(); sceneEdited = true; refreshStaleBadge(); views.changed("all", { saved: false }); } scheduleValidate(); refreshNavBlocks(); syncSceneName(); },
     onSelect: showInspector, // drive the detail inspector off the caret's container stack
     onPlayBlock: (blockId) => { if (currentSceneId) void window.patter.openPlay(currentSceneId, blockId); },
+    playInGame: { available: () => gameOnLink, run: (blockId, takeOver) => void playInGame(blockId, takeOver) },
     onOpenTarget: (targetId) => void openTarget(targetId), // double-click a jump chip -> follow the divert
 
     onComments: (req) => openComments(req),
@@ -3220,6 +3222,32 @@ async function play(): Promise<void> {
 }
 
 playTopEl.addEventListener("click", () => { void play(); });
+
+// Play in game: a game is on the Live Link (the context menu's items show only then).
+let gameOnLink = false;
+window.patter.onDebugStatus((st) => { gameOnLink = st.state === "connected"; });
+void window.patter.debugStatus().then((st) => { gameOnLink = st.state === "connected"; });
+
+/** Play in game: the running game on the Live Link starts this block now (`takeOver`: stop what its
+ *  speakers are doing first). Saves first, so the game has what the writer sees; the answer shows as a
+ *  toast naming the block. With no block given, the block at the caret (the Play menu). */
+async function playInGame(blockId: string | null, takeOver: boolean): Promise<void> {
+  const sceneId = currentSceneId;
+  const id = blockId ?? caretBlock()?.id ?? null;
+  if (!sceneId || !id) { toast("Put the caret in a block to play it in the game.", "info"); return; }
+  const block = project?.scenes.find((sc) => sc.id === sceneId)?.blocks.find((b) => b.id === id)?.name
+    ?? caretBlock()?.name ?? "the block";
+  await save(); // the save pushes the bundle; the link waits for the game to take it before asking
+  const answer = await window.patter.playInGame(sceneId, id, takeOver);
+  const { text, ok } = describePlayAnswer(answer, block);
+  toast(text, ok ? "ok" : "info");
+}
+
+/** The block the caret is in, from the surface's container stack. */
+function caretBlock(): { id: string; name: string } | null {
+  const level = surface?.selectionContext().levels.find((l) => l.kind === "block");
+  return level && level.kind === "block" && level.id ? { id: level.id, name: level.name } : null;
+}
 
 /** Play from Start (Mod+Shift+P): run from the project's start point, prompting to set one if unset. */
 async function playFromStart(): Promise<void> {
@@ -4768,6 +4796,8 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "review-suggestions") { if (project) void window.patter.openSearchWindow("suggestions"); }
   else if (cmd === "play") void play();
   else if (cmd === "play-from-start") void playFromStart();
+  else if (cmd === "play-in-game") void playInGame(null, false);
+  else if (cmd === "play-in-game-take-over") void playInGame(null, true);
   else if (cmd === "select-all") selectAllCommand();
   else if (cmd === "duplicate") surface?.duplicate();
   else if (cmd === "move-up") moveCommand(-1);

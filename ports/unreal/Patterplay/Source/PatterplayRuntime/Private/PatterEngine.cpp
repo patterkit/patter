@@ -4,6 +4,7 @@
 #include "PatterWorld.h"
 #include "PatterLog.h"
 #include "Patter/Engine.h"
+#include "Patter/LiveBundle.h"
 #include "Patter/Save.h"
 #include "PatterConvert.h"
 #include "UObject/Package.h" // GetTransientPackage() - not transitively available in the Game target
@@ -768,12 +769,29 @@ FString UPatterEngine::BuildId() const
 FString UPatterEngine::ApplyLiveBundle(UPatterBundle* NewBundle)
 {
 	if (!Engine || !NewBundle || !NewBundle->Raw()) return TEXT("error");
-	const patter::Bundle* Current = (BundleRef && BundleRef->Raw()) ? BundleRef->Raw() : nullptr;
-	const bool bSameStructure = Current
-		&& !Current->structureHash.empty()
-		&& Current->structureHash == NewBundle->Raw()->structureHash;
-	if (bSameStructure) { ReplaceStrings(NewBundle); return TEXT("text"); }
-	return HotSwap(NewBundle) ? TEXT("structure") : TEXT("error");
+	// The core's rule picks the tier (patter::applyLiveBundle, the one rule in C++); the wrapper keeps the bundle
+	// alive and, after a hot swap, takes the replacement in place. With no bundle to compare against, the core
+	// reads the empty one as a structure change.
+	const patter::Bundle NoBundle;
+	const patter::Bundle& Current = (BundleRef && BundleRef->Raw()) ? *BundleRef->Raw() : NoBundle;
+	try
+	{
+		patter::LiveBundleResult Result = patter::applyLiveBundle(Engine, Current, *NewBundle->Raw());
+		if (Result.kind == "text")
+		{
+			StringsBundleRef = NewBundle; // the core now points into this bundle's tables: keep it alive
+			return TEXT("text");
+		}
+		AdoptReplacement(std::move(Result.engine), NewBundle);
+		return TEXT("structure");
+	}
+	catch (const std::exception& Ex)
+	{
+		// As HotSwap's failure: the flows re-bind, and every wrapper reads as closed rather than dangling.
+		UE_LOG(LogPatterplay, Error, TEXT("Patterplay: hot swap failed - %s"), UTF8_TO_TCHAR(Ex.what()));
+		RebindFlows();
+		return TEXT("error");
+	}
 }
 
 void UPatterEngine::ReplaceStrings(UPatterBundle* NewBundle)
@@ -781,6 +799,15 @@ void UPatterEngine::ReplaceStrings(UPatterBundle* NewBundle)
 	if (!Engine || !NewBundle || !NewBundle->Raw()) return;
 	Engine->replaceStrings(*NewBundle->Raw());
 	StringsBundleRef = NewBundle; // the core now points into this bundle's tables: keep it alive
+}
+
+void UPatterEngine::AdoptReplacement(std::shared_ptr<patter::Engine> Next, UPatterBundle* NewBundle)
+{
+	Engine = std::move(Next);
+	BundleRef = NewBundle;
+	StringsBundleRef = nullptr;
+	RebindFlows(); // the swap rebuilt the flows; the same re-bind the load path needs
+	TapTrace();
 }
 
 bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
@@ -792,12 +819,7 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 		// hotSwap: the old core hands every property bag to the replacement on the same registry (the
 		// same world stays bound), the cursors carry across, and so do locale and captions. Then each
 		// flow wrapper re-binds by id. The old core is released and inert once the swap starts.
-		std::unique_ptr<patter::Engine> Next = Engine->hotSwap(*NewBundle->Raw());
-		Engine = std::shared_ptr<patter::Engine>(std::move(Next));
-		BundleRef = NewBundle;
-		StringsBundleRef = nullptr;
-		RebindFlows(); // the swap rebuilt the flows; the same re-bind the load path needs
-		TapTrace();
+		AdoptReplacement(std::shared_ptr<patter::Engine>(Engine->hotSwap(*NewBundle->Raw())), NewBundle);
 		return true;
 	}
 	catch (const std::exception& Ex)

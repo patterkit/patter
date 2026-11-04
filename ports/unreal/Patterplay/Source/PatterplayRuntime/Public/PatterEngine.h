@@ -399,7 +399,9 @@ public:
 	//   - same structureHash  -> tier 1: the string tables swap, nothing else is touched ("text").
 	//   - changed structure   -> tier 2: the whole run carries across via save/load, content drift
 	//     resolved per the shared corpus rules; flow wrappers re-bind by id ("structure").
-	// Returns "text" / "structure", or "error" when the new bundle is null/unparsed (engine untouched).
+	// The tier is the core's patter::applyLiveBundle (Patter/LiveBundle.h), the same rule a host playing the core
+	// directly calls. Returns "text" / "structure", or "error" when the new bundle is null/unparsed (engine
+	// untouched) or the swap is refused (a checkpoint is open).
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|LiveLink")
 	FString ApplyLiveBundle(UPatterBundle* NewBundle);
 
@@ -513,6 +515,10 @@ private:
 	// id. A wrapper leaves when its flow is closed or replaced: re-binding by id would otherwise point
 	// it at the next flow opened under the same name, and a closed flow stays closed.
 	TArray<TWeakObjectPtr<UPatterFlow>> WrappedFlows;
+
+	// Take a hot swap's replacement core IN PLACE (HotSwap, ApplyLiveBundle): keep its bundle alive, re-bind every
+	// flow wrapper by id, and tap the new core's trace.
+	void AdoptReplacement(std::shared_ptr<patter::Engine> Next, UPatterBundle* NewBundle);
 
 public:
 	/**

@@ -638,13 +638,18 @@ export const PAD_AFTER_MAX = 60;
 export const DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND = 4;
 export const ESTIMATE_SYLLABLES_PER_SECOND_MIN = 2;
 export const ESTIMATE_SYLLABLES_PER_SECOND_MAX = 10;
-/** The shortest and longest a line with no recording lasts, in seconds (`estimateLineDuration`). */
-export const LINE_DURATION_MIN = 1.5;
+/** The shortest and longest a line with no recording lasts, in seconds (`estimateLineDuration`). The shortest is a
+ *  speaking time, the least a spoken word plausibly takes, not a reading time: see SUBTITLE_READING_MIN. */
+export const LINE_DURATION_MIN = 0.5;
 export const LINE_DURATION_MAX = 18;
+/** The least time a line's text should stay on screen to be read, in seconds, whether or not the line is that long:
+ *  for a tool that shows a line as a subtitle or overhead text, which keeps it up at least this long after a shorter
+ *  line ends, overlapping the next if it must. The line itself still ends when it's said (`estimateLineDuration`). */
+export const SUBTITLE_READING_MIN = 1.5;
 
 /** How long a line with no recording lasts, in seconds: the total weight of its speech units (its syllables and its
  *  pauses, `speechUnits`) at `syllablesPerSecond` (default 4, the project's `estimateSyllablesPerSecond` when it
- *  sets one), clamped to 1.5 to 18 seconds. `text` and `locale` are the line as it's spoken, in the project's main
+ *  sets one), clamped to 0.5 to 18 seconds. `text` and `locale` are the line as it's spoken, in the project's main
  *  language (a line result's `spokenText` and `spokenLocale`), never a translation being shown. This is the one
  *  rule every Patter tool and runtime times a line by: Patterpad's Play window, the playable HTML page, and the
  *  Unity, Unreal, and Godot runtimes, which the conformance corpus holds to the same numbers. A rate that isn't a

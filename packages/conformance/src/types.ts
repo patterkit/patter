@@ -201,6 +201,11 @@ export type ScriptOp =
   // content: stack frames re-find their next child by id, drifted choice options drop, a vanished
   // active snippet is skipped. Every port must resolve the drift identically.
   | { op: "hotSwap"; expectRefused?: boolean }
+  // The game-side apply step for a pushed bundle (play-helpers' applyLiveBundle, each port's own spelling): the
+  // case's `bundleB` applied to the engine, compared with the bundle that engine plays. `expectKind` pins the tier
+  // the runtime picks: "text" for the same structureHash (the strings swapped in place), "structure" for any other
+  // (a hot swap). Afterwards the engine plays `bundleB`, so a second apply compares with it.
+  | { op: "applyLiveBundle"; expectKind: "text" | "structure" }
   // Cast introspection: a STATIC structure query, so it reads the same at any point in a script and
   // produces no transcript. No `scene` = the project's declared cast (`getCast`), `scene` alone = that
   // scene's speakers, `scene` + `block` = the block's. `expectResult` pins the exact array INCLUDING
@@ -457,7 +462,7 @@ export interface AudioCase {
 /**
  * A duration case (corpus 9, re-pinned in 11): how long a line with no recording lasts, in seconds, by the one rule
  * every runtime shares (`estimateLineDuration`): the total weight of its speech units at `syllablesPerSecond` (5 when
- * absent), clamped to 1.5 to 18. `locale` is the language the line is spoken in. A runner compares to within 1e-9.
+ * absent), clamped to 0.5 to 18. `locale` is the language the line is spoken in. A runner compares to within 1e-9.
  */
 export interface DurationCase {
   name: string;

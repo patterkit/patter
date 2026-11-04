@@ -162,7 +162,7 @@ these are the rules the writer expects:
 
 A line with no recording lasts
 **`estimateLineDuration(step.spokenText, step.spokenLocale, step.estimateRate)`** seconds: about as long as
-it would take to say, never less than 1.5 seconds or more than 18. A line is spoken in the project's main
+it would take to say, never less than half a second or more than 18. A line is spoken in the project's main
 language whatever language the player reads, so **`spokenText`** is the line in that language (interpolated
 as `text` is, with [caption](/play/closed-captions/) cues left out, and empty for the caption character's
 lines) and **`spokenLocale`** is that language. A French player reading subtitles over an English line gets
@@ -171,6 +171,12 @@ the writer sets **Timing for lines without audio** in Project settings. A line w
 as long as the recording. It's Patter's one rule, the same in every runtime, in Patterpad's Play window, and
 in the playable HTML page, so a line your game times by it lasts as long as the writer heard it. In an
 IDs-only bundle there's no text, so pass your own main-language text and locale, with `estimateRate`.
+
+That's how long a line takes to say, not how long its text needs to be read. If you show lines as subtitles or
+overhead text, keep each one up for at least **`SUBTITLE_READING_MIN`** (1.5 seconds; Unity
+`Bundle.SubtitleReadingMin`, Unreal `patter::SUBTITLE_READING_MIN`, Godot `PatterBundle.SUBTITLE_READING_MIN`) after
+a shorter line ends, overlapping the next line if you must. The line itself still ends when it's said, so a quick
+exchange stays quick.
 
 The estimate is the total weight of the line's **speech units**: **`speechUnits(text, locale)`** gives them
 in order, each `{ kind, weight, start, end }`, where `kind` is `"syllable"`, `"closed"` (a beat with the

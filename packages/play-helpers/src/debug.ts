@@ -13,6 +13,15 @@
 //           `data` is the full .patterc JSON. Pass an `onBundle` handler (or just feed it to
 //           `applyLiveBundle`, which picks strings-only vs full hot swap itself), then call
 //           `link.setBuild(newHash)` so the editor's match/stale pill updates.
+//   play  : { t:"play", v:1, id, sceneId, blockId, takeOver, build? } - EDITOR -> game: Play in game.
+//           The writer asked the running game to start that block now (`takeOver`: stop what the
+//           speakers are doing first). `build` is the editor's bundle hash, so a game still on an
+//           older bundle can answer "staleBuild". Pass an `onPlay` handler; it answers with
+//           `link.replyPlay(id, result)`, then or later. With no handler the link answers
+//           { started:false, reason:"unhandled" } itself.
+//   played: { t:"played", id, started, reason?, detail? } - game -> editor: the answer to `play`.
+//           `reason` is a short code (any string passes through; Patterpad has plain words for
+//           busy, unknownBlock, staleBuild, unhandled, and Patterstage's own); `detail` says more.
 //
 // The link is loopback-only on the editor side (127.0.0.1), so there's no pairing
 // token - only processes on the same machine can reach it. The client never throws
@@ -36,6 +45,30 @@ export interface DebugSocketLike {
 }
 type DebugSocketCtor = new (url: string) => DebugSocketLike;
 
+/** The editor asked the running game to play a block now (Play in game). Ids are the bundle's. */
+export interface PlayRequest {
+  /** Echo it in `replyPlay` so the editor can match the answer to its request. */
+  id: string;
+  sceneId: string;
+  blockId: string;
+  /** Stop what the speakers are doing first, rather than turn the request down as busy. */
+  takeOver: boolean;
+  /** The editor's bundle hash, when it sent one: a game on another build can answer "staleBuild". */
+  build?: string;
+}
+
+/** The game's answer to a `PlayRequest`. */
+export interface PlayResult {
+  started: boolean;
+  /** Why it didn't start, as a short code: "busy", "unknownBlock", "staleBuild", or the game's own. */
+  reason?: string;
+  /** More, in plain words (which speaker is busy, which block was missing). */
+  detail?: string;
+}
+
+/** The `reason` the link answers with when nothing handles `play`. */
+const PLAY_UNHANDLED = "unhandled";
+
 export interface DebugLinkOptions {
   /** The running bundle's build identity - pass `bundle.content.hash`. Lets the editor detect a stale build. */
   build: string;
@@ -49,6 +82,11 @@ export interface DebugLinkOptions {
    *  hand it (with your current engine + bundle) to `applyLiveBundle`, re-bind your flow handles if it
    *  hot-swapped, then call `link.setBuild(build)`. Never called with malformed payloads. */
   onBundle?: (msg: { build: string; data: string }) => void;
+  /** Play in game: the writer asked the game to start a block now. Answer with `link.replyPlay(req.id,
+   *  result)`, in the handler or later (an answer after the editor stopped waiting is ignored). Without a
+   *  handler the link answers `{ started: false, reason: "unhandled" }`. Never called with malformed
+   *  payloads. */
+  onPlay?: (req: PlayRequest) => void;
 }
 
 export interface DebugLink {
@@ -61,6 +99,8 @@ export interface DebugLink {
   /** After applying a pushed bundle: report the build now running (re-hellos, so the editor's
    *  match/stale pill updates and it stops re-pushing the same bundle). */
   setBuild(build: string): void;
+  /** Answer a `play` request (see `onPlay`). Safe to call at any time; a no-op once the link is closed. */
+  replyPlay(id: string, result: PlayResult): void;
   /** Close the link. */
   close(): void;
   /** What the link is doing: `connecting`, `connected`, or `closed`. From inside a running game "the editor
@@ -104,8 +144,16 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
 
   if (!Ctor) {
     // No WebSocket available (old Node, no impl passed) - degrade to a silent no-op link.
-    return { flowOpened() {}, observe() {}, flowClosed() {}, setBuild() {}, close() { closed = true; }, state: "closed", build, url };
+    return { flowOpened() {}, observe() {}, flowClosed() {}, setBuild() {}, replyPlay() {}, close() { closed = true; }, state: "closed", build, url };
   }
+
+  const replyPlay = (id: string, result: PlayResult): void => {
+    post({
+      t: "played", id, started: result.started === true,
+      ...(typeof result.reason === "string" ? { reason: result.reason } : {}),
+      ...(typeof result.detail === "string" ? { detail: result.detail } : {}),
+    });
+  };
 
   const sendHello = (): void => {
     const hello = JSON.stringify({ t: "hello", v: 1, build, project: opts.project, flows: [...flows] });
@@ -119,16 +167,23 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
       sendHello();
       flush();
     });
-    // Live bundle refresh: the editor pushed a new bundle. Validate the shape here so the host's
-    // handler never sees a malformed payload; everything else the editor might send is ignored.
+    // Editor -> game: a live bundle refresh, or Play in game. Validate the shape here so the host's
+    // handlers never see a malformed payload; everything else the editor might send is ignored.
     sock.addEventListener("message", (ev: { data: unknown }) => {
-      if (!opts.onBundle || typeof ev.data !== "string") return;
-      try {
-        const msg = JSON.parse(ev.data) as Record<string, unknown>;
-        if (msg.t === "bundle" && typeof msg.build === "string" && typeof msg.data === "string") {
+      if (typeof ev.data !== "string") return;
+      let msg: Record<string, unknown>;
+      try { msg = JSON.parse(ev.data) as Record<string, unknown>; } catch { return; }
+      if (msg === null || typeof msg !== "object") return;
+      if (msg.t === "bundle") {
+        if (opts.onBundle && typeof msg.build === "string" && typeof msg.data === "string") {
           opts.onBundle({ build: msg.build, data: msg.data });
         }
-      } catch { /* not for us */ }
+      } else if (msg.t === "play") {
+        const req = parsePlayRequest(msg);
+        if (!req) return;
+        if (!opts.onPlay) { replyPlay(req.id, { started: false, reason: PLAY_UNHANDLED }); return; }
+        try { opts.onPlay(req); } catch { /* never throw into the socket: the editor times out */ }
+      }
     });
     sock.addEventListener("error", () => { /* editor not listening - stay a no-op */ });
     sock.addEventListener("close", () => { sock = null; queue = []; });
@@ -146,6 +201,7 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
       if (!flows.has(flowId)) { flows.add(flowId); post({ t: "flowOpen", flow: flowId }); }
       post({ t: "frame", flow: flowId, sceneId, beatId, type, choiceId });
     },
+    replyPlay,
     setBuild(next: string): void {
       if (closed || next === build) return;
       build = next;
@@ -155,5 +211,16 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
     get state() { return closed || !sock ? "closed" : sock.readyState === OPEN ? "connected" : "connecting"; },
     get build() { return build; },
     url,
+  };
+}
+
+/** A `play` message's fields, or null when it isn't a well-formed request. */
+function parsePlayRequest(msg: Record<string, unknown>): PlayRequest | null {
+  const { id, sceneId, blockId } = msg;
+  if (typeof id !== "string" || id === "" || typeof sceneId !== "string" || sceneId === ""
+    || typeof blockId !== "string" || blockId === "") return null;
+  return {
+    id, sceneId, blockId, takeOver: msg.takeOver === true,
+    ...(typeof msg.build === "string" && msg.build !== "" ? { build: msg.build } : {}),
   };
 }

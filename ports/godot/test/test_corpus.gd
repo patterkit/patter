@@ -1014,6 +1014,17 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 					# The engine's own hot_swap, as the reference runner uses: it carries the locale asked
 					# for and the captions toggle across, and the replacement reports as it is built.
 					holder["engine"] = holder["engine"].hot_swap(bundle_b if not bundle_b.is_empty() else bundle)
+			"applyLiveBundle":
+				# The game-side apply step (corpus 15): the engine's own apply_live_bundle picks the tier, from the
+				# pushed .patterc text, against the bundle it plays.
+				if bundle_b.is_empty():
+					_fail("scripted", name, "applyLiveBundle: the case has no bundleB")
+					return false
+				var applied: Dictionary = holder["engine"].apply_live_bundle(JSON.stringify(bundle_b))
+				if applied["kind"] != op["expectKind"]:
+					_fail("scripted", name, "applyLiveBundle: applied as \"%s\", expected \"%s\"" % [applied["kind"], op["expectKind"]])
+					return false
+				holder["engine"] = applied["engine"]
 			"setLocale":
 				holder["engine"].set_locale(op["locale"])
 			"setClosedCaptions":

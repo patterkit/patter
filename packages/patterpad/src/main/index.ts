@@ -157,6 +157,7 @@ function refreshMenu(): void {
   // The "Live Link" checkbox is ticked while the localhost link is up (listening / connected).
   const dbg = debugServer?.status().state;
   const debugActive = dbg === "listening" || dbg === "connected";
+  const gameConnected = dbg === "connected";
   // The Window menu's view extensions: the views the open project offers, as `views.update` last found them.
   const viewMenu = {
     offers: views.offers(),
@@ -165,7 +166,7 @@ function refreshMenu(): void {
     add: (extension: string) => { openExtensionsWindow(extension); },
     isView: (w: BrowserWindow | null) => views.isView(w),
   };
-  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined, project.audioFoldersEnabled(), viewMenu);
+  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined, project.audioFoldersEnabled(), viewMenu, gameConnected);
 }
 
 // Tier 2 view extensions (views.ts): the views the open project offers, their windows, and the Extensions
@@ -1468,6 +1469,11 @@ function registerIpc(): void {
   ipcMain.handle("debug:stop", () => { ensureDebugServer().stop(); refreshMenu(); return ensureDebugServer().status(); });
   ipcMain.handle("debug:status", () => ensureDebugServer().status());
   ipcMain.handle("debug:follow", (_e, flowId: string | null) => { ensureDebugServer().follow(typeof flowId === "string" ? flowId : null); });
+  ipcMain.handle("debug:play-in-game", (_e, sceneId: unknown, blockId: unknown, takeOver: unknown) => {
+    if (typeof sceneId !== "string" || typeof blockId !== "string") return { started: false, reason: "invalid" };
+    if (!debugServer) return { started: false, reason: "noGame" };
+    return debugServer.playInGame({ sceneId, blockId, takeOver: takeOver === true });
+  });
   ipcMain.handle("project:validate", (_e, live?: LiveSceneSource) => project.validate(live));
   // The detached search window (#205): open/focus it, and serve its index queries + jump back to the editor.
   ipcMain.handle("search:open", (_e, mode: SearchMode, focus?: SearchFocus, query?: string) => openSearchWindow(mode, focus, query));

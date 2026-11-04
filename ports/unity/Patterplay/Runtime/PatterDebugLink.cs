@@ -26,6 +26,30 @@ using System.Threading.Tasks;
 
 namespace Patterkit.Patterplay
 {
+    /// <summary>Play in game: the editor asked the running game to start a block now. Ids are the
+    /// bundle's. Parse one from a <c>TryReceive</c> frame with <c>PatterPlayInGame.TryParsePlay</c>.</summary>
+    public sealed class PatterPlayRequest
+    {
+        /// <summary>Echo it in <c>ReplyPlay</c> so the editor can match the answer to its request.</summary>
+        public string Id;
+        public string SceneId;
+        public string BlockId;
+        /// <summary>Stop what the speakers are doing first, rather than turn the request down as busy.</summary>
+        public bool TakeOver;
+        /// <summary>The editor's bundle hash, or null: a game on another build can answer "staleBuild".</summary>
+        public string Build;
+    }
+
+    /// <summary>The game's answer to a <c>PatterPlayRequest</c>.</summary>
+    public sealed class PatterPlayResult
+    {
+        public bool Started;
+        /// <summary>Why it didn't start, as a short code: "busy", "unknownBlock", "staleBuild", or the game's own.</summary>
+        public string Reason;
+        /// <summary>More, in plain words (which speaker is busy, which block was missing).</summary>
+        public string Detail;
+    }
+
     public sealed class PatterDebugLink : IDisposable
     {
         private string _build; // mutable: SetBuild() after a live bundle refresh lands
@@ -109,10 +133,27 @@ namespace Patterkit.Patterplay
             Post(sb.ToString());
         }
 
-        /// <summary>Live bundle refresh: drain the next editor message (a raw JSON frame), if one
-        /// arrived. Call from your Update() so the swap runs on the main thread, then hand the frame
-        /// to <c>PatterLiveBundle.TryParsePush</c> + <c>Apply</c> and report back via SetBuild.</summary>
+        /// <summary>Drain the next editor message (a raw JSON frame), if one arrived. Call from your
+        /// Update() so what it asks for runs on the main thread. A live bundle refresh: hand the frame to
+        /// <c>PatterLiveBundle.TryParsePush</c> + <c>ApplyLiveBundle</c> and report back via SetBuild.
+        /// Play in game: <c>PatterPlayInGame.TryParsePlay</c>, then answer with ReplyPlay.</summary>
         public bool TryReceive(out string message) => _inbox.TryDequeue(out message);
+
+        /// <summary>Play in game: answer the editor's request to start a block (parse it from a
+        /// <c>TryReceive</c> frame with <c>PatterPlayInGame.TryParsePlay</c>). Call it from the game
+        /// thread, at once or a frame or more later; an answer after the editor stopped waiting is
+        /// ignored.</summary>
+        public void ReplyPlay(string id, PatterPlayResult result)
+        {
+            if (string.IsNullOrEmpty(id) || result == null) return;
+            var sb = new StringBuilder();
+            sb.Append("{\"t\":\"played\",\"id\":").Append(Esc(id));
+            sb.Append(",\"started\":").Append(result.Started ? "true" : "false");
+            if (result.Reason != null) sb.Append(",\"reason\":").Append(Esc(result.Reason));
+            if (result.Detail != null) sb.Append(",\"detail\":").Append(Esc(result.Detail));
+            sb.Append("}");
+            Post(sb.ToString());
+        }
 
         /// <summary>After applying a pushed bundle: report the build now running (re-hellos, so the
         /// editor's match/stale pill updates and it stops re-pushing the same bundle).</summary>

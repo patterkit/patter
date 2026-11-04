@@ -190,14 +190,14 @@ describe("playable HTML: line timing", () => {
   });
 
   it("applies a change of speed at once, keeping the time already played", () => {
-    startPage(); // A lasts 1.5 seconds (the estimate's floor) and B cuts in half a second before it ends
-    expect(estimateLineDuration(TEXT.A, "en")).toBe(1.5);
+    startPage(); // A lasts 1.25 seconds (its syllables and a pause) and B cuts in half a second before it ends
+    expect(estimateLineDuration(TEXT.A, "en")).toBe(1.25);
     vi.advanceTimersByTime(500); // half a second played at normal speed
     const select = document.querySelector<HTMLSelectElement>("#speed")!;
     select.value = "half";
     select.dispatchEvent(new Event("change"));
-    // The half second still to come before B takes a whole second at half speed.
-    vi.advanceTimersByTime(999);
+    // The quarter second still to come before B takes half a second at half speed.
+    vi.advanceTimersByTime(499);
     expect(stage()).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(stage()).toHaveLength(2);

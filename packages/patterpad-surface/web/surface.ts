@@ -35,7 +35,7 @@ import { clipboardParagraphs } from "./clipboard.js";
 import { multiSelectState, multiSelectPositions } from "../src/multiselect.js";
 import { setSnippetJump, commitSlashJump } from "../src/special.js";
 import { openTargetPicker, closeTargetPicker, isTargetPickerOpen, type JumpData } from "./targetpicker.js";
-import { setPlayBlockHandler } from "./actionmenu.js";
+import { setPlayBlockHandler, setPlayInGameHandler, type PlayInGameHook } from "./actionmenu.js";
 import { settleReveal } from "./settle-reveal.js";
 import { confirmDeleteBlock, confirmDeleteChunk, confirmDeleteSet } from "./confirm.js";
 import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, optionPromptId, sayText as sayTextOf, sayStartOf, offCue, isBlankBeat, rawAttr, isZoneBeat } from "../src/zoneutil.js";
@@ -146,6 +146,10 @@ export interface MountOptions {
   /** Called when the author picks "Play block" in a snippet/group context menu, with the enclosing
    *  block's id - the host opens the play window entering that block. Omit to hide the item. */
   onPlayBlock?: (blockId: string) => void;
+  /** Play in game in the same context menu: `available` is asked as the menu opens (the items show only
+   *  while it's true, e.g. a game is on the Live Link); `run` gets the enclosing block's id and whether to
+   *  take over. Omit to hide the items. */
+  playInGame?: PlayInGameHook;
   /** Called when the author double-clicks a jump chip, with the divert's target id (a scene or block
    *  opaque id; never "END"). The host switches scene if needed and reveals the node. Omit to disable. */
   onOpenTarget?: (targetId: string) => void;
@@ -758,6 +762,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   };
   setJumpLabelResolver(jumpLabel); // BEFORE the view paints, so existing jump chips show labels
   setPlayBlockHandler(opts.onPlayBlock ?? null); // the context-menu "Play block" item routes here
+  setPlayInGameHandler(opts.playInGame ?? null); // and "Play in game", while a game is connected
   setJumpNavHandler(opts.onOpenTarget ?? null);  // double-click a jump chip -> follow the divert
   setCommentHandler(opts.onComments ?? null);    // the comment bubble + selection affordance route here
   setNoteHandler(opts.onEditNote ?? null);       // the note icon + right-click "Note…" route here
@@ -1775,7 +1780,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     // The floating menus are body-level, so they outlive the editor unless removed here (review 2026-10).
     destroy: () => {
       destroyed = true;
-      cancelPendingMark?.(); listeners.abort(); closeTargetPicker(); setPlayBlockHandler(null); setJumpNavHandler(null);
+      cancelPendingMark?.(); listeners.abort(); closeTargetPicker(); setPlayBlockHandler(null); setPlayInGameHandler(null); setJumpNavHandler(null);
       popup.destroy(); slash.destroy(); destroyActionMenu();
       pointerResize.disconnect(); playPointer.remove(); titleEl?.remove(); sceneFxEl?.remove(); unhookSceneFx?.(); opts.hintbar?.replaceChildren(); view.destroy();
     },

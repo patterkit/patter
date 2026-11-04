@@ -141,3 +141,67 @@ describe("the debug link says what it is doing, as on every other runtime", () =
     }
   });
 });
+
+describe("Play in game: the editor asks the running game to start a block", () => {
+  /** A connected socket the test can push editor messages into. */
+  function linkedSocket() {
+    const sent: Record<string, unknown>[] = [];
+    const listeners: Record<string, ((ev?: { data: unknown }) => void)[]> = {};
+    class Sock {
+      readyState = 1;
+      constructor(public url: string) {}
+      addEventListener(type: string, fn: (ev?: { data: unknown }) => void): void { (listeners[type] ??= []).push(fn); }
+      send(raw: string): void { sent.push(JSON.parse(raw)); }
+      close(): void { this.readyState = 3; }
+    }
+    const fromEditor = (msg: unknown): void => {
+      for (const fn of listeners["message"] ?? []) fn({ data: typeof msg === "string" ? msg : JSON.stringify(msg) });
+    };
+    return { Sock: Sock as never, sent, fromEditor };
+  }
+  const play = { t: "play", v: 1, id: "p1", sceneId: "s1", blockId: "b1", takeOver: true, build: "h2" };
+  const played = (sent: Record<string, unknown>[]) => sent.filter((m) => m["t"] === "played");
+
+  it("hands a well-formed request to onPlay, and sends the answer back with its id", () => {
+    const { Sock, sent, fromEditor } = linkedSocket();
+    const seen: unknown[] = [];
+    const link = createDebugLink({ build: "h1", WebSocket: Sock, onPlay: (req) => seen.push(req) });
+    fromEditor(play);
+    expect(seen).toEqual([{ id: "p1", sceneId: "s1", blockId: "b1", takeOver: true, build: "h2" }]);
+    link.replyPlay("p1", { started: false, reason: "busy", detail: "Mara is talking" });
+    expect(played(sent)).toEqual([{ t: "played", id: "p1", started: false, reason: "busy", detail: "Mara is talking" }]);
+  });
+
+  it("answers unhandled itself when the game has no handler, so the editor isn't left waiting", () => {
+    const { Sock, sent, fromEditor } = linkedSocket();
+    createDebugLink({ build: "h1", WebSocket: Sock });
+    fromEditor(play);
+    expect(played(sent)).toEqual([{ t: "played", id: "p1", started: false, reason: "unhandled" }]);
+  });
+
+  it("ignores a malformed request rather than calling the handler", () => {
+    const { Sock, sent, fromEditor } = linkedSocket();
+    const onPlay = vi.fn();
+    createDebugLink({ build: "h1", WebSocket: Sock, onPlay });
+    fromEditor({ t: "play", id: "p1", sceneId: "s1" });
+    fromEditor({ t: "play", id: "", sceneId: "s1", blockId: "b1" });
+    fromEditor("not json");
+    expect(onPlay).not.toHaveBeenCalled();
+    expect(played(sent)).toEqual([]);
+  });
+
+  it("reads takeOver as false and leaves build out when they are missing", () => {
+    const { Sock, fromEditor } = linkedSocket();
+    const onPlay = vi.fn();
+    createDebugLink({ build: "h1", WebSocket: Sock, onPlay });
+    fromEditor({ t: "play", v: 1, id: "p2", sceneId: "s1", blockId: "b1" });
+    expect(onPlay).toHaveBeenCalledWith({ id: "p2", sceneId: "s1", blockId: "b1", takeOver: false });
+  });
+
+  it("sends a started answer with no reason", () => {
+    const { Sock, sent, fromEditor } = linkedSocket();
+    const link = createDebugLink({ build: "h1", WebSocket: Sock, onPlay: (req) => link.replyPlay(req.id, { started: true }) });
+    fromEditor(play);
+    expect(played(sent)).toEqual([{ t: "played", id: "p1", started: true }]);
+  });
+});

@@ -18,7 +18,7 @@ export { snapshotState, diffState, createStateLogger } from "./logger.js";
 export type { StateSnapshot, StateChange, StateValue, StateLogger, StateLoggerOptions } from "./logger.js";
 
 export { createDebugLink } from "./debug.js";
-export type { DebugLink, DebugLinkOptions, DebugSocketLike } from "./debug.js";
+export type { DebugLink, DebugLinkOptions, DebugSocketLike, PlayRequest, PlayResult } from "./debug.js";
 
 export { applyLiveBundle } from "./refresh.js";
 export type { LiveBundleResult } from "./refresh.js";

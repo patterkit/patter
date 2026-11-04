@@ -201,12 +201,13 @@ let identity: { name: string; email?: string } | null = view === "firstrun" ? nu
 // Play > Live Link (or the chip) "connects" a game with three flows. Drive it from the console:
 // `__debug.frame(flow, sceneId, beatId, type, choiceId?)`, `__debug.open(flow)`, `__debug.close(flow)`.
 let playMark: ((id: string | null, sceneId?: string, optionId?: string) => void) | null = null;
-let debugPush: ((s: unknown) => void) | null = null;
+const debugPushes: Array<(s: unknown) => void> = []; // the debug panel's, and the editor's (Play in game)
+const debugPush = (s: unknown): void => { for (const h of debugPushes) h(s); };
 let debugOn = false;
 const debugNow = (): unknown => debugOn ? { state: "connected", port: 4471, project: "The Tavern", build: "match", ...follower.view() } : { state: "off" };
 const follower = createFlowFollower({
   onFrame: (f) => playMark?.(f.beatId, f.sceneId ?? undefined, f.type === "choice" ? f.choiceId : undefined),
-  onChange: () => { if (debugOn) debugPush?.(debugNow()); },
+  onChange: () => { if (debugOn) debugPush(debugNow()); },
 });
 (window as unknown as { __debug: unknown }).__debug = {
   open: (flow: string) => follower.flowOpen(flow),
@@ -282,11 +283,17 @@ const stub = {
 
   setRecordingMode: () => undefined,
   // Live debug link (#181): the fake link above, which "connects" several flows so the picker is exercisable.
-  debugStart: async () => debugConnect(),
-  debugStop: async () => { debugOn = false; follower.clear(); return debugNow(); },
+  debugStart: async () => { const st = debugConnect(); debugPush(st); return st; },
+  debugStop: async () => { debugOn = false; follower.clear(); const st = debugNow(); debugPush(st); return st; },
   debugStatus: async () => debugNow(),
   debugFollow: (flow: string | null) => follower.follow(flow),
-  onDebugStatus: (h: (s: unknown) => void) => { debugPush = h; },
+  onDebugStatus: (h: (s: unknown) => void) => { debugPushes.push(h); },
+  // Play in game: the fake game starts most blocks and turns a "busy" one down, so both toasts can be seen.
+  playInGame: async (_sceneId: string, blockId: string, takeOver: boolean) => {
+    await new Promise((r) => setTimeout(r, 300));
+    if (!debugOn) return { started: false, reason: "noGame" };
+    return takeOver || !/bar|greet/i.test(blockId) ? { started: true } : { started: false, reason: "busy", detail: "Oda is talking." };
+  },
   // In-memory rewrite proposals so the suggest-rewrite flow round-trips within a preview session.
   readSuggestions: async () => (window as unknown as { __suggestions?: unknown[] }).__suggestions ?? [],
   saveSuggestions: async (_sceneId: string, s: unknown[]) => { (window as unknown as { __suggestions?: unknown }).__suggestions = s; return { ok: true }; },

@@ -59,8 +59,11 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  as the option. The case `steerSetLater`. No earlier expectation changed.
  *  14: the section `versions`: whether a version is in a range (`versionInRange`), the check an extension makes
  *  against the Patterplay it finds. No earlier expectation changed.
+ *  15: the scripted op `applyLiveBundle`: the tier a pushed bundle applies at (`expectKind`, "text" or "structure"),
+ *  picked by the runtime's own apply step. And the shortest a line with no recording lasts is half a second, a
+ *  speaking time, not 1.5 (a reading time, now SUBTITLE_READING_MIN): the duration cases at the floor re-pinned.
  */
-export const CORPUS_VERSION = 14;
+export const CORPUS_VERSION = 15;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at

@@ -16,7 +16,7 @@ namespace Patterkit.Patterplay
 
         /// <summary>How long a line with no recording lasts, in seconds: the total weight of its speech units (its
         /// syllables and its pauses, <see cref="SpeechUnits"/>) at <paramref name="syllablesPerSecond"/> (default 4,
-        /// the project's <see cref="EstimateSyllablesPerSecond"/> when it sets one), clamped to 1.5 to 18 seconds.
+        /// the project's <see cref="EstimateSyllablesPerSecond"/> when it sets one), clamped to 0.5 to 18 seconds.
         /// <paramref name="text"/> and <paramref name="locale"/> are the line as it's spoken, in the project's main
         /// language (a step's <see cref="StepResult.SpokenText"/> and <see cref="StepResult.SpokenLocale"/>), never a
         /// translation being shown. This is the one rule every Patter tool and runtime times a line by, held to the
@@ -59,10 +59,16 @@ namespace Patterkit.Patterplay
         /// <summary>A short pause's weight (`,` `;` `、`), and a long one's (`.` `?` `。`).</summary>
         public const double SpeechPauseShortWeight = 1;
         public const double SpeechPauseLongWeight = 2;
-        /// <summary>The shortest a line with no recording lasts, in seconds.</summary>
-        public const double LineDurationMin = 1.5;
+        /// <summary>The shortest a line with no recording lasts, in seconds: a speaking time, the least a spoken word
+        /// plausibly takes, not a reading time (see <see cref="SubtitleReadingMin"/>).</summary>
+        public const double LineDurationMin = 0.5;
         /// <summary>The longest a line with no recording lasts, in seconds.</summary>
         public const double LineDurationMax = 18;
+        /// <summary>The least time a line's text should stay on screen to be read, in seconds, whether or not the line
+        /// is that long: for a tool that shows a line as a subtitle or overhead text, which keeps it up at least this
+        /// long after a shorter line ends, overlapping the next if it must. The line itself still ends when it's said
+        /// (<see cref="EstimateLineDuration"/>).</summary>
+        public const double SubtitleReadingMin = 1.5;
         /// <summary>The speaker pattern a project starts with, for a bundle that ships none: `You (V.O.)`.
         /// `{name}` and `{qualifier}` are plain placeholders, never run through line interpolation.</summary>
         internal const string DefaultSpeakerPattern = "{name} ({qualifier})";

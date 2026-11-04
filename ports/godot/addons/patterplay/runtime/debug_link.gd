@@ -24,6 +24,14 @@ extends Node
 # _process, so the handler runs on the main thread. Never emitted with malformed payloads.
 signal bundle_pushed(build: String, data: String)
 
+# Play in game: the writer asked the running game to start a block now. `request` is
+# { id, sceneId, blockId, takeOver: bool, build } (build "" when the editor sent none; ids are the
+# bundle's). Answer with reply_play(request.id, { started, reason?, detail? }), at once or a frame or
+# more later; an answer after the editor stopped waiting is ignored. Emitted from _process, so the
+# handler runs on the main thread. With no handler connected to it, the link answers
+# { started: false, reason: "unhandled" } itself. Never emitted with malformed payloads.
+signal play_requested(request: Dictionary)
+
 const DEFAULT_URL := "ws://127.0.0.1:4471"
 
 var _build: String
@@ -127,6 +135,19 @@ func set_build(build: String) -> void:
 	_post(_hello_message())
 
 
+# Answer a play request (see play_requested). `result` is { started: bool, reason?: String,
+# detail?: String }; reason is a short code ("busy", "unknownBlock", "staleBuild", or the game's own).
+func reply_play(id: String, result: Dictionary) -> void:
+	if id == "":
+		return
+	var msg := { "t": "played", "id": id, "started": result.get("started", false) == true }
+	if result.get("reason", null) is String:
+		msg["reason"] = result["reason"]
+	if result.get("detail", null) is String:
+		msg["detail"] = result["detail"]
+	_post(msg)
+
+
 func close() -> void:
 	_enabled = false
 	_queue.clear()
@@ -155,8 +176,9 @@ func _flush() -> void:
 	_queue.clear()
 
 
-# Live bundle refresh: the editor pushes {t:"bundle", build, data}. Validate the shape here so the
-# host's handler never sees a malformed payload; anything else the editor sends is ignored.
+# Editor -> game: a live bundle refresh {t:"bundle", build, data}, or Play in game {t:"play", id,
+# sceneId, blockId, takeOver, build?}. Validate the shape here so the host's handlers never see a
+# malformed payload; anything else the editor sends is ignored.
 func _drain_incoming() -> void:
 	while _ws.get_available_packet_count() > 0:
 		var raw := _ws.get_packet().get_string_from_utf8()
@@ -168,3 +190,25 @@ func _drain_incoming() -> void:
 			var data: String = msg["data"]
 			if build != "" and data != "":
 				bundle_pushed.emit(build, data)
+		elif msg.get("t", "") == "play":
+			var request = _play_request(msg)
+			if request == null:
+				continue
+			if play_requested.get_connections().is_empty():
+				reply_play(request["id"], { "started": false, "reason": "unhandled" })
+			else:
+				play_requested.emit(request)
+
+
+# A play message's fields, or null when it isn't a well-formed request.
+func _play_request(msg: Dictionary):
+	for key in ["id", "sceneId", "blockId"]:
+		if not (msg.get(key, null) is String) or msg[key] == "":
+			return null
+	return {
+		"id": msg["id"],
+		"sceneId": msg["sceneId"],
+		"blockId": msg["blockId"],
+		"takeOver": msg.get("takeOver", false) == true,
+		"build": msg["build"] if msg.get("build", null) is String else "",
+	}
