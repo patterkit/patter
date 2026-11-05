@@ -110,6 +110,12 @@ This needs a one-time hookup on the game side (the **live refresh & debug link**
 developer to wire it in; it's a few lines, described in
 [Live refresh & debug](/play/live-debug/). Once it's in, writers just save.
 
+With the game connected, right-click a block and choose **Play in game** to have the game start that
+block straight away (see [Play in game](/play/live-debug/#play-in-game)). A pushed edit lives only in
+the running game, so publish the bundle to keep it. The link goes by a few names: **Live Link** in
+Patterpad, the **debug link** on Patterstage's director, and **Follow in Patterpad** on
+Patterstage's Gym switch.
+
 ## Testing every path, not just the one you took
 
 Playing walks *one* route at a time. If a run ends because a choice ran dry (its options all

@@ -83,7 +83,8 @@ fix on the next pass, with no rebuild, no restart, and no losing your place.
 
 Two tiers, picked automatically:
 
-- **Text-only edits** swap the string tables in place. Nothing restarts and no state is touched.
+- **Text-only edits** swap the string tables in place. Patterplay restarts nothing and touches no state;
+  under Patterstage, the line playing starts again with its new words.
 - **Structural edits** carry the whole run across (a save and load behind the scenes). Position is re-found
   by id, so lines inserted or reordered before the cursor neither replay nor shift where you are; an
   option you deleted drops out of an open choice; content deleted under the cursor is skipped and
@@ -135,18 +136,27 @@ There are honest limits. Your game's own side-effects don't rewind (things alrea
 already in a transcript keeps the words the player saw; and an edit that changes how many random
 draws happen before the cursor naturally changes later draws.
 
+A pushed bundle lives only in the running game. The next run, and your engine's editor (its pickers
+and checks), still read the bundle you last published, so **publish to keep the edit**
+(**Publish ▸ Publish Bundle**, see [Publishing](/patterpad/publishing/)).
+
 ## Play in game
 
 With a game connected, a writer can jump straight into any conversation: right-click a block (its ⋯ menu)
 and pick **Play in game**, or put the caret in it and use **Play ▸ Play Block in Game**. Patterpad saves
 first, so the game has what the writer sees, then asks the running game to start that block now. **Play
-in game, taking over** asks the game to stop what the block's speakers are doing first, rather than turn
-the request down because they're busy. The game's answer shows in a note: the block started, or why it
-didn't.
+in game, taking over** asks the game to stop what's playing first, so the block needn't wait for a quiet
+moment. What that stops is the game's to decide (Patterstage stops everything playing on that
+director). The game's answer shows in a note: the block started, or why it didn't.
 
 What "start this block" means is the game's to decide: which characters say the lines, whether the player
 takes part, what a busy speaker does. Patterplay hands the request over and carries the answer back.
-Patterstage does all of this for you. A game of your own handles it like this, in JavaScript:
+Patterstage does all of this for you, and asks as the game itself would. If one of the game's triggers
+asks for that block, the request is made as the trigger has it (its requester, bindings, broadcast, and
+type); otherwise it has no requester, and the player's speaker is bound to the player character only
+when the block has lines for them. So a `once` line is spent on the memory it would use in play: the
+trigger's requester's, or, with no trigger, that block's own. A game of your own handles it like this,
+in JavaScript:
 
 ```js
 const link = createDebugLink({
