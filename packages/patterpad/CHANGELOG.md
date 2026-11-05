@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-11-05
+
 ### Breaking
 
 - **Timing for lines without audio is a speed.** In Project settings it's how fast a line with no recording is timed
