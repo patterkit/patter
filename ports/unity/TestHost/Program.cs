@@ -96,10 +96,6 @@ namespace Patterkit.Patterplay.TestHost
             int du = RunDurations(durationsArr);
             Console.WriteLine($"  [durations] how long a line with no recording lasts: {du}/{durationsArr.GetArrayLength()}");
             if (du != durationsArr.GetArrayLength()) Fail("durations", "section total", $"{du} of {durationsArr.GetArrayLength()} passed");
-            if (!root.TryGetProperty("speech", out var speechArr)) { Console.Error.WriteLine("corpus has no speech section"); return 2; }
-            int spc = RunSpeech(speechArr);
-            Console.WriteLine($"  [speech] the units a line is spoken in, and its syllable count: {spc}/{speechArr.GetArrayLength()}");
-            if (spc != speechArr.GetArrayLength()) Fail("speech", "section total", $"{spc} of {speechArr.GetArrayLength()} passed");
             if (!root.TryGetProperty("versions", out var versionsArr)) { Console.Error.WriteLine("corpus has no versions section (corpus 14)"); return 2; }
             int vr = RunVersions(versionsArr);
             Console.WriteLine($"  [versions] the version check an extension makes at start-up: {vr}/{versionsArr.GetArrayLength()}");
@@ -1577,7 +1573,7 @@ namespace Patterkit.Patterplay.TestHost
         {
             if (!idsOnly || s.SpokenText != null) o["spokenText"] = s.SpokenText ?? "<missing>";
             if (!idsOnly || s.SpokenLocale != null) o["spokenLocale"] = s.SpokenLocale ?? "<missing>";
-            o["estimateRate"] = s.EstimateRate.HasValue ? (object)s.EstimateRate.Value : "<missing>";
+            o["estimateSpeed"] = s.EstimateSpeed.HasValue ? (object)s.EstimateSpeed.Value : "<missing>";
         }
 
         private static Dictionary<string, object> NormalizePrompt(ChoicePrompt p, bool idsOnly)
@@ -1802,8 +1798,8 @@ namespace Patterkit.Patterplay.TestHost
 
             // The project's line-padding default (absent = the built-in one).
             bundle.PadAfterDefault = Num(b, "padAfterDefault");
-            // The project's rate for a line with no recording (absent = the built-in one).
-            bundle.EstimateSyllablesPerSecond = Num(b, "estimateSyllablesPerSecond");
+            // The project's speed for a line with no recording (absent = the built-in one).
+            bundle.EstimateSpeed = Num(b, "estimateSpeed");
 
             if (b.TryGetProperty("properties", out var props))
                 foreach (var p in props.EnumerateArray()) bundle.Properties.Add(ParsePropDecl(p));

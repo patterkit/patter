@@ -94,13 +94,6 @@ func _initialize() -> void:
 	var du := _run_durations(root["durations"])
 	print("durations: %d/%d  (how long a line with no recording lasts)" % [du, root["durations"].size()])
 	_expect_all("durations", du, root["durations"].size())
-	if not root.has("speech"):
-		push_error("corpus has no speech section")
-		quit(2)
-		return
-	var spc := _run_speech(root["speech"])
-	print("speech: %d/%d  (a line's speech units and syllable count)" % [spc, root["speech"].size()])
-	_expect_all("speech", spc, root["speech"].size())
 	if not root.has("versions"):
 		push_error("corpus has no versions section")
 		quit(2)
@@ -581,17 +574,17 @@ func _transcript_step(step: Dictionary, ids_only := false, spoken := false) -> D
 
 # A line or text step's spoken fields as a transcript records them (the reference runner's spokenFields): only in
 # a case that sets `spoken`. There, "spokenText" and "spokenLocale" are marked "<missing>" when dropped from a
-# bundle with text (in an IDs-only one they're recorded only when present), and "estimateRate" when dropped.
+# bundle with text (in an IDs-only one they're recorded only when present), and "estimateSpeed" when dropped.
 func _transcript_spoken(out: Dictionary, ids_only: bool, spoken: bool) -> void:
 	if not spoken:
-		for k in ["spokenText", "spokenLocale", "estimateRate"]:
+		for k in ["spokenText", "spokenLocale", "estimateSpeed"]:
 			out.erase(k)
 		return
 	for k in ["spokenText", "spokenLocale"]:
 		if not ids_only and not out.has(k):
 			out[k] = "<missing>"
-	if not out.has("estimateRate"):
-		out["estimateRate"] = "<missing>"
+	if not out.has("estimateSpeed"):
+		out["estimateSpeed"] = "<missing>"
 
 
 # Whether a bundle's strings are IDs-only, as the runtime reads it (a source-debug build still resolves
@@ -825,7 +818,7 @@ func _run_durations(arr: Array) -> int:
 	var pass_count := 0
 	for c in arr:
 		var name: String = c["name"]
-		var got: float = PatterBundle.estimate_line_duration(c["text"], c.get("locale", ""), float(c.get("syllablesPerSecond", PatterBundle.DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND)))
+		var got: float = PatterBundle.estimate_line_duration(c["text"], c.get("locale", ""), float(c.get("speed", PatterBundle.DEFAULT_ESTIMATE_SPEED)))
 		var want: float = c["expected"]
 		if absf(got - want) <= 1e-9:
 			pass_count += 1
@@ -845,33 +838,6 @@ func _run_versions(arr: Array) -> int:
 			pass_count += 1
 		else:
 			_fail("versions", name, "expected %s, got %s" % [want, got])
-	return pass_count
-
-
-# Each text through PatterBundle.speech_units, its units held to the reference's exactly (kind, weight, and
-# code-point offsets), and through count_syllables, to within 1e-9.
-func _run_speech(arr: Array) -> int:
-	var pass_count := 0
-	for c in arr:
-		var name: String = c["name"]
-		var locale: String = c.get("locale", "")
-		var got := PatterBundle.speech_units(c["text"], locale)
-		var want: Array = c["units"]
-		var same := got.size() == want.size()
-		if same:
-			for j in got.size():
-				var g: Dictionary = got[j]
-				var w: Dictionary = want[j]
-				if g["kind"] != w["kind"] or float(g["weight"]) != float(w["weight"]) or int(g["start"]) != int(w["start"]) or int(g["end"]) != int(w["end"]) or String(g.get("vowel", "")) != String(w.get("vowel", "")) or g.has("vowel") != w.has("vowel"):
-					same = false
-					break
-		var syllables := PatterBundle.count_syllables(c["text"], locale)
-		if not same:
-			_fail("speech", name, "units mismatch\n    expected %s\n    got      %s" % [JSON.stringify(want), JSON.stringify(got)])
-		elif absf(syllables - float(c["syllables"])) > 1e-9:
-			_fail("speech", name, "syllables: expected %s, got %s" % [c["syllables"], syllables])
-		else:
-			pass_count += 1
 	return pass_count
 
 

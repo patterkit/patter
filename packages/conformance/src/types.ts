@@ -51,11 +51,11 @@ export type TranscriptStep =
 /** How a line or text step is spoken (corpus 11), recorded only in a scripted case that sets `spoken`, so every
  *  earlier transcript is as it was. Recorded there whenever the step carries them; `spokenText` and
  *  `spokenLocale` are `"<missing>"` when a runtime drops them from a bundle with text, and absent from an IDs-only
- *  one, and `estimateRate` is `"<missing>"` when a runtime drops it. */
+ *  one, and `estimateSpeed` (`estimateRate` before corpus 17) is `"<missing>"` when a runtime drops it. */
 export interface TranscriptSpoken {
   spokenText?: string;
   spokenLocale?: string;
-  estimateRate?: number | "<missing>";
+  estimateSpeed?: number | "<missing>";
 }
 
 /** One option of a transcript `choice`: the runtime's ChoiceOption, keys absent when unset. */
@@ -432,7 +432,6 @@ export interface Corpus {
   outlines: OutlineCase[];
   audio: AudioCase[];
   durations: DurationCase[];
-  speech: SpeechCase[];
   versions: VersionCase[];
 }
 
@@ -460,33 +459,17 @@ export interface AudioCase {
 }
 
 /**
- * A duration case (corpus 9, re-pinned in 11): how long a line with no recording lasts, in seconds, by the one rule
- * every runtime shares (`estimateLineDuration`): the total weight of its speech units at `syllablesPerSecond` (5 when
- * absent), clamped to 0.5 to 18. `locale` is the language the line is spoken in. A runner compares to within 1e-9.
+ * A duration case (corpus 9, re-pinned in 11, 15, and 17): how long a line with no recording lasts, in seconds, by
+ * the one rule every runtime shares (`estimateLineDuration`): its weighted characters at 14 a second times `speed`
+ * (1 when absent or not a finite positive number), clamped to 0.5 to 18. `locale` is passed as the line's, and
+ * reserved: no runtime reads it yet. A runner compares to within 1e-9.
  */
 export interface DurationCase {
   name: string;
   text: string;
   locale?: string;
-  syllablesPerSecond?: number;
+  speed?: number;
   expected: number;
-}
-
-/** A syllable's vowel (corpus 16): ə is a vowel the script shows that isn't one of the five. */
-export type SpeechVowel = "a" | "e" | "i" | "o" | "u" | "ə";
-
-/**
- * A speech case (corpus 11): a line broken into the units it would be spoken in (`speechUnits`), each its kind,
- * weight, and code-point offsets, and its syllable count (`countSyllables`). `locale` is the language the line is
- * spoken in. A runner compares the units exactly, and the count to within 1e-9. Since corpus 16 a syllable carries
- * its `vowel` where the script says it, absent otherwise; a runner compares it too, absent with absent.
- */
-export interface SpeechCase {
-  name: string;
-  text: string;
-  locale?: string;
-  units: { kind: "syllable" | "closed" | "pause"; weight: number; start: number; end: number; vowel?: SpeechVowel }[];
-  syllables: number;
 }
 
 /**
@@ -635,7 +618,6 @@ export interface Fixtures {
   outlines: DescribeFixture[];
   audio: AudioCase[];
   durations: DurationCase[];
-  speech: SpeechCase[];
   versions: VersionCase[];
 }
 

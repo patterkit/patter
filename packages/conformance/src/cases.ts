@@ -8,7 +8,7 @@
 // corpus.json; the test asserts the reference engine reproduces every value.
 // ---------------------------------------------------------------------------
 
-import type { DescribeFixture, DurationCase, SpeechCase, SpeechVowel, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, SteerFixture, TranscriptStep, VersionCase } from "./types.js";
+import type { DescribeFixture, DurationCase, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, SteerFixture, TranscriptStep, VersionCase } from "./types.js";
 import type { Bundle, CompiledGroup, CompiledSnippet, Group, ProjectFile, LocaleFile, SaveGame, Scene, Snippet } from "@patterkit/model";
 import { castStringKey, qualifierStringKey, speakerLabelKey, SPEAKER_PATTERN_KEY } from "@patterkit/model";
 import type { ExtensionShard } from "@patterkit/model";
@@ -3943,118 +3943,43 @@ const audioManifest = {
   ],
 };
 
-// --- how long a line lasts (corpus 9, re-pinned in 11, and in 15 for the half-second floor) ---------------
-// A line with no recording lasts the total weight of its speech units (below) at the project's syllables a second,
-// 4 unless it sets its own, clamped to 0.5 to 18 seconds: the one rule every Patter tool and runtime times a line by
-// (estimateLineDuration). A rate that isn't a positive number is the default.
-const harbourLine = "The lamps are lit along the harbour wall tonight."; // 12 syllables in English
+// --- how long a line lasts (corpus 9, re-pinned in 11, 15 for the half-second floor, and 17) ---------------
+// A line with no recording lasts its weighted characters at 14 a second times the project's speed, 1 unless it sets
+// its own, clamped to 0.5 to 18 seconds: the one rule every Patter tool and runtime times a line by
+// (estimateLineDuration). A character is a code point, weighing 1 but Han 3, kana 2, a Hangul syllable 2.5, and a
+// soft hyphen 0. A speed that isn't a positive number is 1. The locale is reserved: nothing reads it yet.
+const harbourLine = "The lamps are lit along the harbour wall tonight."; // 49 characters
 const durationCases: DurationCase[] = [
   { name: "an empty line lasts the shortest time", text: "", expected: 0.5 },
-  { name: "a one-syllable line is held for the shortest time", text: "Ah", locale: "en", expected: 0.5 },
-  { name: "a short line lasts its syllables and its pause, quicker than a reading time", text: "Yes, sir.", locale: "en", expected: 0.75 },
-  { name: "a line lasts its syllables at 4 a second", text: harbourLine, locale: "en", expected: 3 },
-  { name: "the locale is the language the line is spoken in", text: harbourLine, expected: 3.25 },
-  { name: "a project's own rate", text: harbourLine, locale: "en", syllablesPerSecond: 5, expected: 2.4 },
-  { name: "the slowest rate", text: harbourLine, locale: "en", syllablesPerSecond: 2, expected: 6 },
-  { name: "the quickest rate", text: harbourLine, locale: "en", syllablesPerSecond: 10, expected: 1.2 },
-  { name: "the quickest rate, held for the shortest time", text: "No.", locale: "en", syllablesPerSecond: 10, expected: 0.5 },
-  { name: "a rate of nothing is the default", text: harbourLine, locale: "en", syllablesPerSecond: 0, expected: 3 },
-  { name: "a rate below nothing is the default", text: harbourLine, locale: "en", syllablesPerSecond: -3, expected: 3 },
-  { name: "pauses add their weight", text: "Wait... what?! Really?", locale: "en", expected: 2 },
-  { name: "a Chinese line lasts its characters", text: "你好，世界。今天天气很好。", locale: "zh-Hans", expected: 3.25 },
-  { name: "a Japanese line lasts its morae and kanji", text: "港の灯りが見えますか。", locale: "ja", expected: 3.25 },
-  { name: "digits weigh 1.5 each", text: "It costs 3.5 pounds, or 1,000 in 2026.", locale: "en", expected: 5.25 },
-  { name: "72 syllables is exactly the longest time", text: "la ".repeat(72), locale: "en", expected: 18 },
+  { name: "a two-character line is held for the shortest time", text: "Ah", locale: "en", expected: 0.5 },
+  { name: "7 characters is exactly the shortest time", text: "Ah, no.", locale: "en", expected: 0.5 },
+  { name: "a short line lasts its characters, quicker than a reading time", text: "Yes, sir.", locale: "en", expected: 0.6428571428571429 },
+  { name: "a line lasts its characters at 14 a second", text: harbourLine, locale: "en", expected: 3.5 },
+  { name: "the locale changes nothing", text: harbourLine, expected: 3.5 },
+  { name: "punctuation and spaces are characters too", text: "Wait... what?! Really?", locale: "en", expected: 1.5714285714285714 },
+  { name: "a project's own speed: 2 is twice as fast", text: harbourLine, locale: "en", speed: 2, expected: 1.75 },
+  { name: "the slowest speed", text: harbourLine, locale: "en", speed: 0.5, expected: 7 },
+  { name: "the quickest speed", text: harbourLine, locale: "en", speed: 2.5, expected: 1.4 },
+  { name: "the quickest speed, held for the shortest time", text: "No.", locale: "en", speed: 2.5, expected: 0.5 },
+  { name: "a speed of nothing is 1", text: harbourLine, locale: "en", speed: 0, expected: 3.5 },
+  { name: "a speed below nothing is 1", text: harbourLine, locale: "en", speed: -3, expected: 3.5 },
+  { name: "a Chinese line: a Han character weighs 3", text: "你好，世界。今天天气很好。", locale: "zh-Hans", expected: 2.357142857142857 },
+  { name: "a Japanese line: kanji weigh 3 and kana 2", text: "港の灯りが見えますか。", locale: "ja", expected: 1.7142857142857142 },
+  { name: "halfwidth katakana weigh 2 as well", text: "ｶﾞｯｺｰ", locale: "ja", expected: 0.7142857142857143 },
+  { name: "a Korean line: a Hangul syllable weighs 2.5", text: "안녕하세요, 반갑습니다.", locale: "ko", expected: 2 },
+  { name: "lone Hangul letters weigh 1", text: "ㅋㅋㅋ", locale: "ko", expected: 0.5 },
+  { name: "scripts mixed in a line weigh their own", text: "Hello世界こんにちは", locale: "en", expected: 1.5 },
+  { name: "a soft hyphen weighs nothing", text: "\u00ADIn\u00ADcom\u00ADpre\u00ADhen\u00ADsi\u00ADble", locale: "en", expected: 1.1428571428571428 },
+  { name: "a character is a code point: Han beyond the BMP weighs 3, and an emoji 1", text: "\u{20000}\u{20001} \u{1F319}", locale: "zh-Hans", expected: 0.5714285714285714 },
+  { name: "252 characters is exactly the longest time", text: "la ".repeat(84), locale: "en", expected: 18 },
   { name: "a longer line is held to the longest time", text: "la ".repeat(200), locale: "en", expected: 18 },
-];
-
-// --- the units a line is spoken in (corpus 11) -----------------------------------------------------------
-// speechUnits breaks a line into its syllables, its beats with the mouth shut, and its pauses, each with a weight
-// and its code-point offsets (design/proposals/syllable-counter.md); countSyllables sums the syllables' and shut
-// beats' weights. A game or Patterstage lays the same units over a line's length to move a mouth. Each case lists
-// its units as the text they cover, in order: `|` marks a short pause and `||` a long one, `_` a shut beat, and
-// `*w` a weight other than 1. Then each syllable's vowel, one a syllable in order, `-` where it has none.
-function speech(name: string, text: string, locale: string | undefined, pieces: string[], vowels: string): SpeechCase {
-  const cps = [...text];
-  const vowelList = [...vowels];
-  let from = 0, syllableAt = 0;
-  const units = pieces.map((piece) => {
-    let kind: SpeechCase["units"][number]["kind"] = "syllable", weight = 1, body = piece;
-    if (body.startsWith("||")) { kind = "pause"; weight = 2; body = body.slice(2); }
-    else if (body.startsWith("|")) { kind = "pause"; body = body.slice(1); }
-    else if (body.startsWith("_")) { kind = "closed"; body = body.slice(1); }
-    const star = kind === "pause" ? -1 : body.lastIndexOf("*");
-    if (star > 0) { weight = Number(body.slice(star + 1)); body = body.slice(0, star); }
-    const len = [...body].length;
-    let start = from;
-    while (start + len <= cps.length && cps.slice(start, start + len).join("") !== body) start++;
-    if (start + len > cps.length) throw new Error(`speech case "${name}": "${body}" isn't in the line after offset ${from}`);
-    from = start + len;
-    if (kind !== "syllable") return { kind, weight, start, end: start + len };
-    const vowel = vowelList[syllableAt++];
-    if (vowel === undefined) throw new Error(`speech case "${name}": fewer vowels than syllables`);
-    return { kind, weight, start, end: start + len, ...(vowel !== "-" ? { vowel: vowel as SpeechVowel } : {}) };
-  });
-  if (syllableAt !== vowelList.length) throw new Error(`speech case "${name}": more vowels than syllables`);
-  const syllables = units.reduce((total, u) => total + (u.kind === "pause" ? 0 : u.weight), 0);
-  return { name, text, ...(locale !== undefined ? { locale } : {}), units, syllables };
-}
-const speechCases: SpeechCase[] = [
-  speech("an empty line has no units", "", undefined, [], ""),
-  speech("English: a group of vowels a syllable, and a lone final e silent", "The lamps are lit along the harbour wall tonight.", "en", ["The", "lamps", "are", "lit", "a", "long", "the", "ha", "rbour", "wall", "to", "night"], "eaaiaoeaoaoi"),
-  speech("with no locale there's no silent e", "The lamps are lit along the harbour wall tonight.", undefined, ["The", "lamps", "a", "re", "lit", "a", "long", "the", "ha", "rbour", "wall", "to", "night"], "eaaeiaoeaoaoi"),
-  speech("English keeps a consonant and le, and a comma is a short pause", "A table, a little bottle, a cradle.", "en-GB", ["A", "ta", "ble", "|,", "a", "li", "ttle", "bo", "ttle", "|,", "a", "cra", "dle"], "aaeaieoeaae"),
-  speech("French: a lone final e or es is silent", "Une lampe brûle dans les fenêtres.", "fr_FR", ["Une", "lampe", "brûle", "dans", "les", "fe", "nêtres"], "uauaeee"),
-  speech("the silent e is English's and French's alone", "Une lampe brûle dans les fenêtres.", "de", ["U", "ne", "la", "mpe", "brû", "le", "dans", "les", "fe", "nê", "tres"], "ueaeueaeeee"),
-  speech("accented and other Latin vowels count as vowels", "Café, naïve, Ærøskøbing, cœur.", "en", ["Ca", "fé", "|,", "naïve", "|,", "Æ", "rø", "skø", "bing", "|,", "cœur"], "aeaeooie"),
-  speech("an apostrophe joins a word", "Don't, l'eau, rock’n’roll.", "en", ["Don't", "|,", "l'eau", "|,", "ro", "ck’n’roll"], "oeoo"),
-  speech("German umlauts and \u00df", "Über die Brücke, Straße.", "de", ["Ü", "ber", "die", "Brü", "cke", "|,", "Stra", "ße"], "ueiueae"),
-  speech("Polish accented letters", "Zażółć gęślą jaźń.", "pl", ["Za", "żółć", "gę", "ślą", "jaźń"], "aoeaa"),
-  speech("Turkish dotless and dotted i are vowels", "Işık, İstanbul.", "tr", ["I", "şık", "|,", "İ", "sta", "nbul"], "iiiau"),
-  speech("a word with no vowel is one syllable", "Hmm. Brr. Grr!", "en", ["Hmm", "||.", "Brr", "||.", "Grr"], "---"),
-  speech("Cyrillic: one syllable a vowel letter, and a question mark is a long pause", "Привет, как дела? Моя собака.", "ru", ["При", "вет", "|,", "как", "де", "ла", "||?", "Мо", "я", "со", "ба", "ка"], "ieaeaoaoaa"),
-  speech("Ukrainian \u0456 \u0457 \u0454 are vowels, and \u0439 isn't", "Їжак і єнот йдуть.", "uk", ["Ї", "жак", "і", "є", "нот", "йдуть"], "iaieou"),
-  speech("Han: one syllable a character, with CJK punctuation", "你好，世界。今天天气很好。", "zh-Hans", ["你", "好", "|，", "世", "界", "||。", "今", "天", "天", "气", "很", "好"], "----------"),
-  speech("Japanese: kanji about two, kana one a mora", "港の灯りが見えますか。", "ja", ["港*2", "の", "灯*2", "り", "が", "見*2", "え", "ま", "す", "か"], "-o-ia-eaua"),
-  speech("kana in the line makes it Japanese whatever the locale", "港の灯り", "zh", ["港*2", "の", "灯*2", "り"], "-o-i"),
-  speech("kana makes it Japanese with no locale too", "港の灯り", undefined, ["港*2", "の", "灯*2", "り"], "-o-i"),
-  speech("small kana merge with the one before, and \u3063 is a shut beat", "きょうはがっこうへいきます。", "ja", ["きょ", "う", "は", "が", "_っ", "こ", "う", "へ", "い", "き", "ま", "す"], "ouaaoueiiau"),
-  speech("\u30fc holds the kana before it for another beat", "ラーメン、コーヒー！", "ja", ["ラー*2", "メ", "ン", "|、", "コー*2", "ヒー*2"], "ae-oi"),
-  speech("a small kana or \u3063 with nothing before stands alone, and a lone \u30fc says nothing", "ファイト、ッ、ーあ", "ja", ["ファ", "イ", "ト", "|、", "_ッ", "|、", "あ"], "aioa"),
-  speech("halfwidth katakana, its voicing mark, and its \u30fc", "ｶﾞｯｺｰ", "ja", ["ｶﾞ", "_ｯ", "ｺｰ*2"], "ao"),
-  speech("Hangul: one syllable a block", "안녕하세요, 반갑습니다.", "ko", ["안", "녕", "하", "세", "요", "|,", "반", "갑", "습", "니", "다"], "aəaeoaaiia"),
-  speech("lone Hangul letters count as another script's", "ㅋㅋㅋ", "ko", ["ㅋㅋㅋ"], "-"),
-  speech("Arabic: one syllable a written short vowel", "مَرْحَبًا بِكُمْ", "ar", ["مَ", "رْحَ", "بًا", "بِ", "كُمْ"], "aaaiu"),
-  speech("Arabic with no vowels written: one syllable per two letters, and \u061f is a long pause", "مرحبا بكم في المدينة؟", "ar", ["مر", "حب", "ا", "بك", "م", "في", "ال", "مد", "ين", "ة"], "----------"),
-  speech("a tatweel stretches a word and says nothing", "ـمـرحـبـا", "ar", ["مـر", "حـبـ", "ا"], "---"),
-  speech("Thai: one syllable a vowel, and a space between Thai words a short pause", "สวัสดีครับ ภาษาไทย", "th", ["สวั", "สดี", "ครับ", "| ", "ภา", "ษา", "ไทย"], "aiaaaa"),
-  speech("Thai: a leading vowel takes the signs after it, and consonants with no vowel hold one per two", "เรียน ขอบคุณ ถนน กรุงเทพมหานคร", "th", ["เรียน", "| ", "ขอ", "บคุณ", "| ", "ถน", "น", "| ", "กรุ", "งเท", "พ", "มหา", "นคร"], "i-u--ue-a-"),
-  speech("a script outside the set: one syllable per three letters", "Γεια σου κόσμε.", "el", ["Γει", "α", "σου", "κόσ", "με"], "-----"),
-  speech("Devanagari is outside the set too, and \u0964 is a long pause", "नमस्ते दुनिया।", "hi", ["नमस", "्ते", "दुन", "िया"], "----"),
-  speech("a digit weighs 1.5, and a full stop or comma inside a number is part of it", "It costs 3.5 pounds, or 1,000 in 2026.", "en", ["It", "costs", "3*1.5", "5*1.5", "pounds", "|,", "or", "1*1.5", "0*1.5", "0*1.5", "0*1.5", "in", "2*1.5", "0*1.5", "2*1.5", "6*1.5"], "io--oo----i----"),
-  speech("Arabic-Indic digits weigh 1.5", "١٢٣ ٤٥", "ar", ["١*1.5", "٢*1.5", "٣*1.5", "٤*1.5", "٥*1.5"], "-----"),
-  speech("punctuation in a row is one pause, the stronger, and the last is dropped", "Wait... what?! Really?", "en", ["Wait", "||...", "what", "||?!", "Rea", "lly"], "aaei"),
-  speech("a pause before the first syllable is dropped", "...Well, then.", "en", ["Well", "|,", "then"], "ee"),
-  speech("formatting tags and entities say nothing", "<b>Bold</b> and <i>soft</i> &amp; <bi>both</bi> &#38; a < b > c.", "en", ["Bold", "and", "soft", "both", "a", "b", "c"], "oaooa--"),
-  speech("emoji and symbols say nothing, and a pause runs over them", "Look up, Tam: 🌙 🌊, the moon on the sea", "en", ["Look", "up", "|,", "Tam", "|: 🌙 🌊,", "the", "moon", "on", "the", "sea"], "ouaeooee"),
-  speech("a dash, a semicolon, and a colon are short pauses", "Hello — goodbye; and: then.", "en", ["He", "llo", "|—", "goo", "dbye", "|;", "and", "|:", "then"], "eooeae"),
-  speech("an e and a combining accent is an accented e, never silent", "e\u0301te\u0301", "fr", ["e\u0301", "te\u0301"], "ee"),
-  speech("a soft hyphen joins a word", "\u00ADIn\u00ADcom\u00ADpre\u00ADhen\u00ADsi\u00ADble", "en", ["I", "n\u00ADco", "m\u00ADpre", "\u00ADhe", "n\u00ADsi", "\u00ADble"], "ioeeie"),
-  speech("scripts change mid-word", "Hello世界こんにちは", "en", ["He", "llo", "世*2", "界*2", "こ", "ん", "に", "ち", "は"], "eo--o-iia"),
-  speech("Spanish opening marks say nothing", "¿Qué tal? ¡Hola!", "es", ["Qué", "tal", "||?", "Ho", "la"], "eaoa"),
-  speech("Latin: y before a vowel isn't the vowel, and a u after q is weak", "Yes, you, my yacht; they queen que quiero.", "en", ["Yes", "|,", "you", "|,", "my", "yacht", "|;", "they", "queen", "que", "quie", "ro"], "eoiaeeeio"),
-  speech("Cyrillic: \u044f a, \u0451 o, \u044e u, \u044d e", "Я ёж, юла, это.", "ru", ["Я", "ёж", "|,", "ю", "ла", "|,", "э", "то"], "aouaeo"),
-  speech("Hangul: the block's medial vowel, and \u3153 \u3155 \u315d are \u0259", "어머니 원 의사 으", "ko", ["어", "머", "니", "원", "의", "사", "으"], "əəiəiai"),
-  speech("Arabic: the tanwin say their vowels", "عَلَيْكُمْ كِتَابٌ", "ar", ["عَ", "لَ", "يْكُمْ", "كِ", "تَ", "ابٌ"], "aauiau"),
-  speech("Thai: a fuller sign says the vowel over a leading one", "เรียน ไป แกะ เขา", "th", ["เรียน", "| ", "ไป", "| ", "แกะ", "| ", "เขา"], "iaea"),
-  speech("kana: a small kana says the vowel, and \u3093 has none", "きゃ ファ ちょっと ん ヴ", "ja", ["きゃ", "ファ", "ちょ", "_っ", "と", "ん", "ヴ"], "aaoo-u"),
 ];
 
 // --- how a line is spoken (corpus 11) -------------------------------------------------------------------
 // A line is spoken in the project's main language whatever language is shown, so each line and text step says how:
 // `spokenText`, the line in the main language (interpolated as the shown text is, with caption cues left out whether
 // captions are on or not, empty for the caption character's lines), `spokenLocale`, and the project's
-// `estimateRate`. A game times a line with no recording by them, and moves a mouth by them.
+// `estimateSpeed`. A game times a line with no recording by them, and moves a mouth by them.
 const spokenScenes: Scene[] = [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
   { id: "n", type: "snippet", beats: [
     { id: "L1", kind: "line", character: "NPC" },
@@ -4069,26 +3994,26 @@ const spokenLocales = [
 ];
 const spokenProperties: ProjectFile["properties"] = [{ name: "name", type: "string", shared: true, default: "Ada" }];
 const scriptedSpokenText = {
-  name: "a line is spoken in the main language: its text there, that language, and the project's rate",
-  project: project({ locales: { default: "en", all: ["en", "fr"] }, cast: [{ name: "NPC" }, { name: "SFX" }], properties: spokenProperties, estimateSyllablesPerSecond: 4 }),
+  name: "a line is spoken in the main language: its text there, that language, and the project's speed",
+  project: project({ locales: { default: "en", all: ["en", "fr"] }, cast: [{ name: "NPC" }, { name: "SFX" }], properties: spokenProperties, estimateSpeed: 1.25 }),
   scenes: spokenScenes,
   locales: spokenLocales,
   locale: "fr",
   spoken: true,
   script: [
     { op: "openFlow", flow: "main", scene: "s" },
-    { op: "advance", expect: [{ type: "line", id: "L1", text: "Bonjour Ada, [rit] bienvenue.", character: "NPC", spokenText: "Hello Ada, welcome home.", spokenLocale: "en", estimateRate: 4 }] },
-    { op: "advance", expect: [{ type: "line", id: "L2", text: "[une porte claque]", character: "SFX", spokenText: "", spokenLocale: "en", estimateRate: 4 }] },
-    { op: "advance", expect: [{ type: "text", id: "T1", text: "La pluie sur Ada.", spokenText: "The rain on Ada.", spokenLocale: "en", estimateRate: 4 }] },
-    { op: "advance", expect: [{ type: "line", id: "L3", text: "<Untranslated: L3> Goodbye.", character: "NPC", spokenText: "Goodbye.", spokenLocale: "en", estimateRate: 4 }] },
+    { op: "advance", expect: [{ type: "line", id: "L1", text: "Bonjour Ada, [rit] bienvenue.", character: "NPC", spokenText: "Hello Ada, welcome home.", spokenLocale: "en", estimateSpeed: 1.25 }] },
+    { op: "advance", expect: [{ type: "line", id: "L2", text: "[une porte claque]", character: "SFX", spokenText: "", spokenLocale: "en", estimateSpeed: 1.25 }] },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "La pluie sur Ada.", spokenText: "The rain on Ada.", spokenLocale: "en", estimateSpeed: 1.25 }] },
+    { op: "advance", expect: [{ type: "line", id: "L3", text: "<Untranslated: L3> Goodbye.", character: "NPC", spokenText: "Goodbye.", spokenLocale: "en", estimateSpeed: 1.25 }] },
     { op: "advance", expect: [{ type: "end" }] },
   ],
 } satisfies ScriptedFixture;
 
-// A voiced project's lines aren't interpolated, so neither is how they're spoken; its text still is. With no rate of
-// its own, the project's is the default.
+// A voiced project's lines aren't interpolated, so neither is how they're spoken; its text still is. With no speed
+// of its own, the project's is the default.
 const scriptedSpokenVoiced = {
-  name: "a voiced project's spoken lines aren't interpolated, and its rate is the default",
+  name: "a voiced project's spoken lines aren't interpolated, and its speed is the default",
   project: project({ voiced: true, locales: { default: "en", all: ["en", "fr"] }, cast: [{ name: "NPC" }, { name: "SFX" }], properties: spokenProperties }),
   scenes: spokenScenes,
   locales: spokenLocales,
@@ -4096,25 +4021,25 @@ const scriptedSpokenVoiced = {
   spoken: true,
   script: [
     { op: "openFlow", flow: "main", scene: "s" },
-    { op: "advance", expect: [{ type: "line", id: "L1", text: "Bonjour {@name}, [rit] bienvenue.", character: "NPC", spokenText: "Hello {@name}, welcome home.", spokenLocale: "en", estimateRate: 4 }] },
-    { op: "advance", expect: [{ type: "line", id: "L2", text: "[une porte claque]", character: "SFX", spokenText: "", spokenLocale: "en", estimateRate: 4 }] },
-    { op: "advance", expect: [{ type: "text", id: "T1", text: "La pluie sur Ada.", spokenText: "The rain on Ada.", spokenLocale: "en", estimateRate: 4 }] },
+    { op: "advance", expect: [{ type: "line", id: "L1", text: "Bonjour {@name}, [rit] bienvenue.", character: "NPC", spokenText: "Hello {@name}, welcome home.", spokenLocale: "en", estimateSpeed: 1 }] },
+    { op: "advance", expect: [{ type: "line", id: "L2", text: "[une porte claque]", character: "SFX", spokenText: "", spokenLocale: "en", estimateSpeed: 1 }] },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "La pluie sur Ada.", spokenText: "The rain on Ada.", spokenLocale: "en", estimateSpeed: 1 }] },
   ],
 } satisfies ScriptedFixture;
 
-// An IDs-only bundle has no text, so nothing says how a line is spoken but the rate: the game passes its own text.
+// An IDs-only bundle has no text, so nothing says how a line is spoken but the speed: the game passes its own text.
 const scriptedSpokenIds = {
-  name: "an IDs-only bundle gives only the rate a line is estimated at",
-  project: project({ cast: [{ name: "NPC" }, { name: "SFX" }], properties: spokenProperties, estimateSyllablesPerSecond: 6 }),
+  name: "an IDs-only bundle gives only the speed a line is estimated at",
+  project: project({ cast: [{ name: "NPC" }, { name: "SFX" }], properties: spokenProperties, estimateSpeed: 1.5 }),
   scenes: spokenScenes,
   locales: [spokenLocales[0]!],
   idsOnly: true,
   spoken: true,
   script: [
     { op: "openFlow", flow: "main", scene: "s" },
-    { op: "advance", expect: [{ type: "line", id: "L1", text: "L1", character: "NPC", estimateRate: 6 }] },
-    { op: "advance", expect: [{ type: "line", id: "L2", text: "L2", character: "SFX", estimateRate: 6 }] },
-    { op: "advance", expect: [{ type: "text", id: "T1", text: "T1", estimateRate: 6 }] },
+    { op: "advance", expect: [{ type: "line", id: "L1", text: "L1", character: "NPC", estimateSpeed: 1.5 }] },
+    { op: "advance", expect: [{ type: "line", id: "L2", text: "L2", character: "SFX", estimateSpeed: 1.5 }] },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "T1", estimateSpeed: 1.5 }] },
   ],
 } satisfies ScriptedFixture;
 
@@ -4906,6 +4831,5 @@ export const cases: Fixtures = {
   outlines: [outlineEverything, outlineExtensions],
   audio: [audioManifest],
   durations: durationCases,
-  speech: speechCases,
   versions: versionCases,
 };

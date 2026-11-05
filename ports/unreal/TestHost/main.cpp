@@ -164,13 +164,13 @@ static void setLabelField(JsonValue& o, bool hasCharacter, const std::string& ch
 
 // A line or text step's spoken fields, as a case that sets `spoken` records them (corpus 11): spokenText and
 // spokenLocale, or a marker when a runtime drops them from a bundle with text (absent from an IDs-only one), and
-// estimateRate, or a marker when a runtime drops it. The JS runner's spokenFields.
+// estimateSpeed (estimateRate before corpus 17), or a marker when a runtime drops it. The JS runner's spokenFields.
 static void setSpokenFields(JsonValue& o, const StepResult& s, bool idsOnly)
 {
     if (!idsOnly || s.hasSpokenText) o.set("spokenText", JsonValue::Str(s.hasSpokenText ? s.spokenText : "<missing>"));
     if (!idsOnly || s.hasSpokenLocale) o.set("spokenLocale", JsonValue::Str(s.hasSpokenLocale ? s.spokenLocale : "<missing>"));
-    if (s.estimateRate > 0) o.set("estimateRate", JsonValue::Num(s.estimateRate));
-    else o.set("estimateRate", JsonValue::Str("<missing>"));
+    if (s.estimateSpeed > 0) o.set("estimateSpeed", JsonValue::Num(s.estimateSpeed));
+    else o.set("estimateSpeed", JsonValue::Str("<missing>"));
 }
 
 // `idsOnly`: the bundle's strings are IDs-only, so names (the speaker's label among them) are the game's to resolve.
@@ -1011,7 +1011,7 @@ static int runAudio(const JsonValue& arr)
 }
 
 // The corpus's duration cases: each text (UTF-8, as the corpus holds it) through the core's estimateLineDuration,
-// held to the reference's seconds.
+// at the case's `speed` when it sets one (corpus 17), held to the reference's seconds.
 static int runDurations(const JsonValue& arr)
 {
     int pass = 0;
@@ -1021,9 +1021,9 @@ static int runDurations(const JsonValue& arr)
         try
         {
             const JsonValue* locale = c.find("locale");
-            const JsonValue* rate = c.find("syllablesPerSecond");
+            const JsonValue* speed = c.find("speed");
             const double got = estimateLineDuration(c.at("text").str, locale ? locale->str : std::string(),
-                                                    rate ? rate->num : DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND);
+                                                    speed ? speed->num : DEFAULT_ESTIMATE_SPEED);
             const double want = c.at("expected").num;
             if (std::fabs(got - want) <= 1e-9) ++pass;
             else fail("durations", name, "expected " + std::to_string(want) + ", got " + std::to_string(got));
@@ -1048,45 +1048,6 @@ static int runVersions(const JsonValue& arr)
             else fail("versions", name, std::string("expected ") + (want ? "true" : "false") + ", got " + (got ? "true" : "false"));
         }
         catch (const std::exception& ex) { fail("versions", name, ex.what()); }
-    }
-    return pass;
-}
-
-// The corpus's speech cases (corpus 11): each text (UTF-8) through the core's speechUnits, every unit's kind, weight,
-// and code-point offsets matched exactly, and its countSyllables to within 1e-9. Since corpus 16 a syllable's vowel
-// too: an empty vowel is left out, so it matches a case's absent one, and the units must match key for key.
-static int runSpeech(const JsonValue& arr)
-{
-    int pass = 0;
-    for (const auto& c : arr.arr)
-    {
-        std::string name = c.at("name").str;
-        try
-        {
-            const JsonValue* locale = c.find("locale");
-            const std::string loc = locale ? locale->str : std::string();
-            const std::vector<SpeechUnit> got = speechUnits(c.at("text").str, loc);
-            JsonValue units = JsonValue::Arr();
-            for (const SpeechUnit& u : got)
-            {
-                JsonValue o = JsonValue::Obj();
-                o.set("kind", JsonValue::Str(speechUnitKindName(u.kind)));
-                o.set("weight", JsonValue::Num(u.weight));
-                o.set("start", JsonValue::Num(u.start));
-                o.set("end", JsonValue::Num(u.end));
-                if (!u.vowel.empty()) o.set("vowel", JsonValue::Str(u.vowel));
-                units.push(o);
-            }
-            const double syllables = countSyllables(c.at("text").str, loc);
-            const double want = c.at("syllables").num;
-            // matchValue checks only the expected keys, so a vowel the case hasn't got would slip by: count them.
-            bool sameKeys = units.arr.size() == c.at("units").arr.size();
-            for (std::size_t k = 0; sameKeys && k < units.arr.size(); ++k) sameKeys = units.arr[k].obj.size() == c.at("units").arr[k].obj.size();
-            if (!sameKeys || !matchValue(units, c.at("units"))) fail("speech", name, "units: expected " + dump(c.at("units")) + ", got " + dump(units));
-            else if (std::fabs(syllables - want) > 1e-9) fail("speech", name, "syllables: expected " + std::to_string(want) + ", got " + std::to_string(syllables));
-            else ++pass;
-        }
-        catch (const std::exception& ex) { fail("speech", name, ex.what()); }
     }
     return pass;
 }
@@ -4139,11 +4100,6 @@ int main(int argc, char** argv)
     int du = runDurations(*durationsArr);
     std::cout << "  [durations] how long a line with no recording lasts: " << du << "/" << durationsArr->arr.size() << "\n";
     if (du != static_cast<int>(durationsArr->arr.size())) fail("durations", "section total", std::to_string(du) + " of " + std::to_string(durationsArr->arr.size()) + " passed");
-    const JsonValue* speechArr = root.find("speech");
-    if (!speechArr) { std::cerr << "corpus has no speech section\n"; return 2; }
-    int su = runSpeech(*speechArr);
-    std::cout << "  [speech] the units a line is spoken in, and its syllables: " << su << "/" << speechArr->arr.size() << "\n";
-    if (su != static_cast<int>(speechArr->arr.size())) fail("speech", "section total", std::to_string(su) + " of " + std::to_string(speechArr->arr.size()) + " passed");
     const JsonValue* versionsArr = root.find("versions");
     if (!versionsArr) { std::cerr << "corpus has no versions section\n"; return 2; }
     int vr = runVersions(*versionsArr);

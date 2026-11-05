@@ -17,13 +17,13 @@ import { evaluate, deserialiseAst, makePrng } from "@wildwinter/expr";
 import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
-import { Engine, effectiveGameData, estimateLineDuration, speechUnits, countSyllables, extensionDecls, extensionsOf, gameDataFields, versionInRange } from "@patterkit/runtime";
+import { Engine, effectiveGameData, estimateLineDuration, extensionDecls, extensionsOf, gameDataFields, versionInRange } from "@patterkit/runtime";
 import type { Checkpoint, EngineOptions, HostScope, LoadMisfit, PlayError, StepResult, Steerer } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { applyLiveBundle, createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, FlowState, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
-  AudioCase, DurationCase, SpeechCase, VersionCase, TranscriptSpoken, LogCase, SteerCase, SteerPointRecord,
+  AudioCase, DurationCase, VersionCase, TranscriptSpoken, LogCase, SteerCase, SteerPointRecord,
   ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptOption, TranscriptPrompt, TranscriptStep,
 } from "./types.js";
 
@@ -438,7 +438,7 @@ function spokenFields(r: Extract<StepResult, { type: "line" | "text" }>, idsOnly
   const out: TranscriptSpoken = {};
   if (!idsOnly || r.spokenText !== undefined) out.spokenText = r.spokenText ?? "<missing>";
   if (!idsOnly || r.spokenLocale !== undefined) out.spokenLocale = r.spokenLocale ?? "<missing>";
-  out.estimateRate = r.estimateRate ?? "<missing>";
+  out.estimateSpeed = r.estimateSpeed ?? "<missing>";
   return out;
 }
 
@@ -601,12 +601,7 @@ export function runAudioCase(c: AudioCase): (string | null)[] {
 
 /** How long a duration case's line lasts, by the reference's estimateLineDuration. */
 export function runDurationCase(c: DurationCase): number {
-  return estimateLineDuration(c.text, c.locale, c.syllablesPerSecond);
-}
-
-/** A speech case's units and syllable count, by the reference's speechUnits and countSyllables. */
-export function runSpeechCase(c: SpeechCase): { units: SpeechCase["units"]; syllables: number } {
-  return { units: speechUnits(c.text, c.locale), syllables: countSyllables(c.text, c.locale) };
+  return estimateLineDuration(c.text, c.locale, c.speed);
 }
 
 /** Whether a version case's version is in its range, by the reference's versionInRange. */

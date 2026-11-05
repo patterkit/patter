@@ -14,51 +14,65 @@ namespace Patterkit.Patterplay
         /// padding): the same on every runtime and in Patterpad's Play window.</summary>
         public const double DefaultPadAfter = 0.6;
 
-        /// <summary>How long a line with no recording lasts, in seconds: the total weight of its speech units (its
-        /// syllables and its pauses, <see cref="SpeechUnits"/>) at <paramref name="syllablesPerSecond"/> (default 4,
-        /// the project's <see cref="EstimateSyllablesPerSecond"/> when it sets one), clamped to 0.5 to 18 seconds.
-        /// <paramref name="text"/> and <paramref name="locale"/> are the line as it's spoken, in the project's main
-        /// language (a step's <see cref="StepResult.SpokenText"/> and <see cref="StepResult.SpokenLocale"/>), never a
-        /// translation being shown. This is the one rule every Patter tool and runtime times a line by, held to the
-        /// same numbers by the conformance corpus. A rate that isn't a finite positive number is the default. A line
-        /// with a recording lasts as long as the recording, whatever this says.</summary>
-        public static double EstimateLineDuration(string text, string locale = "", double syllablesPerSecond = DefaultEstimateSyllablesPerSecond)
+        /// <summary>How long a line with no recording lasts, in seconds: its weighted characters
+        /// (<see cref="LineCharWeights"/>, a character being a code point, 1 unless listed there) at
+        /// <see cref="LineCharsPerSecond"/> times <paramref name="speed"/> (default 1, the project's
+        /// <see cref="EstimateSpeed"/> when it sets one), clamped to 0.5 to 18 seconds. <paramref name="text"/> is the
+        /// line as it's spoken, in the project's main language (a step's <see cref="StepResult.SpokenText"/>), never a
+        /// translation being shown. <paramref name="locale"/> is reserved: nothing reads it yet. This is the one rule
+        /// every Patter tool and runtime times a line by, held to the same numbers by the conformance corpus. A speed
+        /// that isn't a finite positive number is 1. A line with a recording lasts as long as the recording, whatever
+        /// this says.</summary>
+        public static double EstimateLineDuration(string text, string locale = "", double speed = DefaultEstimateSpeed)
         {
-            double rate = !double.IsNaN(syllablesPerSecond) && !double.IsInfinity(syllablesPerSecond) && syllablesPerSecond > 0
-                ? syllablesPerSecond : DefaultEstimateSyllablesPerSecond;
+            double s = !double.IsNaN(speed) && !double.IsInfinity(speed) && speed > 0 ? speed : DefaultEstimateSpeed;
             double weight = 0;
-            foreach (var u in Speech.Units(text ?? "", locale)) weight += u.Weight;
-            return System.Math.Min(System.Math.Max(weight / rate, LineDurationMin), LineDurationMax);
+            string t = text ?? "";
+            for (int i = 0; i < t.Length; i++)
+            {
+                int cp = t[i];
+                if (char.IsHighSurrogate(t[i]) && i + 1 < t.Length && char.IsLowSurrogate(t[i + 1]))
+                {
+                    cp = char.ConvertToUtf32(t[i], t[i + 1]);
+                    i++;
+                }
+                double w = 1;
+                foreach (var (lo, hi, cw) in LineCharWeights)
+                {
+                    if (cp < lo) break;
+                    if (cp <= hi) { w = cw; break; }
+                }
+                weight += w;
+            }
+            return System.Math.Min(System.Math.Max(weight / (LineCharsPerSecond * s), LineDurationMin), LineDurationMax);
         }
 
-        /// <summary>A line broken into the units it would be spoken in: its syllables, its beats with the mouth shut
-        /// (っ), and its pauses, in order, each with a weight; their offsets are code points. Lay them over a line's
-        /// length (its recording's, or <see cref="EstimateLineDuration"/>'s) to move a mouth. <paramref name="locale"/>
-        /// is the language the line is spoken in (the project's main language, not the one being shown); it decides
-        /// English's and French's silent e, and Japanese kanji, which also apply when the line has any kana in it.</summary>
-        public static List<SpeechUnit> SpeechUnits(string text, string locale = "") => Speech.Units(text, locale);
-
-        /// <summary>How many syllables a line would be spoken in: its syllables' and shut beats' weights, pauses
-        /// aside. <paramref name="locale"/> is the language it's spoken in, as for <see cref="SpeechUnits"/>.</summary>
-        public static double CountSyllables(string text, string locale = "")
+        /// <summary>The characters <see cref="EstimateLineDuration"/> weighs other than 1, as inclusive code point
+        /// ranges with their weight, in order: Han 3 (CJK Unified Ideographs, Extension A, the Compatibility
+        /// Ideographs, and Extensions B onwards), kana 2 (hiragana, katakana, the katakana phonetic extensions, and
+        /// halfwidth katakana), a Hangul syllable block 2.5, and the soft hyphen 0. Plain ranges rather than Unicode
+        /// properties, so every runtime holds the same list.</summary>
+        public static readonly IReadOnlyList<(int Lo, int Hi, double Weight)> LineCharWeights = new (int, int, double)[]
         {
-            double total = 0;
-            foreach (var u in Speech.Units(text, locale)) if (u.Kind != SpeechUnitKind.Pause) total += u.Weight;
-            return total;
-        }
+            (0x00ad, 0x00ad, 0),
+            (0x3040, 0x30ff, 2),
+            (0x31f0, 0x31ff, 2),
+            (0x3400, 0x4dbf, 3),
+            (0x4e00, 0x9fff, 3),
+            (0xac00, 0xd7a3, 2.5),
+            (0xf900, 0xfaff, 3),
+            (0xff66, 0xff9f, 2),
+            (0x20000, 0x3134f, 3),
+        };
 
-        /// <summary>How many syllables a second a line with no recording is timed at, unless the project sets its own
-        /// (<see cref="EstimateSyllablesPerSecond"/>), and the range a project's is kept within.</summary>
-        public const double DefaultEstimateSyllablesPerSecond = 4;
-        public const double EstimateSyllablesPerSecondMin = 2;
-        public const double EstimateSyllablesPerSecondMax = 10;
-        /// <summary>A digit's weight in <see cref="SpeechUnits"/>: most read as one or two syllables.</summary>
-        public const double SpeechDigitWeight = 1.5;
-        /// <summary>A Han character's weight in Japanese text.</summary>
-        public const double SpeechKanjiWeight = 2;
-        /// <summary>A short pause's weight (`,` `;` `、`), and a long one's (`.` `?` `。`).</summary>
-        public const double SpeechPauseShortWeight = 1;
-        public const double SpeechPauseLongWeight = 2;
+        /// <summary>How fast a line with no recording is timed against the default, unless the project sets its own
+        /// (<see cref="EstimateSpeed"/>), and the range a project's is kept within: higher is faster.</summary>
+        public const double DefaultEstimateSpeed = 1;
+        public const double EstimateSpeedMin = 0.5;
+        public const double EstimateSpeedMax = 2.5;
+        /// <summary>How many weighted characters a second a line with no recording is timed at, at speed 1
+        /// (<see cref="EstimateLineDuration"/>).</summary>
+        public const double LineCharsPerSecond = 14;
         /// <summary>The shortest a line with no recording lasts, in seconds: a speaking time, the least a spoken word
         /// plausibly takes, not a reading time (see <see cref="SubtitleReadingMin"/>).</summary>
         public const double LineDurationMin = 0.5;
@@ -100,9 +114,9 @@ namespace Patterkit.Patterplay
         public string SpeakerPattern;
         /// <summary>The project's own `padAfterDefault` (line padding); null = <see cref="DefaultPadAfter"/>.</summary>
         public double? PadAfterDefault;
-        /// <summary>The project's own `estimateSyllablesPerSecond`, the rate a line with no recording is timed at;
-        /// null = <see cref="DefaultEstimateSyllablesPerSecond"/>.</summary>
-        public double? EstimateSyllablesPerSecond;
+        /// <summary>The project's own `estimateSpeed`, how fast a line with no recording is timed against the
+        /// default; null = <see cref="DefaultEstimateSpeed"/>.</summary>
+        public double? EstimateSpeed;
         public List<PropertyDecl> Properties = new List<PropertyDecl>();
         public Dictionary<string, Scene> Scenes = new Dictionary<string, Scene>();
         /// <summary>locale -> (string id -> text). Empty for an IDs-only build (the engine emits beat IDs).</summary>

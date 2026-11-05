@@ -60,25 +60,18 @@ else the built-in 0.6. A negative value starts the next line that long before th
 only a snippet's last line is never negative (a negative pause before a game event stands). An option's
 `Prompt` carries its pause too, as `PadAfter`, for a game that voices the prompts itself. When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects.
 A line with a recording lasts as long as the recording. For one with no recording,
-`UPatterGameData::EstimateLineDuration(Step.SpokenText, Step.SpokenLocale, Step.EstimateRate)` (C++
+`UPatterGameData::EstimateLineDuration(Step.SpokenText, Step.SpokenLocale, Step.EstimateSpeed)` (C++
 `patter::estimateLineDuration`) gives how long it lasts, in seconds: Patter's one rule, the same in every runtime
-and in Patterpad's Play window. It counts the line's syllables and the pauses at its punctuation, each weighed, at
-the project's syllables a second (`EstimateRate`, 4 unless the project sets its own), clamped to 0.5 to 18
-seconds. That's how long the line takes to say, not how long its text needs to be read: if you show it as a
-subtitle, keep the text up at least `patter::SUBTITLE_READING_MIN` (1.5 seconds) after a shorter line ends,
-overlapping the next line if you must. A line or text step carries what that needs: `SpokenText` is the line in the project's main language
-whatever language is being shown (interpolated, with caption cues left out, and empty for the caption
-character's lines), `SpokenLocale` that language, and `EstimateRate` the rate. An IDs-only build sets no
-`SpokenText` or `SpokenLocale` (`bHasSpokenText` is false), so pass your own text.
-
-To move a mouth, `UPatterGameData::SpeechUnits(Text, Locale)` (C++ `patter::speechUnits`) breaks a line into the
-units it's spoken in: syllables, beats with the mouth shut, and pauses, each an `FPatterSpeechUnit` with its
-`Kind`, `Weight`, and `Start` and `End` (code-point offsets, so an emoji counts once). Lay them over the line's
-length, the recording's or the estimate's, each taking its weight's share, and the mouth keeps time with the
-estimate. A syllable's `Vowel` says which vowel it opens on, for a mouth shape at its peak: `a`, `e`, `i`, `o`,
-`u`, or `ə` (a vowel the script shows that isn't one of the five), and empty where the script doesn't say, as in
-Han, digits, and Arabic with no vowels written, and on pauses and shut beats. It's rough for English, and close for
-languages spelt as they're spoken. `UPatterGameData::CountSyllables` (C++ `patter::countSyllables`) gives the syllable count alone.
+and in Patterpad's Play window. It counts the line's characters (code points, so an emoji is one), each weighed
+(a Han character 3, kana 2, a Hangul syllable 2.5, a soft hyphen nothing, and anything else 1), at 14 a second
+times the project's speed (`EstimateSpeed`, 1 unless the project sets its own, higher is faster), clamped to 0.5
+to 18 seconds. It's meant to be close enough, not exact. That's how long the line takes to say, not how long its
+text needs to be read: if you show it as a subtitle, keep the text up at least `patter::SUBTITLE_READING_MIN` (1.5
+seconds) after a shorter line ends, overlapping the next line if you must. A line or text step carries what that
+needs: `SpokenText` is the line in the project's main language whatever language is being shown (interpolated,
+with caption cues left out, and empty for the caption character's lines), `SpokenLocale` that language, and
+`EstimateSpeed` the speed. An IDs-only build sets no `SpokenText` or `SpokenLocale` (`bHasSpokenText` is false),
+so pass your own text. To move a mouth with the line, Patterstage has the speech units for it.
 
 `patter::PatterplayVersion` (Blueprint: `GetPatterplayVersion`) is this runtime's version, as in its
 `.uplugin`. An extension that ships apart from Patterplay, such as Patterstage or Pattershot, checks at start-up

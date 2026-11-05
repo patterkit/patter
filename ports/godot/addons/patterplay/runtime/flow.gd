@@ -1348,15 +1348,15 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 
 
 # How a line or text beat is spoken, onto its step, for timing a line with no recording and for moving a mouth
-# (PatterBundle.estimate_line_duration(step["spokenText"], step["spokenLocale"], step["estimateRate"])):
+# (PatterBundle.estimate_line_duration(step["spokenText"], step["spokenLocale"], step["estimateSpeed"])):
 # "spokenText", its text in the project's main language whatever language is shown, interpolated as the shown
 # text is (a voiced project's lines aren't), caption cues always left out, and empty for the caption character's
-# lines; "spokenLocale", that language; and "estimateRate", the project's syllables a second for an estimate
-# ("estimateSyllablesPerSecond", default 4), always there. The first two are left off in an IDs-only bundle, which
+# lines; "spokenLocale", that language; and "estimateSpeed", the project's speed for an estimate
+# ("estimateSpeed", default 1, higher is faster), always there. The first two are left off in an IDs-only bundle, which
 # has no text (the game passes its own), and for a beat the main language has no string for.
 func _put_spoken(out: Dictionary, beat: Dictionary) -> void:
-	var rate = _host.bundle.get("estimateSyllablesPerSecond")
-	out["estimateRate"] = float(rate) if rate is float or rate is int else PatterBundle.DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND
+	var speed = _host.bundle.get("estimateSpeed")
+	out["estimateSpeed"] = float(speed) if speed is float or speed is int else PatterBundle.DEFAULT_ESTIMATE_SPEED
 	var source = null if _host.emit_ids else _host.default_strings.get(beat["id"])
 	if source == null:
 		return

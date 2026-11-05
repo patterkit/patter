@@ -37,7 +37,7 @@ import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { defaultFor, PropertyBag } from "@wildwinter/scoperegistry";
 import type { LoadMisfit, LogMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
-import { walkNodes, effectiveGameId, resolveSceneRef, castStringKey, qualifierStringKey, speakerLabelKey, formatSpeakerLabel, SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, DEFAULT_PAD_AFTER, DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
+import { walkNodes, effectiveGameId, resolveSceneRef, castStringKey, qualifierStringKey, speakerLabelKey, formatSpeakerLabel, SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, DEFAULT_PAD_AFTER, DEFAULT_ESTIMATE_SPEED, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
 import { buildPadIndex, type BeatPad } from "./pads.js";
 import { SAVE_VERSION } from "@patterkit/model";
@@ -174,16 +174,16 @@ export type StepResult =
   | { type: "end"; reason: FlowEndReason };
 
 /** What a line or text step says about how it's spoken, for timing a line with no recording and for moving a
- *  mouth: `estimateLineDuration(step.spokenText, step.spokenLocale, step.estimateRate)`. A line is spoken in the
+ *  mouth: `estimateLineDuration(step.spokenText, step.spokenLocale, step.estimateSpeed)`. A line is spoken in the
  *  project's main language whatever language is being shown, so `spokenText` is the line in that language
  *  (interpolated as the shown text is, with caption cues left out whether captions are on or not, and empty for
  *  the caption character's lines) and `spokenLocale` that language. Both are absent from an IDs-only bundle, which
- *  has no text: the game passes its own. `estimateRate` is the project's syllables a second for an estimate
- *  (`estimateSyllablesPerSecond`, default 4); a line with a recording lasts as long as the recording. */
+ *  has no text: the game passes its own. `estimateSpeed` is the project's speed for an estimate (`estimateSpeed`,
+ *  default 1, higher is faster); a line with a recording lasts as long as the recording. */
 export interface SpokenFields {
   spokenText?: string;
   spokenLocale?: string;
-  estimateRate?: number;
+  estimateSpeed?: number;
 }
 
 /** Why a flow ended (see the `end` step). */
@@ -2990,17 +2990,17 @@ export class Flow {
 
   /** How a line or text beat is spoken (`SpokenFields`): its text in the project's main language, interpolated as
    *  the shown text is (a voiced project's lines aren't), caption cues always left out, and empty for the caption
-   *  character's lines; that language; and the project's rate for an estimate. No text in an IDs-only bundle, or
+   *  character's lines; that language; and the project's speed for an estimate. No text in an IDs-only bundle, or
    *  for a beat the main language has no string for. */
   private spokenOf(beat: LineBeat | TextBeat): SpokenFields {
-    const estimateRate = this.host.bundle.estimateSyllablesPerSecond ?? DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND;
+    const estimateSpeed = this.host.bundle.estimateSpeed ?? DEFAULT_ESTIMATE_SPEED;
     const source = this.host.emitIds ? undefined : this.host.defaultStrings[beat.id];
-    if (source === undefined) return { estimateRate };
+    if (source === undefined) return { estimateSpeed };
     let spokenText: string;
     if (beat.kind === "text") spokenText = this.interpolate(source);
     else if (beat.character === this.host.captionCharacter) spokenText = "";
     else spokenText = this.stripCaptions(this.host.bundle.voiced ? source : this.interpolate(source));
-    return { spokenText, spokenLocale: this.host.bundle.locales.default, estimateRate };
+    return { spokenText, spokenLocale: this.host.bundle.locales.default, estimateSpeed };
   }
 
   /**

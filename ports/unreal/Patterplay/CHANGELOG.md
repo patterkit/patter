@@ -7,6 +7,28 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Breaking
+
+- **Speech units have moved to Patterstage.** `patter::speechUnits`, `patter::countSyllables`, `patter::SpeechUnit`,
+  `patter::SpeechUnitKind`, and the speech weights' constants are gone from the C++ core, with `Patter/Speech.h` and
+  the generated table `Patter/SpeechTable.h`; in Blueprint, `UPatterGameData::SpeechUnits`,
+  `UPatterGameData::CountSyllables`, `FPatterSpeechUnit`, and `EPatterSpeechUnitKind` are gone. They only served a
+  mouth, and Patterstage now carries its own copy for that. Nothing else in Patter needs them.
+- **A line with no recording is timed by its weighted characters at a speed.** `patter::estimateLineDuration(text,
+  locale, speed)` (Blueprint: `UPatterGameData::EstimateLineDuration(Text, Locale, Speed)`, now in
+  `Patter/Bundle.h` alone) weighs each character (a code point) as 1, a Han character 3, kana 2, a Hangul syllable
+  2.5, and a soft hyphen 0, at 14 a second times `speed`, clamped to 0.5 to 18 seconds as before. The weights are
+  `patter::LINE_CHAR_WEIGHTS` and the rate `patter::LINE_CHARS_PER_SECOND`. `locale` is reserved and unused. A speed
+  that isn't a finite positive number is 1. A silent line's length changes with the new rule; a line with a
+  recording still lasts as long as the recording.
+- **The project's timing is a speed.** `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND` and its range are now
+  `DEFAULT_ESTIMATE_SPEED` (1), `ESTIMATE_SPEED_MIN` (0.5), and `ESTIMATE_SPEED_MAX` (2.5); the bundle's
+  `estimateSyllablesPerSecond` is now `estimateSpeed` (`Bundle::hasEstimateSpeed` and `estimateSpeed`, present only
+  when the project sets one, higher is faster); and a line or text step's `estimateRate` is now `estimateSpeed`
+  (`FPatterStep::EstimateRate` is now `EstimateSpeed`). `spokenText` and `spokenLocale` are unchanged.
+- The TestHost passes conformance corpus 17: its speech section is gone, and its duration cases are re-pinned for
+  the new rule, with Chinese, Japanese, Korean, soft hyphen, speed, and floor and ceiling cases.
+
 ## [0.44.0] - 2026-11-04
 
 ### Added

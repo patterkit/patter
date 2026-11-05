@@ -2,8 +2,8 @@
 // included), log, interpolation and caption stripping; the engine's locale, captions and source-debug
 // getters, addresses, scene and block tags and Game Data, every open flow, and OpenFlow with a block and
 // a seed; an option's prompt as one value, the flags that tell an unset speaker from an empty one,
-// StepFor, a beat's step before it plays, EstimateLineDuration, how long a line with no recording lasts, the
-// SpeechUnits and CountSyllables it's built on, a step's spoken fields, and the Patterplay version and its range check.
+// StepFor, a beat's step before it plays, EstimateLineDuration, how long a line with no recording lasts, a step's
+// spoken fields, and the Patterplay version and its range check.
 // Runs via
 //   -ExecCmds="Automation RunTests Patterplay.Blueprint"
 
@@ -91,35 +91,25 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 
 	// --- how long a line with no recording lasts: an FString reaches the core's rule whole ---------------
 	// (UTF-16 in, so an emoji's surrogate pair is one code point; the corpus holds the core to every case.)
+	// 49 characters at 14 a second.
 	const FString Lamps = TEXT("The lamps are lit along the harbour wall tonight.");
 	TestEqual(TEXT("EstimateLineDuration: the shortest"), UPatterGameData::EstimateLineDuration(TEXT("Ah.")), 0.5);
-	TestEqual(TEXT("EstimateLineDuration: 4 syllables a second"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en")), 3.0);
-	TestEqual(TEXT("EstimateLineDuration: the project's own rate"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en"), 3.0), 4.0);
-	TestEqual(TEXT("EstimateLineDuration: a rate that isn't positive is the default"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en"), -1.0), 3.0);
+	TestEqual(TEXT("EstimateLineDuration: 14 characters a second"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en")), 3.5);
+	TestEqual(TEXT("EstimateLineDuration: the project's own speed"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en"), 0.5), 7.0);
+	TestEqual(TEXT("EstimateLineDuration: a speed that isn't positive is the default"), UPatterGameData::EstimateLineDuration(Lamps, TEXT("en"), -1.0), 3.5);
+	TestEqual(TEXT("EstimateLineDuration: an emoji is one character"), UPatterGameData::EstimateLineDuration(TEXT("The lamps are lit along the harbour wall tonight\U0001F319"), TEXT("en")), 3.5);
+	TestEqual(TEXT("EstimateLineDuration: a soft hyphen weighs nothing"), UPatterGameData::EstimateLineDuration(TEXT("The lamps are lit along the har\u00ADbour wall tonight."), TEXT("en")), 3.5);
+	FString Han, Hangul;
+	for (int32 I = 0; I < 14; ++I) { Han += TEXT("\u65E5"); Hangul += TEXT("\uC5B4"); }
+	TestEqual(TEXT("EstimateLineDuration: a Han character weighs 3"), UPatterGameData::EstimateLineDuration(Han, TEXT("zh")), 3.0);
+	TestEqual(TEXT("EstimateLineDuration: a Hangul syllable weighs 2.5"), UPatterGameData::EstimateLineDuration(Hangul, TEXT("ko")), 2.5);
 	FString Chant;
 	for (int32 I = 0; I < 100; ++I) Chant += TEXT("la ");
 	TestEqual(TEXT("EstimateLineDuration: the longest"), UPatterGameData::EstimateLineDuration(Chant), 18.0);
-	TestEqual(TEXT("CountSyllables: a silent final e in English"), UPatterGameData::CountSyllables(Lamps, TEXT("en")), 12.0);
-	TestEqual(TEXT("CountSyllables: consonant + le isn't silent"), UPatterGameData::CountSyllables(TEXT("table"), TEXT("en")), 2.0);
 	TestEqual(TEXT("GetPatterplayVersion: the core's version"), UPatterGameData::GetPatterplayVersion(), FString(UTF8_TO_TCHAR(patter::PatterplayVersion)));
 	TestTrue(TEXT("PatterplayVersionInRange: a patch inside the range"), UPatterGameData::PatterplayVersionInRange(TEXT("0.41.7"), TEXT("0.41.0"), TEXT("0.42.0")));
 	TestFalse(TEXT("PatterplayVersionInRange: the top of the range is outside it"), UPatterGameData::PatterplayVersionInRange(TEXT("0.42.0"), TEXT("0.41.0"), TEXT("0.42.0")));
 	TestFalse(TEXT("PatterplayVersionInRange: a text that isn't a version"), UPatterGameData::PatterplayVersionInRange(TEXT("latest"), TEXT("0.41.0"), TEXT("0.42.0")));
-	// An emoji weighs nothing, and counts once in the offsets: Ah [2, 4), the comma [4, 5), no [6, 8).
-	const TArray<FPatterSpeechUnit> Units = UPatterGameData::SpeechUnits(TEXT("\U0001F319 Ah, no."), TEXT("en"));
-	TestEqual(TEXT("SpeechUnits: two syllables and the pause between"), Units.Num(), 3);
-	if (Units.Num() == 3)
-	{
-		TestTrue(TEXT("SpeechUnits: a syllable after the emoji, in code points"), Units[0].Kind == EPatterSpeechUnitKind::Syllable && Units[0].Start == 2 && Units[0].End == 4 && Units[0].Weight == 1.0);
-		TestTrue(TEXT("SpeechUnits: the comma, a short pause"), Units[1].Kind == EPatterSpeechUnitKind::Pause && Units[1].Start == 4 && Units[1].End == 5 && Units[1].Weight == 1.0);
-		TestTrue(TEXT("SpeechUnits: the full stop at the end is dropped"), Units[2].Kind == EPatterSpeechUnitKind::Syllable && Units[2].Start == 6 && Units[2].End == 8);
-		TestEqual(TEXT("SpeechUnits: a syllable's vowel"), Units[0].Vowel, FString(TEXT("a")));
-		TestEqual(TEXT("SpeechUnits: a pause has no vowel"), Units[1].Vowel, FString());
-		TestEqual(TEXT("SpeechUnits: the second syllable's vowel"), Units[2].Vowel, FString(TEXT("o")));
-	}
-	// A vowel outside ASCII comes through UTF-8 whole: the Hangul block U+C5B4's vowel is U+0259 (schwa).
-	const TArray<FPatterSpeechUnit> Schwa = UPatterGameData::SpeechUnits(TEXT("\uC5B4"), TEXT("ko"));
-	TestTrue(TEXT("SpeechUnits: a Hangul block's vowel, schwa"), Schwa.Num() == 1 && Schwa[0].Vowel == FString(TEXT("\u0259")));
 
 	// --- the audio resolver joins its base and a take, keeping a base that is a root --------------------
 	const FString Manifest = TEXT(R"({"clips": {"L": {"file": "final/L.wav"}}})");
@@ -167,7 +157,7 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("the line interpolates @gold"), Line.Text, FString(TEXT("Gold 3.")));
 	TestTrue(TEXT("SpokenText: the line in the main language, interpolated"), Line.bHasSpokenText && Line.SpokenText == TEXT("Gold 3."));
 	TestTrue(TEXT("SpokenLocale: the main language"), Line.bHasSpokenLocale && Line.SpokenLocale == TEXT("en"));
-	TestEqual(TEXT("EstimateRate: the default, as the project sets none"), Line.EstimateRate, 4.0);
+	TestEqual(TEXT("EstimateSpeed: the default, as the project sets none"), Line.EstimateSpeed, 1.0);
 	TestEqual(TEXT("StepFor equals Advance: spoken text"), Ahead.SpokenText, Line.SpokenText);
 	TestTrue(TEXT("bHasCharacter"), Line.bHasCharacter);
 	TestEqual(TEXT("Character"), Line.Character, FString(TEXT("ANNA")));

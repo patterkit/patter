@@ -83,8 +83,7 @@ namespace Patterkit.Patterplay
         public bool Action;
         /// <summary>Line and text only: the beat's string in the project's main language (the bundle's default
         /// locale), whatever language is being shown, for timing a line with no recording and moving a mouth:
-        /// <c>Bundle.EstimateLineDuration(step.SpokenText, step.SpokenLocale, step.EstimateRate.Value)</c>, or
-        /// <c>Bundle.SpeechUnits(step.SpokenText, step.SpokenLocale)</c>. Interpolated as the shown text is (a voiced
+        /// <c>Bundle.EstimateLineDuration(step.SpokenText, step.SpokenLocale, step.EstimateSpeed.Value)</c>. Interpolated as the shown text is (a voiced
         /// project's lines aren't), with closed-caption cues left out whether captions are on or not, and empty for
         /// the caption character's lines. Null in an IDs-only bundle (the game passes its own text), and when the main
         /// language has no string for the beat.</summary>
@@ -92,11 +91,10 @@ namespace Patterkit.Patterplay
         /// <summary>Line and text only: the language <see cref="SpokenText"/> is in (the bundle's default locale).
         /// Set exactly when SpokenText is.</summary>
         public string SpokenLocale;
-        /// <summary>Line and text only (always set there; null on the others): the project's syllables a second for
-        /// a line with no recording (its `estimateSyllablesPerSecond`, else
-        /// <see cref="Bundle.DefaultEstimateSyllablesPerSecond"/>). A line with a recording lasts as long as the
-        /// recording.</summary>
-        public double? EstimateRate;
+        /// <summary>Line and text only (always set there; null on the others): the project's speed for a line with
+        /// no recording (its `estimateSpeed`, else <see cref="Bundle.DefaultEstimateSpeed"/>, 1; higher is faster). A
+        /// line with a recording lasts as long as the recording.</summary>
+        public double? EstimateSpeed;
         public GameData GameData;
         /// <summary>Line, text and game event only: the beat's Patter extension values, by extension id, raw as
         /// the bundle carries them (any JSON as the neutral tree). Null when it has none.</summary>

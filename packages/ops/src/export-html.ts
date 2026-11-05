@@ -184,7 +184,7 @@ const PLAYER_JS = String.raw`
       if (s.type === "choice") { renderChoice(s); return; }
       // Action text (a direction for whoever stages the scene, never shown to the player) takes no time of its
       // own, only its pause, and reads as a direction.
-      timeline.place(s, s.action ? 0 : estimate(s.spokenText != null ? s.spokenText : s.text, s.spokenLocale, s.estimateRate));
+      timeline.place(s, s.action ? 0 : estimate(s.spokenText != null ? s.spokenText : s.text, s.spokenLocale, s.estimateSpeed));
       if (s.type === "line") {
         // The speaker's label as the runtime resolved it (TAM (O.S.), or a pair's own label): this page never
         // puts a name and a qualifier together itself. (Its bundle always carries the strings, so a line with a

@@ -21,7 +21,7 @@ import { loadProject, runExportHtml, runExportWeb } from "../src/index.js";
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), "fixture");
 
 const TEXT = {
-  A: "Hello there, friend.",
+  A: "Hello there, friends.", // 21 characters: 1.5 seconds
   B: "This one runs on for a good while, long enough to be timed longer than the shortest.",
   C: "Short.",
   D: "Next.",
@@ -190,14 +190,14 @@ describe("playable HTML: line timing", () => {
   });
 
   it("applies a change of speed at once, keeping the time already played", () => {
-    startPage(); // A lasts 1.25 seconds (its syllables and a pause) and B cuts in half a second before it ends
-    expect(estimateLineDuration(TEXT.A, "en")).toBe(1.25);
+    startPage(); // A lasts 1.5 seconds (its 21 characters) and B cuts in half a second before it ends
+    expect(estimateLineDuration(TEXT.A, "en")).toBe(1.5);
     vi.advanceTimersByTime(500); // half a second played at normal speed
     const select = document.querySelector<HTMLSelectElement>("#speed")!;
     select.value = "half";
     select.dispatchEvent(new Event("change"));
-    // The quarter second still to come before B takes half a second at half speed.
-    vi.advanceTimersByTime(499);
+    // The half second still to come before B takes a second at half speed.
+    vi.advanceTimersByTime(999);
     expect(stage()).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(stage()).toHaveLength(2);

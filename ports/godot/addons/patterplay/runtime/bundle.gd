@@ -248,11 +248,13 @@ static func format_speaker_label(pattern: String, name: String, qualifier: Strin
 ## runtime and in Patterpad's Play window.
 const DEFAULT_PAD_AFTER := 0.6
 
-## How many syllables a second a line with no recording is timed at, unless the project sets its own
-## ("estimateSyllablesPerSecond"), and the range validation keeps a project's within.
-const DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND := 4.0
-const ESTIMATE_SYLLABLES_PER_SECOND_MIN := 2.0
-const ESTIMATE_SYLLABLES_PER_SECOND_MAX := 10.0
+## How fast a line with no recording is timed against the default, unless the project sets its own
+## ("estimateSpeed"), and the range validation keeps a project's within: higher is faster.
+const DEFAULT_ESTIMATE_SPEED := 1.0
+const ESTIMATE_SPEED_MIN := 0.5
+const ESTIMATE_SPEED_MAX := 2.5
+## How many weighted characters a second a line with no recording is timed at, at speed 1 (estimate_line_duration).
+const LINE_CHARS_PER_SECOND := 14.0
 ## The shortest and longest a line with no recording lasts, in seconds. The shortest is a speaking time, the least a
 ## spoken word plausibly takes, not a reading time (see SUBTITLE_READING_MIN).
 const LINE_DURATION_MIN := 0.5
@@ -262,46 +264,44 @@ const LINE_DURATION_MAX := 18.0
 ## line ends, overlapping the next if it must. The line itself still ends when it's said (estimate_line_duration).
 const SUBTITLE_READING_MIN := 1.5
 
-## A digit's weight in speech_units: most read as one or two syllables.
-const SPEECH_DIGIT_WEIGHT := 1.5
-## A Han character's weight in Japanese text.
-const SPEECH_KANJI_WEIGHT := 2.0
-## A short pause's weight (`,` `;` `、`), and a long one's (`.` `?` `。`).
-const SPEECH_PAUSE_SHORT_WEIGHT := 1.0
-const SPEECH_PAUSE_LONG_WEIGHT := 2.0
+## The characters estimate_line_duration weighs other than 1, as inclusive code point ranges with their weight,
+## in order: Han 3 (CJK Unified Ideographs, Extension A, the Compatibility Ideographs, and Extensions B onwards),
+## kana 2 (hiragana, katakana, the katakana phonetic extensions, and halfwidth katakana), a Hangul syllable block
+## 2.5, and the soft hyphen 0. Plain ranges rather than Unicode properties, so every runtime holds the same list.
+const LINE_CHAR_WEIGHTS := [
+	[0x00AD, 0x00AD, 0.0],
+	[0x3040, 0x30FF, 2.0],
+	[0x31F0, 0x31FF, 2.0],
+	[0x3400, 0x4DBF, 3.0],
+	[0x4E00, 0x9FFF, 3.0],
+	[0xAC00, 0xD7A3, 2.5],
+	[0xF900, 0xFAFF, 3.0],
+	[0xFF66, 0xFF9F, 2.0],
+	[0x20000, 0x3134F, 3.0],
+]
 
 
-## How long a line with no recording lasts, in seconds: the total weight of its speech units (its syllables and its
-## pauses, speech_units) at `syllables_per_second` (default 4, the project's "estimateSyllablesPerSecond" when it
-## sets one, a line step's "estimateRate"), clamped to 0.5 to 18 seconds. `text` and `locale` are the line as it's
-## spoken, in the project's main language (a line step's "spokenText" and "spokenLocale"), never a translation
-## being shown. This is the one rule every Patter tool and runtime times a line by, held to the same numbers by the
-## conformance corpus. A rate that isn't a positive number is the default. A line with a recording lasts as long as
-## the recording, whatever this says.
-static func estimate_line_duration(text: String, locale: String = "", syllables_per_second: float = DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND) -> float:
-	var rate := syllables_per_second if is_finite(syllables_per_second) and syllables_per_second > 0.0 else DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND
+## How long a line with no recording lasts, in seconds: its weighted characters (LINE_CHAR_WEIGHTS, a character
+## being a code point, 1 unless listed there) at LINE_CHARS_PER_SECOND times `speed` (default 1, the project's
+## "estimateSpeed" when it sets one, a line step's "estimateSpeed"), clamped to 0.5 to 18 seconds. `text` is the
+## line as it's spoken, in the project's main language (a line step's "spokenText"), never a translation being
+## shown. `locale` is reserved: nothing reads it yet. This is the one rule every Patter tool and runtime times a
+## line by, held to the same numbers by the conformance corpus. A speed that isn't a finite positive number is 1.
+## A line with a recording lasts as long as the recording, whatever this says.
+static func estimate_line_duration(text: String, locale: String = "", speed: float = DEFAULT_ESTIMATE_SPEED) -> float:
+	var s := speed if is_finite(speed) and speed > 0.0 else DEFAULT_ESTIMATE_SPEED
 	var weight := 0.0
-	for u in PatterSpeech.units(text, locale):
-		weight += float(u["weight"])
-	return clampf(weight / rate, LINE_DURATION_MIN, LINE_DURATION_MAX)
-
-
-## A line broken into the units it would be spoken in: its syllables, its beats with the mouth shut, and its
-## pauses, in order, each {"kind": "syllable" | "closed" | "pause", "weight": float, "start": int, "end": int},
-## the offsets in code points (end exclusive), and a syllable's "vowel" ("a", "e", "i", "o", "u", or "ə", a vowel
-## the script shows that isn't one of the five) where the script says it, the key absent otherwise. Lay them over a line's length (its recording's, or
-## estimate_line_duration's) to move a mouth: a syllable opens it, "closed" (っ) and a pause keep it shut.
-## `locale` is the language the line is spoken in (the project's main language, a step's "spokenLocale"); it
-## decides English's and French's silent e, and Japanese kanji. A syllable's vowel can pick a mouth shape at its
-## peak.
-static func speech_units(text: String, locale: String = "") -> Array:
-	return PatterSpeech.units(text, locale)
-
-
-## How many syllables a line would be spoken in: its syllables' and shut beats' weights, pauses aside. `locale` is
-## the language it's spoken in, as for speech_units.
-static func count_syllables(text: String, locale: String = "") -> float:
-	return PatterSpeech.count(text, locale)
+	for i in text.length():
+		var cp := text.unicode_at(i)
+		var w := 1.0
+		for r in LINE_CHAR_WEIGHTS:
+			if cp < r[0]:
+				break
+			if cp <= r[1]:
+				w = r[2]
+				break
+		weight += w
+	return clampf(weight / (LINE_CHARS_PER_SECOND * s), LINE_DURATION_MIN, LINE_DURATION_MAX)
 
 
 # Line padding: the pause after a line or text beat, `padAfter`, in seconds. A beat without its own takes

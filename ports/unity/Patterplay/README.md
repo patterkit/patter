@@ -80,24 +80,17 @@ carries none. `GetOutline` and `GetBeatSequence` report the same `PadAfter` on a
 beat's `BeatInfo`, with `OwnPadAfter` when the beat sets its own.
 
 A line with a recording lasts as long as the recording. For one without,
-`Bundle.EstimateLineDuration(step.SpokenText, step.SpokenLocale, step.EstimateRate.Value)` gives how long it
+`Bundle.EstimateLineDuration(step.SpokenText, step.SpokenLocale, step.EstimateSpeed.Value)` gives how long it
 lasts, in seconds: Patter's one rule, the same in every runtime and in Patterpad's Play window. It weighs the
-line's syllables and the pauses at its punctuation, and times them at the project's rate (4 syllables a second
-unless the project sets its own), between 0.5 and 18 seconds. That's how long the line takes to say, not how long
-its text needs to be read: if you show it as a subtitle, keep the text up at least `Bundle.SubtitleReadingMin` (1.5
-seconds) after a shorter line ends, overlapping the next line if you must. A line or text step carries what it needs:
-`SpokenText` is the beat's string in the project's main language, whatever language is being shown
-(interpolated, with closed-caption cues left out, and empty for the caption character's lines), `SpokenLocale`
-is that language, and `EstimateRate` is the project's rate. In an IDs-only bundle `SpokenText` and
-`SpokenLocale` are null, so pass your own text.
-
-To move a mouth, `Bundle.SpeechUnits(text, locale)` breaks a line into the units it's spoken in: each
-`SpeechUnit` is a `Syllable` (the mouth opens), a `Closed` beat (the mouth shut), or a `Pause`, with a `Weight`
-and its `Start` and `End` offsets in the text, counted in code points. Lay them over the line's length, its
-recording's or the estimate's, in proportion to their weights, and the mouth and the timing agree.
-A syllable's `Vowel` is "a", "e", "i", "o", "u", or "ə" where the script says it, for a mouth shape at its peak,
-and null where it doesn't (Han, digits, unvowelled Arabic, and any other script), as it is on a pause or a shut beat.
-`Bundle.CountSyllables(text, locale)` gives the syllable count, pauses aside.
+line's characters (a Han character 3, kana 2, a Hangul syllable 2.5, anything else 1), and times them at 14 a
+second times the project's speed (1 unless the project sets its own, higher is faster), between 0.5 and 18 seconds.
+That's how long the line takes to say, not how long its text needs to be read: if you show it as a subtitle, keep
+the text up at least `Bundle.SubtitleReadingMin` (1.5 seconds) after a shorter line ends, overlapping the next line
+if you must. A line or text step carries what it needs: `SpokenText` is the beat's string in the project's main
+language, whatever language is being shown (interpolated, with closed-caption cues left out, and empty for the
+caption character's lines), `SpokenLocale` is that language, and `EstimateSpeed` is the project's speed. In an
+IDs-only bundle `SpokenText` and `SpokenLocale` are null, so pass your own text. To move a mouth over a line, use
+Patterstage, which lays its own speech units over the line's length.
 
 A text step with `Action` set is action: a direction for whoever stages the scene, such as "MARA turns
 away.", that the player never sees. It's a dialogue scene's text when the project doesn't localise it, and its

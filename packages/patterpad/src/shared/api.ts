@@ -108,9 +108,9 @@ export interface OpenedProject {
   /** The project's default pause after a line, in seconds (ProjectFile.padAfterDefault, else the built-in
    *  `DEFAULT_PAD_AFTER`): what the inspector's Pad after field shows when nothing nearer sets one. */
   padAfterDefault: number;
-  /** How many syllables a second a line with no recording is timed at (ProjectFile.estimateSyllablesPerSecond,
-   *  else `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND`). */
-  estimateSyllablesPerSecond: number;
+  /** How fast a line with no recording is timed against the default (ProjectFile.estimateSpeed, else
+   *  `DEFAULT_ESTIMATE_SPEED`). */
+  estimateSpeed: number;
   /** Localise text lines in dialogue scenes (ProjectFile.localiseDialogueText, default off). Off, a dialogue
    *  scene's text is action: the surface draws it as a direction and Play doesn't show it as text. */
   localiseDialogueText: boolean;
@@ -244,10 +244,10 @@ export interface ProjectSettingsDto {
    *  populated (the built-in default when the project sets none); saveSettings drops it again when it
    *  still matches. Optional on save, so a caller with an older settings shape leaves it alone. */
   padAfterDefault?: number;
-  /** How many syllables a second a line with no recording is timed at (ProjectFile.estimateSyllablesPerSecond).
+  /** How fast a line with no recording is timed against the default (ProjectFile.estimateSpeed).
    *  Populated and dropped again on save as `padAfterDefault` is. Optional on save, so a caller with an older
    *  settings shape leaves it alone. */
-  estimateSyllablesPerSecond?: number;
+  estimateSpeed?: number;
   /** Localise text lines in dialogue scenes (ProjectFile.localiseDialogueText): default off, stored only when
    *  on. Optional on save, so a caller with an older settings shape leaves it alone. */
   localiseDialogueText?: boolean;

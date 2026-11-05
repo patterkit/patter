@@ -18,10 +18,11 @@ The **General** tab holds the **Project name**, the **Start** scene (where the s
 used by **Play ▸ Play from Start** and the coverage test), **Pad after**, the project's default
 [pause between lines](/patterpad/writing-surface/#pauses-between-lines) (0.6 seconds unless you
 change it), **Timing for lines without audio**, the **Voiced** flag, and the **Inline formatting** (bold
-and italic) toggle. **Timing for lines without audio** is how many syllables a second a line with no
-recording is timed at, 4 unless you change it, from 2 to 10. It's worked out from the line's text in the
-project's main language, and it's used by Play, the playable HTML page, and your game. A line with a
-recording always lasts as long as the recording.
+and italic) toggle. **Timing for lines without audio** is how fast a line with no recording is timed
+against the default: 1 unless you change it, from 0.5 to 2.5, and higher is faster (2 is twice as fast). It's
+worked out from the line's text in the project's main language, and it's used by Play, the playable HTML page,
+and your game. A line with a recording always lasts as long as the recording. A project from before this
+setting was a speed, which gave a number of syllables a second, opens with that number divided by 4.
 
 The **Publish** tab holds the **Bundle path**, where **Publish ▸ Publish Bundle** writes the
 `.patterc`, and the **Localisation** mode, Embedded or IDs only, with a source-debug option for an

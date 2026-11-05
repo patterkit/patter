@@ -120,8 +120,8 @@ namespace patter
                 if (A::isString(*p)) { out.hasSpeakerPattern = true; out.speakerPattern = A::str(*p); }
 
             if (const J* p = field(root, "padAfterDefault")) readPad(*p, out.hasPadAfterDefault, out.padAfterDefault);
-            // The project's syllables a second for an estimate: a finite number, like a pause; anything else is unset.
-            if (const J* p = field(root, "estimateSyllablesPerSecond")) readPad(*p, out.hasEstimateSyllablesPerSecond, out.estimateSyllablesPerSecond);
+            // The project's speed for an estimate: a finite number, like a pause; anything else is unset.
+            if (const J* p = field(root, "estimateSpeed")) readPad(*p, out.hasEstimateSpeed, out.estimateSpeed);
 
             if (const J* p = field(root, "properties"))
                 eachElement(*p, [&](const J& d) { out.properties.push_back(propDecl(d)); });

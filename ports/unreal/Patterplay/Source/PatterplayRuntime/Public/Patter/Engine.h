@@ -2481,12 +2481,12 @@ namespace patter
         }
         // How a line or text beat is spoken (StepResult's spoken fields): its text in the project's main language,
         // interpolated as the shown text is (a voiced project's lines aren't), caption cues always left out, and
-        // empty for the caption character's lines; that language; and the project's rate for an estimate. No text
+        // empty for the caption character's lines; that language; and the project's speed for an estimate. No text
         // in an IDs-only build, or for a beat the main language has no string for.
         void applySpoken(StepResult& r, const Beat& beat)
         {
             const Bundle& bundle = *host_->bundle;
-            r.estimateRate = bundle.hasEstimateSyllablesPerSecond ? bundle.estimateSyllablesPerSecond : DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND;
+            r.estimateSpeed = bundle.hasEstimateSpeed ? bundle.estimateSpeed : DEFAULT_ESTIMATE_SPEED;
             if (host_->emitIds) return;
             auto source = host_->defaultStrings->find(beat.id);
             if (source == host_->defaultStrings->end()) return;

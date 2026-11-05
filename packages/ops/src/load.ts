@@ -15,7 +15,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, dirname, resolve, basename } from "node:path";
 import { parseSource } from "@patterkit/core";
 import type { ProjectFile, FlowFile, LocaleFile, AuthoringFile, Scene, ExtensionShard } from "@patterkit/model";
-import { EXTENSION_SHARD, EXTENSIONS_DIR, MANIFEST_EXTENSION, isCaseOnlyPropertyName, projectLayout, sceneFolderLayout } from "@patterkit/model";
+import { EXTENSION_SHARD, EXTENSIONS_DIR, MANIFEST_EXTENSION, isCaseOnlyPropertyName, projectLayout, sceneFolderLayout, normaliseEstimateSpeed } from "@patterkit/model";
 import { discoverGameScopes } from "./game-scopes.js";
 import type { GameScopes } from "./game-scopes.js";
 
@@ -233,6 +233,9 @@ function migrateLegacyPropertyTypes(parsed: unknown, expectSchema: string): void
     // a `{ name }` decl. Lift any legacy string entries on read; they upgrade on the next save.
     const recs = obj["recordingStatuses"];
     if (Array.isArray(recs)) obj["recordingStatuses"] = recs.map((r) => (typeof r === "string" ? { name: r } : r));
+    // Back-compat (Patterplay 0.45.0): the timing for lines without audio was `estimateSyllablesPerSecond`; it's now
+    // `estimateSpeed`, a factor of the default. Read the old key as the new; it upgrades on the next save.
+    normaliseEstimateSpeed(obj);
   } else if (expectSchema === "patter/flow") {
     const scene = obj["scene"] as { sceneProps?: unknown } | undefined;
     fixDecls(scene?.sceneProps);

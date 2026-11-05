@@ -134,3 +134,36 @@ describe("names that need more than folding are left for the validator", () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Back-compat (Patterplay 0.45.0): the timing for lines without audio was
+// `estimateSyllablesPerSecond` (syllables a second, default 4); it's now
+// `estimateSpeed`, a factor of the default. The old key reads as old / 4.
+// ---------------------------------------------------------------------------
+
+function makeTimedProject(extra: Record<string, unknown>): string {
+  const dir = mkdtempSync(join(tmpdir(), "patter-migrate-speed-"));
+  for (const d of ["scenes", "loc/en"]) mkdirSync(join(dir, d), { recursive: true });
+  const w = (p: string, o: unknown) => writeFileSync(join(dir, p), JSON.stringify(o));
+  w("game.patterproj", { schema: "patter/project@0", project: { id: "t", name: "Timed" }, locales: { default: "en", all: ["en"] }, ...extra });
+  w("scenes/one.patterflow", { schema: "patter/flow@0", scene: { id: "s1", type: "scene", name: "Start", blocks: [] } });
+  return dir;
+}
+
+describe("legacy estimateSyllablesPerSecond on load", () => {
+  it("reads the old key as estimateSpeed = old / 4, and drops it", () => {
+    const p = loadProject(makeTimedProject({ estimateSyllablesPerSecond: 6 })).project as unknown as Record<string, unknown>;
+    expect(p["estimateSpeed"]).toBe(1.5);
+    expect("estimateSyllablesPerSecond" in p).toBe(false);
+  });
+
+  it("keeps an estimateSpeed the file already has", () => {
+    const p = loadProject(makeTimedProject({ estimateSyllablesPerSecond: 6, estimateSpeed: 2 })).project as unknown as Record<string, unknown>;
+    expect(p["estimateSpeed"]).toBe(2);
+    expect("estimateSyllablesPerSecond" in p).toBe(false);
+  });
+
+  it("leaves a project with neither untimed", () => {
+    expect("estimateSpeed" in loadProject(makeTimedProject({})).project).toBe(false);
+  });
+});

@@ -33,6 +33,24 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Breaking
+
+- **Speech units have moved to Patterstage.** `speechUnits`, `countSyllables`, and the types `SpeechUnit`,
+  `SpeechUnitKind`, and `SpeechVowel` are gone from Patterplay, with the speech weights' constants and the generated
+  speech table. They only served a mouth, and Patterstage now carries its own copy for that. Nothing else in Patter
+  needs them.
+- **A line with no recording is timed by its weighted characters at a speed.** `estimateLineDuration(text, locale?,
+  speed?)` weighs each character (a code point) as 1, a Han character 3, kana 2, a Hangul syllable 2.5, and a soft
+  hyphen 0, at 14 a second times `speed`, clamped to 0.5 to 18 seconds as before. `locale` is reserved and unused. A
+  speed that isn't a finite positive number is 1. A silent line's length changes with the new rule; a line with a
+  recording still lasts as long as the recording.
+- **The project's timing is a speed.** `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND` is now `DEFAULT_ESTIMATE_SPEED` (1),
+  the bundle's `estimateSyllablesPerSecond` is now `estimateSpeed` (present only when the project sets one, 0.5 to
+  2.5, higher is faster), and a line or text step's `estimateRate` is now `estimateSpeed`. `spokenText` and
+  `spokenLocale` are unchanged.
+- The conformance corpus is version 17: its speech section is gone, and its duration cases are re-pinned for the
+  new rule, with Chinese, Japanese, Korean, soft hyphen, speed, and floor and ceiling cases.
+
 ## [0.44.0] - 2026-11-04
 
 ### Added

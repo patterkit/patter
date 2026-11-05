@@ -60,34 +60,24 @@ silenced by closed captions keeps its pause.
 When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects. `get_outline()` and `get_beat_sequence()`
 give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the beat sets its own. For a
 line with a recording, the line lasts as long as the recording. For one without,
-`PatterBundle.estimate_line_duration(step["spokenText"], step["spokenLocale"], step["estimateRate"])` gives how
-long it lasts, in seconds: the weight of its syllables and its pauses at the project's syllables a second (4
-unless the project sets `estimateSyllablesPerSecond`), clamped to 0.5 to 18 seconds. It's Patter's one rule, the
+`PatterBundle.estimate_line_duration(step.get("spokenText", ""), step.get("spokenLocale", ""), step["estimateSpeed"])`
+gives how long it lasts, in seconds: its characters at 14 a second times the project's speed (1 unless the project
+sets `estimateSpeed`, higher is faster), clamped to 0.5 to 18 seconds. Most characters weigh 1, a Han character 3,
+kana 2, a Hangul syllable 2.5, and a soft hyphen 0 (`PatterBundle.LINE_CHAR_WEIGHTS`). It's Patter's one rule, the
 same in every runtime and in Patterpad's Play window. That's how long the line takes to say, not how long its text
 needs to be read: if you show it as a subtitle, keep the text up at least `PatterBundle.SUBTITLE_READING_MIN` (1.5
 seconds) after a shorter line ends, overlapping the next line if you must.
 
-So you can time a line and move a mouth by the same measure, every `"line"` and `"text"` step (a replayed prompt
-too) carries how it's spoken:
+So you can time a line by the same measure, every `"line"` and `"text"` step (a replayed prompt too) carries how
+it's spoken:
 
 - `spokenText`: the line in the project's main language, whatever language is being shown, interpolated as the
   shown text is (a voiced project's lines aren't), with caption cues always left out, and empty for the caption
   character's lines.
 - `spokenLocale`: that language. Both are absent from an IDs-only build, which has no text, so pass your own.
-- `estimateRate`: the project's syllables a second for an estimate, always there.
+- `estimateSpeed`: the project's speed for an estimate, always there.
 
-`PatterBundle.speech_units(text, locale)` breaks a line into the units it would be spoken in, in order, each
-`{"kind": "syllable" | "closed" | "pause", "weight": float, "start": int, "end": int}`, with code-point offsets
-(end exclusive). For a lip flap, spread them over the line's length by weight: a syllable opens the mouth, and a
-`"closed"` beat (Japanese っ) and a pause keep it shut. `PatterBundle.count_syllables(text, locale)` gives the
-syllables alone. The locale is the language the line is spoken in: it decides English's and French's silent e,
-and that a kanji weighs two.
-
-A syllable also has a `"vowel"` where its script says one: `"a"`, `"e"`, `"i"`, `"o"`, `"u"`, or `"ə"` (a vowel
-the script shows that isn't one of the five, such as Korean ㅓ). Use it to pick a mouth shape at the syllable's
-peak. The key's absent on a pause, a `"closed"` beat, and a syllable whose script doesn't say (Han, digits,
-unvowelled Arabic, and scripts outside the set), so read it with `unit.get("vowel", "")`. It's rough for
-English and close for languages spelt as they're spoken.
+To move a mouth to a line, use Patterstage, which breaks a line into the syllables and pauses it's spoken in.
 
 A `"text"` step with `action: true` is action: a direction for whoever stages the scene, never shown to the
 player. It's a dialogue scene's text when the project doesn't localise it, and its text is the source in

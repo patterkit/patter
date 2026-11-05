@@ -6,6 +6,25 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Breaking
+
+- **Speech units have moved to Patterstage.** `Bundle.SpeechUnits`, `Bundle.CountSyllables`, `SpeechUnit`,
+  `SpeechUnitKind`, the speech weights' constants (`Bundle.SpeechDigitWeight`, `SpeechKanjiWeight`,
+  `SpeechPauseShortWeight`, and `SpeechPauseLongWeight`), and the generated speech table are gone from Patterplay.
+  They only served a mouth, and Patterstage now carries its own copy for that. Nothing else in Patter needs them.
+- **A line with no recording is timed by its weighted characters at a speed.** `Bundle.EstimateLineDuration(text,
+  locale, speed)` weighs each character (a code point) as 1, a Han character 3, kana 2, a Hangul syllable 2.5, and a
+  soft hyphen 0 (`Bundle.LineCharWeights`), at `Bundle.LineCharsPerSecond` (14) times `speed`, clamped to 0.5 to 18
+  seconds as before. `locale` is reserved and unused. A speed that isn't a finite positive number is 1. A silent
+  line's length changes with the new rule; a line with a recording still lasts as long as the recording.
+- **The project's timing is a speed.** `Bundle.DefaultEstimateSyllablesPerSecond` is now `Bundle.DefaultEstimateSpeed`
+  (1), with `EstimateSpeedMin` (0.5) and `EstimateSpeedMax` (2.5) in place of the syllable range; the bundle's
+  `estimateSyllablesPerSecond` is now `estimateSpeed`, read into `Bundle.EstimateSpeed` (null unless the project sets
+  one, higher is faster); and a line or text step's `EstimateRate` is now `EstimateSpeed`. `SpokenText` and
+  `SpokenLocale` are unchanged.
+- The conformance corpus is version 17: its speech section is gone, and its duration cases are re-pinned for the
+  new rule.
+
 ## [0.44.0] - 2026-11-04
 
 ### Added

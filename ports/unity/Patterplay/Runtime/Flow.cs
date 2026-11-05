@@ -1106,11 +1106,11 @@ namespace Patterkit.Patterplay
 
         /// <summary>A line or text step with how its beat is spoken: its text in the project's main language,
         /// interpolated as the shown text is (a voiced project's lines aren't), caption cues always left out, and
-        /// empty for the caption character's lines; that language; and the project's rate for an estimate. No text
+        /// empty for the caption character's lines; that language; and the project's speed for an estimate. No text
         /// in an IDs-only bundle, or for a beat the main language has no string for.</summary>
         private StepResult WithSpoken(StepResult step, Beat beat)
         {
-            step.EstimateRate = _host.Bundle.EstimateSyllablesPerSecond ?? Bundle.DefaultEstimateSyllablesPerSecond;
+            step.EstimateSpeed = _host.Bundle.EstimateSpeed ?? Bundle.DefaultEstimateSpeed;
             if (_host.EmitIds || !_host.DefaultStrings.TryGetValue(beat.Id, out var source)) return step;
             if (beat.Kind == "text") step.SpokenText = Interpolate(source);
             else if (beat.Character == _host.CaptionCharacter) step.SpokenText = "";

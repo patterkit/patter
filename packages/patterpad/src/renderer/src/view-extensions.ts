@@ -223,7 +223,7 @@ export function createViewHost(deps: ViewHostDeps, target?: Window): ViewHost {
         const recorded = node.kind === "line" ? await deps.recordedSeconds(id) : null;
         // The authored text is the project's main language, the one a line is spoken in.
         const p = deps.project();
-        out[id] = lineMedia(recorded, estimateLineDuration(String(node.host["text"] ?? ""), p?.sourceLocale, p?.estimateSyllablesPerSecond));
+        out[id] = lineMedia(recorded, estimateLineDuration(String(node.host["text"] ?? ""), p?.sourceLocale, p?.estimateSpeed));
       }
       return out;
     },

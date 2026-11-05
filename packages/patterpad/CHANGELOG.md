@@ -6,6 +6,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Breaking
+
+- **Timing for lines without audio is a speed.** In Project settings it's how fast a line with no recording is timed
+  against the default now, from 0.5 to 2.5 (default 1, higher is faster), in place of syllables a second. A project
+  that set syllables a second opens with that number divided by 4, and is saved with the new setting only. Lines with
+  no recording are timed by their weighted characters, so their lengths in Play change a little; lines with a
+  recording still last as long as the recording. The problem for a timing out of range is now
+  `invalid-estimate-speed`.
+
 ## [0.44.0] - 2026-11-04
 
 ### Changed

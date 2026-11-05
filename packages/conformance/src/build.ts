@@ -65,8 +65,13 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  16: a speech case's syllables carry their `vowel` (a, e, i, o, u, or ə) where the script says it, for a mouth
  *  shape; absent on a pause, a shut beat, and a syllable whose script doesn't say. New cases for the vowel rules.
  *  No unit, weight, offset, or duration changed.
+ *  17: speech section removed with speech units, moved to Patterstage; durations timed by weighted characters at a
+ *  speed (design/proposals/speech-units-to-patterstage.md). A character is a code point, weighing 1 but Han 3, kana
+ *  2, a Hangul syllable 2.5, and a soft hyphen 0, at 14 a second times the speed (default 1). A duration case's
+ *  `syllablesPerSecond` is now `speed`; the bundle's `estimateSyllablesPerSecond` is now `estimateSpeed`, and a line
+ *  or text step's `estimateRate` is now `estimateSpeed`. The `durations` cases re-pinned, with new ones.
  */
-export const CORPUS_VERSION = 16;
+export const CORPUS_VERSION = 17;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at
@@ -209,7 +214,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     };
   });
 
-  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, steers, describes, outlines, audio: fixtures.audio, durations: fixtures.durations, speech: fixtures.speech, versions: fixtures.versions };
+  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, steers, describes, outlines, audio: fixtures.audio, durations: fixtures.durations, versions: fixtures.versions };
 }
 
 // The corpus as the committed corpus.json text. Every case's inputs (`bundle`, `bundleB`, `envelope`) write a

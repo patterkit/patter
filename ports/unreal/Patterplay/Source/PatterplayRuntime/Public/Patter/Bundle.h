@@ -14,7 +14,6 @@
 #include "PatterValue.h"
 #include "Ast.h"
 #include "JsonTree.h"
-#include "Speech.h"     // speechUnits, which countSyllables and estimateLineDuration are built on
 #include "Expr/OrderedMap.h"   // NodeExtensions keep the bundle's key order
 
 namespace patter
@@ -32,13 +31,15 @@ namespace patter
     // (line padding, design/proposals/line-padding.md): the same on every runtime and in Patterpad's Play window.
     inline constexpr double DEFAULT_PAD_AFTER = 0.6;
 
-    // How many syllables a second a line with no recording is timed at, unless the project sets its own
-    // (`estimateSyllablesPerSecond`), and the range validation keeps a project's within; and the shortest and
-    // longest a line with no recording lasts, in seconds.
-    inline constexpr double DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND = 4.0;
-    inline constexpr double ESTIMATE_SYLLABLES_PER_SECOND_MIN = 2.0;
-    inline constexpr double ESTIMATE_SYLLABLES_PER_SECOND_MAX = 10.0;
-    // The shortest is a speaking time, the least a spoken word plausibly takes, not a reading time.
+    // How fast a line with no recording is timed against the default, unless the project sets its own
+    // (`estimateSpeed`), and the range validation keeps a project's within: higher is faster. And how many weighted
+    // characters a second a line with no recording is timed at, at speed 1 (estimateLineDuration).
+    inline constexpr double DEFAULT_ESTIMATE_SPEED = 1.0;
+    inline constexpr double ESTIMATE_SPEED_MIN = 0.5;
+    inline constexpr double ESTIMATE_SPEED_MAX = 2.5;
+    inline constexpr double LINE_CHARS_PER_SECOND = 14.0;
+    // The shortest and longest a line with no recording lasts, in seconds. The shortest is a speaking time, the
+    // least a spoken word plausibly takes, not a reading time.
     inline constexpr double LINE_DURATION_MIN = 0.5;
     inline constexpr double LINE_DURATION_MAX = 18.0;
     // The least time a line's text should stay on screen to be read, in seconds, whether or not the line is that long:
@@ -46,29 +47,69 @@ namespace patter
     // line ends, overlapping the next if it must. The line itself still ends when it's said (estimateLineDuration).
     inline constexpr double SUBTITLE_READING_MIN = 1.5;
 
-    /** How many syllables a line would be spoken in: its syllables' and shut beats' weights, pauses aside. `locale`
-     *  is the language it's spoken in, as for speechUnits. */
-    inline double countSyllables(const std::string& text, const std::string& locale = "")
-    {
-        double total = 0;
-        for (const SpeechUnit& u : speechUnits(text, locale)) if (u.kind != SpeechUnitKind::Pause) total += u.weight;
-        return total;
-    }
+    /** A run of code points estimateLineDuration weighs other than 1, inclusive, with its weight. */
+    struct LineCharWeight { char32_t lo; char32_t hi; double weight; };
+    /** The characters estimateLineDuration weighs other than 1, in order: Han 3 (CJK Unified Ideographs, Extension
+     *  A, the Compatibility Ideographs, and Extensions B onwards), kana 2 (hiragana, katakana, the katakana phonetic
+     *  extensions, and halfwidth katakana), a Hangul syllable block 2.5, and the soft hyphen 0. Plain ranges rather
+     *  than Unicode properties, so every runtime holds the same list (@patterkit/model's LINE_CHAR_WEIGHTS). */
+    inline constexpr LineCharWeight LINE_CHAR_WEIGHTS[] = {
+        { 0x00AD, 0x00AD, 0 },
+        { 0x3040, 0x30FF, 2 },
+        { 0x31F0, 0x31FF, 2 },
+        { 0x3400, 0x4DBF, 3 },
+        { 0x4E00, 0x9FFF, 3 },
+        { 0xAC00, 0xD7A3, 2.5 },
+        { 0xF900, 0xFAFF, 3 },
+        { 0xFF66, 0xFF9F, 2 },
+        { 0x20000, 0x3134F, 3 },
+    };
 
-    /** How long a line with no recording lasts, in seconds: the total weight of its speech units (its syllables
-     *  and its pauses, speechUnits) at `syllablesPerSecond` (default 4, the project's `estimateSyllablesPerSecond`
-     *  when it sets one, a step's `estimateRate`), clamped to 0.5 to 18 seconds. `text` (UTF-8) and `locale` are
-     *  the line as it's spoken, in the project's main language (a step's `spokenText` and `spokenLocale`), never a
-     *  translation being shown. This is the one rule every Patter tool and runtime times a line by, held to the
-     *  same numbers by the conformance corpus. A rate that isn't a finite positive number is the default. A line
-     *  with a recording lasts as long as the recording, whatever this says. */
+    /** How long a line with no recording lasts, in seconds: its weighted characters (LINE_CHAR_WEIGHTS, a character
+     *  being a code point, 1 unless listed there) at LINE_CHARS_PER_SECOND times `speed` (default 1, the project's
+     *  `estimateSpeed` when it sets one, a step's `estimateSpeed`), clamped to 0.5 to 18 seconds. `text` (UTF-8) is
+     *  the line as it's spoken, in the project's main language (a step's `spokenText`), never a translation being
+     *  shown; a malformed byte counts as one character. `locale` is reserved: nothing reads it yet. This is the one
+     *  rule every Patter tool and runtime times a line by, held to the same numbers by the conformance corpus. A
+     *  speed that isn't a finite positive number is 1. A line with a recording lasts as long as the recording,
+     *  whatever this says. */
     inline double estimateLineDuration(const std::string& text, const std::string& locale = "",
-                                       double syllablesPerSecond = DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND)
+                                       double speed = DEFAULT_ESTIMATE_SPEED)
     {
-        const double rate = std::isfinite(syllablesPerSecond) && syllablesPerSecond > 0 ? syllablesPerSecond : DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND;
+        (void)locale;
+        const double s = std::isfinite(speed) && speed > 0 ? speed : DEFAULT_ESTIMATE_SPEED;
         double weight = 0;
-        for (const SpeechUnit& u : speechUnits(text, locale)) weight += u.weight;
-        const double seconds = weight / rate;
+        const std::size_t n = text.size();
+        for (std::size_t i = 0; i < n;)
+        {
+            // One UTF-8 sequence to a code point; a malformed byte is one character of weight 1 (U+FFFD).
+            const unsigned char b = static_cast<unsigned char>(text[i]);
+            const int len = b < 0x80 ? 1 : (b & 0xE0) == 0xC0 ? 2 : (b & 0xF0) == 0xE0 ? 3 : (b & 0xF8) == 0xF0 ? 4 : 0;
+            char32_t cp = 0xFFFD;
+            std::size_t step = 1;
+            if (len == 1) cp = b;
+            else if (len > 1 && i + static_cast<std::size_t>(len) <= n)
+            {
+                char32_t c = b & (0xFF >> (len + 1));
+                bool ok = true;
+                for (int k = 1; k < len && ok; ++k)
+                {
+                    const unsigned char t = static_cast<unsigned char>(text[i + static_cast<std::size_t>(k)]);
+                    ok = (t & 0xC0) == 0x80;
+                    c = (c << 6) | (t & 0x3F);
+                }
+                if (ok) { cp = c; step = static_cast<std::size_t>(len); }
+            }
+            i += step;
+            double w = 1;
+            for (const LineCharWeight& r : LINE_CHAR_WEIGHTS)
+            {
+                if (cp < r.lo) break;
+                if (cp <= r.hi) { w = r.weight; break; }
+            }
+            weight += w;
+        }
+        const double seconds = weight / (LINE_CHARS_PER_SECOND * s);
         return seconds < LINE_DURATION_MIN ? LINE_DURATION_MIN : seconds > LINE_DURATION_MAX ? LINE_DURATION_MAX : seconds;
     }
 
@@ -273,9 +314,9 @@ namespace patter
         bool hasSpeakerPattern = false; std::string speakerPattern;
         // The project's own line-padding default, when it sets one; absent = DEFAULT_PAD_AFTER.
         bool hasPadAfterDefault = false; double padAfterDefault = 0;
-        // The project's own syllables a second for a line with no recording (estimateLineDuration), when it sets
-        // one; absent = DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND.
-        bool hasEstimateSyllablesPerSecond = false; double estimateSyllablesPerSecond = 0;
+        // The project's own speed for a line with no recording (estimateLineDuration), when it sets one; absent =
+        // DEFAULT_ESTIMATE_SPEED.
+        bool hasEstimateSpeed = false; double estimateSpeed = 0;
         std::vector<PropertyDecl> properties;
         std::map<std::string, Scene> scenes;
         // Scene ids in AUTHORED order (the bundle's key order, which is the project's nav order). `scenes`

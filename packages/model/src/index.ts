@@ -12,7 +12,6 @@
 
 import type { AstNode } from "@wildwinter/expr";
 import { gameIdify, isValidGameId } from "@wildwinter/toolkit";
-import { speechUnits } from "./speech.js";
 
 export type ScalarValue = boolean | number | string | string[];
 
@@ -336,8 +335,6 @@ export function isContentlessBeat(beat: Beat, hasText: boolean): boolean {
 // ---------------------------------------------------------------------------
 
 export { gameIdify, isValidGameId };
-export { speechUnits, countSyllables, SPEECH_DIGIT_WEIGHT, SPEECH_KANJI_WEIGHT, SPEECH_PAUSE_SHORT_WEIGHT, SPEECH_PAUSE_LONG_WEIGHT } from "./speech.js";
-export type { SpeechUnit, SpeechUnitKind, SpeechVowel } from "./speech.js";
 
 // ---------------------------------------------------------------------------
 // Property names (design: `@wildwinter/app-shell` src/property-names.ts, which
@@ -633,11 +630,13 @@ export const DEFAULT_PAD_AFTER = 0.6;
 export const PAD_AFTER_MIN = -10;
 export const PAD_AFTER_MAX = 60;
 
-/** How many syllables a second a line with no recording is timed at, unless the project sets its own
- *  (`estimateSyllablesPerSecond`), and the range validation keeps a project's within. */
-export const DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND = 4;
-export const ESTIMATE_SYLLABLES_PER_SECOND_MIN = 2;
-export const ESTIMATE_SYLLABLES_PER_SECOND_MAX = 10;
+/** How fast a line with no recording is timed against the default, unless the project sets its own
+ *  (`estimateSpeed`), and the range validation keeps a project's within: higher is faster. */
+export const DEFAULT_ESTIMATE_SPEED = 1;
+export const ESTIMATE_SPEED_MIN = 0.5;
+export const ESTIMATE_SPEED_MAX = 2.5;
+/** How many weighted characters a second a line with no recording is timed at, at speed 1 (`estimateLineDuration`). */
+export const LINE_CHARS_PER_SECOND = 14;
 /** The shortest and longest a line with no recording lasts, in seconds (`estimateLineDuration`). The shortest is a
  *  speaking time, the least a spoken word plausibly takes, not a reading time: see SUBTITLE_READING_MIN. */
 export const LINE_DURATION_MIN = 0.5;
@@ -647,19 +646,58 @@ export const LINE_DURATION_MAX = 18;
  *  line ends, overlapping the next if it must. The line itself still ends when it's said (`estimateLineDuration`). */
 export const SUBTITLE_READING_MIN = 1.5;
 
-/** How long a line with no recording lasts, in seconds: the total weight of its speech units (its syllables and its
- *  pauses, `speechUnits`) at `syllablesPerSecond` (default 4, the project's `estimateSyllablesPerSecond` when it
- *  sets one), clamped to 0.5 to 18 seconds. `text` and `locale` are the line as it's spoken, in the project's main
- *  language (a line result's `spokenText` and `spokenLocale`), never a translation being shown. This is the one
- *  rule every Patter tool and runtime times a line by: Patterpad's Play window, the playable HTML page, and the
- *  Unity, Unreal, and Godot runtimes, which the conformance corpus holds to the same numbers. A rate that isn't a
- *  positive number is the default. A line with a recording lasts as long as the recording, whatever this says. */
-export function estimateLineDuration(text: string, locale?: string, syllablesPerSecond?: number): number {
-  const rate = typeof syllablesPerSecond === "number" && Number.isFinite(syllablesPerSecond) && syllablesPerSecond > 0
-    ? syllablesPerSecond : DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND;
+/** Reads a project file's timing for lines without audio from before `estimateSpeed`: a project carrying the old
+ *  `estimateSyllablesPerSecond` (syllables a second, 4 the default) and no `estimateSpeed` gets `estimateSpeed` =
+ *  the old value / 4, and the old key goes either way, so the next save writes only the new one. A value that isn't
+ *  a number is carried across as it is, for validation to report. Changes `project` in place and returns it. Every
+ *  reader of a project file calls this once, where it parses the file. */
+export function normaliseEstimateSpeed<T extends object>(project: T): T {
+  const obj = project as Record<string, unknown>;
+  if (!("estimateSyllablesPerSecond" in obj)) return project;
+  const old = obj["estimateSyllablesPerSecond"];
+  delete obj["estimateSyllablesPerSecond"];
+  if (obj["estimateSpeed"] === undefined && old !== undefined) obj["estimateSpeed"] = typeof old === "number" ? old / 4 : old;
+  return project;
+}
+
+/** The characters `estimateLineDuration` weighs other than 1, as inclusive code point ranges with their weight: Han
+ *  3 (CJK Unified Ideographs, Extension A, the Compatibility Ideographs, and Extensions B onwards), kana 2
+ *  (hiragana, katakana, the katakana phonetic extensions, and halfwidth katakana), a Hangul syllable block 2.5, and
+ *  the soft hyphen 0. Plain ranges rather than Unicode properties, so every runtime holds the same list. */
+export const LINE_CHAR_WEIGHTS: readonly (readonly [number, number, number])[] = [
+  [0x00ad, 0x00ad, 0],
+  [0x3040, 0x30ff, 2],
+  [0x31f0, 0x31ff, 2],
+  [0x3400, 0x4dbf, 3],
+  [0x4e00, 0x9fff, 3],
+  [0xac00, 0xd7a3, 2.5],
+  [0xf900, 0xfaff, 3],
+  [0xff66, 0xff9f, 2],
+  [0x20000, 0x3134f, 3],
+];
+
+/** How long a line with no recording lasts, in seconds: its weighted characters (`LINE_CHAR_WEIGHTS`, a character
+ *  being a code point, 1 unless listed there) at `LINE_CHARS_PER_SECOND` times `speed` (default 1, the project's
+ *  `estimateSpeed` when it sets one), clamped to 0.5 to 18 seconds. `text` is the line as it's spoken, in the
+ *  project's main language (a line result's `spokenText`), never a translation being shown. `locale` is reserved:
+ *  nothing reads it yet. This is the one rule every Patter tool and runtime times a line by: Patterpad's Play
+ *  window, the playable HTML page, and the Unity, Unreal, and Godot runtimes, which the conformance corpus holds to
+ *  the same numbers. A speed that isn't a finite positive number is 1. A line with a recording lasts as long as the
+ *  recording, whatever this says. */
+export function estimateLineDuration(text: string, locale?: string, speed?: number): number {
+  void locale;
+  const s = typeof speed === "number" && Number.isFinite(speed) && speed > 0 ? speed : DEFAULT_ESTIMATE_SPEED;
   let weight = 0;
-  for (const u of speechUnits(text ?? "", locale)) weight += u.weight;
-  return Math.min(Math.max(weight / rate, LINE_DURATION_MIN), LINE_DURATION_MAX);
+  for (const ch of text ?? "") {
+    const cp = ch.codePointAt(0)!;
+    let w = 1;
+    for (const [lo, hi, cw] of LINE_CHAR_WEIGHTS) {
+      if (cp < lo) break;
+      if (cp <= hi) { w = cw; break; }
+    }
+    weight += w;
+  }
+  return Math.min(Math.max(weight / (LINE_CHARS_PER_SECOND * s), LINE_DURATION_MIN), LINE_DURATION_MAX);
 }
 
 /** A qualifier as it reaches a compiled bundle: its `gameId` and authored name (the unlocalised fallback). */
@@ -1050,10 +1088,11 @@ export interface ProjectFile {
   /** The project's default `padAfter` for every line and text beat that sets none and has no default above it.
    *  Absent = `DEFAULT_PAD_AFTER`. */
   padAfterDefault?: number;
-  /** How many syllables a second a line with no recording is timed at (`estimateLineDuration`), from 2 to 10.
-   *  Only estimates use it: a line with a recording lasts as long as the recording. Absent =
-   *  `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND`. */
-  estimateSyllablesPerSecond?: number;
+  /** How fast a line with no recording is timed against the default (`estimateLineDuration`), from 0.5 to 2.5:
+   *  higher is faster. Only estimates use it: a line with a recording lasts as long as the recording. Absent =
+   *  `DEFAULT_ESTIMATE_SPEED`. A project file from before 0.45 may carry `estimateSyllablesPerSecond` instead:
+   *  `normaliseEstimateSpeed` reads it as this. */
+  estimateSpeed?: number;
   /** Localise text lines in dialogue scenes (design/proposals/action-text.md). Off (absent) by default: a
    *  dialogue scene's text beats (`isDialogueScene`) are then ACTION, left out of the loc files and the
    *  written word counts, and compiled with `action: true`. On: they're localised and shown as a text
@@ -1500,9 +1539,8 @@ export interface Bundle {
   speakerPattern?: string;
   /** The project's own `padAfterDefault`, when it sets one; absent = `DEFAULT_PAD_AFTER`. */
   padAfterDefault?: number;
-  /** The project's own `estimateSyllablesPerSecond`, when it sets one; absent =
-   *  `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND`. */
-  estimateSyllablesPerSecond?: number;
+  /** The project's own `estimateSpeed`, when it sets one; absent = `DEFAULT_ESTIMATE_SPEED`. */
+  estimateSpeed?: number;
   properties?: PropertyDecl[];
   /** Host / world scope declarations, baked from the project so the runtime can self-back a declared
    *  scope (`@world`, ...) when no host resolver claims its token. Absent = no host scopes. */
