@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-11-05
+
 ### Breaking
 
 - **Speech units have moved to Patterstage.** `PatterBundle.speech_units`, `PatterBundle.count_syllables`, the

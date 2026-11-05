@@ -13,7 +13,7 @@ namespace Patterkit.Patterplay
     {
         /// <summary>This runtime's version, as in its package manifest. Written by <c>npm run bump:play</c>; never
         /// edit it by hand.</summary>
-        public const string Current = "0.44.0";
+        public const string Current = "0.45.0";
 
         // The JS reference's pattern, with [0-9] for \d (.NET's \d takes any Unicode digit) and \z for $ (.NET's $
         // also matches before a final newline).

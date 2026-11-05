@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-11-05
+
 ### Breaking
 
 - **Speech units have moved to Patterstage.** `speechUnits`, `countSyllables`, and the types `SpeechUnit`,

@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-11-05
+
 ### Breaking
 
 - **Speech units have moved to Patterstage.** `patter::speechUnits`, `patter::countSyllables`, `patter::SpeechUnit`,
