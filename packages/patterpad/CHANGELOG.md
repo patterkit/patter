@@ -15,6 +15,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   recording still last as long as the recording. The problem for a timing out of range is now
   `invalid-estimate-speed`.
 
+### Changed
+
+- **Patterplay 0.45.0 inside**, with the timing above.
+
 ## [0.44.0] - 2026-11-04
 
 ### Changed
