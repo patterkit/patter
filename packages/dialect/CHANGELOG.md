@@ -1,5 +1,12 @@
 # @patterkit/dialect
 
+## 0.2.24
+
+### Patch Changes
+
+- Updated dependencies [d35fee2]
+  - @patterkit/model@0.27.0
+
 ## 0.2.23
 
 ### Patch Changes
