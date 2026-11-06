@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-11-06
+
 ### Fixed
 
 - **Play in game straight after a save.** It was refused as "running an older version of the story", because the
