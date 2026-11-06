@@ -3,6 +3,9 @@
 #include "PatterLog.h"
 #include "Patter/Bundle.h"
 #include "UObject/Package.h" // GetTransientPackage() - not transitively available in the Game target
+#if WITH_EDITORONLY_DATA
+#include "EditorFramework/AssetImportData.h"
+#endif
 
 UPatterBundle* UPatterBundle::LoadFromString(const FString& InJson)
 {
@@ -26,6 +29,17 @@ bool UPatterBundle::Parse()
 	LoadError.Empty();
 	Bundle = MoveTemp(NewBundle);
 	return true;
+}
+
+void UPatterBundle::PostInitProperties()
+{
+#if WITH_EDITORONLY_DATA
+	if (!HasAnyFlags(RF_ClassDefaultObject))
+	{
+		AssetImportData = NewObject<UAssetImportData>(this, TEXT("AssetImportData"));
+	}
+#endif
+	Super::PostInitProperties();
 }
 
 void UPatterBundle::PostLoad()

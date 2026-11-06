@@ -7,6 +7,15 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Other plugins hear a bundle's import.** Importing a `.patterc` broadcasts on the editor's import subsystem
+  (`UImportSubsystem::OnAssetPreImport` and `OnAssetPostImport`), as other assets' importers do, and so does a
+  reimport.
+- **A bundle remembers its source file, and Reimport works.** `UPatterBundle` keeps `AssetImportData` (editor only,
+  as a Sound Wave does), so after an editor restart the asset still knows its `.patterc`, and **Reimport** in the
+  Content Browser reads it again. A broken file reimports as an import does, with its `LoadError`.
+
 ## [0.46.0] - 2026-11-06
 
 ### Changed

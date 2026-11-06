@@ -26,6 +26,13 @@ public:
 	UPROPERTY()
 	FString LoadError;
 
+#if WITH_EDITORONLY_DATA
+	// The .patterc it was imported from, as a Sound Wave keeps its source: after an editor restart the
+	// asset still knows its file, and Reimport works from the Content Browser.
+	UPROPERTY(VisibleAnywhere, Instanced, Category = "ImportSource")
+	TObjectPtr<class UAssetImportData> AssetImportData;
+#endif
+
 	// Parse a transient bundle from a JSON string. Returns nullptr (and logs) on a parse error.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	static UPatterBundle* LoadFromString(const FString& InJson);
@@ -34,6 +41,7 @@ public:
 	bool Parse();
 
 	virtual void PostLoad() override;
+	virtual void PostInitProperties() override;
 
 	// The parsed bundle (engine-side); valid after a successful Parse(). May be null.
 	const patter::Bundle* Raw() const { return Bundle.Get(); }
