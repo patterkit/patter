@@ -6,6 +6,11 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- No changes in this runtime. This lockstep release ships Patterplay for Unreal's bundle import: other plugins
+  hear a `.patterc` import, and Reimport works.
+
 ## [0.46.0] - 2026-11-06
 
 ### Changed

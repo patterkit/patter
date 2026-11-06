@@ -10,6 +10,8 @@ import { createViewExtensions, viewsDir, VIEW_SCHEME } from "./views.js";
 import { findPairedStorylets } from "./storyletter.js";
 import { SIBLING_APPS, launchApp, locateApp } from "@wildwinter/app-shell/sibling-app";
 import { createWindowPrompt } from "@wildwinter/app-shell/prompt-main";
+import { externalLinkAllowed } from "@wildwinter/app-shell/external-links";
+import { EXTERNAL_LINKS } from "../shared/repo.js";
 import { setPairedStorylets, refreshPairedCards } from "./paired-cards.js";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1565,7 +1567,7 @@ function registerIpc(): void {
   // openPath - only destinations the app itself put on screen), so a compromised renderer can't launch
   // arbitrary URLs.
   ipcMain.handle("app:openExternal", (_e, url: string) => {
-    if (ABOUT_LINKS.has(url)) void shell.openExternal(url);
+    if (typeof url === "string" && externalLinkAllowed(url, EXTERNAL_LINKS)) void shell.openExternal(url);
   });
   // Reveal the OPEN project in the platform file manager. Main's own record of the root, nothing
   // renderer-supplied (same philosophy as openPath / openExternal above).
@@ -1575,8 +1577,6 @@ function registerIpc(): void {
   });
 }
 
-/** The About dialog's links (the only external URLs the renderer can open). */
-const ABOUT_LINKS = new Set(["https://patterkit.dev", "https://ian.wildwinter.net", "https://patterkit.dev/download/#something-to-open"]);
 
 function createWindow(): void {
   win = new BrowserWindow({
@@ -1676,7 +1676,7 @@ app.setAppUserModelId("com.patterkit.patterpad");
 
 // Every window stays on the page it loaded, opens no other window and attaches no webview (the family's
 // window hardening, patterkit design/family-parity-2026-10.md item 12). Nothing it refuses is opened in the
-// browser instead: the only addresses that leave the app are the About links, by ABOUT_LINKS.
+// browser instead: the only addresses that leave the app go through app:openExternal, by EXTERNAL_LINKS.
 guardAllWindows(app);
 
 // The one privileged-scheme registration Electron keeps (the last call wins), before the app is ready: the

@@ -82,7 +82,8 @@ import { fileSafeName, untitledSceneName } from "../../shared/file-name.js";
 // The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
 // (plural / formatCount / debounce) are the shell's (ui-review-2026-09, shell step 6).
 import { EXAMPLES } from "../../shared/examples.js";
-import { mountWelcome, openKitGallery, type KitGalleryItem, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, showUpdateReady, openCommandPalette, type PaletteItem, whatsNewAfterUpdate, openWhatsNew, type WhatsNewOptions, plural, formatCount, debounce } from "@wildwinter/app-shell";
+import { PATTER_REPO } from "../../shared/repo.js";
+import { mountWelcome, openKitGallery, type KitGalleryItem, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, showUpdateReady, openCommandPalette, type PaletteItem, whatsNewAfterUpdate, openWhatsNew, type WhatsNewOptions, releaseNotesUrl, plural, formatCount, debounce } from "@wildwinter/app-shell";
 import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in this file
 import { rove, wireReorder, wireTreeKeys } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/keys.css"; // the keycaps every hint in this window draws
@@ -4742,7 +4743,7 @@ const whatsNewOpts: Pick<WhatsNewOptions, "appName" | "changelog" | "onShow" | "
   appName: "Patterpad",
   changelog,
   onShow: (show) => window.patter.setWhatsNewShow(show),
-  releaseNotes: (version) => `https://github.com/patterkit/patter/releases/tag/v${version}`,
+  releaseNotes: (version) => releaseNotesUrl(PATTER_REPO, version),
   openExternal: (url) => window.patter.openExternal(url),
 };
 
@@ -4837,7 +4838,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd.startsWith("open-recent:")) void openPath(cmd.slice("open-recent:".length));
   // The family's About surface, never the stock OS panel. The shell draws it; the
   // wordmark, the words and the URLs are ours. Version rides in the cmd.
-  // Links go out through `openExternal`, which main allow-lists (ABOUT_LINKS), so
+  // Links go out through `openExternal`, which main allow-lists (EXTERNAL_LINKS), so
   // a bad label/url pair here is inert rather than dangerous.
   else if (cmd.startsWith("about:")) void showAbout({
     appName: "Patterpad",

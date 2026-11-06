@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **What's New's "Full release notes" link opens.** It did nothing, because the app let only its About links open in
+  the browser. It now also lets out Patter's own release pages and pages on patterkit.dev, so a link in a release
+  note opens too.
+
 ## [0.46.0] - 2026-11-06
 
 ### Fixed
