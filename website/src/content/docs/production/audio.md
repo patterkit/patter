@@ -35,8 +35,8 @@ Each stage then gets its own subfolder under that root, named automatically from
 `../audio` gives `../audio/scratch/`, `../audio/recorded/`, `../audio/final/`) with the lowest "not
 recorded" stage having none.
 
-Patterpad reads every line's recording status straight from the files. Drop a line's `.wav` (or
-`.mp3`) into a stage's folder and the line takes that stage. If a line's audio sits in more than one
+Patterpad reads every line's recording status straight from the files. Drop a line's `.wav`, `.ogg`
+(Ogg Vorbis), or `.mp3` into a stage's folder and the line takes that stage. If a line's audio sits in more than one
 stage, the **most finished** one wins (a `recorded/` take beats a `scratch/` one), and a line with no
 file anywhere reads as **missing**. The folders are watched live, so adding or removing a file
 updates the status on its own. Here the inspector shows the status as a **chip** you can't edit (it
@@ -53,6 +53,24 @@ comes from the files) with a **▶ play button** next to any line that has a cli
 Recording status feeds the same places as writing status. **Filter by it** with **Review ▸
 Find Lines by Recording…** (or the search window's **Recording** mode), and it's broken down
 per character in the [Production Information report](/production/tracking-and-reports/#the-writing-status-rollup).
+
+### Which format to use
+
+Patterpad plays all three formats. If one folder holds more than one for the same line, WAV wins, then
+OGG, then MP3, so a lossless master always beats a compressed copy. Scratch takes recorded in Patterpad are
+saved as WAV.
+
+What your game can play depends on where it runs:
+
+| Format | Unity | Unreal | Godot | Browsers |
+| --- | --- | --- | --- | --- |
+| WAV | Yes | Yes | Yes | Yes |
+| OGG | Yes | Yes | Yes | Chrome, Edge, and Firefox; not reliably Safari |
+| MP3 | Yes | Yes | Yes | Yes |
+
+Unity, Unreal, and Godot import all three. OGG is much smaller than WAV, so it suits a game that ships a
+lot of voice. Safari's support for Ogg Vorbis came late and isn't dependable, so if a web game has to play
+in Safari, use MP3.
 
 ### Flagging a line for a retake
 

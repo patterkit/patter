@@ -25,7 +25,7 @@ function firstSnapshot(root: string, scratch?: string): Promise<AudioSnapshot> {
 }
 
 describe("audio-index: folder-derived recording status", () => {
-  it("resolves the highest rung that holds the file; .wav beats .mp3; absent = missing", async () => {
+  it("resolves the highest rung that holds the file; .wav beats .ogg beats .mp3; absent = missing", async () => {
     const root = mkdtempSync(join(tmpdir(), "patter-audio-"));
     mkdirSync(join(root, "audio/scratch"), { recursive: true });
     mkdirSync(join(root, "audio/recorded"), { recursive: true });
@@ -37,6 +37,11 @@ describe("audio-index: folder-derived recording status", () => {
     // L_c: both .wav + .mp3 in the same folder -> .wav preferred.
     writeFileSync(join(root, "audio/recorded/L_c.mp3"), "x");
     writeFileSync(join(root, "audio/recorded/L_c.wav"), "x");
+    // L_d: .ogg + .mp3 -> .ogg preferred; L_e: .ogg alone is a take; L_f: all three -> .wav.
+    writeFileSync(join(root, "audio/recorded/L_d.mp3"), "x");
+    writeFileSync(join(root, "audio/recorded/L_d.ogg"), "x");
+    writeFileSync(join(root, "audio/scratch/L_e.OGG"), "x");
+    for (const ext of [".mp3", ".ogg", ".wav"]) writeFileSync(join(root, `audio/recorded/L_f${ext}`), "x");
     // a non-audio file is ignored.
     writeFileSync(join(root, "audio/scratch/notes.txt"), "x");
 
@@ -45,7 +50,10 @@ describe("audio-index: folder-derived recording status", () => {
     expect(snap["L_b"]).toEqual({ status: "scratch", path: join(root, "audio/scratch/L_b.wav") });
     expect(snap["L_c"]).toEqual({ status: "recorded", path: join(root, "audio/recorded/L_c.wav") });
     expect(snap["L_missing"]).toBeUndefined(); // never recorded -> implicitly "missing"
-    expect(Object.keys(snap).sort()).toEqual(["L_a", "L_b", "L_c"]);
+    expect(snap["L_d"]).toEqual({ status: "recorded", path: join(root, "audio/recorded/L_d.ogg") });
+    expect(snap["L_e"]).toEqual({ status: "scratch", path: join(root, "audio/scratch/L_e.OGG") });
+    expect(snap["L_f"]).toEqual({ status: "recorded", path: join(root, "audio/recorded/L_f.wav") });
+    expect(Object.keys(snap).sort()).toEqual(["L_a", "L_b", "L_c", "L_d", "L_e", "L_f"]);
     rmSync(root, { recursive: true, force: true });
   });
 

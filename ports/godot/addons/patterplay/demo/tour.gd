@@ -99,7 +99,12 @@ func _play_clip(beat_id: String) -> void:
 	# everything below it: Godot parses every script when a project OPENS, so on 4.3 this one line
 	# would stop the whole project loading - addon, runtime and the author's own game with it. That
 	# is why the floor is stated rather than assumed, and why CI parses every script in the addon.
-	var stream := AudioStreamWAV.load_from_file(path)
+	# A take is a .wav, .ogg or .mp3; each has its own stream type.
+	var stream: AudioStream
+	match path.get_extension().to_lower():
+		"ogg": stream = AudioStreamOggVorbis.load_from_file(path)
+		"mp3": stream = AudioStreamMP3.load_from_file(path)
+		_: stream = AudioStreamWAV.load_from_file(path)
 	if stream != null:
 		_player.stream = stream
 		_player.play()

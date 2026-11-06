@@ -2,8 +2,8 @@
 // Audio Folders (#206): each beat's winning take, from the files on disk, and the
 // sidecar manifest (`patteraudio.json`) that tells a game where it is. One set of
 // rules for every front end: a beat lands on the HIGHEST rung whose derived
-// folder holds its `<beatId>.wav` (preferred) or `.mp3`; a beat in no folder is
-// implicitly the lowest rung (absent from the snapshot).
+// folder holds its `<beatId>.wav`, `.ogg` or `.mp3` (in that order of preference);
+// a beat in no folder is implicitly the lowest rung (absent from the snapshot).
 //
 // Patterpad's live indexer (main/audio-index.ts) watches the folders and feeds
 // its listings through `pickAudio`; the CLI scans once with `scanAudio`. Both
@@ -32,7 +32,9 @@ export type AudioSnapshot = Record<string, AudioEntry>;
 export const AUDIO_MANIFEST_SCHEMA = "patter/audio@0";
 export const AUDIO_MANIFEST_FILE = "patteraudio.json";
 
-const AUDIO_EXT = [".wav", ".mp3"]; // .wav preferred when both exist for an id
+/** The take formats an Audio Folder recognises, most preferred first: WAV is the master, then Ogg Vorbis,
+ *  the better lossy format, then MP3. When one folder holds more than one for an id, the earliest wins. */
+const AUDIO_EXTENSIONS: readonly string[] = [".wav", ".ogg", ".mp3"];
 
 /** Whether a project derives recording status from folders at all: voiced, tracking audio status, Audio
  *  Folders on, and an audio root set. */
@@ -47,22 +49,23 @@ export function audioFolderRungs(root: string, rungs: AudioRung[]): Array<{ name
 }
 
 /** The snapshot from each rung folder's listing, highest rung first (`undefined` files = a folder that is
- *  missing or unreadable, treated as empty). Within a folder a `.wav` beats an `.mp3` of the same id; a
- *  higher rung that already claimed an id wins overall. */
+ *  missing or unreadable, treated as empty). Within a folder a `.wav` beats an `.ogg`, which beats an `.mp3`
+ *  of the same id; a higher rung that already claimed an id wins overall. */
 export function pickAudio(listings: Array<{ name: string; dir: string; files: string[] | undefined }>): AudioSnapshot {
   const snap: AudioSnapshot = {};
   for (const { name, dir, files } of listings) {
-    const byId = new Map<string, string>();
+    const byId = new Map<string, { file: string; rank: number }>();
     for (const f of files ?? []) {
       const dot = f.lastIndexOf(".");
       if (dot <= 0) continue;
       const ext = f.slice(dot).toLowerCase();
-      if (!AUDIO_EXT.includes(ext)) continue;
+      const rank = AUDIO_EXTENSIONS.indexOf(ext);
+      if (rank < 0) continue;
       const id = f.slice(0, dot);
       const existing = byId.get(id);
-      if (!existing || (ext === ".wav" && !existing.toLowerCase().endsWith(".wav"))) byId.set(id, f);
+      if (!existing || rank < existing.rank) byId.set(id, { file: f, rank });
     }
-    for (const [id, file] of byId) if (!(id in snap)) snap[id] = { status: name, path: resolve(dir, file) };
+    for (const [id, { file }] of byId) if (!(id in snap)) snap[id] = { status: name, path: resolve(dir, file) };
   }
   return snap;
 }

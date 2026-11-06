@@ -112,7 +112,10 @@ namespace Patterkit.Patterplay.Samples
 
         private IEnumerator PlayFile(string path)
         {
-            using (var req = UnityWebRequestMultimedia.GetAudioClip("file://" + path, AudioType.WAV))
+            // A take is a .wav, .ogg or .mp3, so tell Unity which decoder to use.
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+            var type = ext == ".ogg" ? AudioType.OGGVORBIS : ext == ".mp3" ? AudioType.MPEG : AudioType.WAV;
+            using (var req = UnityWebRequestMultimedia.GetAudioClip("file://" + path, type))
             {
                 yield return req.SendWebRequest();
                 if (req.result != UnityWebRequest.Result.Success) yield break;

@@ -303,7 +303,8 @@ off:
 - Stop the voice when the reader starts again: make the Play again button
   `button("Play again", () => { stopVoice(); story.innerHTML = ""; runner.begin(); });`.
 
-If your recordings are `.wav` files, change `.mp3` to `.wav`.
+If your recordings are `.wav` or `.ogg` files, change `.mp3` to match. Safari may not play `.ogg`, so use
+`.mp3` if your readers might be on Safari.
 
 :::note[Recording in Patterpad]
 Patterpad's [Audio Folders](/production/audio/) keep each line's takes in a folder per recording

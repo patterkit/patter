@@ -34887,7 +34887,7 @@
   "audio": [
     {
       "name": "the audio resolver joins a base and a take, and has nothing for a beat with no take",
-      "manifest": "{\"schema\":\"patter/audio@0\",\"clips\":{\"L1\":{\"file\":\"final/L1.wav\",\"rung\":\"final\"},\"L2\":{\"file\":\"scratch/L2.mp3\",\"rung\":\"scratch\"},\"L3\":{\"file\":\"\",\"rung\":\"final\"}}}",
+      "manifest": "{\"schema\":\"patter/audio@0\",\"clips\":{\"L1\":{\"file\":\"final/L1.wav\",\"rung\":\"final\"},\"L2\":{\"file\":\"scratch/L2.mp3\",\"rung\":\"scratch\"},\"L3\":{\"file\":\"\",\"rung\":\"final\"},\"L4\":{\"file\":\"recorded/L4.ogg\",\"rung\":\"recorded\"}}}",
       "lookups": [
         {
           "base": "audio",
@@ -34918,6 +34918,11 @@
           "base": "",
           "beatId": "L2",
           "expected": "scratch/L2.mp3"
+        },
+        {
+          "base": "res://audio",
+          "beatId": "L4",
+          "expected": "res://audio/recorded/L4.ogg"
         },
         {
           "base": "audio",

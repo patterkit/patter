@@ -7,6 +7,11 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- No changes in this runtime. This lockstep release ships Audio Folders' Ogg Vorbis takes: a `.ogg` take resolves
+  like any other, and the Unity and Godot Tour demos play `.ogg` and `.mp3` takes.
+
 ## [0.46.1] - 2026-11-06
 
 ### Added

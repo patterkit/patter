@@ -3930,6 +3930,7 @@ const audioManifest = {
     L1: { file: "final/L1.wav", rung: "final" },
     L2: { file: "scratch/L2.mp3", rung: "scratch" },
     L3: { file: "", rung: "final" },
+    L4: { file: "recorded/L4.ogg", rung: "recorded" },
   } }),
   lookups: [
     { base: "audio", beatId: "L1", expected: "audio/final/L1.wav" },
@@ -3938,6 +3939,7 @@ const audioManifest = {
     { base: "res://", beatId: "L1", expected: "res://final/L1.wav" },
     { base: "C:\\Game\\Audio\\", beatId: "L1", expected: "C:\\Game\\Audio\\final/L1.wav" },
     { base: "", beatId: "L2", expected: "scratch/L2.mp3" },
+    { base: "res://audio", beatId: "L4", expected: "res://audio/recorded/L4.ogg" },
     { base: "audio", beatId: "L9", expected: null },
     { base: "audio", beatId: "L3", expected: null },
   ],

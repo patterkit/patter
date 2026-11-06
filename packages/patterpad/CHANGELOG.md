@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Audio Folders take Ogg Vorbis.** A line's take can now be a `.ogg` file as well as a `.wav` or `.mp3`, and
+  Patterpad plays it. If one folder holds more than one format for a line, WAV wins, then OGG, then MP3. Scratch
+  takes are still recorded as WAV.
+
 ## [0.46.1] - 2026-11-06
 
 ### Fixed

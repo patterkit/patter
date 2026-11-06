@@ -101,7 +101,7 @@ corrupt a hidden cache, and the source on disk is always the whole truth.
 
 Audio is an optional add-on, not part of the core: the model, format, compiler, and
 runtime are all text, and a project with no audio is complete and valid. Any audio
-lives **outside** the document, named by beat id (`<beatId>.wav` / `.mp3`) so a clip
+lives **outside** the document, named by beat id (`<beatId>.wav`, `.ogg`, or `.mp3`) so a clip
 always maps back to its line. If you turn on **Audio Folders**, Patterpad reads each
 line's recording status from per-status folders and can play a scene back at
 performance pace. See

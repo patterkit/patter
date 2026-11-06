@@ -1116,7 +1116,7 @@ export interface ProjectFile {
    *  meaningful when `audioFolders` is on. Authoring metadata; never reaches the bundle. */
   audioRoot?: string;
   /** Audio Folders mode (#206): when true, a dialogue line's recording status is DERIVED from which
-   *  rung's derived folder (under `audioRoot`) holds its `<beatId>.wav|mp3` (top-down the ladder, implicit
+   *  rung's derived folder (under `audioRoot`) holds its `<beatId>.wav|ogg|mp3` (top-down the ladder, implicit
    *  "missing"), instead of being set manually. Authoring metadata; never reaches the bundle. Default off. */
   audioFolders?: boolean;
   /** Scratch recording (Patterpad #224): the recording-status rung whose folder is the source/dest for

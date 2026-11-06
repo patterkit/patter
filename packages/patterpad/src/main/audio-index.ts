@@ -2,7 +2,7 @@
 //
 // Self-contained + Electron-free: it takes a project root + the recording ladder (rungs that carry a
 // project-relative `folder`) and emits an `id -> { status, path }` snapshot. A dialogue line's status is
-// the HIGHEST-ranked rung whose folder holds its `<beatId>.wav` (preferred) or `.mp3`; a beat in no folder
+// the HIGHEST-ranked rung whose folder holds its `<beatId>.wav`, `.ogg` or `.mp3` (in that order of preference); a beat in no folder
 // is implicitly "missing". All I/O is async (readdir) + event-driven (one fs.watch per flat folder,
 // debounced), so it never blocks the main event loop; the editor reads a cached copy in the renderer and
 // can't hitch. Structured for a clean lift into a utilityProcess later (no Electron deps, message-style API).

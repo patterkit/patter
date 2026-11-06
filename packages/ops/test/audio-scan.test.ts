@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadProject, scanAudioStatus } from "../src/index.js";
+import { loadProject, scanAudioStatus, pickAudio } from "../src/index.js";
 
 function makeProject(projectExtra: object): string {
   const dir = mkdtempSync(join(tmpdir(), "patter-audioscan-"));
@@ -36,6 +36,21 @@ describe("scanAudioStatus", () => {
     expect(m.get("L1")).toBe("recorded");
     expect(m.get("L2")).toBe("scratch");
     expect(m.has("notes")).toBe(false);
+  });
+
+  it("takes .ogg as well as .wav and .mp3, preferring .wav, then .ogg, then .mp3 within a folder", () => {
+    const dir = makeProject(AUDIO_ON);
+    mkdirSync(join(dir, "audio", "scratch"), { recursive: true });
+    writeFileSync(join(dir, "audio", "scratch", "L1.ogg"), "x");
+    writeFileSync(join(dir, "audio", "scratch", "L2.mp3"), "x");
+    writeFileSync(join(dir, "audio", "scratch", "L2.ogg"), "x");
+    expect(scanAudioStatus(loadProject(dir))!.get("L1")).toBe("scratch");
+
+    const snap = pickAudio([{ name: "final", dir: "/a", files: ["A.mp3", "A.ogg", "B.ogg", "B.wav", "C.mp3", "C.ogg", "C.wav", "D.flac"] }]);
+    expect(snap.A!.path).toMatch(/A\.ogg$/);
+    expect(snap.B!.path).toMatch(/B\.wav$/);
+    expect(snap.C!.path).toMatch(/C\.wav$/);
+    expect(snap.D).toBeUndefined(); // not a take format
   });
 
   it("returns undefined when the project doesn't derive from folders", () => {

@@ -891,7 +891,8 @@ export async function audioBytesForBeat(beatId: string): Promise<{ bytes: Buffer
   if (!entry) return null;
   try {
     const bytes = await readFile(entry.path); // a take can be megabytes: off the main thread's back
-    return { bytes, mime: entry.path.toLowerCase().endsWith(".mp3") ? "audio/mpeg" : "audio/wav" };
+    const ext = entry.path.slice(entry.path.lastIndexOf(".")).toLowerCase();
+    return { bytes, mime: ext === ".mp3" ? "audio/mpeg" : ext === ".ogg" ? "audio/ogg" : "audio/wav" };
   } catch { return null; } // file vanished between scan + read
 }
 

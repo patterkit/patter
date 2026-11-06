@@ -21,7 +21,7 @@ const port = Number(process.argv[2] ?? 8093);
 const types = {
   ".html": "text/html", ".js": "text/javascript", ".json": "application/json",
   ".map": "application/json", ".css": "text/css", ".svg": "image/svg+xml",
-  ".patterc": "application/json", ".wav": "audio/wav", ".mp3": "audio/mpeg",
+  ".patterc": "application/json", ".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg",
 };
 
 createServer(async (req, res) => {

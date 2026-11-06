@@ -26,7 +26,7 @@ requirement, and you can ignore everything past here and just key off the id.
 ## The built-in resolver (optional)
 
 For teams who don't want to build their own lookup, Patterpad's **[Audio Folders](/production/audio/)**
-lets you keep takes as `<beatId>.wav` (or `.mp3`) files, ranked by recording status
+lets you keep takes as `<beatId>.wav`, `.ogg`, or `.mp3` files, ranked by recording status
 (scratch < recorded < final), and Patterplay resolves the **best available take** for each line
 without you reimplementing that folder-ranking search.
 

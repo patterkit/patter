@@ -6,6 +6,11 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- The audio resolver needs no change for Ogg Vorbis takes, which Audio Folders now accept: it returns a `.ogg`
+  path as it does any other. The Tour demo now plays `.ogg` and `.mp3` takes as well as `.wav`.
+
 ## [0.46.1] - 2026-11-06
 
 ### Changed
