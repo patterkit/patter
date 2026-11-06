@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.46.1] - 2026-11-06
+
 ### Added
 
 - **Other plugins hear a bundle's import.** Importing a `.patterc` broadcasts on the editor's import subsystem

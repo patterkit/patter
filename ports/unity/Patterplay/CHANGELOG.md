@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.46.1] - 2026-11-06
+
 ### Changed
 
 - No changes in this runtime. This lockstep release ships Patterplay for Unreal's bundle import: other plugins
