@@ -5,7 +5,7 @@
 // left the editor's follow list short - and the omission SURVIVED a reconnect, because the hello
 // carries the link's own flow set. Reported from the Storylet Studio side, 2026-08-29.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createDebugLink } from "../src/debug.js";
 
 /** A WebSocket stand-in that records what the link sends, and can be reconnected. */
@@ -203,5 +203,104 @@ describe("Play in game: the editor asks the running game to start a block", () =
     const link = createDebugLink({ build: "h1", WebSocket: Sock, onPlay: (req) => link.replyPlay(req.id, { started: true }) });
     fromEditor(play);
     expect(played(sent)).toEqual([{ t: "played", id: "p1", started: true }]);
+  });
+});
+
+describe("the debug link reconnects until the game closes it", () => {
+  /** Each socket its own listeners, so the test can open, drop, or refuse the one the link is on. */
+  function sockets() {
+    const all: Array<{ readyState: number; sent: Record<string, unknown>[]; fire(type: string, ev?: unknown): void }> = [];
+    class Sock {
+      readyState = 0;
+      sent: Record<string, unknown>[] = [];
+      private listeners: Record<string, ((ev?: unknown) => void)[]> = {};
+      constructor(public url: string) { all.push(this); }
+      addEventListener(type: string, fn: (ev?: unknown) => void): void { (this.listeners[type] ??= []).push(fn); }
+      send(raw: string): void { if (this.readyState !== 1) throw new Error("not open"); this.sent.push(JSON.parse(raw)); }
+      close(): void { this.readyState = 3; }
+      fire(type: string, ev?: unknown): void { for (const fn of this.listeners[type] ?? []) fn(ev); }
+    }
+    const last = () => all[all.length - 1]!;
+    const open = (): void => { last().readyState = 1; last().fire("open"); };
+    const drop = (code = 1006): void => { last().readyState = 3; last().fire("close", { code }); };
+    const refuse = (): void => { last().readyState = 3; last().fire("error"); last().fire("close", { code: 1006 }); };
+    return { Sock: Sock as never, all, last, open, drop, refuse };
+  }
+
+  beforeEach(() => { vi.useFakeTimers(); vi.spyOn(console, "info").mockImplementation(() => {}); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  it("retries a refused link after 1 s, doubling to 10 s, logging nothing while it has never opened", () => {
+    const s = sockets();
+    const link = createDebugLink({ build: "b1", WebSocket: s.Sock });
+    const waits: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const before = s.all.length;
+      s.refuse();
+      expect(link.state).toBe("connecting");
+      let waited = 0;
+      while (s.all.length === before) { vi.advanceTimersByTime(100); waited += 100; }
+      waits.push(waited);
+    }
+    expect(waits).toEqual([1000, 2000, 4000, 8000, 10000, 10000]);
+    expect(console.info).not.toHaveBeenCalled();
+    link.close();
+  });
+
+  it("says hello again with the build and open flows, resets the wait, and logs lost and back once each", () => {
+    const s = sockets();
+    const link = createDebugLink({ build: "b1", project: "Test", WebSocket: s.Sock });
+    s.open();
+    link.flowOpened("main");
+    s.drop();
+    vi.advanceTimersByTime(1000);
+    s.refuse();                                   // the editor isn't back yet: 2 s next
+    vi.advanceTimersByTime(2000);
+    link.setBuild("b2");                          // a pushed bundle took while it was away
+    s.open();
+    expect(s.last().sent[0]).toMatchObject({ t: "hello", build: "b2", project: "Test", flows: ["main"] });
+    expect(link.state).toBe("connected");
+    s.drop();                                     // the hello put the wait back to 1 s
+    const before = s.all.length;
+    vi.advanceTimersByTime(1000);
+    expect(s.all.length).toBe(before + 1);
+    expect(vi.mocked(console.info).mock.calls.map((c) => String(c[0]))).toEqual([
+      expect.stringContaining("lost"), expect.stringContaining("back"), expect.stringContaining("lost"),
+    ]);
+    link.close();
+  });
+
+  it("queues nothing while a retry connects, so the hello and fresh frames stand in for what was missed", () => {
+    const s = sockets();
+    const link = createDebugLink({ build: "b1", WebSocket: s.Sock });
+    link.observe("main", "s1", "L1", "line");     // the first attempt holds the opening moments
+    s.refuse();
+    vi.advanceTimersByTime(1000);
+    for (let i = 2; i < 50; i++) link.observe("main", "s1", `L${i}`, "line");
+    s.open();
+    expect(s.last().sent.map((m) => m.t)).toEqual(["hello"]);
+    link.observe("main", "s1", "L50", "line");
+    expect(s.last().sent.map((m) => m.t)).toEqual(["hello", "frame"]);
+    link.close();
+  });
+
+  it("stops for good when the editor replaced it with another game (code 4000)", () => {
+    const s = sockets();
+    const link = createDebugLink({ build: "b1", WebSocket: s.Sock });
+    s.open();
+    s.drop(4000);
+    expect(link.state).toBe("closed");
+    vi.advanceTimersByTime(60000);
+    expect(s.all.length).toBe(1);
+  });
+
+  it("stops retrying once the game closes it", () => {
+    const s = sockets();
+    const link = createDebugLink({ build: "b1", WebSocket: s.Sock });
+    s.refuse();
+    link.close();
+    vi.advanceTimersByTime(60000);
+    expect(s.all.length).toBe(1);
+    expect(link.state).toBe("closed");
   });
 });

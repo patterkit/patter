@@ -5,7 +5,13 @@
 //
 // It is a debug tool: in a Shipping build every method is a no-op and the WebSockets dependency is
 // compiled out entirely (see PatterplayRuntime.Build.cs), so it is safe to leave wired in. Hold the
-// returned shared pointer for as long as you want the link open:
+// returned shared pointer for as long as you want the link open.
+//
+// It reconnects: while the link is open, a socket that closes (or never opens) is tried again after 1 s,
+// doubling to at most 10 s, and sends its hello again when the editor is back. It logs one line when an
+// established link is lost and one when it's back, nothing per attempt. A link the editor replaced with
+// another game (close code 4000) closes for good.
+//
 //
 //   Link = FPatterDebugLink::Create(Engine->BuildId(), TEXT("My Game"));
 //   Link->FlowOpened(TEXT("main"));
@@ -17,6 +23,7 @@
 
 #include "CoreMinimal.h"
 #include "Templates/SharedPointer.h"
+#include "Containers/Ticker.h"
 #include "PatterTypes.h"
 
 class IWebSocket;
@@ -93,19 +100,31 @@ public:
 	const FString& Url() const { return DialUrl; }
 
 private:
+	friend struct FPatterDebugLinkTestAccess;   // the automation test drives the socket's events itself
+
 	FPatterDebugLink(const FString& InBuild, const FString& InProject, const FString& InUrl);
 	void Connect();
+	void HandleConnected();
+	void HandleGone(int32 StatusCode);   // the socket closed (StatusCode from OnClosed) or never opened (-1)
+	void RetryTick();
 	void Post(const FString& Message);
-	void GoQuiet();   // the editor refused or dropped the link: stop queuing for good
+	void Send(const FString& Message);
 	void Flush();
+	void DropSocket();
 	FString HelloMessage() const;
 
 	FString BuildId;
 	FString Project;
 	FString DialUrl;
 	TSet<FString> Flows;
-	TArray<FString> Queue;   // messages awaiting an open socket
+	TArray<FString> Queue;   // messages awaiting the first socket's open
 	bool bOpen = false;
-	bool bClosed = false;   // Close() was called, or the socket went away for good
+	bool bClosed = false;    // Close() was called, or the editor replaced this link
+	bool bStartup = true;    // queue only until the first attempt fails or closes, never again after that
+	bool bLost = false;      // an established link went away and we said so; say so when it's back
+	double RetryAt = 0.0;    // FPlatformTime::Seconds() of the next attempt; 0 while one is under way
+	double RetryWait = 1.0;  // seconds: 1, doubling to 10, back to 1 once a hello goes out
+	FTSTicker::FDelegateHandle RetryTicker;
+	TArray<FString>* SentForTest = nullptr;   // the automation test's: what Send would have sent
 	TSharedPtr<IWebSocket> Socket;
 };

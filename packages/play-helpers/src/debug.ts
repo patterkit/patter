@@ -25,8 +25,17 @@
 //
 // The link is loopback-only on the editor side (127.0.0.1), so there's no pairing
 // token - only processes on the same machine can reach it. The client never throws
-// into the game loop - a missing/closed editor just means frames go nowhere. Wire
-// it up after each advance()/choose():
+// into the game loop - a missing/closed editor just means frames go nowhere.
+//
+// It reconnects (the rule Storylets' live link shares): until the game closes it, a
+// socket that closes or never opens is tried again after 1 s, doubling to 10 s, and
+// back to 1 s once a hello goes. Each new socket says hello again with the build and
+// the open flows. One line is logged when an open link is lost and one when it's
+// back; a link that never opened logs nothing. Frames are queued only while the
+// first socket connects: after any attempt fails, nothing queues until a socket is
+// open. The editor closes a game it replaced (another game connected) with code
+// 4000, and that one doesn't retry, so two games don't take turns. Wire it up after
+// each advance()/choose():
 //
 //   const link = createDebugLink({ build: bundle.content.hash });
 //   link.flowOpened("main");
@@ -39,7 +48,9 @@ export interface DebugSocketLike {
   readyState: number;
   send(data: string): void;
   close(): void;
-  addEventListener(type: "open" | "close" | "error", listener: () => void): void;
+  addEventListener(type: "open" | "error", listener: () => void): void;
+  /** The close event's `code` says why: 4000 is the editor replacing this game with another. */
+  addEventListener(type: "close", listener: (ev?: { code?: number }) => void): void;
   /** Incoming editor messages (live bundle refresh). Optional so a bare-bones send-only socket still fits. */
   addEventListener(type: "message", listener: (ev: { data: unknown }) => void): void;
 }
@@ -113,6 +124,11 @@ export interface DebugLink {
 }
 
 const OPEN = 1; // WebSocket.OPEN
+/** The editor closed this game because another connected: don't retry. */
+const REPLACED = 4000;
+/** The retry's first wait and its longest, in ms. */
+const RETRY_FIRST = 1000;
+const RETRY_MAX = 10000;
 
 /**
  * Open a live debug link to Patterpad. Returns a handle whose calls are no-ops once the editor disconnects
@@ -126,6 +142,11 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
   let sock: DebugSocketLike | null = null;
   let closed = false;
   let build = opts.build; // mutable: setBuild() after a live bundle refresh lands
+  let dropped = false;     // an attempt has failed or closed: queue nothing until a socket opens
+  let wasOpen = false;     // a socket has been open, so losing it is worth a line
+  let lost = false;        // logged as lost, waiting to log it back
+  let wait = RETRY_FIRST;
+  let retry: ReturnType<typeof setTimeout> | null = null;
 
   const flush = (): void => {
     if (!sock || sock.readyState !== OPEN) return;
@@ -138,6 +159,7 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
   // in, which is exactly the build the docs say this is safe in.
   const post = (msg: object): void => {
     if (closed || !sock || sock.readyState > OPEN) return;
+    if (dropped && sock.readyState !== OPEN) return;
     queue.push(JSON.stringify(msg));
     flush();
   };
@@ -157,19 +179,26 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
 
   const sendHello = (): void => {
     const hello = JSON.stringify({ t: "hello", v: 1, build, project: opts.project, flows: [...flows] });
-    try { sock?.send(hello); } catch { /* race: closed immediately */ }
+    try { sock?.send(hello); wait = RETRY_FIRST; } catch { /* race: closed immediately */ }
   };
 
-  try {
-    sock = new Ctor(url);
-    sock.addEventListener("open", () => {
+  const connect = (): void => {
+    retry = null;
+    if (closed) return;
+    let s: DebugSocketLike;
+    try { s = new Ctor(url); } catch { sock = null; return; } // malformed URL etc. - never throw into the game
+    sock = s;
+    s.addEventListener("open", () => {
+      if (sock !== s) return;
+      wasOpen = true;
+      if (lost) { lost = false; console.info(`[patterplay] Live Link is back (${url}).`); }
       // Handshake first, so the editor can verify the build + seed the flow list before frames arrive.
       sendHello();
       flush();
     });
     // Editor -> game: a live bundle refresh, or Play in game. Validate the shape here so the host's
     // handlers never see a malformed payload; everything else the editor might send is ignored.
-    sock.addEventListener("message", (ev: { data: unknown }) => {
+    s.addEventListener("message", (ev: { data: unknown }) => {
       if (typeof ev.data !== "string") return;
       let msg: Record<string, unknown>;
       try { msg = JSON.parse(ev.data) as Record<string, unknown>; } catch { return; }
@@ -185,9 +214,18 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
         try { opts.onPlay(req); } catch { /* never throw into the socket: the editor times out */ }
       }
     });
-    sock.addEventListener("error", () => { /* editor not listening - stay a no-op */ });
-    sock.addEventListener("close", () => { sock = null; queue = []; });
-  } catch { sock = null; } // malformed URL etc. - never throw into the game
+    s.addEventListener("error", () => { /* editor not listening - the close that follows retries */ });
+    s.addEventListener("close", (ev?: { code?: number }) => {
+      if (sock !== s) return;
+      sock = null; queue = []; dropped = true;
+      if (closed) return;
+      if (ev?.code === REPLACED) { closed = true; console.info(`[patterplay] Live Link: another game took the editor's link (${url}).`); return; }
+      if (wasOpen && !lost) { lost = true; console.info(`[patterplay] Live Link lost (${url}); retrying.`); }
+      retry = setTimeout(connect, wait);
+      wait = Math.min(wait * 2, RETRY_MAX);
+    });
+  };
+  connect();
 
   return {
     flowOpened(flowId: string): void { flows.add(flowId); post({ t: "flowOpen", flow: flowId }); },
@@ -207,8 +245,14 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
       build = next;
       if (sock && sock.readyState === OPEN) sendHello(); // re-handshake: the editor re-reads the build
     },
-    close(): void { closed = true; queue = []; try { sock?.close(); } catch { /* already gone */ } sock = null; },
-    get state() { return closed || !sock ? "closed" : sock.readyState === OPEN ? "connected" : "connecting"; },
+    close(): void {
+      closed = true; queue = [];
+      if (retry) { clearTimeout(retry); retry = null; }
+      try { sock?.close(); } catch { /* already gone */ }
+      sock = null;
+    },
+    // Between attempts there's no socket, but the link is still trying: connecting.
+    get state() { return closed ? "closed" : sock && sock.readyState === OPEN ? "connected" : sock || retry ? "connecting" : "closed"; },
     get build() { return build; },
     url,
   };

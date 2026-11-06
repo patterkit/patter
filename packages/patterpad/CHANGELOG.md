@@ -6,6 +6,26 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Play in game straight after a save.** It was refused as "running an older version of the story", because the
+  save's push to the game was still waiting. Play in game now sends the push at once and waits for the game to take
+  it before asking. When the story doesn't compile, so there's nothing to send, it says so.
+- **A game that connects behind the editor is sent the latest.** A game started from an older bundle, or one that
+  reconnects after you've edited, is pushed the current bundle as soon as it says hello, not at your next save.
+- **A game going away clears its playhead.** The editor no longer keeps highlighting the last beat of a game that has
+  quit or dropped off the Live Link.
+
+### Added
+
+- **Unpublished edits.** While a game on the Live Link is running edits you haven't published, **Unpublished edits**
+  shows beside the Live Link icon. It clears when you publish (or Auto Rebuild does).
+
+### Changed
+
+- **Play in game's words when the asking speaker is missing.** "The speaker that asks for it isn't in the game yet",
+  with the game's own line naming them beneath it, in place of "The game has no player character to start it with".
+
 ## [0.45.0] - 2026-11-05
 
 ### Breaking

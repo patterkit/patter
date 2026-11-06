@@ -6,7 +6,14 @@
 // It never throws into your game loop, and if the editor isn't listening every call is a silent no-op
 // (a shipped game on a player's machine has nothing on 127.0.0.1:4471, so it stays inert). Even so it
 // is a DEBUG tool: wire it behind `#if UNITY_EDITOR || DEVELOPMENT_BUILD` so it is stripped from a
-// release player build. Report position after each Advance()/Choose():
+// release player build.
+//
+// It reconnects: while the game has it open, a socket that closes (or never opens) is tried again after
+// 1 s, doubling to at most 10 s, and sends its hello again when the editor is back. It logs one
+// "[Patterplay]" line on standard error when an established link is lost and one when it's back, nothing
+// per attempt. A link the editor replaced with another game (close code 4000) closes for good.
+//
+// Report position after each Advance()/Choose():
 //
 //   var link = new PatterDebugLink(engine.BuildId, "My Game");
 //   link.FlowOpened("main");
@@ -52,7 +59,12 @@ namespace Patterkit.Patterplay
 
     public sealed class PatterDebugLink : IDisposable
     {
-        private string _build; // mutable: SetBuild() after a live bundle refresh lands
+        private const string DefaultUrl = "ws://127.0.0.1:4471";
+        // The editor's server closes a client it replaced (another game connected) with this code. A
+        // replaced link stays closed: retrying would only take the editor back from the game that took over.
+        private const int CloseReplaced = 4000;
+
+        private volatile string _build; // mutable: SetBuild() after a live bundle refresh lands (the worker reads it for a re-hello)
         private readonly string _project;
         private readonly string _url;
         private readonly HashSet<string> _flows = new HashSet<string>();
@@ -62,9 +74,19 @@ namespace Patterkit.Patterplay
         // main thread (Unity objects must not be touched from the socket thread).
         private readonly ConcurrentQueue<string> _inbox = new ConcurrentQueue<string>();
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
-        private ClientWebSocket _ws;
-        private volatile bool _closed;
+        private readonly int _retryFirstMs;
+        private readonly int _retryMaxMs;
+        private volatile ClientWebSocket _ws;
+        private volatile bool _closed;      // Close() was called, or the editor replaced this link
         private volatile bool _connected;
+        // Frames queue only while the FIRST socket connects. Once any attempt fails or closes, a frame
+        // with no open socket has nowhere to go, so it is dropped rather than kept for the rest of a game.
+        private volatile bool _startup = true;
+
+        /// <summary>Test hook: told each wait before a retry, in milliseconds. Null outside the TestHost.</summary>
+        internal Action<int> RetryScheduled;
+        /// <summary>Test hook: frames waiting to be sent.</summary>
+        internal int QueuedCount => _queue.Count;
 
         /// <summary>What the link is doing, for the editor's Runtime State window. "the editor is not
         /// listening" and "I never attached" look identical from inside a running game, and that is the
@@ -77,11 +99,20 @@ namespace Patterkit.Patterplay
         /// <summary>The editor address this link dials.</summary>
         public string Url => _url;
 
-        public PatterDebugLink(string build, string project = null, string url = "ws://127.0.0.1:4471")
+        public PatterDebugLink(string build, string project = null, string url = DefaultUrl)
+            : this(build, project, url, 1000, 10000, null)
+        {
+        }
+
+        /// <summary>The TestHost's: shorter retry waits, and the retry hook in place before the first dial.</summary>
+        internal PatterDebugLink(string build, string project, string url, int retryFirstMs, int retryMaxMs, Action<int> retryScheduled)
         {
             _build = build ?? "";
             _project = project;
-            _url = string.IsNullOrEmpty(url) ? "ws://127.0.0.1:4471" : url;
+            _url = string.IsNullOrEmpty(url) ? DefaultUrl : url;
+            _retryFirstMs = retryFirstMs;
+            _retryMaxMs = retryMaxMs;
+            RetryScheduled = retryScheduled;
             _ = RunAsync(_cts.Token);
         }
 
@@ -178,70 +209,134 @@ namespace Patterkit.Patterplay
 
         private void Post(string json)
         {
-            if (!_closed) _queue.Enqueue(json);
+            if (!_closed && (_connected || _startup)) _queue.Enqueue(json);
         }
 
+        // The socket's worker: dial, and while the game has the link open, dial again after a close or a
+        // failed attempt. Everything here runs off the main thread, so it touches no Unity API: the hello
+        // is built from strings and the _flows set (under its lock), nothing else.
         private async Task RunAsync(CancellationToken ct)
         {
+            Uri uri;
+            try { uri = new Uri(_url); }
+            catch { _closed = true; return; } // an address that can't parse is never going to answer
+
+            int waitMs = _retryFirstMs;
+            bool everOpened = false;
+            bool lost = false;            // an established link went away and we said so
+            byte[] buffer = null;         // the receive buffers, made on the first open and kept
+            MemoryStream frame = null;
             try
             {
-                _ws = new ClientWebSocket();
-                await _ws.ConnectAsync(new Uri(_url), ct).ConfigureAwait(false);
-                _connected = true;
-                // Handshake first, so the editor can verify the build + seed the flow list before frames.
-                await SendRaw(HelloJson(), ct).ConfigureAwait(false);
-                // Send + receive run concurrently: outgoing frames drain from _queue, incoming editor
-                // messages (live bundle refresh) land in _inbox for the game to drain on its own thread.
-                await Task.WhenAll(SendLoop(ct), ReceiveLoop(ct)).ConfigureAwait(false);
+                while (!ct.IsCancellationRequested)
+                {
+                    var ws = new ClientWebSocket();
+                    _ws = ws;
+                    bool opened = false;
+                    try
+                    {
+                        await ws.ConnectAsync(uri, ct).ConfigureAwait(false);
+                        opened = true;
+                        // A Post racing the last close may have queued after the drop; it's stale.
+                        if (everOpened) while (_queue.TryDequeue(out _)) { }
+                        everOpened = true;
+                        _connected = true;
+                        // Handshake first, so the editor can verify the build + seed the flow list before
+                        // frames. On a reconnect it's the same hello, with the build and the flows open now.
+                        await SendRaw(ws, HelloJson(), ct).ConfigureAwait(false);
+                        waitMs = _retryFirstMs;
+                        if (lost)
+                        {
+                            lost = false;
+                            Console.Error.WriteLine("[Patterplay] Live Link is back (" + _url + ").");
+                        }
+                        if (buffer == null) { buffer = new byte[64 * 1024]; frame = new MemoryStream(); }
+                        // Send + receive run concurrently: outgoing frames drain from _queue, incoming editor
+                        // messages (live bundle refresh) land in _inbox for the game to drain on its own thread.
+                        await Task.WhenAll(SendLoop(ws, ct), ReceiveLoop(ws, buffer, frame, ct)).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // Editor not listening / link dropped - try again below (never throw into the game).
+                    }
+                    _connected = false;
+                    _startup = false;
+                    while (_queue.TryDequeue(out _)) { }
+                    // CloseStatus is set once the editor's Close message arrived (ReceiveLoop returns on it).
+                    bool replaced = ws.CloseStatus.HasValue && (int)ws.CloseStatus.Value == CloseReplaced;
+                    ws.Dispose();
+                    if (replaced)
+                    {
+                        Console.Error.WriteLine("[Patterplay] Live Link: another game took the editor's link (" + _url + ").");
+                        return;
+                    }
+                    if (ct.IsCancellationRequested) return;
+                    if (opened && !lost)
+                    {
+                        lost = true;
+                        Console.Error.WriteLine("[Patterplay] Live Link lost (" + _url + "); retrying.");
+                    }
+                    RetryScheduled?.Invoke(waitMs);
+                    await Task.Delay(waitMs, ct).ConfigureAwait(false);
+                    waitMs = Math.Min(waitMs * 2, _retryMaxMs);
+                }
             }
             catch
             {
-                // Editor not listening / link closed - go quiet and stop queuing (never throw into the game).
+                // Close() cancelled the wait - stop.
             }
             finally
             {
                 _closed = true;
                 _connected = false;
+                frame?.Dispose();
                 while (_queue.TryDequeue(out _)) { }
             }
         }
 
-        private async Task SendLoop(CancellationToken ct)
+        private async Task SendLoop(ClientWebSocket ws, CancellationToken ct)
         {
-            while (!ct.IsCancellationRequested && _ws.State == WebSocketState.Open)
+            try
             {
-                if (_queue.TryDequeue(out var msg)) await SendRaw(msg, ct).ConfigureAwait(false);
-                else await Task.Delay(15, ct).ConfigureAwait(false);
+                while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
+                {
+                    if (_queue.TryDequeue(out var msg)) await SendRaw(ws, msg, ct).ConfigureAwait(false);
+                    else await Task.Delay(15, ct).ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+                // A failed send leaves the receive waiting on a socket that's gone: drop it, so the
+                // receive ends too and the worker can dial again.
+                try { ws.Abort(); } catch { /* already gone */ }
+                throw;
             }
         }
 
-        private async Task ReceiveLoop(CancellationToken ct)
+        private async Task ReceiveLoop(ClientWebSocket ws, byte[] buffer, MemoryStream frame, CancellationToken ct)
         {
-            var buffer = new byte[64 * 1024];
             // Accumulate BYTES and decode once at the end of the message, never chunk by chunk: a
             // multi-byte character straddling a 64 KB boundary would decode as two replacement
             // characters, one at the tail of one chunk and one at the head of the next. The message that
             // spans chunks is a pushed bundle, so any non-ASCII character in the story that lands on a
             // boundary would corrupt the JSON the game is about to apply.
-            using (var frame = new MemoryStream())
+            frame.SetLength(0);
+            while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
             {
-                while (!ct.IsCancellationRequested && _ws.State == WebSocketState.Open)
-                {
-                    var result = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct).ConfigureAwait(false);
-                    if (result.MessageType == WebSocketMessageType.Close) return;
-                    if (result.MessageType != WebSocketMessageType.Text) continue;
-                    frame.Write(buffer, 0, result.Count);
-                    if (!result.EndOfMessage) continue; // a pushed bundle spans many chunks
-                    _inbox.Enqueue(Encoding.UTF8.GetString(frame.GetBuffer(), 0, (int)frame.Length));
-                    frame.SetLength(0);
-                }
+                var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct).ConfigureAwait(false);
+                if (result.MessageType == WebSocketMessageType.Close) return;
+                if (result.MessageType != WebSocketMessageType.Text) continue;
+                frame.Write(buffer, 0, result.Count);
+                if (!result.EndOfMessage) continue; // a pushed bundle spans many chunks
+                _inbox.Enqueue(Encoding.UTF8.GetString(frame.GetBuffer(), 0, (int)frame.Length));
+                frame.SetLength(0);
             }
         }
 
-        private async Task SendRaw(string json, CancellationToken ct)
+        private static async Task SendRaw(ClientWebSocket ws, string json, CancellationToken ct)
         {
             var bytes = Encoding.UTF8.GetBytes(json);
-            await _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, ct).ConfigureAwait(false);
+            await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, ct).ConfigureAwait(false);
         }
 
         private string HelloJson()

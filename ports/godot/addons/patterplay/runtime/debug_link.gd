@@ -7,6 +7,11 @@
 # It is a debug tool: it only opens the link in a debug build (OS.is_debug_build()); in a release
 # export it is inert, so it is safe to leave wired in.
 #
+# It reconnects: while the game has it on, a link whose socket closes (or never opens) is tried again
+# after 1 s, doubling to at most 10 s, and sends its hello again when the editor is back. It logs one
+# line when an established link is lost and one when it's back, nothing per attempt. A link the editor
+# replaced with another game (close code 4000) stays closed.
+#
 # Usage - add it under any node, then report position after each advance() / choose():
 #   var link := PatterDebugLink.new(engine.build_id(), "My Game")
 #   add_child(link)                                    # starts polling
@@ -34,14 +39,26 @@ signal play_requested(request: Dictionary)
 
 const DEFAULT_URL := "ws://127.0.0.1:4471"
 
+# The editor's server closes a client it replaced (another game connected) with this code. A replaced
+# link stays closed: retrying would only take the editor back from the game that took it over.
+const CLOSE_REPLACED := 4000
+# The wait before trying again after a close or a failed attempt: 1 s, doubling to at most 10 s, back
+# to 1 s once a hello goes out.
+const RETRY_FIRST_MS := 1000
+const RETRY_MAX_MS := 10000
+
 var _build: String
 var _project: String
 var _url: String
 var _ws := WebSocketPeer.new()
 var _flows: Dictionary = {}
-var _queue: Array = []          # JSON strings awaiting an open socket
+var _queue: Array = []          # JSON strings awaiting the first socket's open
 var _hello_sent := false
-var _enabled := false
+var _enabled := false           # the game wants the link: on until close(), or the editor replaced us
+var _queueing := true           # until the first attempt fails or closes; never again after that
+var _retry_at := 0              # Time.get_ticks_msec() of the next attempt, 0 while one is under way
+var _retry_wait := RETRY_FIRST_MS
+var _lost := false              # an established link went away and we said so; say so when it's back
 
 
 func _init(build: String, project: String = "", url: String = DEFAULT_URL) -> void:
@@ -54,24 +71,44 @@ func _ready() -> void:
 	# Debug-only: never open the link in a release export.
 	if not OS.is_debug_build():
 		return
-	if _ws.connect_to_url(_url) == OK:
-		_enabled = true   # otherwise the editor is unreachable - stay a silent no-op
+	_enabled = true
+	_dial()
 
 
 func _process(_delta: float) -> void:
 	if not _enabled:
 		return
-	_ws.poll()
+	if _retry_at > 0:
+		if Time.get_ticks_msec() < _retry_at:
+			return
+		_retry_at = 0
+		_dial()
+		return
+	if _ws.get_ready_state() == WebSocketPeer.STATE_CONNECTING:
+		# Godot warns from inside poll() when an attempt finds nobody listening ("Unable to set TCP no
+		# delay option" on macOS), which with retries would be a warning every few seconds for as long
+		# as the editor is away. Attempts are meant to be silent, so the poll that settles one is too.
+		var printing := Engine.print_error_messages
+		Engine.print_error_messages = false
+		_ws.poll()
+		Engine.print_error_messages = printing
+	else:
+		_ws.poll()
 	match _ws.get_ready_state():
 		WebSocketPeer.STATE_OPEN:
 			if not _hello_sent:
 				# Handshake first, so the editor can verify the build + seed the flow list before frames.
+				# On a reconnect it's the same hello, with the build and the flows open now.
 				_ws.send_text(JSON.stringify(_hello_message()))
 				_hello_sent = true
+				_retry_wait = RETRY_FIRST_MS
+				if _lost:
+					_lost = false
+					print("[patterplay] Live Link is back (%s)." % _url)
 			_flush()
 			_drain_incoming()
 		WebSocketPeer.STATE_CLOSED:
-			_enabled = false   # editor closed the link - go quiet
+			_socket_gone(_ws.get_close_code())
 
 
 ## What the link is doing: "connecting", "connected" or "closed". From inside a running game "the editor
@@ -150,6 +187,7 @@ func reply_play(id: String, result: Dictionary) -> void:
 
 func close() -> void:
 	_enabled = false
+	_retry_at = 0
 	_queue.clear()
 	if _ws.get_ready_state() != WebSocketPeer.STATE_CLOSED:
 		_ws.close()
@@ -161,8 +199,41 @@ func _hello_message() -> Dictionary:
 	return { "t": "hello", "v": 1, "build": _build, "project": _project, "flows": _flows.keys() }
 
 
+# Dial the editor. An address the peer can't even parse is never going to work, so that one closes
+# the link for good, silently, as it always did; anything else that fails is tried again.
+func _dial() -> void:
+	var err := _ws.connect_to_url(_url)
+	if err == ERR_INVALID_PARAMETER:
+		_enabled = false
+	elif err != OK:
+		_socket_gone(-1)
+
+
+# The socket closed, or never opened. Retry while the game wants the link, unless the editor replaced
+# us with another game. One line when an established link is lost, none per attempt, and nothing at
+# all for a link that has never opened.
+func _socket_gone(code: int) -> void:
+	var was_open := _hello_sent
+	_hello_sent = false
+	# The startup queue only holds frames for the first socket; once that's gone, a frame with no open
+	# socket has nowhere to go, so it is dropped rather than kept for the rest of the game.
+	_queueing = false
+	_queue.clear()
+	if code == CLOSE_REPLACED:
+		_enabled = false
+		print("[patterplay] Live Link: another game took the editor's link (%s)." % _url)
+		return
+	if was_open and not _lost:
+		_lost = true
+		print("[patterplay] Live Link lost (%s); retrying." % _url)
+	_retry_at = Time.get_ticks_msec() + _retry_wait
+	_retry_wait = mini(_retry_wait * 2, RETRY_MAX_MS)
+
+
 func _post(msg: Dictionary) -> void:
 	if not _enabled:
+		return
+	if not _queueing and _ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		return
 	_queue.append(JSON.stringify(msg))
 	_flush()

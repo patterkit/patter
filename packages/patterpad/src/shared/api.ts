@@ -743,19 +743,9 @@ export interface PackMergeSummary {
 }
 
 /** A prompt main asks the editor window to show on the family's dialog frame, answered with the index
- *  of the button chosen. Buttons are in display order, the way out first. */
-export interface AppPrompt {
-  title: string;
-  /** One plain sentence under the title. */
-  sub?: string;
-  /** Paragraphs of body copy. */
-  body?: string[];
-  buttons: string[];
-  /** The button that wears the accent and takes the focus. */
-  defaultId: number;
-  /** What Esc and the backdrop answer. */
-  cancelId: number;
-}
+ *  of the button chosen: app-shell's, shared with Storyletter. */
+import type { AppPrompt } from "@wildwinter/app-shell/prompt-channels";
+export type { AppPrompt };
 
 /** A localisation export: a format + an optional target locale (omitted = a blank source template). */
 export interface LocExportRequest {
@@ -970,7 +960,11 @@ export type DebugStatus =
   | { state: "off" }
   | { state: "error"; message: string }
   | { state: "listening"; port: number }
-  | ({ state: "connected"; port: number; project?: string; build: "match" | "stale" | "unknown" } & FollowView);
+  | ({
+      state: "connected"; port: number; project?: string; build: "match" | "stale" | "unknown";
+      /** The game runs edits pushed to it that haven't been published. */
+      unpublished?: true;
+    } & FollowView);
 
 /** The detached SEARCH window's bridge (window.patterSearch). It queries the project-wide index in the
  *  main process and drives the editor window (jump) over IPC - the editor stays live underneath. */

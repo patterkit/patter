@@ -24,7 +24,7 @@ interface Harness {
   connected: () => DebugStatus | undefined;
 }
 
-async function startServer(buildHash: string | null, playTimeoutMs?: number): Promise<Harness> {
+async function startServer(buildHash: string | null, playTimeoutMs?: number, extra: { pushNow?: () => boolean; publishedBuildHash?: () => string | null } = {}): Promise<Harness> {
   const port = nextPort++;
   const frames: DebugFrame[] = [];
   const statuses: DebugStatus[] = [];
@@ -34,6 +34,7 @@ async function startServer(buildHash: string | null, playTimeoutMs?: number): Pr
     port,
     currentBuildHash: () => buildHash,
     ...(playTimeoutMs !== undefined ? { playTimeoutMs } : {}),
+    ...extra,
     onFrame: (f) => frames.push(f),
     onReset: () => { resets++; },
     onStatus: (s) => { statuses.push(s); const keep: typeof waiters = []; for (const w of waiters) { if (w.pred(s)) w.resolve(s); else keep.push(w); } waiters.length = 0; waiters.push(...keep); },
@@ -289,6 +290,24 @@ describe("the debug link refuses web pages", () => {
   });
 });
 
+describe("a game going away", () => {
+  it("clears the playhead it was moving, and leaves alone one it never moved", async () => {
+    const h = await startServer("HASH_A");
+    const link = await connect(h, "HASH_A", ["main"]);
+    const atHello = h.resets();
+    link.close();                                   // went away without moving anything
+    await h.waitFor((s) => s.state === "listening");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(h.resets()).toBe(atHello);
+    const again = await connect(h, "HASH_A", ["main"]);
+    again.observe("main", "s1", "b1", "line");
+    await waitUntil(() => h.frames.length === 1);
+    const before = h.resets();
+    again.close();
+    await waitUntil(() => h.resets() === before + 1);
+  });
+});
+
 describe("Play in game over the live link", () => {
   const req = { sceneId: "s1", blockId: "b1", takeOver: true };
 
@@ -310,6 +329,51 @@ describe("Play in game over the live link", () => {
     const h = await startServer("HASH_A");
     const link = await connect(h, "HASH_A");
     expect(await server!.playInGame(req)).toEqual({ started: false, reason: "unhandled" });
+    link.close();
+  });
+
+  it("after a save whose push is still waiting, pushes now and waits for the game to take it before asking", async () => {
+    let pushes = 0;
+    const h = await startServer("HASH_NEW", undefined, {
+      pushNow: () => { pushes++; server!.pushBundle("HASH_NEW", "{}"); return true; },
+    });
+    const seen: Array<{ build?: string }> = [];
+    const link = createDebugLink({
+      build: "HASH_OLD", url: `ws://127.0.0.1:${h.port}`, WebSocket: WS,
+      // A game slow to apply: the re-hello comes a moment after the bundle.
+      onBundle: (msg) => { setTimeout(() => link.setBuild(msg.build), 80); },
+      onPlay: (r) => { seen.push(r); link.replyPlay(r.id, { started: true }); },
+    });
+    await h.waitFor((s) => s.state === "connected");
+    await waitUntil(() => pushes === 1);          // the stale hello was offered the current bundle
+    await h.waitFor((s) => s.state === "connected" && s.build === "match");
+    link.setBuild("HASH_OLD");                    // as if the writer saved again and the push hasn't gone
+    await waitUntil(() => server!.gameBuild() === "HASH_OLD");
+    expect(await server!.playInGame(req)).toEqual({ started: true });
+    expect(pushes).toBe(2);
+    expect(seen).toEqual([expect.objectContaining({ build: "HASH_NEW" })]);
+    link.close();
+  });
+
+  it("says cantPush when the game is behind and the story can't be compiled to send", async () => {
+    const h = await startServer("HASH_NEW", undefined, { pushNow: () => false });
+    const link = createDebugLink({ build: "HASH_OLD", url: `ws://127.0.0.1:${h.port}`, WebSocket: WS, onPlay: () => { throw new Error("not asked"); } });
+    await h.waitFor((s) => s.state === "connected");
+    expect(await server!.playInGame(req)).toEqual({ started: false, reason: "cantPush" });
+    link.close();
+  });
+
+  it("marks a game running pushed edits as unpublished until they're published", async () => {
+    let published: string | null = "HASH_OLD";
+    const h = await startServer("HASH_NEW", undefined, {
+      pushNow: () => { server!.pushBundle("HASH_NEW", "{}"); return true; },
+      publishedBuildHash: () => published,
+    });
+    const link = createDebugLink({ build: "HASH_OLD", url: `ws://127.0.0.1:${h.port}`, WebSocket: WS, onBundle: (msg) => link.setBuild(msg.build) });
+    await h.waitFor((s) => s.state === "connected" && s.build === "match" && s.unpublished === true);
+    published = "HASH_NEW";
+    server!.refreshStatus();
+    await h.waitFor((s) => s.state === "connected" && s.unpublished === undefined);
     link.close();
   });
 

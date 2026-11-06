@@ -8,23 +8,13 @@
 // under sibling folders of a game's root). Bounded, since a project near the
 // top of a big tree would otherwise start a search of the whole disk.
 //
-// Storyletter takes `storyletter <project> --at <gameId>` and forwards a second
-// launch to the running app, which opens the card whose gameId is the scene's
-// address. So this starts the executable directly, never `open -a` on macOS: a
-// cold `open` delivers the project through open-file and drops `--at`.
+// Finding Storyletter and starting it at the card is the family's, in
+// app-shell's sibling-app (Storyletter opens Patterpad the same way).
 // ---------------------------------------------------------------------------
 
-import { execFile, spawn } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
-import { type Dir, type Dirent, existsSync, opendirSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { homedir } from "node:os";
+import { type Dir, type Dirent, opendirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseSource } from "@patterkit/core";
-
-/** Storyletter's appId (storylets packages/studio/package.json, `build.appId`). */
-export const STORYLETTER_BUNDLE_ID = "studio.storylet.storyletter";
 
 /** The Storyletter project paired with the Patter project at `patterRoot`, or undefined. */
 export function findPairedStorylets(patterRoot: string): string | undefined {
@@ -83,37 +73,4 @@ export function findPairedStorylets(patterRoot: string): string | undefined {
 /** The next entry of an open folder, or null at its end or on a read error. */
 function readEntry(handle: Dir): Dirent | null {
   try { return handle.readSync(); } catch { return null; }
-}
-
-/** The executable inside a macOS app bundle, or the path itself for anything else. */
-export function storyletterExecutable(path: string, platform: NodeJS.Platform = process.platform): string {
-  return platform === "darwin" && path.endsWith(".app") ? join(path, "Contents", "MacOS", "Storyletter") : path;
-}
-
-/** Where Storyletter is on this machine, or undefined. `remembered` is the author's own answer. The fixed
- *  places are tried first and Spotlight only after, asynchronously: `mdfind` ran synchronously on the main
- *  thread with a three-second timeout, freezing the app while it looked. */
-export async function findStoryletter(remembered?: string, platform: NodeJS.Platform = process.platform): Promise<string | undefined> {
-  const candidates: string[] = [];
-  if (remembered) candidates.push(storyletterExecutable(remembered, platform));
-  if (platform === "darwin") {
-    candidates.push(
-      storyletterExecutable("/Applications/Storyletter.app", platform),
-      storyletterExecutable(join(homedir(), "Applications", "Storyletter.app"), platform),
-    );
-  } else if (platform === "win32") {
-    const local = process.env["LOCALAPPDATA"];
-    if (local) candidates.push(join(local, "Programs", "Storyletter", "Storyletter.exe"));
-  }
-  const fixed = candidates.find((c) => existsSync(c));
-  if (fixed || platform !== "darwin") return fixed;
-  try {
-    const { stdout } = await execFileAsync("mdfind", [`kMDItemCFBundleIdentifier == '${STORYLETTER_BUNDLE_ID}'`], { encoding: "utf8", timeout: 3000 });
-    return stdout.split("\n").map((l) => l.trim()).filter((l) => l.endsWith(".app")).map((app) => storyletterExecutable(app, platform)).find((c) => existsSync(c));
-  } catch { return undefined; } // Spotlight off or slow
-}
-
-/** Start Storyletter on `project`, at the card named `address`. Detached: it outlives Patterpad. */
-export function launchStoryletter(executable: string, project: string, address: string): void {
-  spawn(executable, [project, "--at", address], { detached: true, stdio: "ignore" }).unref();
 }

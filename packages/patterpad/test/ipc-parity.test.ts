@@ -34,9 +34,10 @@ const channels = (src: string, fn: string): string[] =>
 
 const invoked = [...new Set(channels(code("../src/preload/index.ts"), "ipcRenderer\\.invoke"))];
 const handled = [...new Set(channels(code("../src/main/index.ts"), "ipcMain\\.handle"))];
-// Handlers app-shell registers in main for us: the command palette's menu (registerCommandPalette) and What's
-// New's launch state (registerWhatsNew), both called by main/index.ts at startup.
-const SHELL_HANDLED = ["palette:commands", "whatsNew:state"];
+// Handlers app-shell registers in main for us: the command palette's menu (registerCommandPalette), What's
+// New's launch state (registerWhatsNew), and the window prompt's reply (createWindowPrompt), all called by
+// main/index.ts at startup.
+const SHELL_HANDLED = ["palette:commands", "whatsNew:state", "app:promptReply"];
 
 describe("the IPC channels the preload and main agree on", () => {
   it("finds them, so a silent regex change cannot make this test vacuously pass", () => {

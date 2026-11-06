@@ -26,12 +26,14 @@ import { fileURLToPath } from "node:url";
 const source = readFileSync(fileURLToPath(new URL("../src/main/index.ts", import.meta.url)), "utf8");
 
 /** The options object of every `showOpenDialog(` call, brace-matched so nested objects (filters,
- *  properties) come along and the next call's options do not. */
+ *  properties) come along and the next call's options do not. A call whose options come from a
+ *  function (app-shell's `locateDialogOptions`, which carries both fields and is tested there) has no
+ *  literal to read, and is left out rather than matched against the next brace in the file. */
 function openDialogOptions(src: string): string[] {
   const out: string[] = [];
-  for (const m of src.matchAll(/showOpenDialog\(/g)) {
-    const open = src.indexOf("{", m.index! + m[0].length);
-    if (open < 0) continue;
+  for (const m of src.matchAll(/showOpenDialog\(\s*(?:[\w!.]+\s*,\s*)?/g)) {
+    const open = m.index! + m[0].length;
+    if (src[open] !== "{") continue;
     let depth = 0;
     for (let i = open; i < src.length; i++) {
       if (src[i] === "{") depth++;

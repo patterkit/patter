@@ -20,6 +20,15 @@ seconds (default 600) where `timeout` exists. `parse_check.sh` covers the addon'
   RefCounted and goes when the last reference does, while a link is a Node the GAME frees - the
   registry's job is to notice, not to hold on.
 
+- `test_debug_link_reconnect.gd` - the debug link reconnects, against a real loopback WebSocket
+  server: retried after a close or a failed attempt (1 s, doubling to at most 10 s), back to 1 s after
+  a hello, the hello sent again with the current build and open flows, nothing queued while the editor
+  is away, and a link the editor replaced (close code 4000) left closed.
+
+  ```sh
+  ports/godot/test/run.sh test_debug_link_reconnect.gd
+  ```
+
 - `test_corpus.gd` - replays the shared conformance corpus
   ([`packages/conformance`](../../../packages/conformance)) through the addon's runtime and
   asserts the same results the JS reference produces:

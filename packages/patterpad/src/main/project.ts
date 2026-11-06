@@ -992,6 +992,7 @@ function resetProjectState(): void {
   importPlans.clear();         // nor an editable-script import planned against it
   if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; } // a pending rebuild was for it
   lastBuiltHash = undefined;   // the Auto-Rebuild dedup must not carry across projects
+  diskBundleHash = undefined;  // nor the published bundle the Live Link compares a game with
   resetProjectHistory();       // an undo is of the project it was made in
 }
 
@@ -2920,6 +2921,28 @@ let autoRebuildTimer: ReturnType<typeof setTimeout> | null = null;
 // The content hash of the last bundle we wrote (manual OR auto). An auto-rebuild that would produce the same
 // bytes is skipped - no redundant write, no VCS churn. Reset (undefined) when a different project opens.
 let lastBuiltHash: string | undefined;
+// The hash of the .patterc already on disk when the project opened, read once on first ask (null: none, or
+// unreadable). What a game runs is "published" when it's this, or the last bundle written since.
+let diskBundleHash: string | null | undefined;
+
+/** The content hash of the published bundle: the last one written this session, else the one on disk. Null
+ *  when there's none. The Live Link reads it to tell a game running pushed edits nobody has published. */
+export function publishedBuildHash(): string | null {
+  if (lastBuiltHash !== undefined) return lastBuiltHash;
+  if (!loaded) return null;
+  if (diskBundleHash === undefined) {
+    diskBundleHash = null;
+    try {
+      const bundle = JSON.parse(readFileSync(resolveBundleOut(loaded), "utf8")) as { content?: { hash?: unknown } };
+      if (typeof bundle.content?.hash === "string") diskBundleHash = bundle.content.hash;
+    } catch { /* no bundle published yet, or not one we can read */ }
+  }
+  return diskBundleHash;
+}
+
+/** Runs after Auto-Rebuild writes a bundle, so the Live Link's unpublished marker can clear. */
+let onAutoRebuilt: (() => void) | undefined;
+export function setOnAutoRebuilt(fn: () => void): void { onAutoRebuilt = fn; }
 
 /** Whether the author has Auto Rebuild on (drives the Publish-menu checkbox). */
 export function autoRebuildEnabled(): boolean { return autoRebuildOn; }
@@ -2965,7 +2988,7 @@ async function runAutoRebuild(): Promise<void> {
     catch { return; }
     if (plan.bundle.content.hash === lastBuiltHash) return; // deduped: nothing changed
     const res = await commitWrites(plan.writes);
-    if (res.ok) { lastBuiltHash = plan.bundle.content.hash; notePatterScopesWritten(plan.writes); }
+    if (res.ok) { lastBuiltHash = plan.bundle.content.hash; notePatterScopesWritten(plan.writes); onAutoRebuilt?.(); }
   });
 }
 

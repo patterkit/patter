@@ -49,6 +49,8 @@
     <Compile Include="VersionChecks.cs" />
     <!-- Play in game: PatterPlayInGame.TryParsePlay. -->
     <Compile Include="PlayInGameChecks.cs" />
+    <!-- The live debug link reconnects: backs off, re-hellos, stays closed once the editor replaced it. -->
+    <Compile Include="DebugLinkChecks.cs" />
     <!-- The runtime foundations before 1.0: set-up reports, host-write refusals, the copies handed out. -->
     <Compile Include="FoundationsChecks.cs" />
     <!-- The thin runner (PatterRunner): the flow API as events (a port of the JS play-helpers tests). -->

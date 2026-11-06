@@ -1,12 +1,12 @@
 // Show Card in Storyletter: finding the Storyletter project that pairs with a Patter project (it
 // names this one in its project file's `patter`), in the two usual layouts, and nothing when none
-// does; and finding Storyletter itself, with the platform passed in so no install is needed.
+// does. Finding Storyletter itself is app-shell's sibling-app, tested there.
 
 import { afterEach, describe, expect, it } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findPairedStorylets, findStoryletter, storyletterExecutable } from "../src/main/storyletter.js";
+import { findPairedStorylets } from "../src/main/storyletter.js";
 
 /** Temp folders made here, removed after each test so they do not pile up in the system temp folder. */
 const made: string[] = [];
@@ -45,19 +45,5 @@ describe("findPairedStorylets", () => {
     mkdirSync(join(root, "mine.patter"));
     storylets(join(root, "theirs.storylets"), "../theirs.patter");
     expect(findPairedStorylets(join(root, "mine.patter"))).toBeUndefined();
-  });
-});
-
-describe("findStoryletter", () => {
-  it("runs the executable inside a macOS app bundle", () => {
-    expect(storyletterExecutable("/Applications/Storyletter.app", "darwin")).toBe("/Applications/Storyletter.app/Contents/MacOS/Storyletter");
-  });
-
-  it("takes the place the author pointed at, and on Linux nothing else", async () => {
-    const dir = tempRoot("storyletter-");
-    const image = join(dir, "Storyletter.AppImage");
-    writeFileSync(image, "");
-    expect(await findStoryletter(image, "linux")).toBe(image);
-    expect(await findStoryletter(undefined, "linux")).toBeUndefined();
   });
 });

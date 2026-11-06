@@ -9,6 +9,7 @@ const REASONS: Record<string, string> = {
   noGame: "No game is connected on the Live Link.",
   noAnswer: "The game didn't answer. It may not handle Play in game.",
   invalid: "The game turned the request down.",
+  cantPush: "The story doesn't compile right now, so the game can't be sent your latest edits. Fix the problems, and try again.",
   // Any game's.
   unhandled: "The game doesn't handle Play in game.",
   unknownBlock: "The game doesn't have this block.",
@@ -16,7 +17,7 @@ const REASONS: Record<string, string> = {
   busy: "Someone in it is already talking. Use Play in game, taking over, to interrupt them.",
   // Patterstage's.
   castMissing: "A character in it has no speaker free in the game.",
-  requesterMissing: "The game has no player character to start it with.",
+  requesterMissing: "The speaker that asks for it isn't in the game yet.",
   limit: "The game is already running as many conversations as it allows.",
   takeover: "The game couldn't stop what was playing.",
   alreadyCarriedOn: "The game has already played it, and it plays only once.",

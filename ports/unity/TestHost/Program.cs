@@ -129,6 +129,7 @@ namespace Patterkit.Patterplay.TestHost
             RunDescribeSmoke();
             RunAudioJoinCheck();
             RunDebugLinkUtf8Check();
+            RunDebugLinkReconnectCheck();
             RunLegacySaveRngCheck(ParseBundle(root.GetProperty("runtime")[0].GetProperty("bundle")));
             RunLegacyPromptPadCheck(root.GetProperty("runtime"));
             // runtime[1] is "choice with greyed option, pick the eligible": a fixture that actually

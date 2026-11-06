@@ -49,8 +49,14 @@ The icon's **colour** is the state, and hovering it spells the status out:
 
 Red means you've rebuilt or edited since the game launched, so beat ids may not line up. The editor
 still follows scenes, but rebuild and relaunch to re-sync for exact-beat highlighting. A game wired
-for [live bundle refresh](#live-bundle-refresh) re-syncs itself, since saving in Patterpad pushes
-the new bundle straight into the running game.
+for [live bundle refresh](#live-bundle-refresh) re-syncs itself: saving in Patterpad pushes the new
+bundle straight into the running game, and a game that connects on an older build is sent the
+current one as soon as it says hello.
+
+When the game goes away, the playhead it was moving clears. The game's link reconnects by itself. Restart Patterpad, or turn the Live Link on after the game has
+started, and the game connects again within a few seconds: it tries after a second, then less often,
+up to every ten seconds, until it's back. Patterpad takes one game at a time, so a second game that
+connects takes the link, and the first stops trying until you switch its link off and on.
 
 ### Several flows at once
 
@@ -138,7 +144,9 @@ draws happen before the cursor naturally changes later draws.
 
 A pushed bundle lives only in the running game. The next run, and your engine's editor (its pickers
 and checks), still read the bundle you last published, so **publish to keep the edit**
-(**Publish ▸ Publish Bundle**, see [Publishing](/patterpad/publishing/)).
+(**Publish ▸ Publish Bundle**, see [Publishing](/patterpad/publishing/)). While the game is running
+edits you haven't published, **Unpublished edits** shows beside the Live Link icon, and it clears
+once you publish.
 
 ## Play in game
 
@@ -297,7 +305,11 @@ The game answers `play` with:
 { "t": "played", "id": "<request id>", "started": false, "reason": "busy", "detail": "Mara is talking." }
 ```
 
-Send `hello` first; the editor reads the build + flow list from it before honouring any frames. The
+Send `hello` first; the editor reads the build + flow list from it before honouring any frames. When
+the socket closes, try again after 1 second, doubling to at most 10 seconds, and back to 1 second
+once a hello goes; each new socket says `hello` again, with the open flows. Queue frames only while
+the first socket connects. The one close not to retry is code `4000` (`"replaced"`): the editor sends
+it when another game connects. The
 ids are the bundle's **opaque model ids**: the same ones every runtime already exposes on its step
 result and `currentScene`. The server binds to `127.0.0.1` only, so no pairing token is needed. It refuses a connection whose
 `Origin` header names any host but `localhost`, `127.0.0.1` or `::1`; a native client sends no `Origin`,

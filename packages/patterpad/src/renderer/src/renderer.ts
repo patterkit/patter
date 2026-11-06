@@ -61,7 +61,7 @@ import { openEditableExport, openEditableReimport, type EditableDialogContext } 
 import { applyTheme } from "./apply-theme.js";
 import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
   paintVcBadges, lockControls, createNavHistory, historyNav, mountPaneShell, mountSettingsDialog, revealRowWhenReady,
-  askIdentity, confirmDialog, dialogFrame, openContextMenu, setDialogFocusFallback, type ShardVc, type SettingsSectionHandle, type SettingsSection, type SettingsDialog } from "@wildwinter/app-shell";
+  askIdentity, confirmDialog, dialogFrame, openContextMenu, promptDialog, setDialogFocusFallback, type ShardVc, type SettingsSectionHandle, type SettingsSection, type SettingsDialog } from "@wildwinter/app-shell";
 import { extensionAdapter, mountProjectSection, problemSettingsSection, settingsExtensions, settingsSectionId } from "./extension-rows.js";
 import { fieldsState, followTarget, selectedNodes, withoutViewEdited, type FieldsNode } from "./fields-state.js";
 import { createViewHost, takeLengths } from "./view-extensions.js";
@@ -1012,32 +1012,9 @@ const newSceneAfter = (): string | undefined => currentSceneId ?? undefined;
 // Severity scales with the evidence (design/proposals/delete-scene.md): an untouched scaffold
 // deletes silently; content asks; inbound references list the referring scenes BY NAME.
 
-/** A prompt on the family's dialog frame, for whatever `confirmDialog` does not fit: a notice with
- *  nothing to confirm, or a choice of more than one way forward. Buttons are given in display order
- *  (the way out first, as the shell's confirm draws it). The default wears the accent and takes the
- *  focus; Esc and the backdrop answer `cancelId`. A notice is one button, and it reads "OK".
- *
- *  Main's prompts arrive here too (`onPrompt`), so a flow running in main, between its file pickers,
- *  is drawn in the app's own chrome rather than a system message box. */
-function promptDialog(opts: AppPrompt): Promise<number> {
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = (i: number): void => { if (done) return; done = true; resolve(i); frame.close(); };
-    const frame = dialogFrame({ title: opts.title, ...(opts.sub ? { sub: opts.sub } : {}), className: "confirm-dialog", onClose: () => finish(opts.cancelId) });
-    for (const para of opts.body ?? []) frame.body.append(el("p", "confirm-body", para));
-    let focus: HTMLButtonElement | null = null;
-    opts.buttons.forEach((label, i) => {
-      const b = el("button", i === opts.defaultId && opts.buttons.length > 1 ? "btn primary confirm-btn" : "btn confirm-btn", label);
-      b.type = "button";
-      b.addEventListener("click", () => finish(i));
-      frame.actions.append(b);
-      if (i === opts.defaultId) focus = b;
-    });
-    frame.dialog.addEventListener("mousedown", (e) => { if (e.target === frame.dialog) finish(opts.cancelId); });
-    frame.open();
-    (focus as HTMLButtonElement | null)?.focus();
-  });
-}
+// A prompt on the family's dialog frame, for whatever `confirmDialog` doesn't fit, is the shell's
+// `promptDialog`; main's prompts arrive through it too (`onPrompt`), so a flow running in main, between its
+// file pickers, is drawn in the app's own chrome rather than a system message box.
 
 /** A notice: something the author needs to know, and nothing to decide. */
 function notice(title: string, sub: string): Promise<number> {

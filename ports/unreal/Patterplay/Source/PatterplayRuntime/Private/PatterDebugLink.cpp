@@ -2,8 +2,10 @@
 
 #if !UE_BUILD_SHIPPING
 
+#include "PatterLog.h"
 #include "WebSocketsModule.h"
 #include "IWebSocket.h"
+#include "HAL/PlatformTime.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonReader.h"
@@ -20,6 +22,15 @@ namespace
 		FJsonSerializer::Serialize(Obj, Writer);
 		return Out;
 	}
+
+	// The editor's server closes a client it replaced (another game connected) with this code. A replaced
+	// link stays closed: retrying would only take the editor back from the game that took it over.
+	constexpr int32 CloseReplaced = 4000;
+	// The wait before trying again after a close or a failed attempt, in seconds.
+	constexpr double RetryFirst = 1.0;
+	constexpr double RetryMax = 10.0;
+	// How often the retry ticker looks at the clock. Coarse is fine: the waits are whole seconds.
+	constexpr float RetryTickInterval = 0.1f;
 }
 
 TSharedRef<FPatterDebugLink> FPatterDebugLink::Create(const FString& Build, const FString& Project, const FString& Url)
@@ -39,35 +50,38 @@ FPatterDebugLink::~FPatterDebugLink()
 	Close();
 }
 
+// Dial the editor, on a fresh socket each attempt (the last one is dropped first, outside its own
+// callbacks). Each callback checks it is still this link's socket, so a late event from one already
+// dropped changes nothing.
 void FPatterDebugLink::Connect()
 {
 	if (!FModuleManager::Get().IsModuleLoaded("WebSockets"))
 	{
 		FModuleManager::Get().LoadModule("WebSockets");
 	}
+	DropSocket();
 	Socket = FWebSocketsModule::Get().CreateWebSocket(DialUrl, TEXT(""));
 	if (!Socket.IsValid())
 	{
+		bClosed = true;   // no WebSockets here at all: nothing to retry
+		Queue.Reset();
 		return;
 	}
 
 	TWeakPtr<FPatterDebugLink> Weak = AsShared();
-	Socket->OnConnected().AddLambda([Weak]()
+	const IWebSocket* Mine = Socket.Get();
+	Socket->OnConnected().AddLambda([Weak, Mine]()
 	{
 		TSharedPtr<FPatterDebugLink> Self = Weak.Pin();
-		if (!Self.IsValid()) return;
-		Self->bOpen = true;
-		// Handshake first, so the editor can verify the build + seed the flow list before frames.
-		Self->Socket->Send(Self->HelloMessage());
-		Self->Flush();
+		if (Self.IsValid() && Self->Socket.Get() == Mine) Self->HandleConnected();
 	});
 	// Editor -> game: a live bundle refresh {t:"bundle", build, data}, or Play in game {t:"play", id,
 	// sceneId, blockId, takeOver, build?}. Validate the shape here so the host's handlers never see a
 	// malformed payload; anything else the editor sends is ignored.
-	Socket->OnMessage().AddLambda([Weak](const FString& Message)
+	Socket->OnMessage().AddLambda([Weak, Mine](const FString& Message)
 	{
 		TSharedPtr<FPatterDebugLink> Self = Weak.Pin();
-		if (!Self.IsValid()) return;
+		if (!Self.IsValid() || Self->Socket.Get() != Mine) return;
 		TSharedPtr<FJsonObject> Msg;
 		const TSharedRef<TJsonReader<TCHAR>> Reader = TJsonReaderFactory<TCHAR>::Create(Message);
 		if (!FJsonSerializer::Deserialize(Reader, Msg) || !Msg.IsValid()) return;
@@ -102,20 +116,81 @@ void FPatterDebugLink::Connect()
 			Self->OnPlay(Request);
 		}
 	});
-	// The editor is not listening, or it went away: go quiet for good, the way Unity's link does. Leaving
-	// the link "connecting" kept Post queuing one message per step for the rest of the game, and the
-	// header says this is safe to leave wired into a shipping build.
-	Socket->OnConnectionError().AddLambda([Weak](const FString&)
+	// The editor is not listening, or it went away: try again later (HandleGone).
+	Socket->OnConnectionError().AddLambda([Weak, Mine](const FString&)
 	{
 		TSharedPtr<FPatterDebugLink> Self = Weak.Pin();
-		if (Self.IsValid()) Self->GoQuiet();
+		if (Self.IsValid() && Self->Socket.Get() == Mine) Self->HandleGone(-1);
 	});
-	Socket->OnClosed().AddLambda([Weak](int32, const FString&, bool)
+	Socket->OnClosed().AddLambda([Weak, Mine](int32 StatusCode, const FString&, bool)
 	{
 		TSharedPtr<FPatterDebugLink> Self = Weak.Pin();
-		if (Self.IsValid()) Self->GoQuiet();
+		if (Self.IsValid() && Self->Socket.Get() == Mine) Self->HandleGone(StatusCode);
 	});
 	Socket->Connect();
+}
+
+void FPatterDebugLink::HandleConnected()
+{
+	if (bClosed) return;
+	bOpen = true;
+	// Handshake first, so the editor can verify the build + seed the flow list before frames. On a
+	// reconnect it's the same hello, with the build and the flows open now.
+	Send(HelloMessage());
+	RetryWait = RetryFirst;
+	if (bLost)
+	{
+		bLost = false;
+		UE_LOG(LogPatterplay, Log, TEXT("Patterplay: Live Link is back (%s)."), *DialUrl);
+	}
+	Flush();
+}
+
+// The socket closed, or never opened. Retry while the link is open, unless the editor replaced it with
+// another game. One line when an established link is lost, none per attempt, and nothing at all for a
+// link that has never opened.
+void FPatterDebugLink::HandleGone(int32 StatusCode)
+{
+	if (bClosed || RetryAt > 0.0) return;   // closed, or this attempt was already counted
+	const bool bWasOpen = bOpen;
+	bOpen = false;
+	// The startup queue only holds frames for the first socket; once that's gone, a frame with no open
+	// socket has nowhere to go, so it is dropped rather than kept for the rest of the game.
+	bStartup = false;
+	Queue.Reset();
+	if (StatusCode == CloseReplaced)
+	{
+		bClosed = true;
+		UE_LOG(LogPatterplay, Log, TEXT("Patterplay: Live Link: another game took the editor's link (%s)."), *DialUrl);
+		return;
+	}
+	if (bWasOpen && !bLost)
+	{
+		bLost = true;
+		UE_LOG(LogPatterplay, Log, TEXT("Patterplay: Live Link lost (%s); retrying."), *DialUrl);
+	}
+	RetryAt = FPlatformTime::Seconds() + RetryWait;
+	RetryWait = FMath::Min(RetryWait * 2.0, RetryMax);
+	if (!RetryTicker.IsValid())
+	{
+		// One ticker for the link's life, made the first time it's needed: it looks at the clock and
+		// dials when an attempt is due, so a retry allocates nothing but its socket.
+		TWeakPtr<FPatterDebugLink> Weak = AsShared();
+		RetryTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([Weak](float)
+		{
+			TSharedPtr<FPatterDebugLink> Self = Weak.Pin();
+			if (!Self.IsValid()) return false;
+			Self->RetryTick();
+			return true;
+		}), RetryTickInterval);
+	}
+}
+
+void FPatterDebugLink::RetryTick()
+{
+	if (bClosed || RetryAt <= 0.0 || FPlatformTime::Seconds() < RetryAt) return;
+	RetryAt = 0.0;
+	Connect();
 }
 
 void FPatterDebugLink::FlowOpened(const FString& FlowId)
@@ -187,12 +262,13 @@ void FPatterDebugLink::SetBuild(const FString& Build)
 {
 	if (Build == BuildId) return;
 	BuildId = Build;
-	if (bOpen && Socket.IsValid()) Socket->Send(HelloMessage()); // re-handshake: the editor re-reads the build
+	if (bOpen) Send(HelloMessage()); // re-handshake: the editor re-reads the build
 }
 
 FString FPatterDebugLink::State() const
 {
-	if (bClosed || !Socket.IsValid()) return TEXT("closed");
+	// While it waits to try again the link is still "connecting": "closed" is only Close() or replaced.
+	if (bClosed) return TEXT("closed");
 	return bOpen ? TEXT("connected") : TEXT("connecting");
 }
 
@@ -200,37 +276,59 @@ void FPatterDebugLink::Close()
 {
 	bOpen = false;
 	bClosed = true;
+	RetryAt = 0.0;
 	Queue.Reset();
+	if (RetryTicker.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(RetryTicker);
+		RetryTicker.Reset();
+	}
 	if (Socket.IsValid())
 	{
 		Socket->Close();
-		Socket.Reset();
 	}
+	DropSocket();
 }
 
-void FPatterDebugLink::GoQuiet()
+// Let go of the socket, unbinding it first so nothing it reports later reaches this link.
+void FPatterDebugLink::DropSocket()
 {
-	bOpen = false;
-	bClosed = true;
-	Queue.Reset();
+	if (!Socket.IsValid()) return;
+	Socket->OnConnected().Clear();
+	Socket->OnMessage().Clear();
+	Socket->OnConnectionError().Clear();
+	Socket->OnClosed().Clear();
+	Socket.Reset();
 }
 
 void FPatterDebugLink::Post(const FString& Message)
 {
-	if (bClosed) return;
+	if (bClosed || (!bOpen && !bStartup)) return;
 	Queue.Add(Message);
 	Flush();
 }
 
+void FPatterDebugLink::Send(const FString& Message)
+{
+	if (SentForTest)
+	{
+		SentForTest->Add(Message);
+	}
+	else if (Socket.IsValid())
+	{
+		Socket->Send(Message);
+	}
+}
+
 void FPatterDebugLink::Flush()
 {
-	if (!bOpen || !Socket.IsValid())
+	if (!bOpen)
 	{
 		return;
 	}
 	for (const FString& Message : Queue)
 	{
-		Socket->Send(Message);
+		Send(Message);
 	}
 	Queue.Reset();
 }

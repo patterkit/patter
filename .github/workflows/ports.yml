@@ -100,6 +100,8 @@ jobs:
         run: GODOT="$PWD/godot" ports/godot/test/run.sh test_runtime_foundations.gd
       - name: The thin runner plays a flow as signals, as the JS reference's does
         run: GODOT="$PWD/godot" ports/godot/test/run.sh test_runner.gd
+      - name: The debug link reconnects, backs off, and stops when replaced (code 4000)
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_debug_link_reconnect.gd
       # Steering: the corpus pins what each answer does; this pins what it can't. An answer that isn't
       # one is refused as choose() refuses an unknown option, a steerer of the wrong shape is a set-up
       # problem, a method left out answers the default, and a hot swap keeps the steerer.

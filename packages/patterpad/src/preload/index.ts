@@ -145,6 +145,7 @@ const api: PatterApi = {
   // tells it to reload after. (The Replace UI itself lives in the search window: see searchApi below.)
   onEditorFlush: (handler) => { ipcRenderer.on("editor:flush", () => handler()); },
   // Closing the window or quitting: main holds the close until the editor has written what it holds.
+  // app-shell's PROMPT_CHANNELS, by name: a sandboxed preload can't load the package (test/prompt-channels.test.ts pins them).
   onPrompt: (handler) => { ipcRenderer.on("app:prompt", (_e, id: number, prompt: AppPrompt) => { void handler(prompt).then((i) => ipcRenderer.invoke("app:promptReply", id, i)); }); },
   onFlushBeforeClose: (handler) => { ipcRenderer.on("app:flush-before-close", () => { void handler().finally(() => ipcRenderer.invoke("app:close-flushed")); }); },
   editorFlushed: () => { void ipcRenderer.invoke("editor:flushed"); },

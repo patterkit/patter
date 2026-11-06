@@ -7,7 +7,9 @@ import { app, autoUpdater, BrowserWindow, dialog, ipcMain, protocol, screen, she
 import { guardAllWindows } from "@wildwinter/app-shell/window-guard";
 import { viewSchemePrivileges } from "@wildwinter/app-shell/view-host";
 import { createViewExtensions, viewsDir, VIEW_SCHEME } from "./views.js";
-import { findPairedStorylets, findStoryletter, launchStoryletter } from "./storyletter.js";
+import { findPairedStorylets } from "./storyletter.js";
+import { SIBLING_APPS, launchApp, locateApp } from "@wildwinter/app-shell/sibling-app";
+import { createWindowPrompt } from "@wildwinter/app-shell/prompt-main";
 import { setPairedStorylets, refreshPairedCards } from "./paired-cards.js";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,6 +66,8 @@ function ensureDebugServer(): DebugServer {
   if (!debugServer) {
     debugServer = createDebugServer({
       currentBuildHash: () => project.currentBuildHash(),
+      publishedBuildHash: () => project.publishedBuildHash(),
+      pushNow: pushDebugNow,
       onFrame: (f) => { win?.webContents.send("play:mark", f.beatId, f.sceneId, f.type === "choice" ? f.choiceId : undefined); },
       onReset: () => { win?.webContents.send("play:reset"); },
       onStatus: (s) => { win?.webContents.send("debug:status", s); refreshMenu(); }, // keep the menu checkbox in sync
@@ -75,6 +79,7 @@ function ensureDebugServer(): DebugServer {
 // `patterpad-session.json` sitting beside it on the first run after the change.
 const store = createStore(app.getPath("userData"));
 project.setAutoRebuild(store.read().autoRebuild); // the author's own Auto Rebuild, from app state
+project.setOnAutoRebuilt(() => debugServer?.refreshStatus()); // a rebuilt bundle is published: the Live Link's unpublished marker clears
 
 // Long jobs: the coverage sweep, and every export / publish / pack / merge (parity row 20). COOPERATIVE,
 // not parallel: the work still runs here, it just hands the event loop back every few milliseconds, so
@@ -109,10 +114,17 @@ let debugPushTimer: ReturnType<typeof setTimeout> | undefined;
 function scheduleDebugPush(): void {
   if (!debugServer?.isOn() || debugServer.status().state !== "connected") return;
   clearTimeout(debugPushTimer);
-  debugPushTimer = setTimeout(() => {
-    const out = project.compileForDebugPush();
-    if (out) debugServer?.pushBundle(out.hash, out.json);
-  }, 500);
+  debugPushTimer = setTimeout(pushDebugNow, 500);
+}
+/** Push the current bundle now, cancelling one still waiting on its debounce: Play in game needs the
+ *  game on the latest before it asks, and a game that connected on an older build is sent one at once.
+ *  False when the story doesn't compile, so there was nothing to push. */
+function pushDebugNow(): boolean {
+  clearTimeout(debugPushTimer); debugPushTimer = undefined;
+  const out = project.compileForDebugPush();
+  if (!out) return false;
+  debugServer?.pushBundle(out.hash, out.json);
+  return true;
 }
 
 /** The project changed in a way that shapes the compiled bundle (a settings save, a project undo or
@@ -223,29 +235,19 @@ function flushBeforeClose(w: BrowserWindow): Promise<void> {
     setTimeout(() => { const i = closeFlushWaiters.indexOf(resolve); if (i >= 0) { closeFlushWaiters.splice(i, 1); resolve(); } }, 10_000);
   });
 }
-// Ask in the editor's own chrome (the renderer's `promptDialog` on the family's dialog frame), never a
+// Ask in the editor's own chrome (the shell's `promptDialog` on the family's dialog frame), never a
 // system message box, and resolve with the chosen button's index. For a flow that runs here in main
-// between its file pickers. With no window to answer, or none after five minutes, it is `cancelId`.
-let promptSeq = 0;
-const promptWaiters = new Map<number, (i: number) => void>();
+// between its file pickers. With no window to answer, or none after five minutes, it is `cancelId`. The
+// channel is app-shell's prompt-main, shared with Storyletter.
+const windowPrompt = createWindowPrompt({ window: () => win });
 // The newest project step (for a window that asked for a write and wants its Undo), and the editor's
 // answers to "undo this step if it's still the newest".
 let lastProjectStep: import("../shared/api.js").ProjectStep | undefined;
 let undoAskSeq = 0;
 const undoAskWaiters = new Map<number, (r: string) => void>();
-function askInWindow(prompt: AppPrompt): Promise<number> {
-  return new Promise((resolve) => {
-    const w = win;
-    if (!w || w.isDestroyed() || w.webContents.isDestroyed()) return resolve(prompt.cancelId);
-    const id = ++promptSeq;
-    const timer = setTimeout(() => { promptWaiters.delete(id); resolve(prompt.cancelId); }, 300_000);
-    promptWaiters.set(id, (i) => { clearTimeout(timer); promptWaiters.delete(id); resolve(typeof i === "number" ? i : prompt.cancelId); });
-    w.webContents.send("app:prompt", id, prompt);
-  });
-}
+const askInWindow = (prompt: AppPrompt): Promise<number> => windowPrompt.ask(prompt);
 /** A notice: one button, "OK". */
-const tellInWindow = (title: string, sub: string, body?: string[]): Promise<number> =>
-  askInWindow({ title, sub, ...(body ? { body } : {}), buttons: ["OK"], defaultId: 0, cancelId: 0 });
+const tellInWindow = (title: string, sub: string, body?: string[]): Promise<number> => windowPrompt.tell(title, sub, body);
 
 // Set by Quit, so a close that waited for the flush resumes the quit rather than only closing the window.
 let quitting = false;
@@ -1184,7 +1186,7 @@ function registerIpc(): void {
   ipcMain.handle("project:build", (_e, opts?: { pin?: boolean }) => publishJob(async () => {
     if (opts?.pin) await flushEditorScene();
     const r = await project.buildBundle(opts);
-    if (r.ok) scheduleDebugPush(); // live bundle refresh: an explicit build also reaches a connected game
+    if (r.ok) { scheduleDebugPush(); debugServer?.refreshStatus(); } // live bundle refresh: an explicit build also reaches a connected game; the unpublished marker clears
     return r;
   }));
   ipcMain.handle("project:audioManifest", () => project.writeAudioManifest());
@@ -1440,31 +1442,25 @@ function registerIpc(): void {
     if (!pairedStorylets) return { ok: false, error: "No Storyletter project nearby is paired with this one." };
     const name = project.cardNameFor(sceneId);
     if (!name) return { ok: false, error: "Open a scene first." };
-    let executable = await findStoryletter(store.storyletterPath());
-    if (executable === undefined) {
-      const answer = await askInWindow({
-        title: "Patterpad can't find Storyletter", sub: "Point to it once and Patterpad will remember where it is.",
-        buttons: ["Cancel", "Locate Storyletter…"], defaultId: 1, cancelId: 0,
-      });
-      if (answer !== 1) return { ok: false, canceled: true };
-      const picked = await dialog.showOpenDialog(win!, {
-        title: "Locate Storyletter", message: "Choose the Storyletter app. Patterpad will remember where it is.",
-        buttonLabel: "Use Storyletter", properties: ["openFile"],
-        ...(process.platform === "darwin" ? { defaultPath: "/Applications", filters: [{ name: "Applications", extensions: ["app"] }] } : {}),
-        ...(process.platform === "win32" ? { filters: [{ name: "Storyletter", extensions: ["exe"] }] } : {}),
-      });
-      const chosen = picked.filePaths[0];
-      if (picked.canceled || chosen === undefined) return { ok: false, canceled: true };
-      executable = await findStoryletter(chosen);
-      if (executable === undefined) return { ok: false, error: "That isn't Storyletter." };
-      store.setStoryletterPath(chosen);
-    }
-    try { launchStoryletter(executable, pairedStorylets, name); return { ok: true }; }
+    // The family's one flow (app-shell's sibling-app, as Storyletter's Show Scene in Patterpad): remembered,
+    // then the usual places, then asked in the window and picked, then remembered.
+    const found = await locateApp({
+      app: SIBLING_APPS.storyletter, from: "Patterpad", remembered: store.storyletterPath(),
+      ask: askInWindow,
+      pick: async (options) => {
+        const picked = await dialog.showOpenDialog(win!, options);
+        return picked.canceled ? undefined : picked.filePaths[0];
+      },
+      remember: (path) => store.setStoryletterPath(path),
+    });
+    if ("canceled" in found) return { ok: false, canceled: true };
+    if ("error" in found) return { ok: false, error: found.error };
+    try { launchApp(found.executable, pairedStorylets, name); return { ok: true }; }
     catch (e) { return { ok: false, error: `couldn't start Storyletter: ${e instanceof Error ? e.message : String(e)}` }; }
   });
   // Live debug link (#181): a localhost WS server an external game streams its cursor into. Frames for the
   // followed flow reuse the SAME play:mark path the in-app Play window uses, so the editor follows the live
-  // playhead. Observe-only; the editor never drives the game.
+  // playhead; the editor also pushes bundles to it and asks it to play a block (debug-link.ts).
   ipcMain.handle("debug:start", () => { ensureDebugServer().start(); refreshMenu(); return ensureDebugServer().status(); });
   ipcMain.handle("debug:stop", () => { ensureDebugServer().stop(); refreshMenu(); return ensureDebugServer().status(); });
   ipcMain.handle("debug:status", () => ensureDebugServer().status());
@@ -1514,7 +1510,6 @@ function registerIpc(): void {
     win.webContents.send("editor:undoStep", n, id);
   }));
   ipcMain.handle("editor:undoStepReply", (_e, n: number, r: string) => { undoAskWaiters.get(n)?.(r); });
-  ipcMain.handle("app:promptReply", (_e, id: number, i: number) => { promptWaiters.get(id)?.(i); });
   ipcMain.handle("app:close-flushed", () => { const w = closeFlushWaiters; closeFlushWaiters = []; for (const r of w) r(); }); // the editor wrote what it held; the close may go on
   ipcMain.handle("editor:flushed", () => { const w = flushWaiters; flushWaiters = []; for (const r of w) r(); }); // the editor saved its open scene
   // Project-wide Replace (the Find counterpart). Preview is read-only; Apply flushes the editor's open scene

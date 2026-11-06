@@ -15,6 +15,11 @@ describe("the words for a Play in game answer", () => {
     expect(text).toBe("“Greeting” didn't start. A character in it has no speaker free in the game.\nNo speaker for Mara.");
   });
 
+  it("says the asking speaker isn't in the game, with the game's detail naming them", () => {
+    expect(describePlayAnswer({ started: false, reason: "requesterMissing", detail: "guard-1 isn't registered" }, "Bark").text)
+      .toBe("“Bark” didn't start. The speaker that asks for it isn't in the game yet.\nguard-1 isn't registered");
+  });
+
   it("passes an unknown reason through as the game sent it", () => {
     expect(describePlayAnswer({ started: false, reason: "dragonsAsleep" }, "Greeting").text)
       .toBe("“Greeting” didn't start. The game said “dragonsAsleep”.");
