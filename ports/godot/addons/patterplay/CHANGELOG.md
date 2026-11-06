@@ -6,6 +6,15 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **The debug link reconnects.** The debug link tries again 1 s after a close or a failed attempt, doubling to 10 s,
+  and back to 1 s once a hello goes; each new socket says hello again with the build and the open flows. One line is
+  logged when an open link is lost and one when it's back, and a link that never opened logs nothing. Frames queue
+  only while the first attempt connects. A link the editor closes with code 4000 (another game connected) stops until
+  the game switches it off and on. Restart Patterpad, or turn its Live Link on after the game has started, and Follow,
+  live edits, and Play in game come back by themselves. `close()` stops the retries.
+
 ## [0.45.0] - 2026-11-05
 
 ### Breaking
