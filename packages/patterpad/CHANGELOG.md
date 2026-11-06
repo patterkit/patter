@@ -23,6 +23,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
+- **Patterplay 0.46.0 inside**, whose debug link reconnects: restart Patterpad, or turn the Live Link on after the
+  game has started, and the game connects again by itself.
+- **Show Card in Storyletter** finds and opens Storyletter through the family's shared launcher (app-shell 0.77.0),
+  the same one Storyletter will use for Show Scene in Patterpad. Nothing changes in what you see.
 - **Play in game's words when the asking speaker is missing.** "The speaker that asks for it isn't in the game yet",
   with the game's own line naming them beneath it, in place of "The game has no player character to start it with".
 
