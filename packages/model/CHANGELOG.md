@@ -1,5 +1,11 @@
 # @patterkit/model
 
+## 0.27.1
+
+### Patch Changes
+
+- 5fd516a: Audio Folders take Ogg Vorbis (`.ogg`) takes as well as WAV and MP3, so `patter export` writes them into `patteraudio.json`. When one folder holds more than one format for a line, WAV wins, then OGG, then MP3.
+
 ## 0.27.0
 
 ### Minor Changes
