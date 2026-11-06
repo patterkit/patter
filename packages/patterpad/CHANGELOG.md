@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.46.1] - 2026-11-06
+
 ### Fixed
 
 - **What's New's "Full release notes" link opens.** It did nothing, because the app let only its About links open in
