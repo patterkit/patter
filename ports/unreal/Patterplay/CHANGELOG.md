@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.46.2] - 2026-11-06
+
 ### Changed
 
 - No changes in this runtime. This lockstep release ships Audio Folders' Ogg Vorbis takes: a `.ogg` take resolves

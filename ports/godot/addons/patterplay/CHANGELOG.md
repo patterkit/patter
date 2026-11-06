@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.46.2] - 2026-11-06
+
 ### Changed
 
 - The audio resolver needs no change for Ogg Vorbis takes, which Audio Folders now accept: it returns a `.ogg`
