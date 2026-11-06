@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-11-06
+
 ### Added
 
 - **Audio Folders take Ogg Vorbis.** A line's take can now be a `.ogg` file as well as a `.wav` or `.mp3`, and
