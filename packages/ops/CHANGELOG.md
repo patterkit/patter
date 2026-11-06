@@ -1,5 +1,20 @@
 # @patterkit/ops
 
+## 0.28.0
+
+### Minor Changes
+
+- 5fd516a: Audio Folders take Ogg Vorbis (`.ogg`) takes as well as WAV and MP3, so `patter export` writes them into `patteraudio.json`. When one folder holds more than one format for a line, WAV wins, then OGG, then MP3.
+
+### Patch Changes
+
+- f560869: Uses `@patterkit/runtime` 0.46.2, the Patterplay 0.46.2 release.
+- Updated dependencies [5fd516a]
+  - @patterkit/model@0.27.1
+  - @patterkit/compiler@0.17.1
+  - @patterkit/core@0.13.1
+  - @patterkit/dialect@0.2.25
+
 ## 0.27.2
 
 ### Patch Changes
