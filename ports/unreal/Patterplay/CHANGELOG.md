@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-11-06
+
 ### Changed
 
 - **The debug link reconnects.** `UPatterDebugLink` tries again 1 s after a close or a failed attempt, doubling to 10

@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-11-06
+
 ### Changed
 
 - **The debug link reconnects** (JS: `@patterkit/play-helpers`' `createDebugLink`, on every runtime alike). It tries
