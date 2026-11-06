@@ -1,5 +1,11 @@
 # @patterkit/ops
 
+## 0.27.1
+
+### Patch Changes
+
+- b69125b: Uses `@patterkit/runtime` 0.46.0, the Patterplay 0.46.0 release.
+
 ## 0.27.0
 
 ### Minor Changes
