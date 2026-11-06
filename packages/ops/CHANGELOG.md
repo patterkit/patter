@@ -1,5 +1,11 @@
 # @patterkit/ops
 
+## 0.27.2
+
+### Patch Changes
+
+- ebdbaf2: Uses `@patterkit/runtime` 0.46.1, the Patterplay 0.46.1 release.
+
 ## 0.27.1
 
 ### Patch Changes

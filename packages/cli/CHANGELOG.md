@@ -1,5 +1,12 @@
 # @patterkit/cli
 
+## 0.14.13
+
+### Patch Changes
+
+- Updated dependencies [ebdbaf2]
+  - @patterkit/ops@0.27.2
+
 ## 0.14.12
 
 ### Patch Changes
