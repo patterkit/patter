@@ -16,6 +16,13 @@ If you would rather read the ideas first, skim [Core concepts](/concepts/) or
 [PatterKit: A Branching Dialogue System](https://wildwinter.medium.com/patterkit-a-branching-dialogue-system-e0250e6ce045)
 introduces the project, where it came from, what is in it, and why it works this way.
 
+:::note[Two things to know]
+Patter isn't built for multiplayer games. Some of it may work in one, depending on how you use
+it, but it isn't designed or tested for more than one player. And if you record voice, it
+expects one recorded language, while your text and subtitles can go into as many languages as
+you like.
+:::
+
 :::tip[Prefer to learn by playing?]
 The repo ships an **interactive tour** (`examples/projects/tour.patter`), a playable Patter
 story that walks you through choices, the three selectors, properties and conditions,

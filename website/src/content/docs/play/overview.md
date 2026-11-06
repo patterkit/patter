@@ -59,7 +59,7 @@ way.
 non-spoken cues inside dialogue, and the runtime strips them while the line still fires so the
 audio plays.
 
-[Audio](/play/audio/) stays yours. Patter doesn't play audio. Every line carries a stable id
+[Audio](/play/audio/) stays yours. Patter doesn't play audio in engine. Every line carries a stable id
 you tie voice-over to, your way. An optional resolver maps a beat to its winning take if you
 use Audio Folders, and you still play it.
 

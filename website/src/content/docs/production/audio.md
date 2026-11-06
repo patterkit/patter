@@ -79,7 +79,7 @@ in the shipped game.
 
 ## Getting the audio into your game
 
-Patter itself doesn't play audio: your engine and audio tooling do. The durable hook is the line
+Patter itself doesn't play audio in engine: your engine and audio tooling do. The durable hook is the line
 **id** from the callout above, and plenty of teams tie voice-over straight to that id through their own
 audio system or middleware and skip the rest of this section.
 

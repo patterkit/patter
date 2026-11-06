@@ -152,6 +152,10 @@ which beat happens and Patter performs it.
   your existing VCS for collaboration (lock-aware, with structural merge), which scales to
   large teams but is check-out-and-merge rather than simultaneous co-editing.
 - You're already deep in **Ink** and happy writing markup. There's little reason to move.
+- You're making a **multiplayer** game. Some of Patter may work in one, depending on how you
+  use it, but none of it is designed or tested for more than one player.
+- You plan to **record voice in several languages**. If you record voice, Patter expects one
+  recorded language; text and subtitles can go into as many languages as you like.
 - Choosing what happens next is the spine of your game rather than the conversation itself,
   with a pool of beats, each with a condition on the front, dealt as the world changes. That is
   a storylet system, and [Storylet Studio](https://storylet.studio) is built for it. The two

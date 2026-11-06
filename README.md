@@ -12,6 +12,13 @@ on JavaScript, Unity, Unreal, and Godot. Think "Ink, but spoken-line-first":
 every line carries a stable id so VO takes, recording status, and translations
 all hang off it.
 
+It isn't built for two things:
+
+- **Multiplayer.** Some of it may work in a multiplayer game, depending on how you use
+  it, but none of it is designed or tested for one.
+- **Recorded voice in more than one language.** If you record voice, it's in one main
+  language (any language); text and subtitles can go into as many languages as you like.
+
 Everything here is MIT-licensed. **Documentation lives at
 [patterkit.dev](https://patterkit.dev)** - a guided tour, per-role guides for
 writers / producers / game programmers, and the format reference.

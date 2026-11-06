@@ -7,7 +7,8 @@ sidebar:
 
 Patter is built to ship in multiple languages, and the rule that keeps it sane is: **writers
 only ever see and edit the source language.** Translations live in their own files and never
-clutter the writing surface.
+clutter the writing surface. If you record voice, it's in one language: the text and
+subtitles are what you translate.
 
 Setting that up is one step: in **Project Settings ▸ Language**, list the languages you'll
 ship and mark the **default** (the one writers author in). That's it. The project is now

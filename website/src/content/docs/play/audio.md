@@ -5,7 +5,7 @@ sidebar:
   label: Audio
 ---
 
-**Patter doesn't play audio, and it doesn't impose an audio pipeline.** Your engine and your
+**Patter doesn't play audio in engine, and it doesn't impose an audio pipeline.** Your engine and your
 audio tooling own that (Wwise, FMOD, engine-native, whatever you already use). What Patter gives
 you is the hook every pipeline needs: **a stable [id](/format/gamedata-and-addressing/#the-two-ids)
 on every line** (the same id that keys [translations](/production/localisation/)). Tie your
@@ -110,7 +110,8 @@ No search is shipped. The winner is chosen at build time, so the runtime just do
 A line with no recording is fine. `resolve` returns null / empty for a beat with no take, so you can
 fall back to on-screen text or silence.
 
-It's single language for now, since VO isn't localised per-locale yet.
+There's one recorded language. Patter is built for voice recorded in one main language, so
+every locale resolves to the same take; subtitles and text change with the language.
 
 Keep it fresh. Re-run **Update Audio Manifest** (or Build) after adding takes so `patteraudio.json`
 reflects the latest winners.
