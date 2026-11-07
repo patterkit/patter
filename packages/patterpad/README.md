@@ -97,15 +97,3 @@ node node_modules/vite/bin/vite.js --config packages/patterpad/preview.vite.conf
   end), choices are buttons, restart at the end. A **per-line step marker** in the editor follows the
   walk and leaves a **visited trail** (muted gutter dots) of what the playhead passed through; both
   clear on reset. The app **quits when all windows close** (no window-less macOS process).
-
-## Not yet (the designed shape is Patterpad.md §4/§6; the current chrome is provisional)
-
-- **Inspector per-field editing**: M0 inspector is a read view; editing conditions / effects / gameData
-  inline (beyond the surface's existing jump / condition / selector affordances) is M1.
-- **Transient pane "peek"**: panes slide/pin/full-bleed now; an auto-reveal of the inspector on
-  selection (when unpinned) is a later nicety.
-- Step marker follows play at line granularity already; the engine-link stretch (§6) reuses it.
-- Edit-trail is per **scene** for now (who last saved it); per-beat granularity is a follow-up.
-- Branches polish (M1), production / export (M2), collaboration (M3), localisation (M4).
-- A clean split of surface-component CSS from app-shell CSS.
-- The GUI itself is unverified here (no display in CI): launch with `npm run dev`.

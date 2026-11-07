@@ -75,8 +75,8 @@ so pass your own text. To move a mouth with the line, Patterstage has the speech
 
 `patter::PatterplayVersion` (Blueprint: `GetPatterplayVersion`) is this runtime's version, as in its
 `.uplugin`. An extension that ships apart from Patterplay, such as Patterstage or Pattershot, checks at start-up
-that the Patterplay it finds is one it was built for: `patter::versionInRange(patter::PatterplayVersion, "0.41.0",
-"0.42.0")` (Blueprint: `PatterplayVersionInRange`) is true from 0.41.0 up to, but not including, 0.42.0.
+that the Patterplay it finds is one it was built for: `patter::versionInRange(patter::PatterplayVersion, "1.0.0",
+"2.0.0")` (Blueprint: `PatterplayVersionInRange`) is true from 1.0.0 up to, but not including, 2.0.0.
 
 A text step with `bAction` set is action: a direction for whoever stages the scene, such as "Mara turns
 away.", that the player never sees. A dialogue scene's text is action unless the project localises it, so

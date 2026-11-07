@@ -5,8 +5,11 @@
   "type": "module",
   "description": "The Patter marketing + docs site: a static Astro + Starlight build for GitHub Pages.",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+    "predev": "node scripts/whats-new.mjs",
+  "dev": "astro dev",
+    "prebuild": "node scripts/whats-new.mjs",
+  "build": "astro build",
+    "whats-new": "node scripts/whats-new.mjs",
     "preview": "astro preview",
     "postbuild": "node scripts/search-index.mjs && node scripts/check-docs.mjs",
     "check": "node scripts/check-docs.mjs",

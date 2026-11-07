@@ -3,7 +3,7 @@
 // An extension (Patterstage, Pattershot) ships apart from Patterplay and never bundles it, so it checks at start-up
 // that the Patterplay it finds is one it was built for. Unreal's .uplugin can't declare a version range for a plugin
 // it depends on, so the check runs in code: PatterplayVersion says what this runtime is, and versionInRange tests it.
-// An extension built for Patterplay 0.41 checks `patter::versionInRange(patter::PatterplayVersion, "0.41.0", "0.42.0")`.
+// An extension built for Patterplay 1.x checks `patter::versionInRange(patter::PatterplayVersion, "1.0.0", "2.0.0")`.
 #pragma once
 
 #include <cstddef>

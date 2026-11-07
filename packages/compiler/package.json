@@ -2,6 +2,7 @@
   "name": "@patterkit/compiler",
   "version": "0.17.1",
   "description": "Patter compiler: compile condition/effect expressions, validate them, and export source to the runtime bundle.",
+  "keywords": ["patter", "patterkit", "dialogue", "interactive-fiction", "branching-dialogue", "game-dev", "narrative", "compiler", "expressions"],
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",

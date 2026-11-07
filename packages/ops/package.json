@@ -2,6 +2,7 @@
   "name": "@patterkit/ops",
   "version": "0.28.0",
   "description": "The shared operations layer: every project operation (load, validate, export, format, play, ...) as a pure function, consumed by the patter CLI and Patterpad alike.",
+  "keywords": ["patter", "patterkit", "dialogue", "interactive-fiction", "branching-dialogue", "game-dev", "narrative", "operations", "export", "localisation"],
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",

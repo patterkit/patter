@@ -1,8 +1,8 @@
 ---
-title: Compatibility and conformance
-description: See how one bundle schema and a shared test suite keep a Patter story playing identically on every engine.
+title: Versions, compatibility, and conformance
+description: What Patter's versions promise from 1.0, and how one bundle schema and a shared test suite keep a story playing identically on every engine.
 sidebar:
-  label: Compatibility and conformance
+  label: Versions and compatibility
 ---
 
 "Write once, play everywhere" is only worth anything if it's actually *true*. Patter
@@ -47,12 +47,47 @@ pass, so parity is something you can check, not just hope for.
   <text x="380" y="270" text-anchor="middle" fill="var(--sl-color-gray-3)" font-size="11.5">The same language-neutral cases, pinned so a conforming runtime reproduces them exactly.</text>
 </svg>
 
-## The bundle schema is the contract
+## Versions and compatibility
 
-A compiled bundle declares a **schema version** (`patter/bundle@N`). A runtime plays any bundle
-whose schema it supports. The schema is the one version that cuts across everything: bumping it
-is the only thing that forces every runtime to update together. Everything else (each runtime's
-own features, the editor, the CLI) versions on its own.
+Patter is at 1.0: its shape has settled. From here every public package, runtime, app, and library in the
+family follows semantic versioning, with one meaning of "breaking" for all of them: a change that makes your
+game, your project, or your build pipeline do something before it works again.
+
+- **A patch (1.0.x)** is fixes. Nothing that plays changes unless it was wrong.
+- **A minor (1.x.0)** adds: new API, new format fields with defaults, new features. Everything that worked
+  keeps working, unchanged.
+- **A major (2.0.0)** removes or changes the meaning of something, collected together, with a migration guide
+  and tooling. One happens when a break is worth it, not on a calendar.
+
+What a minor may not break:
+
+- **Bundles.** A bundle compiled by any 1.x compiler plays on the same or any later 1.x runtime. The other way
+  round isn't promised: a minor may add to the format, so build with a compiler no newer than the Patterplay you
+  ship, which the [Download](/download/) page keeps together.
+- **Saves.** A save written by any 1.x runtime loads in any later 1.x runtime.
+- **Projects.** A 1.x project opens in any later 1.x Patterpad, migrated in place where a field has changed.
+- **The public API** of all four runtimes: the JavaScript exports, Unity's public members, Unreal's Blueprint nodes
+  and public C++, and Godot's methods and signals. A removal or a change of meaning waits for a major. A rename
+  adds the new name and marks the old one deprecated in each runtime's own way, and the old name stays until the
+  next major.
+- **The expression kernel**, which Patterplay shares with the Storylet Engine: a kernel change is a major on every
+  runtime that carries it.
+
+Who shares a number:
+
+- **The four Patterplay runtimes share one version** and move together. A feature lands in all four in one release,
+  or in none. This is the version your game sees, and the one an extension checks with `versionInRange`.
+- **The libraries** (`@patterkit/*` on npm) have their own versions. **Patterpad and the CLI** have theirs, and
+  release whenever a library they bundle moves, so a download never carries an older library than npm does.
+- **Extensions** such as Patterstage have their own versions, each declaring the Patterplay range it runs on.
+
+Deprecated API in force: none at 1.0.0. [What's new](/whats-new/) lists each release.
+
+## The bundle schema names the shape, not the version
+
+A compiled bundle declares a **schema** (`patter/bundle@0`), and a save declares its own (`patter/save@0`).
+These name the shape of the data, not the product version, and they change only for a break the runtimes
+can't read past, which is a major. Every 1.x runtime reads `patter/bundle@0`.
 
 | Runtime | Artifact | Status |
 |---|---|---|

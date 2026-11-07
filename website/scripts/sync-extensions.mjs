@@ -30,7 +30,9 @@
 //   src/content/docs/<slug>/          the pages, with the banner added
 //   src/content/docs/<slug>/_assets/  the images, with the pages' links to them rewritten
 //   public/<slug>/play/               the extension's play/ pages (a playable demo, say), served as
-//                                     they are: single-file .html, built by the extension, no banner
+//                                     they are: single-file .html, built by the extension, no banner,
+//                                     plus what a page loads from PLAY_FOLDERS beside it (voices,
+//                                     models, a download), each folder on its own budget
 //   src/extensions/generated.json     each section's name, licence, sidebar and downloads, read
 //                                     by astro.config.mjs, the chrome and check-docs.mjs
 //   src/extensions/manifest.json      a hash of every file above, so check-docs.mjs fails a
@@ -64,6 +66,17 @@ const ASSETS = "_assets";
 const PUBLIC = "public";
 const CONTACT = "ian@storytools.se"; // who to ask about an extension before it launches
 const PLAY_LIMIT = 2 * 1024 * 1024; // a play page is one file with everything inlined; 2 MB is plenty
+// What a play page may load from beside it: play/<folder>/..., each folder its file types and a budget for the
+// whole folder. A page's voices (audio/, with their patteraudio.json), its 3D models (models/), and a file for the
+// reader to download (downloads/, a zipped Patter project, say). Anything else under play/ is refused. An
+// extension's docs:check reads this export to decide whether to send those folders (asked by Patterstage,
+// 2026-11-07, for the browser Gym). GitHub Pages serves .ogg, .glb, and .zip with the right types and Range
+// requests, so nothing else is needed for them.
+export const PLAY_FOLDERS = {
+  audio: { types: [".ogg", ".mp3", ".json"], limit: 6 * 1024 * 1024 },
+  models: { types: [".glb"], limit: 12 * 1024 * 1024 },
+  downloads: { types: [".zip"], limit: 2 * 1024 * 1024 },
+};
 
 const sha = (data) => createHash("sha256").update(data).digest("hex");
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -215,13 +228,26 @@ function buildSection(ext, files, version) {
   for (const s of slugs.keys()) if (!listed.includes(s)) fail(`${id}: pages/${slugs.get(s)} isn't in docs.json's groups`);
   if (docs.groups[0].items[0] !== "overview") fail(`${id}: the first item of the first group must be "overview"`);
   if (!slugs.has(licence.page)) fail(`${id}: the licence page "${licence.page}" isn't a page`);
-  // play/ holds single-file pages and nothing else: a folder, an image or a script there would be
-  // served as a stranger, so it's refused, named, as the other mistakes are.
+  // play/ holds single-file pages, and what they load from PLAY_FOLDERS beside them; anything else
+  // there (a script, a stray folder) would be served as a stranger, so it's refused, named, as the
+  // other mistakes are.
   const play = [...files.keys()].filter((k) => k.startsWith("play/"));
+  const used = {};
   for (const path of play) {
-    if (!/^play\/[^/]+\.html$/.test(path)) fail(`${id}: ${path} isn't a page directly under play/, which holds single-file .html pages only`);
     const size = files.get(path).length;
-    if (size > PLAY_LIMIT) fail(`${id}: ${path} is ${(size / 1024 / 1024).toFixed(1)} MB, over the ${PLAY_LIMIT / 1024 / 1024} MB a play page may be`);
+    if (/^play\/[^/]+\.html$/.test(path)) {
+      if (size > PLAY_LIMIT) fail(`${id}: ${path} is ${(size / 1024 / 1024).toFixed(1)} MB, over the ${PLAY_LIMIT / 1024 / 1024} MB a play page may be`);
+      continue;
+    }
+    const folder = /^play\/([^/]+)\/./.exec(path)?.[1];
+    const rule = folder && Object.hasOwn(PLAY_FOLDERS, folder) ? PLAY_FOLDERS[folder] : null;
+    if (!rule) fail(`${id}: ${path} isn't a page directly under play/ or in one of its folders (${Object.keys(PLAY_FOLDERS).join(", ")})`);
+    if (!rule.types.some((t) => path.toLowerCase().endsWith(t))) fail(`${id}: ${path} isn't one of the types play/${folder}/ holds (${rule.types.join(", ")})`);
+    used[folder] = (used[folder] ?? 0) + size;
+  }
+  for (const [folder, bytes] of Object.entries(used)) {
+    const limit = PLAY_FOLDERS[folder].limit;
+    if (bytes > limit) fail(`${id}: play/${folder}/ is ${(bytes / 1024 / 1024).toFixed(1)} MB, over the ${limit / 1024 / 1024} MB it may hold`);
   }
   if (play.length) checkSlugFolder(slug, PUBLIC);
   const hasDownload = slugs.has("download");

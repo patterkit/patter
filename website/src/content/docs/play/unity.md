@@ -9,7 +9,7 @@ Patterplay for Unity is the **native C# Patterplay runtime**: no web view, no Ja
 IPC. It loads a `.patterc` [bundle](/format/overview/) and plays it directly, held to the
 same [shared test suite](/compatibility/) as every other engine.
 
-> Verified on Unity 6000.x. Some C# is expected, this is the game-developer side of the project.
+> Needs Unity 6 (6000.x), the version it's verified on. Some C# is expected, this is the game-developer side of the project.
 
 ## Install
 
@@ -204,8 +204,8 @@ edited bundle (`HotSwap`) hands its bags to the replacement on the same registry
 The registry, the value type `ExprValue`, and the rest of the shared expression kernel live in the
 `Wildwinter.Expr` namespace, in their own assembly, `Patterplay.Expr`. The Storylet Engine carries the
 same kernel, and with both packages installed it compiles once, in Patterplay, so one `ScopeRegistry`
-is the same type to both engines. The Storylet Engine then needs Patterplay 0.14.0 or newer, and stops
-the compile with an error saying so if it finds an older one. If your scripts have their own assembly
+is the same type to both engines. The Storylet Engine names the Patterplay it needs, and stops the
+compile with an error saying so if it finds an older one. If your scripts have their own assembly
 definition, reference `Patterplay.Expr` and `StoryletEngine.Expr` beside `Patterplay.Runtime`: Unity
 ignores whichever is not installed. The engine's own errors are still `EvalError`; a call you make
 straight to the registry throws the kernel's `RegistryError`.
@@ -274,9 +274,9 @@ state into JSON and back. See [Taking one flow out](/play/integration/#taking-on
 
 ## Which Patterplay is this?
 
-**`PatterplayVersion.Current`** is the runtime's version, as in its package manifest (`"0.41.0"`). An extension that
+**`PatterplayVersion.Current`** is the runtime's version, as in its package manifest (`"1.0.0"`). An extension that
 ships apart from Patterplay checks it at start-up with
-**`PatterplayVersion.InRange(PatterplayVersion.Current, "0.41.0", "0.42.0")`**: at least the first version and below
+**`PatterplayVersion.InRange(PatterplayVersion.Current, "1.0.0", "2.0.0")`**: at least the first version and below
 the second, by semantic-version order. Every runtime has the same pair.
 
 ## Next

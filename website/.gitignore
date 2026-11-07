@@ -1,5 +1,8 @@
 # Astro
 dist/
+
+# The What's new page, written from the changelogs by scripts/whats-new.mjs before each build
+src/content/docs/whats-new.md
 .astro/
 node_modules/
 
@@ -12,3 +15,6 @@ src/content/docs/stage/
 public/stage/
 src/content/docs/shot/
 public/shot/
+
+# A stray build archive from the first commit, untracked since 1.0
+dist.zip

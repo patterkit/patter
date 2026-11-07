@@ -2,6 +2,7 @@
   "name": "@patterkit/cli",
   "version": "0.14.14",
   "description": "The `patter` CLI: validate, format, export, play, test coverage, localise, and merge Patter projects.",
+  "keywords": ["patter", "patterkit", "dialogue", "interactive-fiction", "branching-dialogue", "game-dev", "narrative", "cli", "validate", "export", "localisation"],
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",

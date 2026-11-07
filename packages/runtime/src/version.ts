@@ -54,7 +54,7 @@ function compare(a: Parsed, b: Parsed): number {
 /**
  * Whether `version` is at least `min` and below `maxExclusive`, by semantic-version precedence (build metadata
  * after `+` is ignored, and a prerelease comes before its release). False when any of the three isn't a version.
- * An extension built for Patterplay 0.41 checks `versionInRange(PATTERPLAY_VERSION, "0.41.0", "0.42.0")`.
+ * An extension built for Patterplay 1.x checks `versionInRange(PATTERPLAY_VERSION, "1.0.0", "2.0.0")`.
  */
 export function versionInRange(version: string, min: string, maxExclusive: string): boolean {
   const v = parse(version), lo = parse(min), hi = parse(maxExclusive);

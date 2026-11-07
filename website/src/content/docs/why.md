@@ -136,7 +136,7 @@ database they connect to, Patter is the fit.
 
 ### Alongside Storylet Studio
 
-[Storylet Studio](https://storylet.studio) is the sibling project. It's built for storylets,
+[Storylet Studio](https://storylets.dev) is the sibling project. It's built for storylets,
 chunks of story with a condition on the front, dealt to the player when they fit. **You don't
 need it.** Patter knows nothing about Storylet Studio, and nothing in a scene refers to it
 unless you put it there yourself. What the two share is your game's state. Both read and write
@@ -158,7 +158,7 @@ which beat happens and Patter performs it.
   recorded language; text and subtitles can go into as many languages as you like.
 - Choosing what happens next is the spine of your game rather than the conversation itself,
   with a pool of beats, each with a condition on the front, dealt as the world changes. That is
-  a storylet system, and [Storylet Studio](https://storylet.studio) is built for it. The two
+  a storylet system, and [Storylet Studio](https://storylets.dev) is built for it. The two
   pair well. It picks the beat, and Patter performs it.
 
 ## Ready to look closer?

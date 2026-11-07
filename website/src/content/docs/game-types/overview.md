@@ -37,7 +37,7 @@ and roguelikes.
 
 ## Where Storylet Studio fits
 
-[Storylet Studio](https://storylet.studio) is Patter's sibling, built for storylets: pieces of story with a
+[Storylet Studio](https://storylets.dev) is Patter's sibling, built for storylets: pieces of story with a
 condition on the front, dealt to the player when they fit. You don't need it. It earns its place when the game
 has to choose which scene comes next from a pool, as the world changes: tonight's event, the next rumour, which
 character turns up. Storylet Studio picks the beat, and Patter performs it, with both reading the same game state

@@ -170,19 +170,19 @@ one. The runtime's copy reaches npm with its next Patterplay release, since its 
 > local version is ahead of the registry), but its version comes from `bump:play` - so do
 > not add a changeset that names it, and if a "Version Packages" PR touches
 > `packages/runtime`, something went wrong. Its dependencies on `@patterkit/model` and
-> `@patterkit/dialect` are wide ranges (`>=0.14.0 <1.0.0`, `>=0.2.11 <1.0.0`) rather than carets,
-> so a MINOR of either does not cascade-bump it on its own (a caret on model let that happen
-> twice, on the Version Packages PRs 42 and 50, unseen because bot-PR CI never ran; the caret on
-> dialect did it again on PR 76, for dialect 0.2.0). Any internal dependency the runtime gains
+> `@patterkit/dialect` are wide ranges (`>=0.27.0 <1.0.0` on a 0.x model; `>=1.0.0 <2.0.0` once it's
+> 1.x) rather than carets, so a MINOR of either does not cascade-bump it on its own (a caret on model
+> let that happen twice, on the Version Packages PRs 42 and 50, unseen because bot-PR CI never ran; the
+> caret on dialect did it again on PR 76, for dialect 0.2.0). Any internal dependency the runtime gains
 > takes a wide range for the same reason: on a 0.x caret, every minor is out of range.
-> Only the top of each range is fixed. `bump:play` raises the floor to the model and dialect versions
-> in the workspace on every release, because npm keeps any older copy a consumer's lockfile holds while
-> it satisfies the range: runtime 0.26.0 still said `>=0.4.0`, and a lockfile holding model 0.6.0 broke
-> it on imports that arrived in model 0.14.0.
+> `bump:play` writes both ends: the floor is the model or dialect version in the workspace, and the top is
+> the floor's next major. The floor moves on every release because npm keeps any older copy a consumer's
+> lockfile holds while it satisfies the range: runtime 0.26.0 still said `>=0.4.0`, and a lockfile
+> holding model 0.6.0 broke it on imports that arrived in model 0.14.0.
 > `@wildwinter/scoperegistry` is different again: a game shares ONE registry between engines, so an
 > install must hold exactly one copy. Every public package that uses it takes it as a **peer
-> dependency** with a wide range (the runtime `>=0.7.0 <1.0.0`, the rest `>=0.8.0 <1.0.0`), and as a
-> dev dependency with the same range for building here. A peer is installed once for everything that
+> dependency** with a wide range (`>=0.9.0 <1.0.0` today; `>=1.0.0 <2.0.0` once scoperegistry is 1.x, moved
+> by hand in every package in one train), and as a dev dependency with the same range for building here. A peer is installed once for everything that
 > names it, and a conflict stops the install instead of quietly adding a second copy. Runtime 0.14.0
 > shipped it as a caret dependency (`^0.7.0`) beside a dialect on `^0.8.0`, and every install got
 > two copies, so a game's `ScopeRegistry` was not the type the runtime used. Never move it back to

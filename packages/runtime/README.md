@@ -95,7 +95,7 @@ your game localises the IDs in its own system, then applies `{@ref}` replacement
 [Localisation guide](https://patterkit.dev/play/localisation/) for both modes across all four runtimes.
 
 `PATTERPLAY_VERSION` is this runtime's version, as in its `package.json`. An extension that ships apart from
-Patterplay checks it at start-up with `versionInRange(PATTERPLAY_VERSION, "0.41.0", "0.42.0")` (at least the first
+Patterplay checks it at start-up with `versionInRange(PATTERPLAY_VERSION, "1.0.0", "2.0.0")` (at least the first
 version, below the second).
 
 ## Drop-in (`<script>`)

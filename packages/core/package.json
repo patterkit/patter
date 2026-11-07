@@ -2,6 +2,7 @@
   "name": "@patterkit/core",
   "version": "0.13.1",
   "description": "Patter core: stable id generation, readable-handle computation, canonical (de)serialisation, and the structural validator.",
+  "keywords": ["patter", "patterkit", "dialogue", "interactive-fiction", "branching-dialogue", "game-dev", "narrative", "ids", "serialisation", "validation"],
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",

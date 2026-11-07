@@ -177,7 +177,7 @@ export default defineConfig({
           ],
         },
         { label: "The CLI", items: ["cli"] },
-        { label: "Reference", items: ["specification", "licensing", "contact"] },
+        { label: "Reference", items: ["whats-new", "specification", "licensing", "contact"] },
         ...extensions.map((e) => e.sidebar),
       ],
     }),

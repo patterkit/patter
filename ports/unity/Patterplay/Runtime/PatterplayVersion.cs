@@ -86,8 +86,8 @@ namespace Patterkit.Patterplay
         /// <summary>Whether <paramref name="version"/> is at least <paramref name="min"/> and below
         /// <paramref name="maxExclusive"/>, by semantic-version precedence (build metadata after <c>+</c> is ignored,
         /// and a prerelease comes before its release). False, never a throw, when any of the three isn't a version.
-        /// An extension built for Patterplay 0.41 checks
-        /// <c>PatterplayVersion.InRange(PatterplayVersion.Current, "0.41.0", "0.42.0")</c>.</summary>
+        /// An extension built for Patterplay 1.x checks
+        /// <c>PatterplayVersion.InRange(PatterplayVersion.Current, "1.0.0", "2.0.0")</c>.</summary>
         public static bool InRange(string version, string min, string maxExclusive)
         {
             Parsed v = Parse(version), lo = Parse(min), hi = Parse(maxExclusive);

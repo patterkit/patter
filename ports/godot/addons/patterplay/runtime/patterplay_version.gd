@@ -17,7 +17,7 @@ static var _regex: RegEx = null
 
 ## Whether `version` is at least `min` and below `max_exclusive`, by semantic-version precedence (build metadata
 ## after `+` is ignored, and a prerelease comes before its release). False when any of the three isn't a version.
-## An extension built for Patterplay 0.41 checks `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "0.41.0", "0.42.0")`.
+## An extension built for Patterplay 1.x checks `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "1.0.0", "2.0.0")`.
 static func in_range(version: String, min: String, max_exclusive: String) -> bool:
 	var v := _parse(version)
 	var lo := _parse(min)

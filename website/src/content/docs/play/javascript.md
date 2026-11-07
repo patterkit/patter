@@ -180,8 +180,8 @@ values while you playtest. Leave it out of your shipping build.
 
 ## Which Patterplay is this?
 
-**`PATTERPLAY_VERSION`** is the runtime's version, as in its package (`"0.41.0"`). An extension that ships apart from
-Patterplay checks it at start-up with **`versionInRange(PATTERPLAY_VERSION, "0.41.0", "0.42.0")`**: at least the
+**`PATTERPLAY_VERSION`** is the runtime's version, as in its package (`"1.0.0"`). An extension that ships apart from
+Patterplay checks it at start-up with **`versionInRange(PATTERPLAY_VERSION, "1.0.0", "2.0.0")`**: at least the
 first version and below the second, by semantic-version order. Every runtime has the same pair.
 
 ## Going deeper

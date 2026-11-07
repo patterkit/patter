@@ -76,9 +76,9 @@ one the writer set; a project that sets none starts at its first scene.
 
 `patter::PatterplayVersion` (Blueprint: `Get Patterplay Version`) is this runtime's version, as in its
 `.uplugin`. An extension that ships apart from Patterplay, such as Patterstage or Pattershot, checks at start-up
-that the Patterplay it finds is one it was built for: `patter::versionInRange(patter::PatterplayVersion, "0.41.0",
-"0.42.0")` (Blueprint: `Patterplay Version In Range`, `UPatterGameData::PatterplayVersionInRange`) is true from
-0.41.0 up to, but not including, 0.42.0.
+that the Patterplay it finds is one it was built for: `patter::versionInRange(patter::PatterplayVersion, "1.0.0",
+"2.0.0")` (Blueprint: `Patterplay Version In Range`, `UPatterGameData::PatterplayVersionInRange`) is true from
+1.0.0 up to, but not including, 2.0.0.
 
 Blueprint can't catch what the engine throws, so a refused call says so in the open. A flow keeps the reason
 its last `Advance`, `AdvanceToStop`, `Choose`, `Goto`, or `Reset` was refused in **`GetLastError`** (empty when

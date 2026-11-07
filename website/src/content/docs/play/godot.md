@@ -240,7 +240,7 @@ registry leaves them to [the registry's save](#one-registry-per-game). `deserial
 `false`, with a `push_error`, for a blob it cannot read. It is the **same `patter/save@0` format every
 Patterplay runtime uses**, so a save written by a web build or by Patterpad loads here, and a save
 written here loads in Unity or Unreal. Saves are version 4, and a version 3 save still loads; older
-ones (version 2, and this addon's snake_case shape from before 0.11.0) don't. A save at a choice keeps
+ones don't. A save at a choice keeps
 which options were offered, not their text, so a load shows them in the language in use. A load against
 an edited build whose saved place has gone resumes at the nearest safe point (it offers the choice
 again, or carries on after what was removed) and reports it to `on_error` as `"save"`. [Save/load & Game Data](/play/integration/) covers the format.
@@ -251,7 +251,7 @@ To set one flow aside instead, `engine.capture_flow(id)` returns its part of a s
 
 ## Exporting your game
 
-**Nothing to configure.** From Patterplay 0.4.5 the plugin puts your `.patterc` into the export
+**Nothing to configure.** The plugin puts your `.patterc` into the export
 itself, so an exported build has its story on every platform (desktop, mobile, and web). Export as
 you would any Godot project.
 
@@ -275,9 +275,9 @@ print(FileAccess.file_exists("res://story.patterc"))   # must print true
 
 ## Which Patterplay is this?
 
-**`PatterplayVersion.CURRENT`** is this runtime's version, as in its `plugin.cfg` (`"0.41.0"`). An extension that
+**`PatterplayVersion.CURRENT`** is this runtime's version, as in its `plugin.cfg` (`"1.0.0"`). An extension that
 ships apart from Patterplay checks it at start-up with
-**`PatterplayVersion.in_range(PatterplayVersion.CURRENT, "0.41.0", "0.42.0")`**: at least the first version and
+**`PatterplayVersion.in_range(PatterplayVersion.CURRENT, "1.0.0", "2.0.0")`**: at least the first version and
 below the second, by semantic-version order. Every runtime has the same pair.
 
 ## Next

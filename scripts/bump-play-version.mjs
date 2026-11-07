@@ -67,8 +67,10 @@ for (const f of readdirSync(resolve(root, ".changeset"))) {
 // --- 1. manifests ------------------------------------------------------------
 
 // The floors of the runtime's wide ranges on model and dialect move up to the versions in this
-// workspace, the ones it was built and tested against. Only the bottom moves: the `<1.0.0` top is
-// what keeps a model or dialect minor from cascade-bumping the runtime (see RELEASING.md). A stale
+// workspace, the ones it was built and tested against. The top is the floor's next major (`<1.0.0`
+// on a 0.x floor, `<2.0.0` on a 1.x one): what keeps a model or dialect minor from cascade-bumping
+// the runtime (see RELEASING.md), and what lets a 1.0.0 floor install at all, since a fixed `<1.0.0`
+// top would have written a range that matches nothing (found in the 1.0 readiness survey). A stale
 // floor fails nothing here; it breaks a consumer whose lockfile still holds an older model, which
 // npm keeps because it satisfies the range (2026-10-17: Storylets kept model 0.6.0 under runtime
 // 0.26.0's `>=0.4.0`, and the runtime broke on imports that arrived in model 0.14.0). Dialect pins
@@ -79,15 +81,17 @@ for (const name of ["model", "dialect"]) {
     readFileSync(resolve(root, `packages/${name}/package.json`), "utf8"),
   ).version;
 }
+// The top of a wide range: the next major above the floor.
+const top = (floor) => `<${Number(floor.split(".")[0]) + 1}.0.0`;
 
 // The JS runtime. Line-targeted replaces (not a JSON rewrite) to keep the file's formatting.
 edit("packages/runtime/package.json", (s, rel) => {
   if (!/^  "version": "[^"]+",$/m.test(s)) throw new Error(`${rel}: no version line found`);
   s = s.replace(/^  "version": "[^"]+",$/m, `  "version": "${version}",`);
   for (const [dep, floor] of Object.entries(floors)) {
-    const range = new RegExp(`"${dep}": ">=[^ "]+ <1\\.0\\.0"`);
-    if (!range.test(s)) throw new Error(`${rel}: no ">=x <1.0.0" range on ${dep}`);
-    s = s.replace(range, `"${dep}": ">=${floor} <1.0.0"`);
+    const range = new RegExp(`"${dep}": ">=[^ "]+ <\\d+\\.0\\.0"`);
+    if (!range.test(s)) throw new Error(`${rel}: no ">=x <N.0.0" range on ${dep}`);
+    s = s.replace(range, `"${dep}": ">=${floor} ${top(floor)}"`);
   }
   return s;
 });
@@ -159,7 +163,7 @@ edit("package-lock.json", (s, rel) => {
   if (!runtime) throw new Error(`${rel}: no workspace entry for packages/runtime`);
   runtime.version = version;
   for (const [dep, floor] of Object.entries(floors)) {
-    if (runtime.dependencies?.[dep]) runtime.dependencies[dep] = `>=${floor} <1.0.0`;
+    if (runtime.dependencies?.[dep]) runtime.dependencies[dep] = `>=${floor} ${top(floor)}`;
   }
   for (const dir of ["packages/play-helpers", "packages/ops", "packages/patterpad"]) {
     const deps = lock.packages?.[dir]?.dependencies;
