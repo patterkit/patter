@@ -81,7 +81,30 @@ export default defineConfig({
       sidebar: [
         {
           label: "Start here",
-          items: ["getting-started", "web-story", "download", "concepts", "architecture", "why"],
+          items: [
+            "getting-started",
+            "web-story",
+            "download",
+            "concepts",
+            "architecture",
+            "why",
+            // Nested, so the family keeps its eight top-level groups.
+            {
+              label: "Example game types",
+              collapsed: true,
+              items: [
+                "game-types/overview",
+                "game-types/visual-novels",
+                "game-types/point-and-click",
+                "game-types/linear-action",
+                "game-types/rpgs",
+                "game-types/detective-and-mystery",
+                "game-types/management-and-sim",
+                "game-types/walking-sims",
+                "game-types/roguelikes",
+              ],
+            },
+          ],
         },
         {
           label: "Writing in Patterpad",

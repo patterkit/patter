@@ -166,5 +166,6 @@ which beat happens and Patter performs it.
 - New to the ideas? Start with [Core concepts](/concepts/).
 - Want the 10-minute path? [Getting started](/getting-started/).
 - Curious how the pieces connect? [How it fits together](/architecture/).
+- Wondering where it fits in your kind of game? [Example game types](/game-types/overview/).
 - Evaluating for a game team? Skim [Playing in your game](/play/overview/) to see
   the integration story for your engine.
