@@ -37,28 +37,28 @@ version number always means the same runtime behaviour. This package is versione
 
 ### Changed
 
-- **Patterplay 1.0.0.** The runtime of 0.46.2, unchanged, declared settled: from here a patch fixes, a minor adds, and a major removes or changes a meaning. Every 1.x reads `patter/bundle@0` bundles and `patter/save@0` saves. On `@patterkit/model` and `@patterkit/dialect` 1.x (`>=1.0.0 <2.0.0`) and the 1.x of `@wildwinter/expr`, `expr-specificity`, and `scoperegistry` (a peer, `>=1.0.0 <2.0.0`).
+- **Patterplay 1.0.0 is the runtime of 0.46.2, unchanged, and a promise: every 1.x plays the bundles and loads the saves your game has today.** From here a patch fixes, a minor adds, and only a major may change behaviour your game relies on, with its notes saying what and why. Every 1.x reads `patter/bundle@0` bundles and `patter/save@0` saves. On `@patterkit/model` and `@patterkit/dialect` 1.x (`>=1.0.0 <2.0.0`) and the 1.x of `@wildwinter/expr`, `expr-specificity`, and `scoperegistry` (a peer, `>=1.0.0 <2.0.0`).
 
 ## [0.46.2] - 2026-11-06
 
 ### Changed
 
-- No changes in this runtime. This lockstep release ships Audio Folders' Ogg Vorbis takes: a `.ogg` take resolves
-  like any other, and the Unity and Godot Tour demos play `.ogg` and `.mp3` takes.
+- **No runtime change: this release ships Audio Folders' Ogg Vorbis takes.** A `.ogg` take resolves like any
+  other, and the Unity and Godot Tour demos play `.ogg` and `.mp3` takes.
 
 ## [0.46.1] - 2026-11-06
 
 ### Changed
 
-- No changes in this runtime. This lockstep release ships Patterplay for Unreal's bundle import: other plugins
-  hear a `.patterc` import, and Reimport works.
+- **No runtime change: this release ships Patterplay for Unreal's bundle import.** Other plugins hear a `.patterc`
+  import, and Reimport works.
 
 ## [0.46.0] - 2026-11-06
 
 ### Changed
 
-- **The debug link reconnects** (JS: `@patterkit/play-helpers`' `createDebugLink`, on every runtime alike). It tries
-  again 1 s after a close or a failed attempt, doubling to 10 s, and back to 1 s once a hello goes; each new socket
+- **The debug link to Patterpad reconnects by itself after a drop, on every runtime.** In JS it's
+  `@patterkit/play-helpers`' `createDebugLink`. It tries again 1 s after a close or a failed attempt, doubling to 10 s, and back to 1 s once a hello goes; each new socket
   says hello again with the build and the open flows. One line is logged when an open link is lost and one when it's
   back, and a link that never opened logs nothing. Frames queue only while the first attempt connects. A link the
   editor closes with code 4000 (another game connected) stops until the game switches it off and on. Restart
@@ -78,7 +78,7 @@ version number always means the same runtime behaviour. This package is versione
   hyphen 0, at 14 a second times `speed`, clamped to 0.5 to 18 seconds as before. `locale` is reserved and unused. A
   speed that isn't a finite positive number is 1. A silent line's length changes with the new rule; a line with a
   recording still lasts as long as the recording.
-- **The project's timing is a speed.** `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND` is now `DEFAULT_ESTIMATE_SPEED` (1),
+- **The project's timing setting is a speed now, not syllables a second.** `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND` is now `DEFAULT_ESTIMATE_SPEED` (1),
   the bundle's `estimateSyllablesPerSecond` is now `estimateSpeed` (present only when the project sets one, 0.5 to
   2.5, higher is faster), and a line or text step's `estimateRate` is now `estimateSpeed`. `spokenText` and
   `spokenLocale` are unchanged.
@@ -89,7 +89,7 @@ version number always means the same runtime behaviour. This package is versione
 
 ### Added
 
-- **Each syllable says its vowel.** `speechUnits(text, locale)` gives a `syllable` unit a `vowel` now: `"a"`, `"e"`,
+- **Each syllable now says its vowel, for games that move a mouth.** `speechUnits(text, locale)` gives a `syllable` unit a `vowel` now: `"a"`, `"e"`,
   `"i"`, `"o"`, `"u"`, or `"ə"` for a vowel the script shows that isn't one of the five. Move a mouth to a shape at
   each syllable's peak with it. It's absent on pauses and shut beats, and where the script doesn't say (Han, digits,
   and scripts outside the set). Latin takes the first vowel of the syllable's vowel group with its accent dropped,
@@ -104,7 +104,7 @@ version number always means the same runtime behaviour. This package is versione
 
 ### Added
 
-- **Play in game.** Patterpad can ask the running game to start a block now: a `play` message on the debug link.
+- **Play in game: Patterpad can ask your running game to start a block.** It's a `play` message on the debug link.
   Pass `onPlay` to play-helpers' `createDebugLink`; it gets `{ id, sceneId, blockId, takeOver, build? }`. Start the block
   however your game plays conversations, and answer with `link.replyPlay(id, { started, reason?, detail? })`, at once or
   later. `reason` is a short code (`busy`, `unknownBlock`, `staleBuild`, or your own) and Patterpad words it. With no
@@ -112,7 +112,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ### Changed
 
-- **A line with no recording can be quick.** `estimateLineDuration` now clamps to 0.5 to 18 seconds, not 1.5 to 18: the
+- **A line with no recording can now last half a second, not 1.5, so short exchanges play at speaking pace.**
+  `estimateLineDuration` now clamps to 0.5 to 18 seconds: the
   shortest a line lasts is a speaking time, the least a spoken word plausibly takes, not a reading time, so an
   unvoiced "No." answered by "Yes." no longer takes three seconds. The new `SUBTITLE_READING_MIN` (with `LINE_DURATION_MIN` and `LINE_DURATION_MAX`, now exported too) (1.5 seconds) is the least time a
   line's text should stay on screen to be read: if you show lines as subtitles or overhead text, keep each one up at
@@ -125,7 +126,7 @@ version number always means the same runtime behaviour. This package is versione
 
 ### Added
 
-- **Which Patterplay this is.** `PATTERPLAY_VERSION` is the runtime's version, as in its `package.json`, and
+- **A runtime can say which Patterplay version it is, so an extension can check it at start-up.** `PATTERPLAY_VERSION` is the runtime's version, as in its `package.json`, and
   `versionInRange(version, min, maxExclusive)` says whether a version is at least `min` and below `maxExclusive`, by
   semantic-version order (a prerelease before its release, build metadata ignored, and anything that isn't a
   version out of range). An extension that ships apart from Patterplay, such as Patterstage or Pattershot, checks

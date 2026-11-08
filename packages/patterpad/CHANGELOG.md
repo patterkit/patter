@@ -10,20 +10,30 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Announcement
 
-- **Patter 1.0.** Patterpad, the four Patterplay runtimes, the CLI, and the packages on npm are all 1.0.0 today: the
-  shape has settled, and from here a patch fixes, a minor adds, and a major is for a change that breaks. Projects
-  made in 0.x open as they are. [What's new](https://patterkit.dev/whats-new/)
+- **Patter 1.0.** Patterpad, the Patterplay runtimes, and the CLI are 1.0 today. That's a promise about stability:
+  your projects keep opening, your published bundles keep playing, and when a change would affect your work, the
+  version number will say so before it reaches you. [What's new](https://patterkit.dev/whats-new/)
+
+### Highlights
+
+- **Your work is safe across updates**, so a project from an earlier Patterpad opens in 1.0 as it is, and a bundle
+  you publish today plays in every Patterplay 1.x to come.
+- **Version numbers now say plainly what an update does**, so 1.0.1 and 1.0.2 are fixes, 1.1 and 1.2 add things
+  without taking anything away, and only a 2.0 may change how something you rely on works. When one does, its notes
+  will say what and why.
+- **Nothing in the app changed for 1.0**, which is Patterpad 0.47 with Patterplay 1.0.0 inside, and the number says
+  the shape has settled, not that there's a new feature.
 
 ### Changed
 
-- **1.0.0.** Patterpad 0.47.0, unchanged, on Patterplay 1.0.0 and the 1.x of the shared libraries.
+- **Patterpad 0.47.0 becomes 1.0.0, unchanged**, on Patterplay 1.0.0 and the 1.x of the shared libraries.
 
 ## [0.47.0] - 2026-11-06
 
 ### Added
 
-- **Audio Folders take Ogg Vorbis.** A line's take can now be a `.ogg` file as well as a `.wav` or `.mp3`, and
-  Patterpad plays it. If one folder holds more than one format for a line, WAV wins, then OGG, then MP3. Scratch
+- **Audio folders now take Ogg Vorbis recordings**, so a line's take can be a `.ogg` file as well as a `.wav` or
+  `.mp3`, and Patterpad plays it. If one folder holds more than one format for a line, WAV wins, then OGG, then MP3. Scratch
   takes are still recorded as WAV.
 
 ## [0.46.1] - 2026-11-06
@@ -48,24 +58,26 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
-- **Unpublished edits.** While a game on the Live Link is running edits you haven't published, **Unpublished edits**
-  shows beside the Live Link icon. It clears when you publish (or Auto Rebuild does).
+- **A new Unpublished edits badge shows when the game is running edits you haven't published.** It sits beside the
+  Live Link icon and clears when you publish (or Auto Rebuild does).
 
 ### Changed
 
-- **Patterplay 0.46.0 inside**, whose debug link reconnects: restart Patterpad, or turn the Live Link on after the
-  game has started, and the game connects again by itself.
-- **Show Card in Storyletter** finds and opens Storyletter through the family's shared launcher (app-shell 0.77.0),
-  the same one Storyletter will use for Show Scene in Patterpad. Nothing changes in what you see.
-- **Play in game's words when the asking speaker is missing.** "The speaker that asks for it isn't in the game yet",
-  with the game's own line naming them beneath it, in place of "The game has no player character to start it with".
+- **A game on the Live Link reconnects by itself** after you restart Patterpad or turn the Live Link on once the
+  game is already running, with Patterplay 0.46.0 inside.
+- **Show Card in Storyletter finds and opens Storyletter more reliably.** It now goes through the launcher the
+  whole family shares (app-shell 0.77.0), the same one Storyletter will use for Show Scene in Patterpad. Nothing
+  changes in what you see.
+- **Play in game says plainly when the speaker who'd start the block isn't in the game yet.** The note reads "The
+  speaker that asks for it isn't in the game yet", with the game's own line naming them beneath it, in place of "The
+  game has no player character to start it with".
 
 ## [0.45.0] - 2026-11-05
 
 ### Breaking
 
-- **Timing for lines without audio is a speed.** In Project settings it's how fast a line with no recording is timed
-  against the default now, from 0.5 to 2.5 (default 1, higher is faster), in place of syllables a second. A project
+- **Lines without a recording are now timed by a speed setting, not syllables a second.** In Project settings it's
+  how fast such a line is timed against the default, from 0.5 to 2.5 (default 1, higher is faster). A project
   that set syllables a second opens with that number divided by 4, and is saved with the new setting only. Lines with
   no recording are timed by their weighted characters, so their lengths in Play change a little; lines with a
   recording still last as long as the recording. The problem for a timing out of range is now
@@ -73,38 +85,39 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
-- **Patterplay 0.45.0 inside**, with the timing above.
+- **Patterplay 0.45.0 inside**, which carries the new timing for lines without a recording.
 
 ## [0.44.0] - 2026-11-04
 
 ### Changed
 
-- **Patterplay 0.44.0 inside.** Its speech units now say each syllable's vowel, for games and tools that move a
-  mouth; nothing changes in Patterpad itself, and lines are timed as before.
+- **Patterplay 0.44.0 inside, for games that move a character's mouth: each syllable now says its vowel.** Nothing
+  changes in Patterpad itself, and lines are timed as before.
 
 ## [0.43.0] - 2026-11-04
 
 ### Added
 
-- **Play in game.** With a game on the Live Link, right-click a block (or use its ⋯ menu) and pick **Play in game**, or
+- **Play in game: start a block in your running game from the editor.** With a game on the Live Link, right-click a
+  block (or use its ⋯ menu) and pick **Play in game**, or
   put the caret in it and use **Play > Play Block in Game**: Patterpad saves, then asks the running game to start that
   block now. **Play in game, taking over** asks it to stop what the block's speakers are doing first. A note says
   whether it started, and if not, why, in plain words.
 
 ### Changed
 
-- **Quick unvoiced lines play quickly.** The Play window times a line with no recording by Patterplay's estimate,
-  whose shortest line is now half a second, not 1.5, so a short exchange such as "No." "Yes." plays at the pace it
-  would be said. Every line stays in the Play window's transcript as it plays, so nothing leaves the screen sooner.
+- **Short lines without a recording now play at speaking pace in the Play window.** It times such a line by
+  Patterplay's estimate, whose shortest line is now half a second, not 1.5, so an exchange such as "No." "Yes." plays
+  at the pace it would be said. Every line stays in the Play window's transcript as it plays, so nothing leaves the screen sooner.
 
 ## [0.42.3] - 2026-11-03
 
 ### Changed
 
-- **Patterkit, with a lowercase k.** The suite is written Patterkit now, beside Patterpad and Patterplay: the About
-  box's wordmark and credits, and the Help menu's Patterkit Documentation Home.
-- **Patterplay 0.42.0 inside.** Each runtime now says its own version, for extensions to check; nothing changes in
-  Patterpad itself.
+- **The suite is written Patterkit now, with a lowercase k**, beside Patterpad and Patterplay: the About box's
+  wordmark and credits, and the Help menu's Patterkit Documentation Home.
+- **Patterplay 0.42.0 inside, which can tell an extension which version it is.** Nothing changes in Patterpad
+  itself.
 
 ## [0.42.2] - 2026-11-02
 

@@ -10,7 +10,7 @@ same runtime behaviour.
 
 ### Changed
 
-- **Patterplay 1.0.0.** The runtime of 0.46.2, unchanged, declared settled: from here a patch fixes, a minor adds, and a major removes or changes a meaning. Every 1.x reads `patter/bundle@0` bundles and `patter/save@0` saves.
+- **Patterplay 1.0.0 is the runtime of 0.46.2, unchanged, and a promise: every 1.x plays the bundles and loads the saves your game has today.** From here a patch fixes, a minor adds, and only a major may change behaviour your game relies on, with its notes saying what and why. Every 1.x reads `patter/bundle@0` bundles and `patter/save@0` saves.
 
 ## [0.46.2] - 2026-11-06
 
