@@ -6,10 +6,17 @@ name: Website
 # after a merge, so a website dependency PR arrived with a green tick that had never touched website/ -
 # the monorepo's CI ignores this directory entirely. Seven dependabot PRs sat that way (2026-09-13),
 # five of them website-only, and the first thing to actually run the build would have been the deploy.
+# The What's new page is generated at build time from Patterpad's and the runtime's CHANGELOGs
+# (website/scripts/whats-new.mjs), so a release that dates a section there must redeploy the site too:
+# Patter 1.0.0 (2026-11-08) shipped with the page still showing 0.47.0 until a deploy was run by hand.
 on:
   push:
     branches: [main]
-    paths: ["website/**", ".github/workflows/website.yml"]
+    paths:
+      - "website/**"
+      - ".github/workflows/website.yml"
+      - "packages/patterpad/CHANGELOG.md"
+      - "packages/runtime/CHANGELOG.md"
   pull_request:
     paths: ["website/**", ".github/workflows/website.yml"]
   workflow_dispatch:
