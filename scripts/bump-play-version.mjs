@@ -34,6 +34,7 @@ import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VERSION_CONSTANTS, writeVersionConstant } from "./lib/patterplay-version-constants.mjs";
+import { changelogProblems } from "@wildwinter/app-shell/changelog";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const version = process.argv[2];
@@ -181,6 +182,13 @@ for (const rel of [
   "ports/godot/addons/patterplay/CHANGELOG.md",
 ]) {
   edit(rel, (s) => {
+    // The site's What's new page shows each entry's lede and the start of its paragraph, so the section being
+    // released has to read as written for a game developer (patterkit design/changelog-writing.md).
+    const releasing = s.includes(`## [${version}] - Unreleased`) ? version : "Unreleased";
+    const problems = changelogProblems(s, releasing);
+    if (problems.length) {
+      throw new Error(`${rel}: What's new can't show ${problems.length === 1 ? "an entry" : `${problems.length} entries`} as written:\n${problems.map((p) => `  - ${p.entry.text.slice(0, 80)}\n      ${p.problem}`).join("\n")}`);
+    }
     if (s.includes(`## [${version}] - Unreleased`)) {
       // The pending section already carries this version: just date it.
       return s.replace(`## [${version}] - Unreleased`, `## [${version}] - ${today}`);

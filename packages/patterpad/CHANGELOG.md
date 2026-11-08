@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **What's New tells you more about each change.** Each entry now shows its lede and the sentences that explain it,
+  breaking changes come first and are marked, fixes are listed by what they fixed instead of counted, and a release
+  that only carries a new Patterplay takes one line. The same list is on patterkit.dev's What's new page.
+
 ## [1.0.0] - 2026-11-08
 
 ### Announcement

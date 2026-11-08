@@ -4,17 +4,20 @@
 //   node scripts/whats-new.mjs
 //
 // It writes src/content/docs/whats-new.md (git-ignored) from the same material Patterpad's own What's
-// New dialog shows (app-shell's changelog.ts reads the same file by the same rules): for each release,
-// the lead of every Added, Changed and Removed entry, the count of fixes, and a link to the full release
-// notes on GitHub. Patterpad first, then the Patterplay runtimes, whose four CHANGELOGs share one version;
-// the JS runtime's stands for the set. A `### Highlights` section replaces the automatic list for its
-// version, and a `### Announcement` entry is shown above it, as in the dialog.
+// New dialog shows, by the same rules (app-shell's changelog.ts; the writing rule is patterkit
+// design/changelog-writing.md): for each release, every entry's preview, which is its bold lede and the
+// rest of its first paragraph in whole sentences up to about forty words, Breaking entries first and
+// marked, the fixes the same way under "Fixed", and a link to the full release notes on GitHub. A release
+// that only carries another ("Patterplay 0.46.0 inside", "Nothing changed in the runtime") is one line
+// rather than a heading. Patterpad first, then the Patterplay runtimes, whose four CHANGELOGs share one
+// version; the JS runtime's stands for the set. A `### Highlights` section replaces the automatic list for
+// its version, and a `### Announcement` entry is shown above it, as in the dialog.
 //
 // The changelogs keep the Keep a Changelog shape:
 //
 //   ## [0.47.0] - 2026-11-06
 //   ### Added
-//   - **Audio Folders take Ogg Vorbis.** A line's take can now be ...
+//   - **Audio folders now take Ogg Vorbis recordings**, so a line's take can be ...
 //     - a nested point, left to the full notes
 //
 // Only versioned, dated sections count; the runtime file's older Changesets entries below are skipped.
@@ -28,6 +31,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(root, "src/content/docs/whats-new.md");
 const SHOWN = 8; // releases per product; the rest are on GitHub
 const REPO = "https://github.com/patterkit/patter";
+/** About how many words of an entry the page shows (app-shell's PREVIEW_WORDS). */
+export const PREVIEW_WORDS = 40;
+const HEADLINE_SECTIONS = ["Breaking", "Added", "Changed", "Removed"];
+/** A lede that only says a version went by (app-shell's CARRIER). */
+const CARRIER = /\b\d+\.\d+\.\d+ inside\b|^nothing changed in the runtime\b/i;
 
 const SOURCES = [
   {
@@ -79,35 +87,68 @@ export function parseChangelog(text) {
   return versions;
 }
 
-/** An entry's lead: the bold opening, then the rest of its first sentence, links and code kept. */
-export function lead(entry) {
-  const m = /^\*\*(.+?)\*\*\s*(.*)$/.exec(entry);
-  if (!m) return firstSentence(entry);
-  const [, bold, rest] = m;
-  if (/[.!?]$/.test(bold)) return `**${bold}**`;
-  const gap = /^[,;:]/.test(rest) ? "" : " ";
-  return `**${bold}**${gap}${firstSentence(rest)}`.trim();
-}
+const words = (s) => s.split(/\s+/).filter(Boolean).length;
 
-function firstSentence(s) {
-  // Up to the first full stop that ends a sentence (not inside a version number, a filename or `code`).
-  let depth = 0;
+/** The sentences of a paragraph, each with its closing quote or bracket. A stop inside `code`, or one not
+ *  followed by a space (a version number, a filename), doesn't end a sentence. */
+function sentences(s) {
+  const out = [];
+  let start = 0;
+  let code = false;
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
-    if (c === "`") depth ^= 1;
-    if (depth) continue;
-    if ((c === "." || c === "!" || c === "?") && (i + 1 === s.length || /\s/.test(s[i + 1])) && !/[\d`]/.test(s[i - 1] ?? "")) {
-      return s.slice(0, i + 1);
+    if (c === "`") code = !code;
+    if (code || !/[.!?]/.test(c)) continue;
+    let j = i + 1;
+    while (j < s.length && /["”’)]/.test(s[j])) j++;
+    if (j === s.length || /\s/.test(s[j])) {
+      out.push(s.slice(start, j).trim());
+      start = j;
+      i = j - 1;
     }
   }
-  return s;
+  const tail = s.slice(start).trim();
+  if (tail) out.push(tail);
+  return out;
 }
+
+/** An entry's preview: the bold lede, then the rest of its first paragraph in whole sentences up to about
+ *  `cap` words, links and code kept. An entry with no lede shows its first sentence. */
+export function lead(entry, cap = PREVIEW_WORDS) {
+  const m = /^\*\*(.+?)\*\*\s*(.*)$/.exec(entry);
+  if (!m) return sentences(entry)[0] ?? entry;
+  const [, bold, after] = m;
+  const boldIsSentence = /[.!?:]["”’)]*$/.test(bold);
+  let rest = "";
+  let count = words(bold);
+  const parts = sentences(after.replace(/:$/, "."));
+  for (let i = 0; i < parts.length; i++) {
+    const s = parts[i];
+    const completes = i === 0 && !boldIsSentence; // a bold phrase is finished by its first sentence
+    if (!completes && count + words(s) > cap) break; // and the preview ends at the first sentence that won't fit
+    rest = rest ? `${rest} ${s}` : s;
+    count += words(s);
+  }
+  if (!rest) return `**${bold}**`;
+  const gap = /^[,;:.)]/.test(rest) ? "" : " ";
+  return `**${bold}**${gap}${rest}`;
+}
+
+/** The bold lede alone, plain. */
+const ledeOf = (entry) => (/^\*\*(.+?)\*\*/.exec(entry)?.[1] ?? entry).replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const prettyDate = (iso) => {
   const [y, m, d] = iso.split("-").map(Number);
   return `${d} ${MONTHS[m - 1]} ${y}`;
 };
+
+/** True when the version's only entries say another release is inside it, and there's nothing else to say. */
+export function isCarrier(v) {
+  const shown = HEADLINE_SECTIONS.flatMap((k) => v.sections.get(k) ?? []);
+  return !(v.sections.get("Highlights")?.length) && !(v.sections.get("Announcement")?.length)
+    && !(v.sections.get("Fixed")?.length) && shown.length > 0 && shown.every((e) => CARRIER.test(ledeOf(e)));
+}
 
 export function render(sources) {
   const out = [];
@@ -118,10 +159,10 @@ export function render(sources) {
   out.push("  label: What's new");
   out.push("---");
   out.push("");
-  out.push("Each release, newest first, in the words its changelog uses. Patterpad shows the same list in its What's New");
-  out.push(`dialog. The full notes, with every fix, are on [GitHub Releases](${REPO}/releases); the installers and`);
-  out.push("runtime zips are on the [Download](/download/) page, and what a version number promises is on");
-  out.push("[Versions and compatibility](/compatibility/).");
+  out.push("Each release, newest first: what changed and what it means for you, in the words its changelog uses.");
+  out.push("Patterpad shows the same list in its What's New dialog. The full notes, with every detail, are on");
+  out.push(`[GitHub Releases](${REPO}/releases); the installers and runtime zips are on the [Download](/download/)`);
+  out.push("page, and what a version number promises is on [Versions and compatibility](/compatibility/).");
   out.push("");
   for (const src of sources) {
     out.push(`## ${src.heading}`);
@@ -129,23 +170,36 @@ export function render(sources) {
     out.push(src.blurb);
     out.push("");
     for (const v of src.versions.slice(0, SHOWN)) {
+      const notes = `[Full release notes](${REPO}/releases/tag/${src.tag(v.version)})`;
+      if (isCarrier(v)) {
+        // Only another release inside this one: the version, what it carried, and the link, on one line.
+        const carried = HEADLINE_SECTIONS.flatMap((k) => v.sections.get(k) ?? []).map((e) => lead(e)).join(" ");
+        out.push(`**${v.version}** (${prettyDate(v.date)}). ${carried} ${notes}.`);
+        out.push("");
+        continue;
+      }
       out.push(`### ${v.version} (${prettyDate(v.date)})`);
       out.push("");
       for (const a of v.sections.get("Announcement") ?? []) {
-        out.push(`:::tip[${lead(a).replace(/\*\*/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")}]`);
+        out.push(`:::tip[${ledeOf(a)}]`);
         out.push(a.replace(/^\*\*(.+?)\*\*\s*/, ""));
         out.push(":::");
         out.push("");
       }
       const highlights = v.sections.get("Highlights");
       const shown = highlights?.length
-        ? highlights
-        : ["Added", "Changed", "Removed"].flatMap((k) => v.sections.get(k) ?? []);
-      for (const e of shown) out.push(`- ${lead(e)}`);
-      const fixes = (v.sections.get("Fixed") ?? []).length;
-      const notes = `[Full release notes](${REPO}/releases/tag/${src.tag(v.version)})`;
-      if (fixes) out.push(`- ${fixes === 1 ? "One fix" : `${fixes} fixes`}. ${notes}.`);
-      else out.push(`- ${notes}.`);
+        ? highlights.map((e) => lead(e))
+        : HEADLINE_SECTIONS.flatMap((k) => (v.sections.get(k) ?? []).map((e) => (k === "Breaking" ? `Breaking: ${lead(e)}` : lead(e))));
+      for (const line of shown) out.push(`- ${line}`);
+      const fixed = v.sections.get("Fixed") ?? [];
+      if (fixed.length) {
+        if (shown.length) out.push("");
+        out.push("Fixed:");
+        out.push("");
+        for (const e of fixed) out.push(`- ${lead(e)}`);
+      }
+      out.push("");
+      out.push(`${notes}.`);
       out.push("");
     }
     if (src.versions.length > SHOWN) {

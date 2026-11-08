@@ -20,7 +20,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { entriesWithoutLead } from "@wildwinter/app-shell/changelog";
+import { changelogProblems } from "@wildwinter/app-shell/changelog";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const version = process.argv[2];
@@ -64,12 +64,13 @@ edit("package-lock.json", (s, rel) => {
 // --- 2. the changelog ----------------------------------------------------------
 
 edit("packages/patterpad/CHANGELOG.md", (s, rel) => {
-  // What's New headlines each entry by its bold lead (app-shell whats-new.ts), so every entry being released
-  // needs one: "- **The command palette.** Press Cmd+K ...".
+  // What's New shows each entry's bold lede and the start of its first paragraph (app-shell changelog.ts), so
+  // every entry being released has to read as written for the person using the app: a short lede and a sentence
+  // saying what it means (patterkit design/changelog-writing.md).
   const releasing = s.includes(`## [${version}] - Unreleased`) ? version : "Unreleased";
-  const bare = entriesWithoutLead(s, releasing);
-  if (bare.length) {
-    throw new Error(`${rel}: ${bare.length === 1 ? "an entry has" : `${bare.length} entries have`} no bold lead for What's New to show:\n${bare.map((e) => `  - ${e.text.slice(0, 100)}`).join("\n")}`);
+  const problems = changelogProblems(s, releasing);
+  if (problems.length) {
+    throw new Error(`${rel}: What's New can't show ${problems.length === 1 ? "an entry" : `${problems.length} entries`} as written:\n${problems.map((p) => `  - ${p.entry.text.slice(0, 80)}\n      ${p.problem}`).join("\n")}`);
   }
   if (s.includes(`## [${version}] - Unreleased`)) {
     // The pending section already carries this version: just date it.
