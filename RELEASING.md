@@ -105,6 +105,13 @@ npm run release:guard         # run the check by hand
 git push --no-verify          # bypass, if you are certain
 ```
 
+The guard judges a commit by the files it touches, not by its versions: a release commit made by hand (`npm run
+version-packages` run locally, so the versions move in the same commit as a source change, such as the
+playable-runtime blob the pre-commit hook regenerates) trips it for that package even though the change ships
+under a version npm has never had. That is what Patter 1.0.0 did (2026-11-08). When `npm run check:published`
+and the suite pass, `git push --no-verify` is the route; an empty changeset is not, since it stops the Release
+run publishing.
+
 `@patterkit/runtime` is the exception in both directions: it is versioned by `npm run bump:play`, so
 changing it needs no changeset, and a changeset that NAMES it is an error the guard reports.
 
