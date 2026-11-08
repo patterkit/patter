@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-08
+
 ### Changed
 
 - **What's New tells you more about each change.** Each entry now shows its lede and the sentences that explain it,
