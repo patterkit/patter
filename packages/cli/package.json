@@ -1,8 +1,20 @@
 {
   "name": "@patterkit/cli",
-  "version": "0.14.14",
+  "version": "1.0.0",
   "description": "The `patter` CLI: validate, format, export, play, test coverage, localise, and merge Patter projects.",
-  "keywords": ["patter", "patterkit", "dialogue", "interactive-fiction", "branching-dialogue", "game-dev", "narrative", "cli", "validate", "export", "localisation"],
+  "keywords": [
+    "patter",
+    "patterkit",
+    "dialogue",
+    "interactive-fiction",
+    "branching-dialogue",
+    "game-dev",
+    "narrative",
+    "cli",
+    "validate",
+    "export",
+    "localisation"
+  ],
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",
@@ -30,9 +42,9 @@
     "build:standalone:others": "node scripts/build-standalone.mjs --targets=linux-x64,linux-arm64,windows-x64"
   },
   "dependencies": {
-    "@patterkit/core": "0.13.1",
-    "@patterkit/ops": "0.28.0",
+    "@patterkit/core": "1.0.0",
+    "@patterkit/ops": "1.0.0",
     "@wildwinter/simple-vc-lib": "^0.5.2",
-    "@wildwinter/toolkit": "^0.4.0"
+    "@wildwinter/toolkit": "^1.0.0"
   }
 }

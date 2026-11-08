@@ -1,8 +1,18 @@
 {
   "name": "@patterkit/dialect",
-  "version": "0.2.25",
+  "version": "1.0.0",
   "description": "The Patter dialect for @wildwinter/expr (scopes shared/scene/flow, built-in functions), an ExpressionSchema builder from property declarations, and the inline {@ref} interpolation helpers (spec §16).",
-  "keywords": ["patter", "patterkit", "dialogue", "interactive-fiction", "branching-dialogue", "game-dev", "narrative", "expressions", "expr"],
+  "keywords": [
+    "patter",
+    "patterkit",
+    "dialogue",
+    "interactive-fiction",
+    "branching-dialogue",
+    "game-dev",
+    "narrative",
+    "expressions",
+    "expr"
+  ],
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",
@@ -35,13 +45,13 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --clean"
   },
   "dependencies": {
-    "@patterkit/model": "0.27.1",
-    "@wildwinter/expr": "^0.6.0"
+    "@patterkit/model": "1.0.0",
+    "@wildwinter/expr": "^1.0.0"
   },
   "peerDependencies": {
-    "@wildwinter/scoperegistry": ">=0.9.0 <1.0.0"
+    "@wildwinter/scoperegistry": ">=1.0.0 <2.0.0"
   },
   "devDependencies": {
-    "@wildwinter/scoperegistry": ">=0.9.0 <1.0.0"
+    "@wildwinter/scoperegistry": ">=1.0.0 <2.0.0"
   }
 }

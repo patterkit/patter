@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-08
+
+### Changed
+
+- **Patterplay 1.0.0.** The runtime of 0.46.2, unchanged, declared settled: from here a patch fixes, a minor adds, and a major removes or changes a meaning. Every 1.x reads `patter/bundle@0` bundles and `patter/save@0` saves. Needs Unity 6 (6000.0), the version it's verified on.
+
 ## [0.46.2] - 2026-11-06
 
 ### Changed

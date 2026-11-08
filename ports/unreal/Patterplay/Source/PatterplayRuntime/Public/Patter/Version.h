@@ -14,7 +14,7 @@ namespace patter
 {
     /** This runtime's version, as in its .uplugin's VersionName. Written by `npm run bump:play`; never edit it by
      *  hand. */
-    inline constexpr const char* PatterplayVersion = "0.46.2";
+    inline constexpr const char* PatterplayVersion = "1.0.0";
 
     namespace version_detail
     {

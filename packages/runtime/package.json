@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/runtime",
-  "version": "0.46.2",
+  "version": "1.0.0",
   "description": "Patter reference runtime: load a bundle and play dialogue - flows, selectors, choices, jumps, effects, properties. Built on @wildwinter/expr + scoperegistry.",
   "keywords": ["patter", "patterkit", "dialogue", "interactive-fiction", "branching-dialogue", "game-dev", "narrative", "runtime", "engine", "choices"],
   "type": "module",
@@ -36,15 +36,15 @@
     "build": "tsup"
   },
   "dependencies": {
-    "@patterkit/model": ">=0.27.0 <1.0.0",
-    "@patterkit/dialect": ">=0.2.24 <1.0.0",
-    "@wildwinter/expr": "^0.6.0",
-    "@wildwinter/expr-specificity": "^0.1.0"
+    "@patterkit/model": ">=1.0.0 <2.0.0",
+    "@patterkit/dialect": ">=1.0.0 <2.0.0",
+    "@wildwinter/expr": "^1.0.0",
+    "@wildwinter/expr-specificity": "^1.0.0"
   },
   "peerDependencies": {
-    "@wildwinter/scoperegistry": ">=0.9.0 <1.0.0"
+    "@wildwinter/scoperegistry": ">=1.0.0 <2.0.0"
   },
   "devDependencies": {
-    "@wildwinter/scoperegistry": ">=0.9.0 <1.0.0"
+    "@wildwinter/scoperegistry": ">=1.0.0 <2.0.0"
   }
 }

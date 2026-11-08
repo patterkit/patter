@@ -6,6 +6,16 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Announcement
+
+- **Patter 1.0.** Patterpad, the four Patterplay runtimes, the CLI, and the packages on npm are all 1.0.0 today: the
+  shape has settled, and from here a patch fixes, a minor adds, and a major is for a change that breaks. Projects
+  made in 0.x open as they are. [What's new](https://patterkit.dev/whats-new/)
+
+### Changed
+
+- **1.0.0.** Patterpad 0.47.0, unchanged, on Patterplay 1.0.0 and the 1.x of the shared libraries.
+
 ## [0.47.0] - 2026-11-06
 
 ### Added

@@ -1,5 +1,17 @@
 # @patterkit/cli
 
+## 1.0.0
+
+### Major Changes
+
+- 1.0.0: the API of the last 0.x release, unchanged, declared settled. From here the version follows semver: a patch fixes, a minor adds, and a major removes or changes a meaning. Built on the 1.x of the shared libraries (`@wildwinter/expr`, `toolkit`, `expr-specificity`, `app-shell`; `@wildwinter/scoperegistry` stays a peer, now `>=1.0.0 <2.0.0`, one copy per install).
+
+### Patch Changes
+
+- Updated dependencies
+  - @patterkit/core@1.0.0
+  - @patterkit/ops@1.0.0
+
 ## 0.14.14
 
 ### Patch Changes
