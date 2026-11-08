@@ -10,7 +10,7 @@ same runtime behaviour.
 
 ### Changed
 
-- **Patterplay 1.0.0 is the runtime of 0.46.2, unchanged, and a promise: every 1.x plays the bundles and loads the saves your game has today.** From here a patch fixes, a minor adds, and only a major may change behaviour your game relies on, with its notes saying what and why. Every 1.x reads `patter/bundle@0` bundles and `patter/save@0` saves. Needs Unity 6 (6000.0), the version it's verified on.
+- **Patterplay 1.0.0 is 0.46.2 with a new number and a promise: every 1.x will play the bundles and load the saves your game has today.** From here a patch fixes, a minor adds, and only a major may change behaviour your game relies on, with its notes saying what and why. Every 1.x reads `patter/bundle@0` bundles and `patter/save@0` saves. Needs Unity 6 (6000.0), the version it's verified on.
 
 ## [0.46.2] - 2026-11-06
 

@@ -16,13 +16,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Highlights
 
-- **Your work is safe across updates**, so a project from an earlier Patterpad opens in 1.0 as it is, and a bundle
-  you publish today plays in every Patterplay 1.x to come.
-- **Version numbers now say plainly what an update does**, so 1.0.1 and 1.0.2 are fixes, 1.1 and 1.2 add things
-  without taking anything away, and only a 2.0 may change how something you rely on works. When one does, its notes
-  will say what and why.
-- **Nothing in the app changed for 1.0**, which is Patterpad 0.47 with Patterplay 1.0.0 inside, and the number says
-  the shape has settled, not that there's a new feature.
+- **Your work is safe across updates**: a project from an earlier Patterpad opens in 1.0 as it is, and a bundle you
+  publish today will play in every Patterplay 1.x to come.
+- **Version numbers now tell you what an update does**: 1.0.1 and 1.0.2 are fixes, 1.1 and 1.2 add things without
+  taking anything away, and only a 2.0 may change how something you rely on works. When one does, its notes will say
+  what and why.
+- **Nothing in the app changed for 1.0**: it's Patterpad 0.47 with a new number, marking that the design has
+  settled.
 
 ### Changed
 
@@ -63,12 +63,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
-- **A game on the Live Link reconnects by itself** after you restart Patterpad or turn the Live Link on once the
-  game is already running, with Patterplay 0.46.0 inside.
+- **A game on the Live Link reconnects by itself** when you restart Patterpad, or switch the Live Link on after the
+  game has started (Patterplay 0.46.0 inside).
 - **Show Card in Storyletter finds and opens Storyletter more reliably.** It now goes through the launcher the
   whole family shares (app-shell 0.77.0), the same one Storyletter will use for Show Scene in Patterpad. Nothing
   changes in what you see.
-- **Play in game says plainly when the speaker who'd start the block isn't in the game yet.** The note reads "The
+- **Play in game explains itself when the speaker who would start the block isn't in the game yet.** The note reads "The
   speaker that asks for it isn't in the game yet", with the game's own line naming them beneath it, in place of "The
   game has no player character to start it with".
 
@@ -91,8 +91,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
-- **Patterplay 0.44.0 inside, for games that move a character's mouth: each syllable now says its vowel.** Nothing
-  changes in Patterpad itself, and lines are timed as before.
+- **Patterplay 0.44.0 inside, which now reports each syllable's vowel for lip-sync.** Nothing changes in Patterpad
+  itself, and lines are timed as before.
 
 ## [0.43.0] - 2026-11-04
 
@@ -116,8 +116,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 - **The suite is written Patterkit now, with a lowercase k**, beside Patterpad and Patterplay: the About box's
   wordmark and credits, and the Help menu's Patterkit Documentation Home.
-- **Patterplay 0.42.0 inside, which can tell an extension which version it is.** Nothing changes in Patterpad
-  itself.
+- **Patterplay 0.42.0 inside, which lets an extension check the runtime version it's running on.** Nothing changes
+  in Patterpad itself.
 
 ## [0.42.2] - 2026-11-02
 

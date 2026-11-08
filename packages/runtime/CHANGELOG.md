@@ -37,21 +37,21 @@ version number always means the same runtime behaviour. This package is versione
 
 ### Changed
 
-- **Patterplay 1.0.0 is the runtime of 0.46.2, unchanged, and a promise: every 1.x plays the bundles and loads the saves your game has today.** From here a patch fixes, a minor adds, and only a major may change behaviour your game relies on, with its notes saying what and why. Every 1.x reads `patter/bundle@0` bundles and `patter/save@0` saves. On `@patterkit/model` and `@patterkit/dialect` 1.x (`>=1.0.0 <2.0.0`) and the 1.x of `@wildwinter/expr`, `expr-specificity`, and `scoperegistry` (a peer, `>=1.0.0 <2.0.0`).
+- **Patterplay 1.0.0 is 0.46.2 with a new number and a promise: every 1.x will play the bundles and load the saves your game has today.** From here a patch fixes, a minor adds, and only a major may change behaviour your game relies on, with its notes saying what and why. Every 1.x reads `patter/bundle@0` bundles and `patter/save@0` saves. On `@patterkit/model` and `@patterkit/dialect` 1.x (`>=1.0.0 <2.0.0`) and the 1.x of `@wildwinter/expr`, `expr-specificity`, and `scoperegistry` (a peer, `>=1.0.0 <2.0.0`).
 
 ## [0.46.2] - 2026-11-06
 
 ### Changed
 
-- **No runtime change: this release ships Audio Folders' Ogg Vorbis takes.** A `.ogg` take resolves like any
-  other, and the Unity and Godot Tour demos play `.ogg` and `.mp3` takes.
+- **Nothing changed in the runtime**, which is released alongside Patterpad 0.47's Ogg Vorbis recordings: a `.ogg`
+  take resolves like any other, and the Unity and Godot Tour demos play `.ogg` and `.mp3` takes.
 
 ## [0.46.1] - 2026-11-06
 
 ### Changed
 
-- **No runtime change: this release ships Patterplay for Unreal's bundle import.** Other plugins hear a `.patterc`
-  import, and Reimport works.
+- **Nothing changed in the runtime**, which is released alongside Patterplay for Unreal's bundle import: other
+  plugins hear a `.patterc` import, and Reimport works.
 
 ## [0.46.0] - 2026-11-06
 
@@ -89,7 +89,7 @@ version number always means the same runtime behaviour. This package is versione
 
 ### Added
 
-- **Each syllable now says its vowel, for games that move a mouth.** `speechUnits(text, locale)` gives a `syllable` unit a `vowel` now: `"a"`, `"e"`,
+- **Each syllable now carries its vowel, for lip-sync.** `speechUnits(text, locale)` gives a `syllable` unit a `vowel` now: `"a"`, `"e"`,
   `"i"`, `"o"`, `"u"`, or `"ə"` for a vowel the script shows that isn't one of the five. Move a mouth to a shape at
   each syllable's peak with it. It's absent on pauses and shut beats, and where the script doesn't say (Han, digits,
   and scripts outside the set). Latin takes the first vowel of the syllable's vowel group with its accent dropped,
@@ -126,7 +126,7 @@ version number always means the same runtime behaviour. This package is versione
 
 ### Added
 
-- **A runtime can say which Patterplay version it is, so an extension can check it at start-up.** `PATTERPLAY_VERSION` is the runtime's version, as in its `package.json`, and
+- **Your game can read which Patterplay version it's running, so an extension can check it at start-up.** `PATTERPLAY_VERSION` is the runtime's version, as in its `package.json`, and
   `versionInRange(version, min, maxExclusive)` says whether a version is at least `min` and below `maxExclusive`, by
   semantic-version order (a prerelease before its release, build metadata ignored, and anything that isn't a
   version out of range). An extension that ships apart from Patterplay, such as Patterstage or Pattershot, checks
