@@ -1,6 +1,6 @@
 // Placeholder Speech in Patterpad's main process (patterkit design/proposals/placeholder-speech.md, section 6):
 // a cut and paste carries a line's take to its new id; a deleted line's scratch take starts a week's clock and
-// placeholder speech goes at once; Remove Takes for Deleted Lines finds what's left. No Google: nothing here
+// placeholder speech goes at once; Remove Voice Clips for Deleted Lines finds what's left. No Google: nothing here
 // makes speech.
 
 import { describe, it, expect, vi, beforeAll } from "vitest";
@@ -92,7 +92,7 @@ describe("takes for cut, pasted, and deleted lines", () => {
     expect(Object.keys(Object.values(memory.deleted)[0]!)).toEqual(["L_work"]);
   });
 
-  it("removes the scratch take once the week is up, and Remove Takes for Deleted Lines finds what's left", async () => {
+  it("removes the scratch take once the week is up, and Remove Voice Clips for Deleted Lines finds what's left", async () => {
     const file = join(userData, "placeholder-speech.json");
     const memory = JSON.parse(readFileSync(file, "utf8")) as { deleted: Record<string, Record<string, string>> };
     const key = Object.keys(memory.deleted)[0]!;
@@ -101,7 +101,7 @@ describe("takes for cut, pasted, and deleted lines", () => {
     await settled(() => "L_work" in project.audioCurrentSnapshot());
     await speech.sweepDeleted();
     expect(existsSync(join(audio, "scratch/L_work.wav"))).toBe(false);
-    expect(notes.some((n) => /Removed 1 scratch take/.test(n))).toBe(true);
+    expect(notes.some((n) => /Removed 1 scratch voice clip/.test(n))).toBe(true);
     writeFileSync(join(audio, "scratch/L_orphan.wav"), take([["PTRK", "aaaaaa"]]));
     await settled(() => "L_orphan" in project.audioCurrentSnapshot());
     expect(speech.takesForDeletedLines().map((p) => p.split(/[\\/]/).pop())).toEqual(["L_orphan.wav"]);

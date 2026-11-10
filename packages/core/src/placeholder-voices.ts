@@ -59,16 +59,16 @@ export function placeholderAccent(code: string | undefined): PlaceholderAccent |
   return want === undefined ? undefined : PLACEHOLDER_ACCENTS.find((a) => a.code.toLowerCase() === want);
 }
 
-/** The accent a project's main language implies: an exact match (`en-GB`), else the first accent of that
- *  language when the code names one with only one accent on offer. A bare `en`, which has several, gives
- *  undefined: the writer picks. */
+/** The accent a project's main language implies: an exact match (`en-GB`), else the first accent on offer for
+ *  that language, so a bare `en` is British English (Ian, 2026-11-10), changeable in settings. Undefined for a
+ *  language with no accent on offer. */
 export function accentForLanguage(locale: string | undefined): string | undefined {
   if (!locale) return undefined;
   const exact = placeholderAccent(locale);
   if (exact) return exact.code;
   const lang = locale.split(/[-_]/)[0]!.toLowerCase();
   const same = PLACEHOLDER_ACCENTS.filter((a) => a.code.split("-")[0]!.toLowerCase() === lang);
-  return same.length === 1 ? same[0]!.code : undefined;
+  return same[0]?.code;
 }
 
 /** The voice a character gets with none chosen: a hash of their name picks from the accent's voices; when

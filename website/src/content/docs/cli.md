@@ -83,7 +83,7 @@ writes too; `-o -` writes to stdout. `--ids` builds an IDs-only bundle (ships no
 problems listed; `--allow-invalid` builds it anyway, for looking at, never for shipping. Where the game
 shares its scopes, it also writes `game-scopes/patter.scopes.json`, and only when its content would
 change, and in an **Audio Folders** project the `patteraudio.json` manifest beside the audio (neither
-with `-o -`). The manifest names only takes whose line is in the project.
+with `-o -`). The manifest names only voice clips whose line is in the project.
 
 `--audio-manifest-out file` writes the audio manifest there instead of beside the audio: a shipping
 manifest, in your build folder, whose files are still named relative to the audio root.
@@ -146,7 +146,7 @@ A production report: status, burndown, recording coverage, and an `action lines`
 project has [action text](/production/tracking-and-reports/#action-text), counted beside the written
 lines rather than in them. `--xlsx file` also writes
 a spreadsheet; `--json` emits JSON to stdout (for pipelines). In an **Audio Folders**
-project, recording status is derived from the takes on disk, the same numbers Patterpad
+project, recording status is derived from the voice clips on disk, the same numbers Patterpad
 shows.
 
 ### `patter loc-export [path] -o file`
@@ -175,7 +175,7 @@ how many.
 ### `patter voice-export [path] -o file.xlsx`
 A voice-recording script. Requires a **Voiced** project (`voiced: true`), or it exits with an
 error. `--all` includes every voiced line (otherwise only those ready to record). In an
-**Audio Folders** project, each line's status column is derived from the takes on disk. The
+**Audio Folders** project, each line's status column is derived from the voice clips on disk. The
 spreadsheet has a Direction column with each line's performance direction.
 
 ### `patter placeholder-speech [path]`

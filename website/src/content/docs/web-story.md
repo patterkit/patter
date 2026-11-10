@@ -307,10 +307,10 @@ If your recordings are `.wav` or `.ogg` files, change `.mp3` to match. Safari ma
 `.mp3` if your readers might be on Safari.
 
 :::note[Recording in Patterpad]
-Patterpad's [Audio Folders](/production/audio/) keep each line's takes in a folder per recording
-stage (`scratch/`, `recorded/`, `final/`), named after the line's id in the same way. Copy the takes you
+Patterpad's [Audio Folders](/production/audio/) keep each line's voice clips in a folder per recording
+stage (`scratch/`, `recorded/`, `final/`), named after the line's id in the same way. Copy the voice clips you
 want into `my-story/audio`. On a page you serve from a web host, the
-[audio resolver](/play/audio/#the-built-in-resolver-optional) can pick the best take for each line from
+[audio resolver](/play/audio/#the-built-in-resolver-optional) can pick the best voice clip for each line from
 those folders for you. It reads a small manifest file, which a page opened straight from your disk
 isn't allowed to load, so this page keeps to one folder.
 :::

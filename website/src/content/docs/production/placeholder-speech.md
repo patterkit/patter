@@ -1,6 +1,6 @@
 ---
 title: Placeholder Speech
-description: Hear every spoken line in a stand-in voice before anyone records it, made from the line's words, and replaced by any real take.
+description: Hear every spoken line in a stand-in voice before anyone records it, made from the line's words, and replaced by any real voice clip.
 sidebar:
   label: Placeholder Speech
 ---
@@ -10,7 +10,7 @@ time it, and play it in your game before anyone records a line. Google's Text-to
 team provides.
 
 It sounds like a stand-in on purpose. It uses Google's plainer voices at a low sample rate, so nobody mistakes it
-for the finished thing, and any real take replaces it: a scratch take, a recorded take, or a final one is always
+for the finished thing, and any real voice clip replaces it: a scratch voice clip, a recorded one, or a final one is always
 heard instead.
 
 ## Turning it on
@@ -22,15 +22,15 @@ Placeholder Speech**:
    above **missing**, so its folder is `placeholder/` under your audio root. (If your ladder already has a stage
    called placeholder, it uses that.)
 2. Set the **Google Cloud key file** (see [getting a key](#getting-a-key)).
-3. Choose an **accent**, if your project's language doesn't name one. A project written in `en` could be British,
-   American, Australian, or Indian English, so it asks.
+3. Check the **accent**. It follows your project's main language: a project written in `en-US` speaks with an
+   American accent, and one written in plain `en` with a British one, so choose another there if you want it.
 
 Then carry on writing. A moment after you move off a line you've edited, its speech is made in the background,
 with a strip at the bottom of the window while it works. Lines still waiting when you close Patterpad are made
 next time you open the project.
 
-To make a whole scene or the project at once, use **Production ▸ Make Placeholder Speech for This Scene** or
-**…for the Project**. The project one says how many lines it will make first.
+To make a whole scene or the project at once, use **Production ▸ Placeholder Speech ▸ Make for This Scene** or
+**Make for the Project**. The project one says how many lines it will make first.
 
 ## Voices
 
@@ -43,7 +43,7 @@ if the name picked a voice of the other kind, it moves to one that fits. Charact
 it. Renaming a character keeps their voice.
 
 Change a voice, a gender, or the accent and Patterpad offers to make that character's lines again. If you'd
-rather wait, **Make Placeholder Speech** does it later.
+rather wait, **Production ▸ Placeholder Speech** does it later.
 
 ## What it means for the rest of the project
 
@@ -53,11 +53,11 @@ rather wait, **Make Placeholder Speech** does it later.
 - **Editing a line makes its speech again**, on its own. It isn't flagged for re-record, since nobody needs to do
   anything. If Google sends a clip cut short (it happens now and then), **Make again** in the inspector asks for it
   again.
-- **Your game plays it** like any other take, through the [audio manifest](/production/audio/#getting-the-audio-into-your-game),
+- **Your game plays it** like any other voice clip, through the [audio manifest](/production/audio/#getting-the-audio-into-your-game),
   so a development build can be heard all the way through. For a release, leave the placeholder folder out of
   what you package and write a shipping manifest without it:
   `patter export --audio-manifest-out build/patteraudio.json --no-placeholder-speech`.
-- **Its files are WAV, 16 kHz, trimmed of silence** at each end, as scratch takes are, so lines are timed by their
+- **Its files are WAV, 16 kHz, trimmed of silence** at each end, as scratch voice clips are, so lines are timed by their
   speech and not by Google's pauses.
 - **A file you put in the placeholder folder yourself is never touched.** Placeholder Speech marks its own files,
   and only remakes or removes those. The settings page lists any it didn't make.
@@ -83,7 +83,15 @@ home folder, and point Patterpad at it with **Choose…**. Patterpad stores the 
   the key in the same place on every computer shares one setting.
 - A path relative to the project works too, for a team that keeps the key beside its checkouts.
 - If the path is empty, or the file isn't on a computer, Patterpad uses the standard
-  `GOOGLE_APPLICATION_CREDENTIALS` environment variable instead.
+  `GOOGLE_APPLICATION_CREDENTIALS` environment variable instead, and then a gcloud sign-in (below).
+
+### If you already use gcloud
+
+Someone who works with Google Cloud from the command line can skip the service account and use their own sign-in:
+`gcloud auth application-default login`, then `gcloud auth application-default set-quota-project` with the
+project's id, so Google knows which project to bill. Patterpad finds that sign-in where gcloud keeps it
+(`~/.config/gcloud/application_default_credentials.json`, or `%APPDATA%\gcloud\` on Windows) when no key file is
+set, or you can choose the file itself. It belongs to one person, so a team shares a service account's key instead.
 
 The settings page says whether the key works on this computer, and which Google project and account it belongs
 to. If the key sits inside your project's folder, it says so.
@@ -92,7 +100,7 @@ to. If the key sits inside your project's folder, it says so.
 
 A teammate whose computer has no key gets one quiet note per session, never an error. Their saves aren't held up,
 and they hear the speech others made and committed. To stop the note on a computer that's never meant to make
-speech, untick **Production ▸ Make Placeholder Speech on This Computer**.
+speech, untick **Production ▸ Placeholder Speech ▸ Make on This Computer**.
 
 A team can also keep the key on one build machine only, and make the speech there with
 [`patter placeholder-speech`](/cli/#patter-placeholder-speech-path).

@@ -269,7 +269,7 @@ export function mountRecordingStatus(host: HTMLElement, a: AudioSettings): void 
     }).row);
     if (s.audioFolders) {
       const rootRow = el("label", "sp-folder sp-folder-root");
-      rootRow.append(el("span", "sp-folder-cap", "Audio root folder"));
+      rootRow.append(el("span", "sp-folder-cap sp-field-cap", "Audio root folder"));
       const inp = el("input", "gd-input sp-folder-input") as HTMLInputElement;
       inp.type = "text"; inp.placeholder = "../audio"; inp.spellcheck = false; inp.value = s.audioRoot;
       inp.dataset.tip = "Relative to the project folder. Each status's folder is named from the status.";
@@ -311,7 +311,7 @@ export function mountScratchRecording(host: HTMLElement, a: AudioSettings): void
     if (s.scratch && !c.includes(s.scratch)) s.scratch = null; // its folder went, or Placeholder Speech took it
     host.append(labelledToggle("Enable scratch recording", {
       checked: s.scratch != null, disabled: c.length === 0,
-      hint: c.length === 0 ? "Scratch takes record into a status's folder: set up Audio Folders first." : "Record quick takes in Patterpad, straight into a status's folder.",
+      hint: c.length === 0 ? "Scratch voice clips record into a status's folder: set up Audio Folders first." : "Record quick voice clips in Patterpad, straight into a status's folder.",
       onChange: (on) => { s.scratch = on ? preferred() : null; a.changed(); },
     }).row);
     if (s.scratch) {
@@ -323,7 +323,7 @@ export function mountScratchRecording(host: HTMLElement, a: AudioSettings): void
       sel.addEventListener("change", () => { s.scratch = c[Number(sel.value)] ?? null; a.changed(); });
       pick.append(sel);
       host.append(pick);
-      host.append(el("p", "settings-note", "Each take is trimmed of silence and stamped with the words it was recorded against, so a line edited afterwards shows its take as out of date."));
+      host.append(el("p", "settings-note", "Each voice clip is trimmed of silence and stamped with the words it was recorded against, so a line edited afterwards shows its voice clip as out of date."));
     }
   };
   a.onChange(render);
@@ -358,17 +358,19 @@ export function mountPlaceholderSpeech(host: HTMLElement, a: AudioSettings, opts
   const render = (): void => {
     host.replaceChildren();
     const ready = a.foldersOn();
-    host.append(el("p", "settings-note", "Stand-in speech for every spoken line, made from its words, so a scene can be heard before anyone records it. It sounds like a stand-in on purpose. Any scratch, recorded, or final take is heard instead."));
+    host.append(el("p", "settings-note", "Stand-in speech for every spoken line, made from its words, so a scene can be heard before anyone records it. It sounds like a stand-in on purpose. Any scratch, recorded, or final voice clip is heard instead."));
     host.append(labelledToggle("Generate Placeholder Speech", {
       checked: p.on, disabled: !ready,
       hint: ready ? `Speech goes in the ${p.rung && p.on ? `"${p.rung.name.trim()}"` : `"${PLACEHOLDER_STATUS}"`} status's folder, below scratch.` : "Placeholder Speech goes in a status's folder: set up Audio Folders first.",
       onChange: (on) => { p.on = on; if (on) { ensureRung(); if (!p.accent && opts.impliedAccent) p.accent = opts.impliedAccent; } a.changed(); },
     }).row);
     if (!p.on) return;
+    // On with no accent of its own: the one the main language implies (a bare "en" is British), saved with the rest.
+    if (!p.accent && opts.impliedAccent) p.accent = opts.impliedAccent;
 
     // The key file: a path stored in the project (a team often shares one key), never the key itself.
     const keyRow = el("div", "sp-folder sp-key-row");
-    keyRow.append(el("span", "sp-folder-cap", "Google Cloud key file"));
+    keyRow.append(el("span", "sp-folder-cap sp-field-cap", "Google Cloud key file"));
     const key = el("input", "gd-input sp-folder-input") as HTMLInputElement;
     key.type = "text"; key.spellcheck = false; key.value = p.keyFile; key.placeholder = "~/.patter/placeholder-speech-key.json";
     key.dataset.tip = "A path relative to the project folder, or starting ~/ for your home folder. Keep the key outside version control.";
@@ -389,27 +391,29 @@ export function mountPlaceholderSpeech(host: HTMLElement, a: AudioSettings, opts
     key.addEventListener("input", () => { p.keyFile = key.value; });
     key.addEventListener("change", check);
     choose.addEventListener("click", () => { void opts.chooseKeyFile().then((path) => { if (path != null) { p.keyFile = path; key.value = path; check(); } }); });
-    host.append(keyRow, status, guide);
+    // The key, what it is, and where to get one: one block, spaced from the rest as a setting is.
+    host.append(el("div", "sp-group", keyRow, status, guide));
     check();
 
     // The accent: which of Google's Standard voices the cast draws on.
     const accentRow = el("label", "sp-folder");
-    accentRow.append(el("span", "sp-folder-cap", "Accent"));
+    accentRow.append(el("span", "sp-folder-cap sp-field-cap", "Accent"));
     const accent = el("select", "gd-input sp-folder-input") as HTMLSelectElement;
     if (!p.accent) accent.append(new Option("Choose an accent", ""));
     for (const [code, label] of opts.accents) accent.append(new Option(label, code));
     accent.value = p.accent;
     accent.addEventListener("change", () => { p.accent = accent.value; a.changed(); });
     accentRow.append(accent);
-    host.append(accentRow);
-    if (!p.accent) host.append(el("p", "settings-fieldnote is-bad", "Choose an accent: the main language doesn't say which."));
+    const accentGroup = el("div", "sp-group", accentRow);
+    if (!p.accent) accentGroup.append(el("p", "settings-fieldnote is-bad", "Choose an accent: none is on offer for the project's main language."));
+    host.append(accentGroup);
 
     host.append(labelledToggle("Keep Placeholder Speech out of version control", {
       checked: p.keepOut,
       hint: "Each machine with a key makes its own. Saves repository space; anyone without a key hears none.",
       onChange: (on) => { p.keepOut = on; },
     }).row);
-    host.append(el("p", "settings-note", "Each character's voice is set in Cast. Speech is made for lines you edit, a moment after you move on. Production > Make Placeholder Speech does a whole scene or the project."));
+    host.append(el("p", "settings-note", "Each character's voice is set in Cast. Speech is made for lines you edit, a moment after you move on. Production > Placeholder Speech makes a whole scene or the project."));
   };
   a.onChange(render);
   render();

@@ -573,6 +573,8 @@
 .scene-props-dialog { --dialog-width: 640px; }
 /* Audio Status tab: the ladder / folders / scratch below the "Track Audio Status?" switch, dimmed + inert
    (the `inert` attribute blocks interaction) while tracking is off (#206). */
+/* The settings under Track audio status, spaced as a page's own are (settings-panel's gap). */
+.sp-audio-body { display: flex; flex-direction: column; gap: 14px; }
 .sp-audio-body.is-disabled { opacity: 0.45; }
 /* Closed Captions: the open/close delimiter pair side by side, centred single-glyph inputs. */
 .caption-delims { display: flex; gap: 13px; align-items: flex-end; flex-wrap: wrap; }
@@ -772,6 +774,14 @@ input::placeholder, textarea::placeholder {
 /* Audio Folders (#206): the per-rung project-relative folder field, shown under a rung when folders mode is on. */
 .sp-folder { display: flex; align-items: center; gap: 5.5px; padding-left: 1.5px; margin-top: 4px; }
 .sp-folder-cap { font: var(--text-xs) var(--font-ui); color: var(--muted); }
+/* The audio pages (Recording status, Scratch recording, Placeholder Speech): spaced as a settings page is, each
+   setting and the lines that belong to it one block (Ian, 2026-11-10: they ran together). A key or accent row's
+   caption is a setting's name, so it reads as one. */
+.sp-page { display: flex; flex-direction: column; gap: 14px; }
+.sp-group { display: flex; flex-direction: column; gap: 4px; }
+.sp-group > .sp-folder { margin-top: 0; }
+.sp-group > .linklike { align-self: flex-start; }
+.sp-field-cap { font: var(--text-md) var(--font-ui); color: var(--ink); white-space: nowrap; }
 .sp-folder-input { font-family: var(--font-mono); font-size: var(--text-sm); flex: 1 1 auto; min-width: 0; }
 /* The fixed "missing" fallback rung (folder mode): its name reads as locked, and it shows a muted note in
    place of the folder field (it never points at a folder). */
@@ -923,6 +933,9 @@ body.writing-view #hintbar { padding-right: 192px; }
    row's width, and the purpose under it keeps the inspector's small voice. */
 .insp-gd-row textarea.insp-gd-input { max-width: none; resize: vertical; }
 .insp-gd-row .shell-fieldrow-purpose, .insp-gd-row .shell-fieldrow-problem { font-size: var(--text-xs); }
+/* Project Settings' extension fields: a little room between rows, so a label that wraps to two lines doesn't meet
+   the next row's. */
+.settings-ext-rows .insp-row:not(.shell-valuerow) { margin-block: 3px; }
 
 /* Hover tints ease in and out (app-shell's --dur-tint): a colour that snaps on every pass of the pointer is
    busier than one that settles. These had no transition at all. */

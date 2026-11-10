@@ -33,8 +33,10 @@ const TRIM_PAD_SECONDS = 0.05; // keep 50 ms either side
 // --- The key -------------------------------------------------------------------------------------------------
 
 /** Where the key file is: the project's path (relative to the `.patter` folder, or `~/...`), else the
- *  `GOOGLE_APPLICATION_CREDENTIALS` environment variable. `source` says which, for the settings page. */
-export function resolveKeyFile(projectRoot: string, keyFile: string | undefined, env: Record<string, string | undefined> = process.env): { path?: string; source: "project" | "environment" | "none"; stored?: string } {
+ *  `GOOGLE_APPLICATION_CREDENTIALS` environment variable, else gcloud's own sign-in (`gcloud auth
+ *  application-default login`), where Google's libraries look last too. `source` says which, for the settings
+ *  page. */
+export function resolveKeyFile(projectRoot: string, keyFile: string | undefined, env: Record<string, string | undefined> = process.env): { path?: string; source: "project" | "environment" | "gcloud" | "none"; stored?: string } {
   const stored = keyFile?.trim();
   if (stored) {
     const path = expandKeyPath(projectRoot, stored);
@@ -42,7 +44,19 @@ export function resolveKeyFile(projectRoot: string, keyFile: string | undefined,
   }
   const fromEnv = env["GOOGLE_APPLICATION_CREDENTIALS"]?.trim();
   if (fromEnv && existsSync(fromEnv)) return { path: fromEnv, source: "environment", ...(stored ? { stored } : {}) };
+  const gcloud = gcloudCredentialsPath(env);
+  if (gcloud && existsSync(gcloud)) return { path: gcloud, source: "gcloud", ...(stored ? { stored } : {}) };
   return { source: "none", ...(stored ? { stored } : {}) };
+}
+
+/** Where `gcloud auth application-default login` keeps its sign-in: `CLOUDSDK_CONFIG` when set, else gcloud's
+ *  config folder (`%APPDATA%\gcloud` on Windows, `~/.config/gcloud` elsewhere). */
+export function gcloudCredentialsPath(env: Record<string, string | undefined> = process.env): string | undefined {
+  const file = "application_default_credentials.json";
+  const config = env["CLOUDSDK_CONFIG"]?.trim();
+  if (config) return join(config, file);
+  if (process.platform === "win32") return env["APPDATA"] ? join(env["APPDATA"], "gcloud", file) : undefined;
+  return join(homedir(), ".config", "gcloud", file);
 }
 
 /** A stored key path made absolute: a leading `~/` is the home folder on every system (Node expands it nowhere),
@@ -65,26 +79,53 @@ export function storedKeyPath(projectRoot: string, chosen: string): string {
   return norm(isAbsolute(rel) ? chosen : rel); // another drive on Windows: the absolute path
 }
 
-export interface ServiceAccount { projectId: string; clientEmail: string; privateKey: string }
+/**
+ * A Google credential Placeholder Speech can use: a service account's JSON key, or gcloud's own sign-in for a
+ * person (`gcloud auth application-default login`, `"type": "authorized_user"`), which Google bills to its quota
+ * project. `projectId` is the project that's billed, `account` the email it acts as (empty when the file doesn't
+ * say).
+ */
+export type GoogleKey =
+  | { readonly kind: "service-account"; readonly projectId: string; readonly account: string; readonly privateKey: string }
+  | { readonly kind: "user"; readonly projectId: string; readonly account: string; readonly clientId: string; readonly clientSecret: string; readonly refreshToken: string };
 
-/** Read a service-account key file. Throws, in plain words, when it isn't one. */
-export function readServiceAccount(path: string): ServiceAccount {
+/** Read a Google credential file. Throws, in plain words, when it isn't one Placeholder Speech can use. */
+export function readGoogleKey(path: string): GoogleKey {
   let raw: unknown;
   try { raw = JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error("That file isn't a Google key: it isn't readable JSON."); }
   const k = raw as Record<string, unknown>;
-  if (k["type"] !== "service_account") throw new Error("That file isn't a service-account key (Google's \"JSON key\" for a service account).");
-  const projectId = String(k["project_id"] ?? ""), clientEmail = String(k["client_email"] ?? ""), privateKey = String(k["private_key"] ?? "");
-  if (!clientEmail || !privateKey) throw new Error("That key file is missing its account or its private key.");
-  return { projectId, clientEmail, privateKey };
+  const text = (name: string): string => (typeof k[name] === "string" ? k[name] as string : "");
+  if (k["type"] === "service_account") {
+    if (!text("client_email") || !text("private_key")) throw new Error("That key file is missing its account or its private key.");
+    return { kind: "service-account", projectId: text("project_id"), account: text("client_email"), privateKey: text("private_key") };
+  }
+  if (k["type"] === "authorized_user") {
+    if (!text("client_id") || !text("client_secret") || !text("refresh_token")) throw new Error("That gcloud sign-in file is incomplete: sign in again with gcloud auth application-default login.");
+    if (!text("quota_project_id")) throw new Error("That gcloud sign-in names no project to bill: run gcloud auth application-default set-quota-project with your project's id.");
+    return { kind: "user", projectId: text("quota_project_id"), account: text("account"), clientId: text("client_id"), clientSecret: text("client_secret"), refreshToken: text("refresh_token") };
+  }
+  throw new Error("That file isn't a Google key Placeholder Speech can use: choose a service account's JSON key, or gcloud's sign-in (application_default_credentials.json).");
 }
+
+/** What a request to Google carries: the token, and for a person's sign-in the project to bill. */
+export interface GoogleAuth { readonly token: string; readonly quotaProject?: string }
 
 const b64url = (b: Buffer | string): string => Buffer.from(b).toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
 
-/** A short-lived OAuth token for the key, minted from a signed JWT. */
-export async function mintToken(key: ServiceAccount, fetchFn: typeof fetch = fetch): Promise<{ token: string; expiresAt: number }> {
+/** A short-lived OAuth token for the key: minted from a signed JWT for a service account, or from the refresh
+ *  token for a person's gcloud sign-in. */
+export async function mintToken(key: GoogleKey, fetchFn: typeof fetch = fetch): Promise<{ token: string; expiresAt: number }> {
+  if (key.kind === "user") {
+    const res = await fetchFn("https://oauth2.googleapis.com/token", {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "refresh_token", client_id: key.clientId, client_secret: key.clientSecret, refresh_token: key.refreshToken }).toString(),
+    });
+    if (!res.ok) throw new SpeechError(res.status === 400 || res.status === 401 ? "auth" : kindForStatus(res.status), `Google refused this sign-in (${res.status}): ${await errorText(res)}. Sign in again with gcloud auth application-default login.`);
+    return tokenFrom(await res.json() as { access_token?: string; expires_in?: number });
+  }
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claims = b64url(JSON.stringify({ iss: key.clientEmail, scope: "https://www.googleapis.com/auth/cloud-platform", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
+  const claims = b64url(JSON.stringify({ iss: key.account, scope: "https://www.googleapis.com/auth/cloud-platform", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
   const signer = createSign("RSA-SHA256");
   signer.update(`${header}.${claims}`);
   const jwt = `${header}.${claims}.${b64url(signer.sign(key.privateKey))}`;
@@ -93,7 +134,10 @@ export async function mintToken(key: ServiceAccount, fetchFn: typeof fetch = fet
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }).toString(),
   });
   if (!res.ok) throw new SpeechError(res.status === 400 || res.status === 401 ? "auth" : kindForStatus(res.status), `Google refused this key (${res.status}): ${await errorText(res)}`);
-  const body = await res.json() as { access_token?: string; expires_in?: number };
+  return tokenFrom(await res.json() as { access_token?: string; expires_in?: number });
+}
+
+function tokenFrom(body: { access_token?: string; expires_in?: number }): { token: string; expiresAt: number } {
   if (!body.access_token) throw new SpeechError("auth", "Google gave no token for this key.");
   return { token: body.access_token, expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000 - 60_000 };
 }
@@ -142,11 +186,13 @@ export function requestHash(r: SpeechRequest): string {
 }
 
 /** Ask Google for one line's speech: the raw WAV it returns (LINEAR16 comes with a WAV header). */
-export async function synthesize(token: string, r: SpeechRequest, fetchFn: typeof fetch = fetch): Promise<Uint8Array> {
+export async function synthesize(auth: string | GoogleAuth, r: SpeechRequest, fetchFn: typeof fetch = fetch): Promise<Uint8Array> {
+  const { token, quotaProject } = typeof auth === "string" ? { token: auth, quotaProject: undefined } : auth;
   let res: Response;
   try {
     res = await fetchFn("https://texttospeech.googleapis.com/v1/text:synthesize", {
-      method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...(quotaProject ? { "x-goog-user-project": quotaProject } : {}) },
       body: JSON.stringify({ input: { text: r.text }, voice: { languageCode: r.languageCode, name: r.voice }, audioConfig: { audioEncoding: "LINEAR16", sampleRateHertz: PLACEHOLDER_SAMPLE_RATE } }),
     });
   } catch (e) {
@@ -326,8 +372,9 @@ function lineIdsInScenes(loaded: LoadedProject, scenes: Set<string>): Set<string
 // --- Running ---------------------------------------------------------------------------------------------------
 
 export interface RunOptions {
-  /** A fresh token when asked (minted once, then reused until near expiry). */
-  token(): Promise<string>;
+  /** A fresh token when asked (minted once, then reused until near expiry), with the project to bill for a
+   *  person's sign-in (`tokenSource`). */
+  token(): Promise<string | GoogleAuth>;
   /** Write a finished take; return false to say it was skipped (a file someone else has open). */
   write(path: string, bytes: Uint8Array): Promise<boolean>;
   onProgress?(done: number, total: number, task: PlaceholderTask): void;
@@ -370,14 +417,15 @@ export async function runPlaceholderSpeech(tasks: PlaceholderTask[], o: RunOptio
   return result;
 }
 
-/** A token source for a key: mints once, refreshes near expiry. */
-export function tokenSource(key: ServiceAccount, fetchFn?: typeof fetch): () => Promise<string> {
+/** A token source for a key: mints once, refreshes near expiry. A person's sign-in bills its quota project. */
+export function tokenSource(key: GoogleKey, fetchFn?: typeof fetch): () => Promise<GoogleAuth> {
   let cached: { token: string; expiresAt: number } | undefined;
   let pending: Promise<{ token: string; expiresAt: number }> | undefined;
+  const auth = (token: string): GoogleAuth => (key.kind === "user" ? { token, quotaProject: key.projectId } : { token });
   return async () => {
-    if (cached && cached.expiresAt > Date.now()) return cached.token;
+    if (cached && cached.expiresAt > Date.now()) return auth(cached.token);
     pending ??= mintToken(key, fetchFn).finally(() => { pending = undefined; });
     cached = await pending;
-    return cached.token;
+    return auth(cached.token);
   };
 }

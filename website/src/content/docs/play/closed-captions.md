@@ -75,7 +75,7 @@ text, no speaker, and no qualifier**, so nothing is captioned. It keeps its `pad
 after it still holds. Lines with no cue are returned untouched.
 
 Captions are a **presentation** setting, like the language: toggling them never changes save state, the
-story position, or which lines play. Audio is keyed off the line's id, so a silent line's voice take plays
+story position, or which lines play. Audio is keyed off the line's id, so a silent line's voice clip plays
 exactly as before.
 
 ## Turning them off in your game

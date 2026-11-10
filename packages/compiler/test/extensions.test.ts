@@ -171,6 +171,25 @@ describe("extensionPass", () => {
     expect(text).toContain(`warning: data for the Patter extension "ghost", which the project doesn't take`);
   });
 
+  it("counts each pool's values over every scene, and warns of two that differ only in case or spacing", () => {
+    const pooled = { schema: "wildwinter/extension@0", id: "probe", name: "Probe", version: "1.1.0", targets: { patter: {
+      line: { fields: [{ name: "look", type: "pick", from: [{ words: ["away"] }, { to: "cast" }, { pool: "pointOfInterest" }] }] },
+      text: { fields: [{ name: "camera", type: "pick", from: [{ pool: "locationCamera" }] }] },
+    } } };
+    const { issues, pools } = pass({
+      manifests: [{ path: "extensions/probe.extension.json", id: "probe", manifest: pooled }],
+      shards: [
+        shard("s1", { line: { L1: { look: "the gate" }, L2: { look: "ANNA" }, L_bare: { look: "The Gate" } }, text: { P1: { camera: "tower-low" } } }),
+        shard("s2", { text: { T2: { camera: "tower-low" } } }),
+      ],
+    });
+    expect(pools).toEqual({ probe: { locationCamera: ["tower-low"], pointOfInterest: ["ANNA", "The Gate", "the gate"] } });
+    expect(messages(issues.filter((i) => i.code === "pool-near-duplicate"))).toEqual([
+      'warning: the Patter extension "probe": the pool "pointOfInterest" has "The Gate" (1 use) and "the gate" (1 use), which differ only in case, spaces, or punctuation',
+    ]);
+    expect(issues.filter((i) => i.severity === "error")).toEqual([]);   // any text is a pool's: nothing missing
+  });
+
   it("checks references, a cast member's by name", () => {
     const text = messages(pass({ shards: [shard("s1", { line: { L1: { next: "nowhere", perf: { NOBODY: { look: "x" } } } } })] }).issues).join("\n");
     expect(text).toMatch(/error: entries\.line\.L1\.next/);

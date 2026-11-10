@@ -71,7 +71,7 @@ only those marked ready to record. A **Direction** column gives each line's perf
 actor reads it beside the line. A **Qualifier** column gives each line's
 [speaker qualifier](/setup/cast/#speaker-qualifiers), so the actor knows a line is a thought or
 off-screen, and the studio knows it can record a `RADIO` line clean and filter it later; the lines
-still sit under the one character. Once takes come back, drop them into folders by status and
+still sit under the one character. Once voice clips come back, drop them into folders by status and
 Patterpad reads each line's recording status from the files, as
 [Audio & recording](/production/audio/#recording-status) describes.
 

@@ -25,7 +25,7 @@ import {
   planShareScopes, defaultGameScopesDir, GAME_SCOPES_DIR,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, qualifierNamer,
   scriptFontLicences,
-  planPlaceholderSpeech, runPlaceholderSpeech, resolveKeyFile, readServiceAccount, tokenSource, describeSpeechError,
+  planPlaceholderSpeech, runPlaceholderSpeech, resolveKeyFile, readGoogleKey, tokenSource, describeSpeechError,
   findProjectFile, readProjectManifest, detectMergeType, // merge: an extension shard merges by the project's own manifest
 } from "@patterkit/ops";
 import type { InitVcs, BundlePosture, MergeFileType, MergeResult, PlannedWrite, LocCatalog, ImportPlan, LoadedProject } from "@patterkit/ops";
@@ -726,12 +726,12 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       if (!plan.tasks.length) return 0;
       const key = resolveKeyFile(loaded.root, ps.keyFile);
       if (!key.path) {
-        const msg = `placeholder-speech: no Google key on this machine (${ps.keyFile ? `${ps.keyFile} isn't here, and ` : ""}GOOGLE_APPLICATION_CREDENTIALS isn't set)`;
+        const msg = `placeholder-speech: no Google key on this machine (${ps.keyFile ? `${ps.keyFile} isn't here, and ` : ""}GOOGLE_APPLICATION_CREDENTIALS isn't set, and there's no gcloud sign-in)`;
         if (flags.soft === true) { console.log(msg.replace("placeholder-speech: ", "note: ")); return 0; }
         console.error(msg); return 1;
       }
       let account;
-      try { account = readServiceAccount(key.path); } catch (e) { console.error(`placeholder-speech: ${describeSpeechError(e)}`); return 1; }
+      try { account = readGoogleKey(key.path); } catch (e) { console.error(`placeholder-speech: ${describeSpeechError(e)}`); return 1; }
       mkdirSync(plan.folder, { recursive: true });
       const keepOut = ps.keepOutOfVersionControl === true;
       const result = await runPlaceholderSpeech(plan.tasks, {

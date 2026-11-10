@@ -106,7 +106,7 @@ describe("audio-index: folder-derived recording status", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it("reads the stamps of a generated take, not an older DINK one, and says which statuses to read", async () => {
+  it("reads the stamps of an older DINK take and a generated take, and says which statuses to read", async () => {
     const root = mkdtempSync(join(tmpdir(), "patter-audio-"));
     mkdirSync(join(root, "audio/scratch"), { recursive: true });
     const old = encodeScratchWav([new Float32Array(800)], 8000, "x");
@@ -118,7 +118,7 @@ describe("audio-index: folder-derived recording status", () => {
     writeFileSync(join(root, "audio/scratch/L_d.wav"), withDink);
     writeFileSync(join(root, "audio/scratch/L_g.wav"), withStamps(old, [["PTRK", "aaaaaa"], ["PTPS", "req"]]));
     const snap = await firstSnapshot(root, ["scratch"]);
-    expect(snap["L_d"]?.textHash).toBeUndefined(); // DINK isn't read
+    expect(snap["L_d"]?.textHash).toBe("abcdef");
     expect(snap["L_d"]?.generated).toBeUndefined();
     expect(snap["L_g"]).toMatchObject({ textHash: "aaaaaa", generated: "req" });
     expect(stampRungs({ recordingStatuses: [{ name: "missing" }, { name: "placeholder" }, { name: "scratch" }, { name: "recorded" }] })).toEqual(["placeholder", "scratch"]);

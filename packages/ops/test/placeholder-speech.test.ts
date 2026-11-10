@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { generateKeyPairSync } from "node:crypto";
-import { loadProject, runReport, planPlaceholderSpeech, runPlaceholderSpeech, finishTake, requestHash, expandKeyPath, storedKeyPath, resolveKeyFile, readServiceAccount, tokenSource, describeSpeechError, SpeechError } from "../src/index.js";
+import { loadProject, runReport, planPlaceholderSpeech, runPlaceholderSpeech, finishTake, requestHash, expandKeyPath, storedKeyPath, resolveKeyFile, readGoogleKey, tokenSource, describeSpeechError, SpeechError } from "../src/index.js";
 import { readTextStamp, readGeneratedStamp, textHash, withStamps, defaultPlaceholderVoice } from "@patterkit/core";
 
 const LADDER = [{ name: "missing" }, { name: "placeholder" }, { name: "scratch" }, { name: "recorded" }];
@@ -100,24 +100,37 @@ describe("Placeholder Speech: the key", () => {
     expect(storedKeyPath("/p/game.patter", "/p/keys/k.json")).toBe("../keys/k.json");
   });
 
-  it("falls back to the environment, and reads a service account", () => {
+  it("falls back to the environment, then gcloud's sign-in, and reads a service account", () => {
     const dir = mkdtempSync(join(tmpdir(), "patter-key-"));
     const keyPath = join(dir, "k.json");
     const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
     writeFileSync(keyPath, JSON.stringify({ type: "service_account", project_id: "demo", client_email: "x@demo.iam.gserviceaccount.com", private_key: privateKey }));
     expect(resolveKeyFile(dir, "missing.json", { GOOGLE_APPLICATION_CREDENTIALS: keyPath })).toMatchObject({ path: keyPath, source: "environment" });
     expect(resolveKeyFile(dir, "k.json", {})).toMatchObject({ path: keyPath, source: "project" });
-    expect(resolveKeyFile(dir, undefined, {}).source).toBe("none");
-    expect(readServiceAccount(keyPath).projectId).toBe("demo");
-    writeFileSync(join(dir, "bad.json"), JSON.stringify({ type: "authorized_user" }));
-    expect(() => readServiceAccount(join(dir, "bad.json"))).toThrow(/service-account/);
+    const noGcloud = { CLOUDSDK_CONFIG: join(dir, "no-gcloud") };
+    expect(resolveKeyFile(dir, undefined, noGcloud).source).toBe("none");
+    expect(resolveKeyFile(dir, undefined, { CLOUDSDK_CONFIG: dir }).source).toBe("none");
+    writeFileSync(join(dir, "application_default_credentials.json"), "{}");
+    expect(resolveKeyFile(dir, undefined, { CLOUDSDK_CONFIG: dir })).toMatchObject({ path: join(dir, "application_default_credentials.json"), source: "gcloud" });
+    expect(readGoogleKey(keyPath)).toMatchObject({ kind: "service-account", projectId: "demo", account: "x@demo.iam.gserviceaccount.com" });
+    writeFileSync(join(dir, "bad.json"), JSON.stringify({ type: "external_account" }));
+    expect(() => readGoogleKey(join(dir, "bad.json"))).toThrow(/isn't a Google key Placeholder Speech can use/);
+  });
+
+  it("reads gcloud's sign-in for a person, which must name a project to bill", () => {
+    const dir = mkdtempSync(join(tmpdir(), "patter-key-"));
+    const user = { type: "authorized_user", client_id: "cid", client_secret: "cs", refresh_token: "rt", account: "ian@example.com", quota_project_id: "games-tts" };
+    writeFileSync(join(dir, "adc.json"), JSON.stringify(user));
+    expect(readGoogleKey(join(dir, "adc.json"))).toEqual({ kind: "user", projectId: "games-tts", account: "ian@example.com", clientId: "cid", clientSecret: "cs", refreshToken: "rt" });
+    writeFileSync(join(dir, "noquota.json"), JSON.stringify({ ...user, quota_project_id: undefined }));
+    expect(() => readGoogleKey(join(dir, "noquota.json"))).toThrow(/set-quota-project/);
   });
 });
 
 describe("Placeholder Speech: a run against a fake Google", () => {
   const key = (() => {
     const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
-    return { projectId: "demo", clientEmail: "x@demo", privateKey };
+    return { kind: "service-account" as const, projectId: "demo", account: "x@demo", privateKey };
   })();
   const fakeGoogle = (synth: (body: { voice: { name: string } }) => Response): typeof fetch => (async (url: string | URL, init?: RequestInit) => {
     if (String(url).includes("oauth2")) return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }), { status: 200 });
@@ -148,6 +161,23 @@ describe("Placeholder Speech: a run against a fake Google", () => {
     expect(r.stopped?.message).toMatch(/isn't switched on/);
     expect(r.made).toEqual([]);
     expect(r.notTried).toBe(2);
+  });
+
+  it("makes speech with a person's gcloud sign-in: a refreshed token, billed to its project", async () => {
+    const plan = planPlaceholderSpeech(loadProject(makeProject()))!;
+    const grants: string[] = [];
+    const projects: Array<string | undefined> = [];
+    const fetchFn = (async (url: string | URL, init?: RequestInit) => {
+      if (String(url).includes("oauth2")) { grants.push(new URLSearchParams(String(init!.body)).get("grant_type") ?? ""); return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }), { status: 200 }); }
+      projects.push((init!.headers as Record<string, string>)["x-goog-user-project"]);
+      return new Response(JSON.stringify({ audioContent: Buffer.from(googleWav()).toString("base64") }), { status: 200 });
+    }) as typeof fetch;
+    const user = { kind: "user" as const, projectId: "games-tts", account: "", clientId: "cid", clientSecret: "cs", refreshToken: "rt" };
+    mkdirSync(plan.folder, { recursive: true });
+    const r = await runPlaceholderSpeech(plan.tasks, { token: tokenSource(user, fetchFn), fetchFn, write: async () => true });
+    expect(r.made.length).toBe(3);
+    expect(grants).toEqual(["refresh_token"]);
+    expect(new Set(projects)).toEqual(new Set(["games-tts"]));
   });
 
   it("says no network in plain words", () => {

@@ -26,8 +26,8 @@ requirement, and you can ignore everything past here and just key off the id.
 ## The built-in resolver (optional)
 
 For teams who don't want to build their own lookup, Patterpad's **[Audio Folders](/production/audio/)**
-lets you keep takes as `<beatId>.wav`, `.ogg`, or `.mp3` files, ranked by recording status
-(scratch < recorded < final), and Patterplay resolves the **best available take** for each line
+lets you keep voice clips as `<beatId>.wav`, `.ogg`, or `.mp3` files, ranked by recording status
+(scratch < recorded < final), and Patterplay resolves the **best available voice clip** for each line
 without you reimplementing that folder-ranking search.
 
 The ranking is resolved **at build time**, not in your game. When you Build (or run **Production ▸
@@ -41,7 +41,7 @@ Update Audio Manifest**), Patterpad writes a small sidecar next to your audio, `
 ```
 
 Each beat maps to the **winning** file (highest recorded rung), as a path relative to your audio root.
-It's a **sidecar**, never baked into the `.patterc`, so new takes don't force a story rebuild.
+It's a **sidecar**, never baked into the `.patterc`, so new voice clips don't force a story rebuild.
 
 To ship: drop the audio folder (subfolders + `patteraudio.json`) wherever your engine reads data, then
 point a resolver at it. The resolver **resolves a path; it does not play** the audio: playback is
@@ -81,9 +81,9 @@ UPatterAudioResolver* Audio = UPatterAudioResolver::Create(ManifestJson, TEXT("A
 FString Path = Audio->Resolve(Step.Id);                    // full path, or empty
 ```
 
-Unreal plays sound assets rather than loose files, so if you import your takes into the project, the resolver
+Unreal plays sound assets rather than loose files, so if you import your voice clips into the project, the resolver
 can find the asset for you: `SoundAsset(BeatId, ContentRoot)` returns a soft pointer to the asset the import made
-of the beat's take (under `/Game/<ContentRoot>/`, mirroring the folders), and `LoadSound` loads it there and then.
+of the beat's voice clip (under `/Game/<ContentRoot>/`, mirroring the folders), and `LoadSound` loads it there and then.
 A bigger game loads the soft pointer asynchronously itself.
 
 ```cpp
@@ -107,11 +107,11 @@ That boundary is deliberate, audio playback isn't portable, but resolution is.
 
 No search is shipped. The winner is chosen at build time, so the runtime just does a map lookup.
 
-A line with no recording is fine. `resolve` returns null / empty for a beat with no take, so you can
+A line with no recording is fine. `resolve` returns null / empty for a beat with no voice clip, so you can
 fall back to on-screen text or silence.
 
 There's one recorded language. Patter is built for voice recorded in one main language, so
-every locale resolves to the same take; subtitles and text change with the language.
+every locale resolves to the same voice clip; subtitles and text change with the language.
 
-Keep it fresh. Re-run **Update Audio Manifest** (or Build) after adding takes so `patteraudio.json`
+Keep it fresh. Re-run **Update Audio Manifest** (or Build) after adding voice clips so `patteraudio.json`
 reflects the latest winners.

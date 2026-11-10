@@ -45,7 +45,7 @@ carry on in another. Your game decides which one wins when two want to speak.
 
 ## Voice first, with subtitles
 
-Every line has a recording status and a place in the voice script, and writers can record a scratch take to
+Every line has a recording status and a place in the voice script, and writers can record a scratch voice clip to
 hear the pacing before the actors do ([Audio](/production/audio/)). Each line's text and speaker label are the
 subtitle. Cues in brackets, such as `[static]` or `[a door slams]`, are
 [closed captions](/play/closed-captions/), which players who can hear the audio can turn off.

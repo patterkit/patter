@@ -87,7 +87,7 @@ interface Overlay {
 }
 
 /** Badge copy per take state (styled by the matching scratch-badge-* class). */
-const BADGE: Record<TakeState, string> = { missing: "No take yet", stale: "Take out of date", current: "Take up to date" };
+const BADGE: Record<TakeState, string> = { missing: "No voice clip yet", stale: "Voice clip out of date", current: "Voice clip up to date" };
 
 /** Build the blocking overlay: the speaker + line being recorded, a big state area (countdown / REC /
  *  processing bar / saved), the saved-state action buttons, and the key hints. */

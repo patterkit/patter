@@ -43,7 +43,7 @@ productive on day one. Logic lives in a side panel, never in the prose.
 
 Patter is built around the lines characters *say*, and it's especially at home when those
 lines are performed and voiced. Every line has its own id, a recording status, and a place in
-the voice script, and a writer can even record a rough **scratch take** at their desk to hear
+the voice script, and a writer can even record a rough **scratch voice clip** at their desk to hear
 a scene read back. Some other tools are aimed mainly at on-screen text. Patter is aimed at
 dialogue you can hear.
 

@@ -17,10 +17,10 @@ import type {
   BundleExtension, ExtensionFieldDecl, ExtensionShard, GameData, Group, NodeExtensions, ProjectFile, Scene, Snippet,
 } from "@patterkit/model";
 import {
-  HOSTS, compileEntry, compiledTarget, entryProblems, manifestProblems, missingRequirements, orphanedEntries, pickClashes, pickLists,
-  targetOf,
+  HOSTS, addPoolValues, compileEntry, compiledTarget, entryProblems, manifestProblems, missingRequirements, orphanedEntries, pickClashes,
+  pickLists, poolNearDuplicates, poolValues, targetOf,
 } from "@wildwinter/toolkit/extensions";
-import type { Manifest, Problem, TypeDecl, ValueContext } from "@wildwinter/toolkit/extensions";
+import type { Manifest, PoolCounts, Problem, TypeDecl, ValueContext } from "@wildwinter/toolkit/extensions";
 
 /** One extension's manifest, as a project keeps it (`extensions/<id>.extension.json`). */
 export interface ExtensionManifestFile {
@@ -139,7 +139,10 @@ interface Taken {
  * what the bundle carries. Data whose manifest is missing or unsound is reported and left out of the bundle,
  * never changed; an entry with an error is left out on its own.
  */
-export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIssue[]; compiled: CompiledExtensions } {
+/** Each extension's pools, by extension id and then pool name: the values in the order an editor offers them. */
+export type ExtensionPools = Record<string, Record<string, string[]>>;
+
+export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIssue[]; compiled: CompiledExtensions; pools: ExtensionPools } {
   const { project, scenes } = input;
   const issues: ExtensionIssue[] = [];
   const projectPath = input.projectPath ?? "";
@@ -226,6 +229,9 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
   }
 
   const sceneIds = new Set(scenes.map((s) => s.id));
+  // Each extension's pools: every value a field naming a pool holds, counted over all the data, the open
+  // scene's as it stands among it. An editor offers them; two that differ only in case or spacing warn below.
+  const poolCounts = new Map<string, PoolCounts>();
   const values = new Map<string, NodeExtensions>();
   const projectValues = new Map<string, Record<string, unknown>>();
   for (const { path, shard } of [...input.shards].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))) {
@@ -275,6 +281,7 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
           issues.push({ severity: "warning", file: path, node: id,
             message: `entries.${kind}.${id} belongs ${node.scene === undefined ? "in the project's own shard" : `in scene "${node.scene}"'s shard`}; it's compiled from here all the same` });
         }
+        addPoolValues(target, entry, poolCounts.get(ext) ?? poolCounts.set(ext, new Map()).get(ext)!);
         const problems = entryProblems(target, entry, contexts.get(ext) ?? { exists });
         for (const p of problems) issues.push(issueOf(path, p, `entries.${kind}.${id}${p.path === "" ? ": " : "."}`, id));
         if (problems.some((p) => p.severity === "error")) continue;
@@ -283,6 +290,15 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
         if (kind === "project") { projectValues.set(ext, compiled); continue; }
         values.set(id, { ...(values.get(id) ?? {}), [ext]: compiled });
       }
+    }
+  }
+
+  const pools: ExtensionPools = {};
+  for (const [ext, counts] of [...poolCounts].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    if (counts.size === 0) continue;
+    pools[ext] = Object.fromEntries([...counts.keys()].sort().map((pool) => [pool, poolValues(counts, pool)]));
+    for (const p of poolNearDuplicates(counts)) {
+      issues.push({ severity: p.severity, file: projectPath, node: projectId, code: p.code, message: `the Patter extension "${ext}": ${p.message}` });
     }
   }
 
@@ -298,7 +314,7 @@ export function extensionPass(input: ExtensionPassInput): { issues: ExtensionIss
     bundle[id] = { version: manifest.version, fields, ...(projectEntry !== undefined ? { project: projectEntry } : {}) };
   }
   const sortedNodes = new Map([...values.entries()].map(([id, v]) => [id, sortRecord(v)]));
-  return { issues, compiled: { bundle, nodes: sortedNodes } };
+  return { issues, compiled: { bundle, nodes: sortedNodes }, pools };
 }
 
 /** Every pick a manifest declares for Patter, at any depth (in a record, or as a map's or a list's items). */

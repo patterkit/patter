@@ -361,12 +361,16 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { label: "Export Voice Script…", enabled: voiced, click: () => send("voice-script") }, // VO script only for a voiced project (#206)
         { label: "Update Audio Manifest…", enabled: audioFolders, click: () => send("audio-manifest") }, // #206: rewrite patteraudio.json from the audio folders
         { type: "separator" },
-        // Placeholder Speech: stand-in speech from each spoken line. Made for edited lines on its own; these
-        // make a scene's or the whole project's at once. The checkbox is this machine's, not the project's.
-        { label: "Make Placeholder Speech for This Scene", enabled: speech.on && !speech.optedOut, click: () => send("speech-scene") },
-        { label: "Make Placeholder Speech for the Project…", enabled: speech.on && !speech.optedOut, click: () => send("speech-project") },
-        { label: "Make Placeholder Speech on This Computer", type: "checkbox", checked: !speech.optedOut, enabled: speech.on, click: (item) => speech.setOptOut(!item.checked) },
-        { label: "Remove Takes for Deleted Lines…", enabled: audioFolders, click: () => send("remove-deleted-takes") },
+        // Placeholder Speech: stand-in speech from each spoken line, in a submenu of its own so a project not
+        // using it sees one greyed line (Ian, 2026-11-10). Made for edited lines on its own; these make a scene's
+        // or the whole project's at once. The checkbox is this machine's, not the project's.
+        { label: "Placeholder Speech", enabled: speech.on, submenu: [
+          { label: "Make for This Scene", enabled: speech.on && !speech.optedOut, click: () => send("speech-scene") },
+          { label: "Make for the Project…", enabled: speech.on && !speech.optedOut, click: () => send("speech-project") },
+          { type: "separator" },
+          { label: "Make on This Computer", type: "checkbox", checked: !speech.optedOut, enabled: speech.on, click: (item) => speech.setOptOut(!item.checked) },
+        ] },
+        { label: "Remove Voice Clips for Deleted Lines…", enabled: audioFolders, click: () => send("remove-deleted-takes") },
         { label: "Export / Import Localisation…", enabled: hasProject, click: () => send("localisation") },
       ],
     },

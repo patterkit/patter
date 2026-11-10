@@ -43,7 +43,7 @@ import type { PairedCard } from "../../shared/paired-cards.js";
 import { selectAllOutsideEditor, undoRoute } from "./edit-commands.js";
 import { UndoJournal, type EntryResult, type JournalEntry } from "./undo-journal.js";
 import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
-import type { BootState, ClashDto, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectHistoryOutcome, ProjectSettingsDto, ProjectStep, RecentProject, ReportData, ReviewItem, SaveResult, StageRenameDto, ThemePrefs, VcsKind } from "../../shared/api.js";
+import type { BootState, ClashDto, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ExtensionPoolsDto, ProjectHistoryOutcome, ProjectSettingsDto, ProjectStep, RecentProject, ReportData, ReviewItem, SaveResult, StageRenameDto, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector, formatSeconds } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
 // open, because they are all the one panel.
@@ -119,6 +119,9 @@ import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
 import { textHash } from "./wav.js";
 import { mountDebugLink } from "./debug-panel.js";
 import { markTarget } from "./debug-flows.js";
+
+/** Each extension's pools as the last validation counted them: what a pool pick suggests (free-text-picks). */
+let extensionPools: ExtensionPoolsDto = {};
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -1927,7 +1930,9 @@ async function refreshProblems(): Promise<void> {
   // Validate the LIVE in-memory source of the open scene (not just disk) so problems track edits as
   // they happen - toggling sticky, fixing a condition, etc. clears/raises issues without a save first.
   const live = surface && currentSceneId ? { sceneId: currentSceneId, ...surface.getSource() } : undefined;
-  renderProblems(await window.patter.validate(live));
+  const found = await window.patter.validate(live);
+  extensionPools = found.pools ?? {};
+  renderProblems(found);
 }
 
 // Re-validate shortly after edits settle (debounced): the problems panel reflects unsaved changes, and
@@ -2863,6 +2868,7 @@ function currentExtensionAdapter(): ReturnType<typeof extensionAdapter> {
     openScene: currentSceneId,
     openNodes: (kind) => surface?.nodesOfKind(kind) ?? [],
     ...(project?.extensionNodes ? { index: project.extensionNodes } : {}),
+    pools: extensionPools,
   });
 }
 
@@ -3956,7 +3962,7 @@ function confirmPackMerge(summary: PackMergeSummary): Promise<boolean> {
   });
 }
 
-/** Production > Make Placeholder Speech for the Project: says how many lines first, since each is a request
+/** Production > Placeholder Speech > Make for the Project: says how many lines first, since each is a request
  *  to Google on the project's key. */
 async function makeProjectSpeech(): Promise<void> {
   const n = await window.patter.speechCount({});
@@ -3973,19 +3979,19 @@ async function makeProjectSpeech(): Promise<void> {
  *  project, now, listed first. Recorded and final takes are never touched. */
 async function removeDeletedTakes(): Promise<void> {
   const takes = await window.patter.speechDeletedTakes();
-  if (!takes.length) { toast("No scratch or placeholder takes are left from deleted lines.", "info"); return; }
+  if (!takes.length) { toast("No scratch or placeholder voice clips are left from deleted lines.", "info"); return; }
   const list = el("div", "merge-evidence");
   for (const t of takes.slice(0, 12)) list.append(el("p", "confirm-body", t.split(/[\\/]/).slice(-2).join("/")));
   if (takes.length > 12) list.append(el("p", "confirm-body", `and ${takes.length - 12} more`));
   const go = await confirmDialog({
-    title: `Remove ${takes.length} take${takes.length === 1 ? "" : "s"} for deleted lines?`,
-    body: "Scratch and placeholder takes whose line is no longer in the project. They're deleted through version control, so committed ones stay in its history.",
+    title: `Remove ${takes.length} voice clip${takes.length === 1 ? "" : "s"} for deleted lines?`,
+    body: "Scratch and placeholder voice clips whose line is no longer in the project. They're deleted through version control, so committed ones stay in its history.",
     bodyNode: list,
-    confirmLabel: "Remove Takes",
+    confirmLabel: "Remove Voice Clips",
   });
   if (!go) return;
   const n = await window.patter.speechRemoveDeletedTakes();
-  toast(`Removed ${n} take${n === 1 ? "" : "s"}.`, "ok");
+  toast(`Removed ${n} voice clip${n === 1 ? "" : "s"}.`, "ok");
 }
 
 /** File ▸ Merge Returned Patterpack: fold a pack that came back into the OPEN project.
@@ -4125,11 +4131,11 @@ const DUP_MESSAGE = "Two entries share a name. Names must be unique.";
  *  opened, by extension id: each the whole entry, carried at Save. */
 let settingsExtensionEdits: Record<string, Record<string, unknown>> = {};
 
-/** A section of Project Settings for each Patter extension declaring project fields, in the Project group
- *  after Version control: what the project takes it at, then the project's own values. */
+/** A section of Project Settings for each Patter extension declaring project fields, under their own Extensions
+ *  heading after Version control: the extension and the version the project uses, then the project's own values. */
 function projectExtensionSections(): SettingsSection[] {
   return settingsExtensions(project?.extensions).map((extension): SettingsSection => ({
-    id: settingsSectionId(extension.id), label: extension.name, mount: (host): SettingsSectionHandle => {
+    id: settingsSectionId(extension.id), label: extension.name, group: "Extensions", mount: (host): SettingsSectionHandle => {
       // Mounted fresh on every open, from the project as it now stands (its values may have been saved since
       // the dialog was built).
       mountProjectSection(host, {
@@ -4275,17 +4281,17 @@ function buildSettingsDialog(): SettingsDialog {
     // Recording status, Scratch recording, and Placeholder Speech: three pages over one audio state (each sees
     // the others' changes), made by whichever mounts first.
     { id: "recording-status", label: "Recording status", mount: (host): SettingsSectionHandle => {
-      const audioHost = el("div"); host.append(audioHost);
+      const audioHost = el("div", "sp-page"); host.append(audioHost);
       mountRecordingStatus(audioHost, audioSettings());
       return {};
     }, disabled: () => live.voiced?.checked ? null : "Enable Voiced (General tab) to track recording status and audio." },
     { id: "scratch-recording", label: "Scratch recording", mount: (host): SettingsSectionHandle => {
-      const h = el("div"); host.append(h);
+      const h = el("div", "sp-page"); host.append(h);
       mountScratchRecording(h, audioSettings());
       return {};
-    }, disabled: () => !live.voiced?.checked ? "Enable Voiced (General tab) first." : audioSettings().foldersOn() ? null : "Turn on Use Audio Folders (Recording status) first: scratch takes record into a status's folder." },
+    }, disabled: () => !live.voiced?.checked ? "Enable Voiced (General tab) first." : audioSettings().foldersOn() ? null : "Turn on Use Audio Folders (Recording status) first: scratch voice clips record into a status's folder." },
     { id: "placeholder-speech", label: "Placeholder Speech", mount: (host): SettingsSectionHandle => {
-      const h = el("div"); host.append(h);
+      const h = el("div", "sp-page"); host.append(h);
       const { s } = settingsRead!;
       mountPlaceholderSpeech(h, audioSettings(), {
         accents: PLACEHOLDER_ACCENTS.map((a) => [a.code, a.label]),
@@ -4376,7 +4382,7 @@ async function afterSpeechSettings(before: ProjectSettingsDto, after: { cast: Ca
   const who = changed.length === 1 ? changed[0]! : `${changed.length} characters`;
   const go = await confirmDialog({
     title: `Make ${n} line${n === 1 ? "" : "s"} again for ${who}?`,
-    body: "Their Placeholder Speech voice changed. If you'd rather wait, Production > Make Placeholder Speech does it later.",
+    body: "Their Placeholder Speech voice changed. If you'd rather wait, Production > Placeholder Speech makes it later.",
     confirmLabel: "Make Again",
   });
   if (go) void window.patter.speechMake({ characters: changed });

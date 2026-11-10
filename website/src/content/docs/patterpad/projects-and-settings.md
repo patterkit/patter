@@ -78,7 +78,7 @@ The **Writing status** and **Recording status** tabs hold the status ladders, ea
 its own colour. Recording status is opt-in (a **Track audio status** switch) and needs the
 project to be **Voiced**; see [Recording status &
 audio](/production/audio/#recording-status). With Audio Folders on, the **Scratch recording** and
-[**Placeholder Speech**](/production/placeholder-speech/) tabs set up recording takes in Patterpad and
+[**Placeholder Speech**](/production/placeholder-speech/) tabs set up recording voice clips in Patterpad and
 stand-in speech for every spoken line.
 
 The **Estimating** tab sizes still-unwritten scenes by a guess instead of their

@@ -331,7 +331,10 @@ describe("loc-export / loc-import", () => {
     const spy = vi.spyOn(console, "log").mockImplementation((m?: unknown) => { lines.push(String(m)); });
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const prior = process.env["GOOGLE_APPLICATION_CREDENTIALS"];
+    const priorGcloud = process.env["CLOUDSDK_CONFIG"];
     delete process.env["GOOGLE_APPLICATION_CREDENTIALS"];
+    // No gcloud sign-in either: this machine's own would be found, and Google asked for real.
+    process.env["CLOUDSDK_CONFIG"] = mkdtempSync(join(tmpdir(), "patter-no-gcloud-"));
     try {
       expect(await main(["placeholder-speech", dir, "--dry-run"])).toBe(0);
       expect(lines.some((l) => /^  L1  ANNA  en-GB-Standard-[A-Z]$/.test(l))).toBe(true);
@@ -341,6 +344,7 @@ describe("loc-export / loc-import", () => {
     } finally {
       spy.mockRestore(); err.mockRestore();
       if (prior !== undefined) process.env["GOOGLE_APPLICATION_CREDENTIALS"] = prior;
+      if (priorGcloud !== undefined) process.env["CLOUDSDK_CONFIG"] = priorGcloud; else delete process.env["CLOUDSDK_CONFIG"];
     }
   });
 

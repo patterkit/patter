@@ -297,7 +297,7 @@ describe("a pick", () => {
     const h = handlersWith({ extensions: () => shots(["Gate", "BEN"]), setExtensionValue: (_id, _x, _f, v) => seen.push(v) });
     const host = draw(h, { kind: "leaf", beat: "line", id: "L_bell", ext: { shot: { to: "BEN" } } });
     const row = rowOf(host, "To")!;
-    expect(options(row)).toEqual(["auto", "all", "ANNA", "BEN", "Gate"]);
+    expect(options(row)).toEqual(["default (auto)", "all", "ANNA", "BEN", "Gate"]);
     expect(row.querySelector(".shell-fieldrow-problem")?.textContent).toContain("a cast member and an entry of the list");
     const sel = row.querySelector("select")!;
     sel.value = "Gate"; sel.dispatchEvent(new Event("change", { bubbles: true }));
@@ -313,15 +313,23 @@ describe("a pick", () => {
     expect(extensionScoped(adapter, x!, { pointsOfInterest: ["Well"] }).list!("pointsOfInterest")).toEqual(["Well"]);
     expect(extensionScoped(adapter, x!).list!("nowhere")).toBeUndefined();
   });
+
+  it("hands a pool pick its extension's pools, as the last validation counted them", () => {
+    const [x] = shots(["Gate"]);
+    const pooled = extensionAdapter({ cast: ["ANNA"], scenes: [], openScene: null, openNodes: () => [], pools: { [x!.id]: { pointOfInterest: ["the gate", "well"] }, other: { pointOfInterest: ["nope"] } } });
+    expect(extensionScoped(pooled, x!).pool!("pointOfInterest")).toEqual(["the gate", "well"]);
+    expect(extensionScoped(pooled, x!).pool!("locationCamera")).toBeUndefined();
+    expect(extensionScoped(adapter, x!).pool!("pointOfInterest")).toBeUndefined();
+  });
 });
 
 describe("an extension's section of Project Settings", () => {
-  it("says what the project takes it at, draws the project's fields, and hands back the whole entry", () => {
+  it("says it's an extension and the version the project uses, draws the project's fields, and hands back the whole entry", () => {
     const [x] = probe({ studio: "Wildwinter" });
     const host = document.createElement("div");
     const seen: Array<Record<string, unknown>> = [];
     mountProjectSection(host, { extension: x!, adapter, locked: null, onChange: (e) => seen.push(e) });
-    expect(host.querySelector(".settings-ext-taken")?.textContent).toBe("Taken at 1.1.0.");
+    expect(host.querySelector(".settings-ext-taken")?.textContent).toBe("Probe extension, version 1.1.0.");
     const input = host.querySelector<HTMLInputElement>(".settings-ext-rows input")!;
     expect(input.value).toBe("Wildwinter");
     input.value = "Northwind"; input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -404,6 +412,11 @@ describe("an extension's problem in the problems bar", () => {
   const line = (message: string, detail?: string): string | undefined =>
     extensionProblemLine({ message, extension: "probe", ...(detail ? { detail } : {}) }, ctx);
 
+  it("says two names of a pool that differ only in case or spacing in plain words", () => {
+    expect(line('the Patter extension "probe": the pool "pointOfInterest" has "the gate" (3 uses) and "The Gate" (1 use), which differ only in case, spaces, or punctuation', "pool-near-duplicate"))
+      .toBe("Probe: “the gate” (3 uses) and “The Gate” (1 use) differ only in capitals, spaces, or punctuation, so your game will take them as different names. If they're the same, change one to match the other.");
+  });
+
   it("names the extension, the node in the writer's words, and the field by its label, for each code", () => {
     expect(line("entries.line.L_greet.cue.sound: \"cue.sound\" is required and not set", "required")).toBe("Probe: “What'll it be, stranger?” needs a sound in cue.");
     expect(line("entries.line.L_greet.next: \"next\" names line \"L_x\", which does not exist", "no-such-node")).toBe("Probe: Next on “What'll it be, stranger?” names the line “L_x”, which isn't in the project. Choose another, or clear it.");
@@ -425,8 +438,8 @@ describe("an extension's problem in the problems bar", () => {
     expect(line("entries.line.L_gone: an entry for line \"L_gone\", which no longer exists; it is kept, and not compiled", "orphan")).toBe("Probe: There are values for a line that isn't in the project any more. They're kept, but your game won't get them.");
     expect(line("entries.line.L_greet belongs in scene \"scn_b\"'s shard; it's compiled from here all the same")).toBe("Probe: The values for “What'll it be, stranger?” are kept in another scene's file. They're used all the same.");
     expect(extensionProblemLine({ message: "the project takes the Patter extension \"lights\", but has no manifest for it at extensions/lights.extension.json; its data is left as it is, and not compiled", extension: "lights" }, ctx))
-      .toBe("This project takes the extension “lights”, but its manifest isn't in the extensions folder. Its data is kept, but your game won't get it.");
-    expect(line("the project takes \"probe\" at version 1.0.0, but its manifest is version 1.1.0; run `patter format` to take it (renamed stages are renamed in the data as it does)")).toBe("Probe: The project takes version 1.0.0, but the manifest is version 1.1.0. Run patter format to take the manifest's version.");
+      .toBe("This project uses the extension “lights”, but its manifest isn't in the extensions folder. Its data is kept, but your game won't get it.");
+    expect(line("the project takes \"probe\" at version 1.0.0, but its manifest is version 1.1.0; run `patter format` to take it (renamed stages are renamed in the data as it does)")).toBe("Probe: The project uses version 1.0.0, but the manifest is version 1.1.0. Run patter format to move the project to the manifest's version.");
     expect(line("the project's pin for \"probe\" still has settings, which mean nothing now: extensions no longer have settings, so they're ignored, and you can delete them"))
       .toBe("Probe: The project file still gives it settings, which extensions no longer have. They're ignored, and you can delete them from the project file.");
   });
@@ -469,12 +482,15 @@ describe("a group that starts closed", () => {
     expect(probe()[0]!.closedGroups).toBeUndefined();
   });
 
-  it("is a disclosure in the open inspector section, counting and showing what the node sets", () => {
+  it("is a disclosure in the open inspector section, with what the node sets drawn above it", () => {
     const x = grouped();
     const host = draw(handlersWith({ extensions: () => [x] }), line({ act: "turn" }));
-    expect(groupCap(host)?.textContent).toBe("More (1 set)");
+    expect(groupCap(host)?.textContent).toBe("More");
     expect(groupCap(host)?.closest(".insp-ext-group")).not.toBeNull();
     expect(labels(host)).toContain("act");
+    // The field the node sets is drawn above the closed group's heading, which holds only the defaults.
+    const act = [...host.querySelectorAll<HTMLElement>(".shell-fieldrow > .shell-fieldrow-label")].find((l) => l.textContent === "act")!;
+    expect(act.compareDocumentPosition(groupCap(host)!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(labels(host)).not.toContain("marks");
     groupCap(host)!.click();
     expect(labels(host)).toContain("marks");
@@ -487,7 +503,7 @@ describe("a group that starts closed", () => {
   it("is a disclosure in Project Settings too", () => {
     const host = document.createElement("div");
     mountProjectSection(host, { extension: grouped(), adapter, locked: null, onChange: noop });
-    expect(groupCap(host)?.textContent).toBe("More (1 set)");
+    expect(groupCap(host)?.textContent).toBe("More");
     expect(labels(host)).toEqual(["studio", "lens"]);
   });
 });

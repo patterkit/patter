@@ -10,19 +10,26 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 - **Placeholder Speech: hear a scene before anyone records it.** Turn it on in Project Settings and every spoken
   line gets stand-in speech, made from its words a moment after you move off it. Any scratch, recorded, or final
-  take is heard instead, and the speech sounds like a stand-in on purpose.
+  voice clip is heard instead, and the speech sounds like a stand-in on purpose.
   - It needs a Google Cloud key file (a team can share one, kept outside version control); a machine without one
-    just doesn't make any, and hears what others made. The docs walk through getting a key.
+    just doesn't make any, and hears what others made. The docs walk through getting a key. If you already use gcloud, your own
+    sign-in (`gcloud auth application-default login`) works too.
   - Each character's voice is in Cast, with Hear; with none chosen, the name picks one. Changing a voice offers to
     remake that character's lines.
   - A line with only placeholder speech still counts as to record: the scratch recorder's Next needed stops at it,
     editing it doesn't flag it for re-record, and Production Information shows how many lines are still to record.
-  - Make again, in the inspector, remakes a line Google cut short. Production > Make Placeholder Speech does a
+  - Make again, in the inspector, remakes a line Google cut short. Production > Placeholder Speech makes a
     scene or the whole project, and its last item switches it off for this computer.
-- **Moving a line keeps its take.** Cut a line and paste it elsewhere and its scratch take follows it to the new
+- **A field can take any name, and suggests the ones you've used.** Where an extension's field lets you name
+  something only the game knows (a point of interest, a camera), you type the name in a box that offers the names
+  already used for the same kind of thing anywhere in the project, the commonest first, with the field's fixed
+  choices and the cast above them. Arrow keys and Enter pick one; anything else you type is kept as it is. Two
+  names that differ only in capitals, spaces, or punctuation show in Problems, so a typo doesn't become a second
+  name.
+- **Moving a line keeps its voice clip.** Cut a line and paste it elsewhere and its scratch voice clip follows it to the new
   line, rather than being left behind under the old one.
-- **Takes for deleted lines go, in time.** Delete a line and its placeholder speech goes straight away; its
-  scratch take goes a week later, in case you change your mind. Production > Remove Takes for Deleted Lines clears
+- **Voice clips for deleted lines go, in time.** Delete a line and its placeholder speech goes straight away; its
+  scratch voice clip goes a week later, in case you change your mind. Production > Remove Voice Clips for Deleted Lines clears
   them now, after listing them.
 
 ### Changed
@@ -31,9 +38,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   Folders and the audio root now sit above the statuses they decide, and each status's folder lines up.
 - **The tour opens with its voice.** The Interactive Tour now copies into a folder of its own with its audio
   beside it, where before the copy had none.
-- **Takes are stamped `PTRK`.** The words a take was recorded against are kept in a `PTRK` chunk in the WAV, no
-  longer `DINK`. Takes stamped `DINK` (by Dink, or an earlier Patterpad) no longer show when they're out of date;
-  record them again to bring the flag back.
+- **Takes are voice clips.** Everywhere Patterpad used the recording studio's word "take" for a line's audio, it
+  now says "voice clip": the scratch recorder's badges, the inspector, the audio settings, and Production > Remove
+  Voice Clips for Deleted Lines.
+- **Voice clips are stamped `PTRK`.** The words a voice clip was recorded against are now kept in a `PTRK` chunk in
+  the WAV, no longer `DINK`. Voice clips you've already recorded keep working: `DINK` is still read, so they still
+  show when they're out of date.
 
 ## [1.1.1] - 2026-11-10
 

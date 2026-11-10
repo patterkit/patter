@@ -52,7 +52,7 @@ reading them, and covers save and load, which is one call each way. The whole ru
 state, visit counts, even the PRNG) serialises to a string and restores later.
 
 [Localisation](/play/localisation/) works in both modes. Read resolved text in Embedded mode,
-or take ids in IDs-only mode and feed them to your own system, and switch language live either
+or voice clip ids in IDs-only mode and feed them to your own system, and switch language live either
 way.
 
 [Closed captions](/play/closed-captions/) are a runtime toggle. Players can turn off the
@@ -60,7 +60,7 @@ non-spoken cues inside dialogue, and the runtime strips them while the line stil
 audio plays.
 
 [Audio](/play/audio/) stays yours. Patter doesn't play audio in engine. Every line carries a stable id
-you tie voice-over to, your way. An optional resolver maps a beat to its winning take if you
+you tie voice-over to, your way. An optional resolver maps a beat to its winning voice clip if you
 use Audio Folders, and you still play it.
 
 A live state inspector ships with every engine. Watch and edit a running engine's `@patter`

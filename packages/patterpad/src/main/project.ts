@@ -890,6 +890,8 @@ function reloadAfterHistory(): void {
 // the manual per-line recording map). The indexer lives off the event loop (async readdir + fs.watch), so
 // scanning never hitches the editor.
 let audioIndex: AudioIndexHandle | null = null;
+/** The project folder `audioIndex` reads its rung folders against: a different project needs a new index. */
+let audioIndexRoot: string | null = null;
 let audioSnapshot: AudioSnapshot = {};
 let audioListener: (snap: AudioSnapshot) => void = () => {};
 
@@ -955,7 +957,7 @@ export function saveScratchAudio(beatId: string, bytes: Uint8Array): Promise<Sav
     try {
       // A refused write (a lock, a file out of date) comes back as a result, not a throw.
       const res = await writeBinaryFileAsync(path, Buffer.from(bytes));
-      if (!res.success) return { ok: false, error: `Couldn't save the take: ${res.message}` };
+      if (!res.success) return { ok: false, error: `Couldn't save the voice clip: ${res.message}` };
       audioIndex?.rescan();
       return { ok: true };
     }
@@ -979,17 +981,21 @@ export function stampRungs(p: Pick<ProjectFile, "recordingStatuses" | "scratchSt
 /** (Re)build or tear down the audio indexer to match the loaded project's audio config. Idempotent;
  *  call on open + whenever the audio settings change. */
 function syncAudioIndex(): void {
-  if (!audioActive()) { // mode off (or un-voiced) -> drop the index + tell the renderer it's empty
-    audioIndex?.dispose(); audioIndex = null;
+  if (!audioActive() || audioIndexRoot !== loaded!.root) {
+    // Mode off (or un-voiced), or another project: drop the index and tell the renderer it's empty. The index
+    // reads its folders against the root it started with, so a project opened over another with Audio Folders
+    // was shown the old project's folders: every line missing, and Placeholder Speech made for lines that had
+    // takes (Ian, 2026-11-10, the tour opened over Pattershot's Gatehouse, both "../audio").
+    audioIndex?.dispose(); audioIndex = null; audioIndexRoot = null;
     if (Object.keys(audioSnapshot).length) { audioSnapshot = {}; audioListener(audioSnapshot); }
-    return;
+    if (!audioActive()) return;
   }
   const p = loaded!.project; // audioActive() guarantees a loaded, voiced, folder-mode project
   const rungs = deriveRecordingFolders(p.audioRoot, p.recordingStatuses ?? DEFAULT_RECORDING_STATUSES);
   const stamps = stampRungs(p);
   const onSnap = (snap: AudioSnapshot): void => { audioSnapshot = snap; audioListener(snap); };
   if (audioIndex) audioIndex.update(rungs, stamps);
-  else audioIndex = startAudioIndex(loaded!.root, rungs, onSnap, stamps);
+  else { audioIndex = startAudioIndex(loaded!.root, rungs, onSnap, stamps); audioIndexRoot = loaded!.root; }
 }
 
 /** Pin simple-vc-lib to the project's CONFIGURED version control, so it never auto-detects one the author
@@ -2545,7 +2551,7 @@ export function validate(live?: LiveSceneSource): ProblemsDto {
     // Which scene each node-bearing problem is in, so the renderer can switch to it before revealing.
     const sceneOf = sceneIndex(fresh);
     for (const p of problems) { const s = p.nodeId ? sceneOf.get(p.nodeId) : undefined; if (s) p.sceneId = s; }
-    return { ok: r.ok, problems };
+    return { ok: r.ok, problems, ...(Object.keys(r.extensionPools).length ? { pools: r.extensionPools } : {}) };
   } catch (e) {
     return { ok: false, problems: [{ category: "structure", severity: "error", message: e instanceof Error ? e.message : String(e) }] };
   }
@@ -2658,7 +2664,7 @@ export function untakeExtension(id: string): Promise<SaveResult & { step?: Proje
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const taken = loaded.project.extensions ?? {};
-    if (!taken[id]) return { ok: false, error: `This project doesn't take ${id}.` };
+    if (!taken[id]) return { ok: false, error: `This project doesn't use ${id}.` };
     const name = readProjectManifest(loaded.root, id)?.name || id;
     const { [id]: _gone, ...rest } = taken;
     // From the file as it is, not the loaded model, as the upgrade does: a merge's mark, say, is kept.
@@ -2682,7 +2688,7 @@ export function untakeExtension(id: string): Promise<SaveResult & { step?: Proje
 export function saveProjectExtensionValues(id: string, entry: Record<string, unknown>, label: string): Promise<SaveResult & { step?: ProjectStep; project?: OpenedProject }> {
   return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
-    if (!loaded.project.extensions?.[id]) return { ok: false, error: `This project doesn't take ${id}.` };
+    if (!loaded.project.extensions?.[id]) return { ok: false, error: `This project doesn't use ${id}.` };
     const writes = projectExtensionWrites({ [id]: entry });
     if (writes.length === 0) return { ok: true, project: summarise(loaded) };
     const res = await projectCommit(label, freshKey("view"), writes);

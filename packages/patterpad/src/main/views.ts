@@ -14,7 +14,7 @@ import { app, dialog, type BrowserWindow } from "electron";
 import { basename, dirname, join } from "node:path";
 import {
   extensionRows, installExtensionPackage, installedExtensions, openViewWindow, planPackageAdd, planPackageUpdate,
-  planProjectRemoval, readExtensionPackage, resolveInstalled, sameAsInstalled, uninstallViews,
+  planProjectRemoval, readExtensionPackage, resolveInstalled, chooseInstalled, sameAsInstalled, uninstallViews,
 } from "@wildwinter/app-shell/view-host";
 import type { ExtensionPackage, ExtensionRow, ViewWindow } from "@wildwinter/app-shell/view-host";
 import { rescueToolWindow, savedWindowRect } from "@wildwinter/app-shell/tool-window";
@@ -82,7 +82,7 @@ export function problemSentence(p: Problem): string {
 export function packageRefusal(pkg: ExtensionPackage): { title: string; sub: string; body?: string[] } | null {
   const name = typeof pkg.manifest.name === "string" && pkg.manifest.name ? pkg.manifest.name : "This extension";
   const errors = pkg.problems.filter((p) => p.severity === "error").map(problemSentence);
-  if (errors.length) return { title: `${name} can't be added`, sub: "Its manifest has faults, so Patterpad won't take it:", body: errors };
+  if (errors.length) return { title: `${name} can't be added`, sub: "Its manifest has faults, so Patterpad won't add it:", body: errors };
   const patter = pkg.manifest.targets?.patter;
   if (!patter || Object.keys(patter).length === 0) {
     const others = Object.keys(pkg.manifest.targets ?? {});
@@ -308,7 +308,7 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
         const what = differs
           ? `Reinstalling replaces its installed files on this machine, and the project's copy of its manifest, which this package changes. You can undo the project's part.`
           : `Reinstalling replaces its installed files on this machine. The project stays as it is.`;
-        const go = await deps.ask(`Reinstall ${name} ${v}?`, `This package is ${name} ${v}, the version ${mine ? "this project takes" : "installed here"}. ${what} Its open views close.`, [`Reinstall ${v}`, "Cancel"]);
+        const go = await deps.ask(`Reinstall ${name} ${v}?`, `This package is ${name} ${v}, the version ${mine ? "this project uses" : "installed here"}. ${what} Its open views close.`, [`Reinstall ${v}`, "Cancel"]);
         if (go !== 0) return null;
         closeViews();
         let taken0: Awaited<ReturnType<ViewDeps["take"]>> | null = null;
@@ -328,7 +328,7 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
 
       const lines = plan.changes.length ? plan.changes : ["No fields or views change."];
       const how = mine
-        ? "The project takes it as one step you can undo, and its views install on this machine."
+        ? "The project moves to it as one step you can undo, and its views install on this machine."
         : "Its views install on this machine. No project changes.";
       const go = await deps.ask(`Update ${name}${plan.from ? ` from ${plan.from}` : ""} to ${plan.to}?`,
         `${lines.join(" ")} ${how} Values it no longer accepts show among the problems afterwards.`, [`Update to ${plan.to}`, "Cancel"]);
@@ -367,8 +367,15 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
       const name = at.manifest.name || id;
       const taken = deps.root() ? deps.taken().find((t) => t.id === id) : undefined;
       const last = mine.length === 1;
+      // Whether this is the copy the project opens, and what it opens once it's gone.
+      const using = taken ? chooseInstalled(mine, id, taken.pin).installed?.version : undefined;
+      const after = using === version ? chooseInstalled(mine.filter((i) => i.version !== version), id, taken!.pin).installed?.version : undefined;
+      const views = viewsFor(at.manifest, "patter").map((v) => v.name);
+      const its = views.length === 1 ? `its ${views[0]}` : "its views";
       const parts = [
-        ...(taken ? [`This project takes ${name}${last ? `, so its views will show as not installed until you install them again` : ""}.`] : []),
+        ...(using === version
+          ? [after ? `This project uses this version, and will open ${after} instead.` : `This project uses this version, so ${its} won't open until you install it again.`]
+          : using ? [`This project uses ${using}, not this version.`] : []),
         "Other projects on this machine that use this version lose its views too.",
         last ? `${name}'s views keep their own settings on this machine, and those go too.` : "The other installed versions keep their views' settings.",
       ];
@@ -401,7 +408,7 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
       let take = plan.project === "take";
       if (plan.project === "update") {
         take = await deps.ask(`Update ${name} in this project?`,
-          `This project takes ${name}${plan.pinned ? ` ${plan.pinned}` : ""}, and this package is ${plan.version}. Updating takes it into the project as one step you can undo. Its views are installed on this machine either way.`,
+          `This project uses ${name}${plan.pinned ? ` ${plan.pinned}` : ""}, and this package is ${plan.version}. Updating moves the project to it as one step you can undo. Its views are installed on this machine either way.`,
           [`Update to ${plan.version}`, "Not Now"]) === 0;
       }
       // What it requires and the project lacks goes in with it, in the same step, or nothing does.
@@ -443,7 +450,7 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
     const out: ExtensionPackage[] = [];
     for (const id of missing) {
       const go = await deps.ask(`${name} needs “${id}”`,
-        `${name} works only in a project that also takes the extension “${id}”, which this one doesn't. Choose its package to add both, as one step you can undo.`,
+        `${name} works only in a project that also uses the extension “${id}”, which this one doesn't. Choose its package to add both, as one step you can undo.`,
         [`Choose “${id}” Package…`, "Cancel"]);
       if (go !== 0) return null;
       const req = await readPackage(`Add “${id}”`, `Choose the package of “${id}”, which ${name} needs: its folder, or an npm package tarball (.tgz).`);
@@ -458,7 +465,7 @@ export function createViewExtensions(deps: ViewDeps): ViewExtensions {
       const have = [...deps.taken().map((t) => t.id), pkg.manifest.id, ...missing];
       const further = missingRequirements(req.manifest, have);
       if (further.length > 0) {
-        await deps.tell(`${name} wasn't added`, `${nameOf(req)} needs ${further.map((f) => `“${f}”`).join(" and ")} too, which this project doesn't take. Add ${further.length > 1 ? "them" : "it"} first, then ${name}.`);
+        await deps.tell(`${name} wasn't added`, `${nameOf(req)} needs ${further.map((f) => `“${f}”`).join(" and ")} too, which this project doesn't use. Add ${further.length > 1 ? "them" : "it"} first, then ${name}.`);
         return null;
       }
       out.push(req);

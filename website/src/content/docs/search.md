@@ -78,7 +78,7 @@ you the *counts*; the Writing tab gives you the *lines themselves*.
 If your project is [**Voiced** and tracks audio status](/production/audio/#recording-status), a
 **Recording** tab appears alongside Writing. It works the same way: pick a recording stage (missing,
 scratch, recorded, final, or your own) and it lists every spoken line at that stage, so you can pull up
-"everything still **missing** a take" and work through it. The tab stays hidden until both **Voiced**
+"everything still **missing** a voice clip" and work through it. The tab stays hidden until both **Voiced**
 and **Track audio status** are on.
 
 ## Finding where a property is used

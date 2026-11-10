@@ -70,14 +70,14 @@ list and jump to every line at a given stage while you write, open **Review ▸ 
 Status…** or switch the [search window](/search/#browsing-by-writing-status) to its
 **Writing** mode.
 
-## Recording a scratch take
+## Recording a scratch voice clip
 
 Voiced projects track a second, separate **recording status** for each spoken line. Most of
 that is a producer's job, but one piece is worth knowing about as a writer: in Audio Folders
-mode you can record a quick **scratch take** of a line in your own voice, right at your desk,
+mode you can record a quick **scratch voice clip** of a line in your own voice, right at your desk,
 and hear the scene read back before anyone books a booth. The inspector shows a **● Record**
 button on the line, gives a short **3, 2, 1** countdown, captures your microphone, and saves the
-take, no files to shuffle.
+voice clip, no files to shuffle.
 
 The rest of the recording pipeline (the status ladder, audio folders, table-read playback, and
 the scratch setup) lives under **Running the project**, see

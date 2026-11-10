@@ -18,7 +18,7 @@ describe("Placeholder Speech voices", () => {
   it("finds the accent from the main language, and asks when the language has several", () => {
     expect(accentForLanguage("en-GB")).toBe("en-GB");
     expect(accentForLanguage("en_us")).toBe("en-US");
-    expect(accentForLanguage("en")).toBeUndefined();
+    expect(accentForLanguage("en")).toBe("en-GB");   // the first English on offer
     expect(accentForLanguage("sv")).toBe("sv-SE");
     expect(accentForLanguage("xx")).toBeUndefined();
   });

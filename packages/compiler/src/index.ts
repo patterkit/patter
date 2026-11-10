@@ -10,7 +10,7 @@ export { exportBundle } from "./export.js";
 export type { ExportInput } from "./export.js";
 export { extensionNodes, extensionPass } from "./extensions.js";
 export type {
-  CompiledExtensions, ExtensionIssue, ExtensionManifestFile, ExtensionNode, ExtensionPassInput, ExtensionShardFile,
+  CompiledExtensions, ExtensionIssue, ExtensionPools, ExtensionManifestFile, ExtensionNode, ExtensionPassInput, ExtensionShardFile,
 } from "./extensions.js";
 export { projectScopes, externalGameScopes, PATTER_SCOPE } from "./game-scopes.js";
 export type { ProjectScopes, HostScopeNote } from "./game-scopes.js";

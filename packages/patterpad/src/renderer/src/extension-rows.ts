@@ -17,8 +17,8 @@ import { extensionFold, fieldGroups, isRecordMap, recordMapSummary, valueRows } 
 import type { FieldGroups, ValueAdapter, ValueDecl, ValueRows } from "@wildwinter/app-shell/value-rows";
 import { entryProblems, pickLists, valueProblems } from "@wildwinter/toolkit/extensions";
 import type { TargetDecl, TypeDecl } from "@wildwinter/toolkit/extensions";
-import type { ExtensionDto, ExtensionFieldDto, ExtensionNodeDto, Problem } from "../../shared/api.js";
-import { takenLine } from "../../shared/extensions.js";
+import type { ExtensionDto, ExtensionFieldDto, ExtensionNodeDto, ExtensionPoolsDto, Problem } from "../../shared/api.js";
+import { extensionLine } from "../../shared/extensions.js";
 
 /** What the inspector asks of its host for Patter extensions. */
 export interface ExtensionHandlers {
@@ -52,11 +52,13 @@ const sentence = (message: string): string => `${message.charAt(0).toUpperCase()
 const existsOf = (adapter: ValueAdapter) => (kind: string, id: string): boolean =>
   adapter.nodes(kind).some((n) => n.id === id) || adapter.label?.(kind, id) !== undefined;
 
-/** The adapter for one extension's rows: the project's nodes, and that extension's project lists for a pick's
- *  `list` sources, read off its project entry (the toolkit's `pickLists`). */
+/** The adapter for one extension's rows: the project's nodes, that extension's project lists for a pick's
+ *  `list` sources, read off its project entry (the toolkit's `pickLists`), and its pools for a pick's `pool`
+ *  sources (free-text-picks). */
 export function extensionScoped(adapter: ValueAdapter, extension: ExtensionDto, projectEntry = extension.projectValues): ValueAdapter {
   const project = { fields: extension.targets["project"]?.fields ?? [] } as unknown as TargetDecl;
-  return { ...adapter, list: pickLists(project, projectEntry) };
+  const pools = (adapter as PatterValueAdapter).extensionPools?.[extension.id];
+  return { ...adapter, list: pickLists(project, projectEntry), pool: (name: string) => pools?.[name] };
 }
 
 /**
@@ -112,6 +114,8 @@ interface RowsFor {
   cache: ValueRows;
   /** The fields window's opener: a map of records is then a summary with an Edit button (H3). */
   openFields?: () => void;
+  /** Lay maps and lists of records out as tables, a column per field: Project Settings has the room. */
+  tables?: boolean;
   /** A field's editor view, when it opens here: its Edit opens the view instead (Y5). */
   editorOf?: (decl: ExtensionFieldDto) => FieldEditor | null;
 }
@@ -146,6 +150,7 @@ function extensionParts(o: RowsFor): { fields: readonly ExtensionFieldDto[]; lea
       ...(renamed ? { replaceProblem: renamedStageSentence(renamed.from, renamed.to, o.extension.name) }
         : problem ? { problem } : {}),
       className: "insp-row insp-gd-row", labelClassName: "insp-key", controlClassName: "insp-gd-input",
+      ...(o.tables ? { tables: true } : {}),
     });
   };
   const declared = new Set(fields.map((f) => f.name));
@@ -269,7 +274,7 @@ export interface ProjectSectionOptions {
 const settingsGroups = new Map<string, FieldGroups>();
 let settingsMounts = 0;
 
-/** An extension's section in Project Settings: what the project takes it at and its settings, read only,
+/** An extension's section in Project Settings: that it's an extension, the version the project uses, and its settings, read only,
  *  then a row for each project field. The values are the dialog's until Save. */
 export function mountProjectSection(host: HTMLElement, o: ProjectSectionOptions): void {
   const groups = settingsGroups.get(o.extension.id) ?? fieldGroups();
@@ -282,7 +287,7 @@ export function mountProjectSection(host: HTMLElement, o: ProjectSectionOptions)
   // row the author is typing in here.
   const cache = valueRows();
   const draw = (): void => {
-    rows.replaceChildren(...extensionRows({ cache,
+    rows.replaceChildren(...extensionRows({ cache, tables: true,
       extension: o.extension, kind: "project", id: o.extension.projectNode, entry: Object.keys(entry).length ? entry : undefined,
       adapter: o.adapter, locked: o.locked,
       commit: (field, value) => {
@@ -296,7 +301,7 @@ export function mountProjectSection(host: HTMLElement, o: ProjectSectionOptions)
     cache.sweep();
     groups.sweep();
   };
-  host.append(el("p", "settings-note settings-ext-taken", takenLine(o.extension)), rows);
+  host.append(el("p", "settings-note settings-ext-taken", extensionLine(o.extension)), rows);
   draw();
 }
 
@@ -331,6 +336,14 @@ export interface AdapterSources {
   openNodes: (kind: string) => readonly { id: string; label: string }[];
   /** The rest of the project's nodes, as main read them (OpenedProject.extensionNodes). */
   index?: Record<string, readonly ExtensionNodeDto[]>;
+  /** Each extension's pools, as the last validation counted them (ProblemsDto.pools). */
+  pools?: ExtensionPoolsDto;
+}
+
+/** The adapter Patterpad passes around: the shell's, with every extension's pools for `extensionScoped` to pick
+ *  one extension's from. */
+export interface PatterValueAdapter extends ValueAdapter {
+  readonly extensionPools?: ExtensionPoolsDto;
 }
 
 /**
@@ -338,7 +351,7 @@ export interface AdapterSources {
  * nodes. A node held in another scene is named from the project's index, with its scene; one the project
  * doesn't have is undefined, which the rows show as gone.
  */
-export function extensionAdapter(src: AdapterSources): ValueAdapter {
+export function extensionAdapter(src: AdapterSources): PatterValueAdapter {
   const sceneName = (id: string | undefined): string => src.scenes.find((s) => s.id === id)?.name ?? id ?? "";
   const nodes = (kind: string): readonly { id: string; label: string }[] => {
     if (kind === "cast") return src.cast.map((c) => ({ id: c, label: c }));
@@ -348,6 +361,7 @@ export function extensionAdapter(src: AdapterSources): ValueAdapter {
   };
   return {
     nodes,
+    ...(src.pools ? { extensionPools: src.pools } : {}),
     label: (kind, id) => {
       const held = nodes(kind).find((n) => n.id === id)?.label;
       if (held !== undefined) return held;

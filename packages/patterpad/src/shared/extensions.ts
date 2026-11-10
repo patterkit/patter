@@ -74,10 +74,10 @@ function missingFacts(manifest: Manifest, taken: readonly string[]): Pick<Extens
   return missing.length ? { missing } : {};
 }
 
-/** The read-only line an extension's Settings section opens with: what the project takes it at.
- *  "Taken at 1.1.0." */
-export function takenLine(x: Pick<ExtensionDto, "taken" | "version">): string {
-  return x.taken ? `Taken at ${x.taken}.` : `Taken with no version (the manifest is ${x.version}).`;
+/** The read-only line an extension's Settings section opens with: that it's an extension, and the version the
+ *  project uses. "Pattershot extension, version 0.7.0." */
+export function extensionLine(x: Pick<ExtensionDto, "name" | "taken" | "version">): string {
+  return x.taken ? `${x.name} extension, version ${x.taken}.` : `${x.name} extension. The project doesn't name a version; its manifest is ${x.version}.`;
 }
 
 /** Words to show for a node: trimmed to a line. */

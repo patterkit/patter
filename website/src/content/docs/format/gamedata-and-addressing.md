@@ -74,7 +74,7 @@ renaming, and re-ordering**. Change a line's words, drag it to another block, it
 doesn't change. It's the key that a line's **[localisation](/production/localisation/)
 string, its [audio](/production/audio/#recording-status) file, and its place in a save** all
 join on, which is *why* it can't encode location. If it changed when you moved a line, the
-translation and the recorded take would be orphaned. A game that needs to react to one
+translation and the recorded voice clip would be orphaned. A game that needs to react to one
 *specific* line watches for its `id`.
 
 The `gameId` is an author-editable, host-facing address on a **scene or block** ("play this

@@ -1239,7 +1239,13 @@ export interface Problem {
 export interface ProblemsDto {
   ok: boolean;
   problems: Problem[];
+  /** Each extension's pools (a pick's `{ "pool": name }` source), counted over the project as validated, the
+   *  open scene as it stands among it: the values to suggest, the commonest first. Absent when there are none. */
+  pools?: ExtensionPoolsDto;
 }
+
+/** Each extension's pools: by extension id, then pool name, the values in the order to offer them. */
+export type ExtensionPoolsDto = Record<string, Record<string, string[]>>;
 
 export interface PatterApi {
   /** Launch: restore the last project (open-where-you-left-off), plus recents + identity. */

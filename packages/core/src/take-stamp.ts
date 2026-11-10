@@ -8,12 +8,14 @@
 //         Speech). Read as "out of date" when it no longer matches the line.
 //   PTPS  Placeholder Speech's request hash (text, voice, language, rate, format): marks a take as generated,
 //         so ours to remake or remove. A take without it is a person's, never touched.
-// Patterstage's voice-takes marks its own generated takes with PSVT: read as PTPS, never written. (The text hash's
-// first name, DINK, from Dink and earlier Patterpads, isn't read: Ian, 2026-11-10.)
+// Older takes carry DINK (the text hash under its first name, written by Dink and by every Patterpad up to 1.1.1)
+// and PSVT (Patterstage's voice-takes request hash): read as PTRK and PTPS, never written. DINK stays read so
+// scratch takes recorded before PTRK keep their out-of-date flag (Ian, 2026-11-10).
 // ---------------------------------------------------------------------------
 
-/** The text-hash stamp's chunk id. */
+/** The text-hash stamp's chunk id, and the older name it's still read under. */
 export const TEXT_STAMP = "PTRK";
+const TEXT_STAMP_OLD = "DINK";
 /** Placeholder Speech's request-hash stamp, and Patterstage's name for the same thing. */
 export const GENERATED_STAMP = "PTPS";
 const GENERATED_STAMP_OTHER = "PSVT";
@@ -82,10 +84,10 @@ export function readInfoChunks(bytes: Uint8Array): Map<string, string> {
   return out;
 }
 
-/** A take's text-hash stamp (`PTRK`), or null when it has none. */
+/** A take's text-hash stamp (`PTRK`, else the older `DINK`), or null when it has none. */
 export function readTextStamp(bytes: Uint8Array): string | null {
   const info = readInfoChunks(bytes);
-  return info.get(TEXT_STAMP) ?? null;
+  return info.get(TEXT_STAMP) ?? info.get(TEXT_STAMP_OLD) ?? null;
 }
 
 /** A take's generated-speech stamp (`PTPS`, else Patterstage's `PSVT`), or null for a person's take. */

@@ -375,7 +375,7 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
       const warn = el("span", "insp-rec-stale"); warn.append(iconNode("warning", 12), "out of date");
       warn.dataset.tip = isSpeech
         ? "This placeholder speech was made from an earlier version of the line. It's made again a moment after you move on."
-        : "This scratch take was recorded against an earlier version of the line.";
+        : "This scratch voice clip was recorded against an earlier version of the line.";
       wrap.append(warn);
     }
     // A play button only when a file actually resolved (not for an implicitly-missing line).
@@ -402,7 +402,7 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
       const scrIdx = order.indexOf(scratch);
       if (curIdx >= 0 && scrIdx >= 0 && curIdx <= scrIdx) {
         const rec = el("button", "insp-rec-record") as HTMLButtonElement;
-        rec.type = "button"; rec.append(iconNode("record", 12), "Record"); rec.dataset.tip = "Record a scratch take";
+        rec.type = "button"; rec.append(iconNode("record", 12), "Record"); rec.dataset.tip = "Record a scratch voice clip";
         rec.addEventListener("click", () => h.recordScratch(id));
         wrap.append(rec);
       }
@@ -444,7 +444,7 @@ function rerecordRow(id: string | null, h: InspectorHandlers): HTMLElement | nul
   cb.type = "checkbox"; cb.checked = on;
   cb.addEventListener("change", () => h.setNeedsRerecord(id, cb.checked));
   label.append(cb, document.createTextNode(" Needs re-record"));
-  label.dataset.tip = 'The take exists but must be redone (bad quality, wrong take). Masks the recording status as "re-record".';
+  label.dataset.tip = 'The voice clip exists but must be redone (bad quality, the wrong reading). Masks the recording status as "re-record".';
   wrap.append(label);
   if (on) {
     const pill = el("span", "insp-rec-chip", "re-record");

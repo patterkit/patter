@@ -138,7 +138,7 @@ UMG widget built in C++ (`UTourRunnerWidget`) to copy from.
 For C++ outside Blueprint, the engine-free core has the same runner, `patter::Runner`, with
 `onLine`, `onText`, `onGameEvent`, `onChoice`, and `onEnded`.
 
-**Voice-over as imported assets (optional).** If you import your takes as sound assets, `UPatterAudioResolver`
+**Voice-over as imported assets (optional).** If you import your voice clips as sound assets, `UPatterAudioResolver`
 can find them for you: `SoundAsset(BeatId, ContentRoot)` gives the soft pointer to the asset the import made of a
-beat's take, and `LoadSound` loads it there and then (a bigger game loads the soft pointer asynchronously
+beat's voice clip, and `LoadSound` loads it there and then (a bigger game loads the soft pointer asynchronously
 itself). The runner doesn't use either; they're there if you want them. See [Audio](/play/audio/).

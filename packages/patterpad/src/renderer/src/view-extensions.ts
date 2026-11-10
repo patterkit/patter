@@ -143,7 +143,7 @@ export function createViewHost(deps: ViewHostDeps, target?: Window): ViewHost {
 
   const writable = (extension: string): ViewWritable => {
     if (!deps.project()) return { readOnly: true, why: "No project is open." };
-    if (!extensionOf(extension)) return { readOnly: true, why: `This project doesn't take ${extension}, so a view can't change its data.` };
+    if (!extensionOf(extension)) return { readOnly: true, why: `This project doesn't use ${extension}, so a view can't change its data.` };
     // The scene somebody else holds. A shard of the extension's they hold isn't said here: a write to it is
     // refused `held`, with the lock's sentence, so the view can tell the two apart.
     const locked = deps.sceneLocked();
@@ -229,7 +229,7 @@ export function createViewHost(deps: ViewHostDeps, target?: Window): ViewHost {
     },
     async write(extension, label, edits) {
       const x = extensionOf(extension);
-      if (!x) return refuse("read-only", `This project doesn't take ${extension}, so a view can't change its data.`);
+      if (!x) return refuse("read-only", `This project doesn't use ${extension}, so a view can't change its data.`);
       const f = facts()!;
       // A write is all on the project node or none of it (hostView refuses a mix): they undo separately.
       if (edits[0]?.node === f.id) {
@@ -265,7 +265,7 @@ export function createViewHost(deps: ViewHostDeps, target?: Window): ViewHost {
       const kind = at?.index.get(id)?.node.kind;
       if (!at || (kind !== "line" && kind !== "text")) return refuse("gone", `There's no line called ${id} in this project now.`);
       const played = await deps.play(id);
-      if (played === null) return refuse("unsupported", "Patterpad plays recordings in Audio Folders mode only: turn it on in Project Settings to hear takes.");
+      if (played === null) return refuse("unsupported", "Patterpad plays recordings in Audio Folders mode only: turn it on in Project Settings to hear voice clips.");
       return played;
     },
     stop: () => deps.stop(),

@@ -185,12 +185,12 @@ describe("the Extensions window", () => {
     expect(await t.views.uninstall("shot", "0.4.0")).toBe(true);
     expect(t.installed()).toEqual(["shot@0.3.0"]);
     expect(picks.cleared).toEqual([]);
-    expect(t.details[0]).toBe("This project takes Shot. Other projects on this machine that use this version lose its views too. The other installed versions keep their views' settings.");
+    expect(t.details[0]).toBe("This project uses 0.3.0, not this version. Other projects on this machine that use this version lose its views too. The other installed versions keep their views' settings.");
     expect(await t.views.uninstall("shot", "0.3.0")).toBe(true);
     expect(t.installed()).toEqual([]);
     expect(picks.cleared).toEqual(["persist:view-shot"]);
     expect(t.asked).toEqual(["Uninstall Shot 0.4.0 from this machine?", "Uninstall Shot 0.3.0 from this machine?"]);
-    expect(t.details[1]).toContain("so its views will show as not installed until you install them again.");
+    expect(t.details[1]).toMatch(/^This project uses this version, so its .+ won't open until you install it again\. /);
     expect(t.details[1]).toContain("and those go too.");
     expect(await t.views.uninstall("shot", "9.9.9")).toBe(false);
   });
@@ -216,7 +216,7 @@ describe("Update…", () => {
     expect(t.told).toEqual(["Nothing was updated", "Nothing was updated"]);
     expect(t.details).toEqual([
       "That package is Stage (\u201cstage\u201d), not Shot (\u201cshot\u201d), so nothing changed.",
-      "This project takes Shot 0.3.0, newer than this package's 0.2.0, so nothing changed: an update never goes back to an older version.",
+      "This project uses Shot 0.3.0, newer than this package's 0.2.0, so nothing changed: an update never goes back to an older version.",
     ]);
     expect(t.take).not.toHaveBeenCalled();
     expect(t.installed()).toEqual([]);
@@ -255,7 +255,7 @@ describe("Update…", () => {
     picks.paths.push(packageDir(next));
     expect(await t.views.upgrade("shot")).toMatchObject({ ok: true, version: "0.4.0" });
     expect(t.asked).toEqual(["Update Shot from 0.3.0 to 0.4.0?", "Update Shot from 0.3.0 to 0.4.0?"]);
-    expect(t.details[1]).toBe("Line: adds \u201cLens\u201d. The project takes it as one step you can undo, and its views install on this machine. Values it no longer accepts show among the problems afterwards.");
+    expect(t.details[1]).toBe("Line: adds \u201cLens\u201d. The project moves to it as one step you can undo, and its views install on this machine. Values it no longer accepts show among the problems afterwards.");
     expect(t.takenIds()).toEqual([["shot"]]);
     expect(t.installed()).toEqual(["shot@0.4.0"]);
   });

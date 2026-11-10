@@ -32,9 +32,9 @@ The whole VO pipeline lives in the app:
 - **Export a recording script** for the studio, either every voiced line or only those marked ready to
   record, from [Production reports and exports](/production/tracking-and-reports/#production-reports-and-exports)
   (or `patter voice-export` from the [CLI](/cli/)).
-- **Track takes** by dropping audio into per-status folders. Patter derives each line's recording
-  status from the files, and flags a take as **out of date** when the line is edited after it was
-  recorded, so you know exactly what needs a re-take. See
+- **Track voice clips** by dropping audio into per-status folders. Patter derives each line's recording
+  status from the files, and flags a voice clip as **out of date** when the line is edited after it was
+  recorded, so you know exactly what needs a re-record. See
   [Recording status and audio](/production/audio/#recording-status).
 
 ## Run localisation

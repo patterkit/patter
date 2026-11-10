@@ -58,7 +58,7 @@ and [finishing flows](/play/navigation/#finished-flows).
 
 ## Recording the voice
 
-Every line has a recording status and a place in the voice script, and writers can record a scratch take at
+Every line has a recording status and a place in the voice script, and writers can record a scratch voice clip at
 their desk to hear a scene before the actors do. [Audio](/production/audio/) covers the production side. Each
 line's text is its subtitle, and cues in brackets, such as `[explosion]`, are
 [closed captions](/play/closed-captions/) that players can turn off.

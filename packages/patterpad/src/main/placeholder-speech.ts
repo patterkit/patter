@@ -9,8 +9,8 @@ import { mkdirSync, readFileSync, writeFileSync, realpathSync, existsSync, unlin
 import { dirname, join, resolve, sep } from "node:path";
 import { writeBinaryFileAsync, deleteFileAsync, renameFileAsync } from "@wildwinter/simple-vc-lib";
 import {
-  planPlaceholderSpeech, runPlaceholderSpeech, resolveKeyFile, storedKeyPath, readServiceAccount, tokenSource, synthesize, finishTake,
-  describeSpeechError, placeholderAccentOf, requestHash, runVoiceScript, manifestLineIds, sourceStrings, type RunResult, type ServiceAccount,
+  planPlaceholderSpeech, runPlaceholderSpeech, resolveKeyFile, storedKeyPath, readGoogleKey, tokenSource, synthesize, finishTake,
+  describeSpeechError, placeholderAccentOf, requestHash, runVoiceScript, manifestLineIds, sourceStrings, type RunResult, type GoogleKey, type GoogleAuth,
 } from "@patterkit/ops";
 import { textHash, readTextStamp, readGeneratedStamp } from "@patterkit/core";
 import type { JobHost } from "@wildwinter/app-shell/job";
@@ -61,7 +61,7 @@ let pendingFor: string | null = null;
 let idle: NodeJS.Timeout | undefined;
 let notedNoKey = false;
 let notedOffline = false;
-let tokens: { keyPath: string; get: () => Promise<string> } | null = null;
+let tokens: { keyPath: string; get: () => Promise<GoogleAuth> } | null = null;
 
 export function initPlaceholderSpeech(h: SpeechHost): void {
   host = h;
@@ -122,13 +122,13 @@ async function runPending(): Promise<void> {
 
 type RunOutcome = RunResult | "no-key" | "opted-out" | "stopped" | "off";
 
-function keyFor(): { account: ServiceAccount; path: string } | string {
+function keyFor(): { account: GoogleKey; path: string } | string {
   const loaded = project.loadedProject();
   const ps = loaded?.project.placeholderSpeech;
   if (!loaded || !ps) return "Placeholder Speech is off for this project.";
   const key = resolveKeyFile(loaded.root, ps.keyFile);
   if (!key.path) return "Placeholder Speech isn't being made on this machine: there's no Google key here.";
-  try { return { account: readServiceAccount(key.path), path: key.path }; } catch (e) { return describeSpeechError(e); }
+  try { return { account: readGoogleKey(key.path), path: key.path }; } catch (e) { return describeSpeechError(e); }
 }
 
 /** Plan and make. `loud` runs say why they can't run (a command the writer chose); quiet ones say it once. */
@@ -143,7 +143,9 @@ async function run(opts: Parameters<typeof planPlaceholderSpeech>[1], loud: bool
     else if (!notedNoKey) { notedNoKey = true; host?.note(key, "info"); }
     return "no-key";
   }
-  const plan = planPlaceholderSpeech(loaded, { ...opts, snapshot: project.audioCurrentSnapshot() });
+  // The planner reads the audio folders itself: the live index can be a moment behind (just after a project
+  // opens or the ladder changes), and an empty view would plan speech for lines that already have takes.
+  const plan = planPlaceholderSpeech(loaded, opts);
   if (!plan) return "off";
   if (!plan.accent) { host?.note("Placeholder Speech needs an accent: choose one in Project settings > Placeholder Speech.", "error"); return "stopped"; }
   if (!plan.tasks.length) { if (loud) host?.note("Placeholder Speech is up to date.", "info"); return { made: [], failed: [], skippedLocked: [], notTried: 0 }; }
@@ -193,7 +195,7 @@ function idsFor(req: SpeechRequestScope): Set<string> | undefined {
   return new Set(loaded ? runVoiceScript(loaded, { everything: true }).lines.filter((l) => who.has(l.character)).map((l) => l.id) : []);
 }
 
-/** Production > Make Placeholder Speech (a scene or the project), Make again (lines, forced), and a voice
+/** Production > Placeholder Speech (a scene or the project), Make again (lines, forced), and a voice
  *  change's lines. */
 export async function makeNow(req: SpeechRequestScope & { force?: boolean }): Promise<{ ok: boolean; message?: string }> {
   const ids = idsFor(req);
@@ -211,7 +213,7 @@ export function countToMake(req: SpeechRequestScope): number {
   const loaded = project.loadedProject();
   if (!loaded) return 0;
   const ids = idsFor(req);
-  const plan = planPlaceholderSpeech(loaded, { ...(req.scene ? { scene: req.scene } : {}), ...(ids ? { only: ids } : {}), snapshot: project.audioCurrentSnapshot() });
+  const plan = planPlaceholderSpeech(loaded, { ...(req.scene ? { scene: req.scene } : {}), ...(ids ? { only: ids } : {}) });
   return plan?.tasks.length ?? 0;
 }
 
@@ -238,18 +240,22 @@ export function keyStatus(keyFile: string): { ok: boolean; message: string } {
   const key = resolveKeyFile(root, keyFile || undefined);
   if (!key.path) {
     return { ok: false, message: keyFile.trim()
-      ? `There's no key at ${keyFile.trim()} on this machine, and GOOGLE_APPLICATION_CREDENTIALS isn't set. Speech made elsewhere still plays.`
-      : "No key on this machine: set the key file, or GOOGLE_APPLICATION_CREDENTIALS. Speech made elsewhere still plays." };
+      ? `There's no key at ${keyFile.trim()} on this machine, GOOGLE_APPLICATION_CREDENTIALS isn't set, and there's no gcloud sign-in. Speech made elsewhere still plays.`
+      : "No key on this machine: set the key file, or GOOGLE_APPLICATION_CREDENTIALS, or sign in with gcloud auth application-default login. Speech made elsewhere still plays." };
   }
-  let account: ServiceAccount;
-  try { account = readServiceAccount(key.path); } catch (e) { return { ok: false, message: describeSpeechError(e) }; }
-  const where = key.source === "environment" ? " (from GOOGLE_APPLICATION_CREDENTIALS)" : "";
+  let account: GoogleKey;
+  try { account = readGoogleKey(key.path); } catch (e) { return { ok: false, message: describeSpeechError(e) }; }
+  const where = key.source === "environment" ? " (from GOOGLE_APPLICATION_CREDENTIALS)" : key.source === "gcloud" ? " (gcloud's sign-in on this machine)" : "";
+  // A service account says its project and account; a person's gcloud sign-in, the account and the project billed.
+  const who = account.kind === "user"
+    ? `your Google sign-in${account.account ? ` (${account.account})` : ""}, billed to project ${account.projectId}`
+    : `project ${account.projectId}, account ${account.account}`;
   // A key inside the project's working copy can be committed by accident: say so. (Telling "ignored" needs
   // simple-vc-lib to report it; until then, inside the folder that holds the project is the test.)
   const checkout = dirname(resolve(root));
   const inside = resolve(key.path).startsWith(checkout + sep);
-  if (inside) return { ok: false, message: `Ready: project ${account.projectId}, account ${account.clientEmail}${where}. But the key sits beside your project, where version control can pick it up: move it outside, or make sure it's ignored.` };
-  return { ok: true, message: `Ready: project ${account.projectId}, account ${account.clientEmail}${where}.` };
+  if (inside) return { ok: false, message: `Ready: ${who}${where}. But the key sits beside your project, where version control can pick it up: move it outside, or make sure it's ignored.` };
+  return { ok: true, message: `Ready: ${who}${where}.` };
 }
 
 /** One sentence in a voice, for the Cast editor's Hear button: the WAV bytes, or why not. */
@@ -352,7 +358,7 @@ export async function sweepDeleted(): Promise<void> {
     delete deleted[id];
   }
   writeMemory(m);
-  if (n) { project.rescanAudio(); host?.note(`Removed ${n} scratch take${n === 1 ? "" : "s"} for lines deleted over a week ago.`, "info"); }
+  if (n) { project.rescanAudio(); host?.note(`Removed ${n} scratch voice clip${n === 1 ? "" : "s"} for lines deleted over a week ago.`, "info"); }
 }
 
 /** Production > Remove Takes for Deleted Lines: what it would remove (every scratch and placeholder take whose

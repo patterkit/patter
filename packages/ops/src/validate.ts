@@ -12,7 +12,7 @@ import { validateProject, parseSource } from "@patterkit/core";
 import type { ValidationIssue } from "@patterkit/core";
 import { validateConditions, validateInterpolation, hostScopesToSpec, projectScopes, extensionPass } from "@patterkit/compiler";
 import { compileLoaded, bundleOutputPath, loadedExtensions } from "./compile.js";
-import type { ConditionIssue, ExtensionIssue } from "@patterkit/compiler";
+import type { ConditionIssue, ExtensionIssue, ExtensionPools } from "@patterkit/compiler";
 import type { Bundle } from "@patterkit/model";
 import { EXTENSION_SHARD, PROJECT_LOCALE_SCENE, projectLayout } from "@patterkit/model";
 import { reachabilityIssues } from "./reachability.js";
@@ -69,6 +69,9 @@ export interface ValidateResult {
    *  refuses them; warnings (a missing manifest, an orphaned entry, a pin still carrying settings, a
    *  `.gitattributes` with no merge rule for the data) don't. */
   extensions: ExtensionIssue[];
+  /** Each extension's pools (a pick's `{ "pool": name }` source), by extension and pool: the values the
+   *  project's data holds, the commonest first, for an editor to suggest. */
+  extensionPools: ExtensionPools;
   /** Only ERRORS count: a warning (another tool's scope, say) never fails a build. */
   ok: boolean;
 }
@@ -101,7 +104,8 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
   // committed): refused here, so CI refuses it on every machine. Every shard type, project file included.
   const unresolvedMerges = [...sidecarIssues(tree.get(CONFLICT_SIDECAR)!), ...markedShards(SHARD_EXTENSIONS.flatMap((ext) => tree.get(ext)!))];
   const orphans = orphanShards(loaded, tree);
-  const extensions = [...extensionIssues(loaded), ...gitattributesHint(loaded)];
+  const extensionPassed = extensionIssues(loaded);
+  const extensions = [...extensionPassed.issues, ...gitattributesHint(loaded)];
   // Only worth asking of a project that compiles: over a broken bundle the answer would be about the
   // breakage, and the real errors are already being told. A structural WARNING (a choice that can run
   // dry) compiles, and once switched this off, hiding real latch faults behind an advisory. Nor does a note.
@@ -119,6 +123,7 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
     gameScopes,
     localisation,
     extensions,
+    extensionPools: extensionPassed.pools,
     ok: !localisation.some(isError) && !extensions.some(isError) && structuralErrors.length === 0 && !conditions.some(isError) && !interpolation.some(isError)
       && hygiene.length === 0 && staleBundles.length === 0 && unresolvedMerges.length === 0
       && orphans.length === 0 && !gameScopes.some(isError),
@@ -143,7 +148,7 @@ export function exportBlockers(loaded: LoadedProject): string[] {
     ...structural.map((i) => `[${i.code}] ${i.message}`),
     ...[...conditions, ...interpolation].map((i) => `[${i.field}] ${i.nodeId}: ${i.message}  (${i.src})`),
     ...locIssues(loaded).filter(isError).map((i) => `[localisation] ${i.file}: ${i.message}`),
-    ...extensionIssues(loaded).filter(isError).map((i) => `[extension] ${i.file}: ${i.message}`),
+    ...extensionIssues(loaded).issues.filter(isError).map((i) => `[extension] ${i.file}: ${i.message}`),
   ];
 }
 
@@ -152,14 +157,14 @@ export function exportBlockers(loaded: LoadedProject): string[] {
  * it is left out of the compile), a pin still carrying settings, and the extension pass over the rest, the
  * same pass the compile runs.
  */
-function extensionIssues(loaded: LoadedProject): ExtensionIssue[] {
+function extensionIssues(loaded: LoadedProject): { issues: ExtensionIssue[]; pools: ExtensionPools } {
   const loadIssues = loaded.extensionIssues.map((i): ExtensionIssue => ({ severity: "error", file: i.file, message: i.message }));
-  if (loaded.project.extensions === undefined && loaded.manifests.length === 0 && loaded.extensionShards.length === 0) return loadIssues;
-  const { issues } = extensionPass({
+  if (loaded.project.extensions === undefined && loaded.manifests.length === 0 && loaded.extensionShards.length === 0) return { issues: loadIssues, pools: {} };
+  const { issues, pools } = extensionPass({
     project: loaded.project, scenes: loaded.scenes, ...loadedExtensions(loaded),
     projectPath: loaded.projectFile, sceneFiles: loaded.sceneFiles,
   });
-  return [...loadIssues, ...pinSettingsIssues(loaded), ...issues];
+  return { issues: [...loadIssues, ...pinSettingsIssues(loaded), ...issues], pools };
 }
 
 /**
