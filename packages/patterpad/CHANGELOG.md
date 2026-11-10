@@ -32,7 +32,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **The tour opens with its voice.** The Interactive Tour now copies into a folder of its own with its audio
   beside it, where before the copy had none.
 - **Takes are stamped `PTRK`.** The words a take was recorded against are kept in a `PTRK` chunk in the WAV, no
-  longer `DINK`; takes stamped `DINK` still show when they're out of date.
+  longer `DINK`. Takes stamped `DINK` (by Dink, or an earlier Patterpad) no longer show when they're out of date;
+  record them again to bring the flag back.
 
 ## [1.1.1] - 2026-11-10
 

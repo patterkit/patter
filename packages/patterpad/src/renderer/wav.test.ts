@@ -1,6 +1,6 @@
 // @vitest-environment node
 // The scratch-recording WAV codec (#224): the FNV text-hash, the silence trim, and the round-trip of the
-// hash through a real WAV's LIST/INFO/DINK chunk. Pure functions, so no Web Audio / browser needed.
+// hash through a real WAV's LIST/INFO/PTRK chunk. Pure functions, so no Web Audio / browser needed.
 
 import { describe, it, expect } from "vitest";
 import { textHash, trimSilence, encodeScratchWav, readTextStamp } from "./src/wav.js";

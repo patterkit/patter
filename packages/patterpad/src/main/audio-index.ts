@@ -54,7 +54,7 @@ export async function readStamps(path: string): Promise<{ text?: string; generat
           const list = Buffer.alloc(8 + len);
           await fh.read(list, 0, list.length, pos);
           const info = readInfoChunks(new Uint8Array(Buffer.concat([head, list])));
-          found.text ??= info.get(TEXT_STAMP) ?? info.get("DINK");
+          found.text ??= info.get(TEXT_STAMP);
           found.generated ??= info.get(GENERATED_STAMP) ?? info.get("PSVT");
         }
         pos += 8 + len + (len % 2);

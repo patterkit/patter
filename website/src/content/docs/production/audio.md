@@ -181,8 +181,8 @@ a take before committing to it.
 
 Each take remembers the exact line it was recorded against, so if you later edit that line,
 the inspector flags it **⚠ out of date**, and the recorder's badges pick out exactly which
-scratch needs redoing. The words are kept in the WAV itself, in a `PTRK` chunk. (Older takes, from Dink and
-from earlier versions of Patterpad, keep them in a `DINK` chunk, which is still read.)
+scratch needs redoing. The words are kept in the WAV itself, in a `PTRK` chunk. (Takes from Dink and from
+earlier versions of Patterpad kept them in a `DINK` chunk, which isn't read, so those don't show as out of date.)
 
 A line with only [placeholder speech](/production/placeholder-speech/) counts as needing a take: **Next
 needed** stops at it, as it does at a line with nothing.

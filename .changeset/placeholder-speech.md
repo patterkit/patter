@@ -18,8 +18,9 @@ scratch, so any real take is heard instead. It sounds like a stand-in on purpose
   `GOOGLE_APPLICATION_CREDENTIALS`, so a build machine can hold the one key: `--scene`, `--dry-run`, `--force`,
   and `--soft` (no key is a note, not a failure). The work is `planPlaceholderSpeech` and `runPlaceholderSpeech`
   in ops, shared with Patterpad.
-- **Takes are stamped `PTRK`, no longer `DINK`.** The text hash a take was made from now lives in a `PTRK` chunk;
-  `DINK` is still read, so no existing take loses its out-of-date flag. Placeholder Speech adds `PTPS`, a hash of
+- **Takes are stamped `PTRK`, no longer `DINK`.** The text hash a take was made from now lives in a `PTRK` chunk,
+  and `DINK` isn't read, so a take stamped by Dink or an earlier Patterpad no longer shows as out of date until
+  it's recorded again. Placeholder Speech adds `PTPS`, a hash of
   the whole request, so a changed voice remakes a line. The stamp helpers are in core (`textHash`,
   `readTextStamp`, `withStamps`).
 - **The audio manifest names only takes whose line is in the project.** A deleted line's take, or a cut line's,

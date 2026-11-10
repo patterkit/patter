@@ -31,11 +31,11 @@ describe("take stamps", () => {
     expect(textHash("one")).not.toBe(textHash("two"));
   });
 
-  it("reads the text stamp as PTRK, and from an older DINK chunk", () => {
+  it("reads the text stamp as PTRK, and not the older DINK", () => {
     const w = wav(infoListChunk([["PTRK", "abc123"]]));
     expect(readTextStamp(w)).toBe("abc123");
-    expect(readTextStamp(wav(oldDinkList("xyz789")))).toBe("xyz789");
-    expect(readTextStamp(wav(oldDinkList("odd")))).toBe("odd"); // padded to an even length
+    expect(readTextStamp(wav(oldDinkList("xyz789")))).toBeNull();
+    expect(readTextStamp(wav(oldDinkList("odd"), infoListChunk([["PTRK", "odd"]])))).toBe("odd"); // an odd-length, padded list before it is walked past
     expect(readTextStamp(wav())).toBeNull();
   });
 
