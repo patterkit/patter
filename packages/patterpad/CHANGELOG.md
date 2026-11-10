@@ -6,6 +6,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **Patterplay 1.0.1 inside: joining strings with `+` now fails in Play**, as it already did when compiling. Text
+  built from pieces can't be translated, so put the value into the line's own text instead.
+
 ## [1.1.0] - 2026-11-10
 
 ### Added
