@@ -8,6 +8,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startAudioIndex, type AudioIndexHandle, type AudioSnapshot } from "../src/main/audio-index.js";
 import { encodeScratchWav, textHash } from "../src/renderer/src/wav.js";
+import { withStamps } from "../src/shared/wav-hash.js";
+import { stampRungs } from "../src/main/project.js";
 
 // The ladder as stored: lowest -> highest. "missing" has no folder (it's the implicit absence).
 const LADDER = [
@@ -20,8 +22,8 @@ let handle: AudioIndexHandle | null = null;
 afterEach(() => { handle?.dispose(); handle = null; });
 
 /** Start the index and resolve the FIRST snapshot it emits (the initial scan). */
-function firstSnapshot(root: string, scratch?: string): Promise<AudioSnapshot> {
-  return new Promise((res) => { handle = startAudioIndex(root, LADDER, (snap) => res(snap), scratch); });
+function firstSnapshot(root: string, stamped: string[] = []): Promise<AudioSnapshot> {
+  return new Promise((res) => { handle = startAudioIndex(root, LADDER, (snap) => res(snap), stamped); });
 }
 
 describe("audio-index: folder-derived recording status", () => {
@@ -66,11 +68,11 @@ describe("audio-index: folder-derived recording status", () => {
     // A recorded take (not the scratch rung) - its hash is NOT read (out-of-date only matters for scratch).
     writeFileSync(join(root, "audio/recorded/L_b.wav"), encodeScratchWav([new Float32Array(800)], 8000, textHash("other")));
 
-    const snap = await firstSnapshot(root, "scratch");
+    const snap = await firstSnapshot(root, ["scratch"]);
     expect(snap["L_a"]?.status).toBe("scratch");
     expect(snap["L_a"]?.textHash).toBe(textHash("hello there"));
     expect(snap["L_b"]?.status).toBe("recorded");
-    expect(snap["L_b"]?.textHash).toBeUndefined(); // not the scratch rung -> not read
+    expect(snap["L_b"]?.textHash).toBeUndefined(); // not a stamped status -> not read
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -102,5 +104,25 @@ describe("audio-index: folder-derived recording status", () => {
     await next;
     expect(snapshots.at(-1)?.["L_new"]).toEqual({ status: "scratch", path: join(root, "audio/scratch/L_new.wav") });
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it("reads the stamps of an older DINK take and a generated take, and says which statuses to read", async () => {
+    const root = mkdtempSync(join(tmpdir(), "patter-audio-"));
+    mkdirSync(join(root, "audio/scratch"), { recursive: true });
+    const old = encodeScratchWav([new Float32Array(800)], 8000, "x");
+    // the same take as Dink wrote it: DINK, no terminator
+    const dink = withStamps(old, []);
+    const list = Buffer.concat([Buffer.from("LIST"), Buffer.from([18, 0, 0, 0]), Buffer.from("INFO"), Buffer.from("DINK"), Buffer.from([6, 0, 0, 0]), Buffer.from("abcdef")]);
+    const withDink = Buffer.concat([Buffer.from(dink), list]);
+    withDink.writeUInt32LE(withDink.length - 8, 4);
+    writeFileSync(join(root, "audio/scratch/L_d.wav"), withDink);
+    writeFileSync(join(root, "audio/scratch/L_g.wav"), withStamps(old, [["PTRK", "aaaaaa"], ["PTPS", "req"]]));
+    const snap = await firstSnapshot(root, ["scratch"]);
+    expect(snap["L_d"]?.textHash).toBe("abcdef");
+    expect(snap["L_d"]?.generated).toBeUndefined();
+    expect(snap["L_g"]).toMatchObject({ textHash: "aaaaaa", generated: "req" });
+    expect(stampRungs({ recordingStatuses: [{ name: "missing" }, { name: "placeholder" }, { name: "scratch" }, { name: "recorded" }] })).toEqual(["placeholder", "scratch"]);
+    expect(stampRungs({ recordingStatuses: [{ name: "missing" }, { name: "temp" }, { name: "rough" }], scratchStatus: "rough" })).toEqual(["temp", "rough"]);
+    expect(stampRungs({ recordingStatuses: [{ name: "missing" }, { name: "recorded" }] })).toEqual([]);
   });
 });

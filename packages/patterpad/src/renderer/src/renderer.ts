@@ -99,7 +99,8 @@ import { mountProperties } from "./settings-properties.js";
 import { mountCast } from "./settings-cast.js";
 import { mountQualifiers } from "./settings-qualifiers.js";
 import { mountWorld } from "./settings-world.js";
-import { mountWritingStatus, mountAudio } from "./settings-status.js";
+import { mountWritingStatus, createAudioSettings, mountRecordingStatus, mountScratchRecording, mountPlaceholderSpeech, type AudioSettings } from "./settings-status.js";
+import { PLACEHOLDER_ACCENTS, accentForLanguage, defaultPlaceholderVoice } from "@patterkit/core";
 import { mountEstimating } from "./settings-estimating.js";
 import { mountDictionary } from "./settings-dictionary.js";
 import { mountLanguages } from "./settings-languages.js";
@@ -110,7 +111,7 @@ import { openComments as shellComments, openNotesEditor } from "@wildwinter/app-
 import "@wildwinter/app-shell/notes-editor.css"; // the family's Notes editor (ruling I)
 import "@wildwinter/app-shell/comments.css"; // a shared module carries its own CSS
 import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from "./suggestion-popover.js";
-import type { PropertyDecl, PropertyType, DocLine, Comment, Suggestion } from "@patterkit/model";
+import type { PropertyDecl, PropertyType, DocLine, Comment, Suggestion, CastMember } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES, DEFAULT_PAD_AFTER, PAD_AFTER_MIN, PAD_AFTER_MAX, DEFAULT_ESTIMATE_SPEED, ESTIMATE_SPEED_MIN, ESTIMATE_SPEED_MAX } from "@patterkit/model";
 import { openValuePicker, qualifierRows } from "./value-picker.js";
 import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt, SceneVcStatus, VcStatusDto, AddExtensionResult } from "../../shared/api.js";
@@ -285,6 +286,8 @@ const writingExitEl = $<HTMLButtonElement>("writing-exit"); // Writing View's bo
 // until one does: the strip follows the data and flips to the bar on the first total. Cancel asks main
 // to stop the job at its next yield.
 const jobView = mountJobProgress($("job"), { onCancel: () => window.patter.cancelJob("publish"), units: "files" });
+/** Placeholder Speech's strip: lines being made in the background, cancellable. */
+const speechJobView = mountJobProgress($("speech-job"), { onCancel: () => window.patter.cancelJob("placeholder"), units: "lines" });
 async function withJob<T>(label: string, work: () => Promise<T>): Promise<T> {
   jobView.begin(label);
   try { return await work(); }
@@ -2284,6 +2287,7 @@ function startScratchRecording(id: string): void {
 function scratchTakeState(beatId: string, text: string): "missing" | "stale" | "current" {
   const e = audioIndex[beatId];
   if (!e) return "missing";
+  if (e.status === project?.placeholderSpeech?.status) return "missing"; // placeholder speech isn't a recording
   if (e.textHash != null && e.textHash !== textHash(text)) return "stale";
   return "current";
 }
@@ -2556,7 +2560,10 @@ function setReviewFeedback(on: boolean): void {
 function showInspector(ctx: InspectorContext): void {
   // Remember the caret to the LINE (deepest node id under the selection) on every move - even when the
   // inspector projection below is unchanged (the early-return) - so open-where-you-left-off restores it.
+  const caretWas = caretNodeId;
   caretNodeId = ctx.levels.map((l) => (l as { id?: string | null }).id).find((id): id is string => !!id) ?? null;
+  // Moving off a line is Placeholder Speech's cue to make what the last edits left waiting.
+  if (caretWas && caretWas !== caretNodeId && project?.placeholderSpeech) window.patter.speechNudge();
   scheduleRemember();
   // The nav's block sub-list follows the caret: mark the block the selection sits in (null = scene level).
   const blockLevel = ctx.levels.find((l) => l.kind === "block");
@@ -2636,11 +2643,13 @@ onCreateProperty: (name) => createPatterProperty(name) }),
     playRecording: (id, btn) => void playLineAudio(id, btn),  // ▶ play the line's audio (folder mode)
     scratchStatus: () => (project?.trackAudioStatus ? project.scratchStatus ?? null : null), // the rung scratch records into (null = off, #224)
     recordScratch: (id) => void startScratchRecording(id),    // ● record a scratch take for this line
-    scratchStale: (id) => {                                   // ⚠ the scratch take no longer matches the line
-      const e = audioIndex[id]; const scr = project?.scratchStatus;
-      if (!scr || !e || e.status !== scr || e.textHash == null) return false;
+    scratchStale: (id) => {                                   // ⚠ the take no longer matches the line
+      const e = audioIndex[id]; const scr = project?.scratchStatus; const ps = project?.placeholderSpeech?.status;
+      if (!e || e.textHash == null || (e.status !== scr && e.status !== ps)) return false;
       return e.textHash !== textHash(surface?.sayText(id) ?? "");
     },
+    placeholderStatus: () => (project?.trackAudioStatus ? project.placeholderSpeech?.status ?? null : null),
+    makeSpeechAgain: (id) => { void window.patter.speechMake({ ids: [id], force: true }); },
     sceneProps: () => surface?.sceneProps() ?? [],
     editSceneProps: () => openSceneProps(),
     // Patter extensions: their fields after Game Data, one transaction each on the node's `ext`.
@@ -3947,6 +3956,38 @@ function confirmPackMerge(summary: PackMergeSummary): Promise<boolean> {
   });
 }
 
+/** Production > Make Placeholder Speech for the Project: says how many lines first, since each is a request
+ *  to Google on the project's key. */
+async function makeProjectSpeech(): Promise<void> {
+  const n = await window.patter.speechCount({});
+  if (n === 0) { toast("Placeholder Speech is up to date.", "info"); return; }
+  const go = await confirmDialog({
+    title: `Make Placeholder Speech for ${n} line${n === 1 ? "" : "s"}?`,
+    body: "Each is made by Google on the project's key, in the background. You can carry on writing, and cancel from the strip.",
+    confirmLabel: "Make Speech",
+  });
+  if (go) void window.patter.speechMake({});
+}
+
+/** Production > Remove Takes for Deleted Lines: every scratch and placeholder take whose line isn't in the
+ *  project, now, listed first. Recorded and final takes are never touched. */
+async function removeDeletedTakes(): Promise<void> {
+  const takes = await window.patter.speechDeletedTakes();
+  if (!takes.length) { toast("No scratch or placeholder takes are left from deleted lines.", "info"); return; }
+  const list = el("div", "merge-evidence");
+  for (const t of takes.slice(0, 12)) list.append(el("p", "confirm-body", t.split(/[\\/]/).slice(-2).join("/")));
+  if (takes.length > 12) list.append(el("p", "confirm-body", `and ${takes.length - 12} more`));
+  const go = await confirmDialog({
+    title: `Remove ${takes.length} take${takes.length === 1 ? "" : "s"} for deleted lines?`,
+    body: "Scratch and placeholder takes whose line is no longer in the project. They're deleted through version control, so committed ones stay in its history.",
+    bodyNode: list,
+    confirmLabel: "Remove Takes",
+  });
+  if (!go) return;
+  const n = await window.patter.speechRemoveDeletedTakes();
+  toast(`Removed ${n} take${n === 1 ? "" : "s"}.`, "ok");
+}
+
 /** File ▸ Merge Returned Patterpack: fold a pack that came back into the OPEN project.
  *
  *  Flush first, and flush everything. A merge reads the working copy off DISK, so any pending edit still
@@ -4049,7 +4090,7 @@ interface LiveSettings {
   world: ReturnType<typeof mountWorld>; worldHost: HTMLElement; cast: ReturnType<typeof mountCast>;
   qualifiers: ReturnType<typeof mountQualifiers>;
   writingStatus: ReturnType<typeof mountWritingStatus>; estimating: ReturnType<typeof mountEstimating>;
-  audio: ReturnType<typeof mountAudio>; dictionary: ReturnType<typeof mountDictionary>;
+  audio: AudioSettings; dictionary: ReturnType<typeof mountDictionary>;
 }
 let live: Partial<LiveSettings> = {};
 
@@ -4202,7 +4243,13 @@ function buildSettingsDialog(): SettingsDialog {
         pairs: speakerPairs,
         qualifierName: (gameId) => live.qualifiers?.nameOf(gameId) ?? s.qualifiers.find((q) => q.gameId === gameId)?.name ?? gameId,
         pattern: () => live.qualifiers?.pattern() ?? s.speakerPattern ?? "",
+      }, {
+        // Placeholder Speech's Voice field, read live from the dialog's own audio pages.
+        on: () => audioSettings().value().placeholderSpeech != null,
+        accent: () => audioSettings().value().placeholderSpeech?.accent ?? accentForLanguage(s.localeDefault),
+        hear: (voice, name) => void hearVoice(voice, name),
       });
+      audioSettings().onChange(() => cast.refreshSpeech());
       live.cast = cast;
       return { firstInvalid: () => { const dup = cast.firstDuplicate(); return dup ? { el: dup, message: DUP_MESSAGE } : null; } };
     } },
@@ -4225,12 +4272,30 @@ function buildSettingsDialog(): SettingsDialog {
       live.estimating = mountEstimating(estHost, s.estimating, s.writingStatuses);
       return {};
     } },
+    // Recording status, Scratch recording, and Placeholder Speech: three pages over one audio state (each sees
+    // the others' changes), made by whichever mounts first.
     { id: "recording-status", label: "Recording status", mount: (host): SettingsSectionHandle => {
-      const { s } = settingsRead!;
       const audioHost = el("div"); host.append(audioHost);
-      live.audio = mountAudio(audioHost, { trackAudioStatus: s.trackAudioStatus, statuses: s.recordingStatuses, audioFolders: s.audioFolders, audioRoot: s.audioRoot, scratchStatus: s.scratchStatus });
+      mountRecordingStatus(audioHost, audioSettings());
       return {};
     }, disabled: () => live.voiced?.checked ? null : "Enable Voiced (General tab) to track recording status and audio." },
+    { id: "scratch-recording", label: "Scratch recording", mount: (host): SettingsSectionHandle => {
+      const h = el("div"); host.append(h);
+      mountScratchRecording(h, audioSettings());
+      return {};
+    }, disabled: () => !live.voiced?.checked ? "Enable Voiced (General tab) first." : audioSettings().foldersOn() ? null : "Turn on Use Audio Folders (Recording status) first: scratch takes record into a status's folder." },
+    { id: "placeholder-speech", label: "Placeholder Speech", mount: (host): SettingsSectionHandle => {
+      const h = el("div"); host.append(h);
+      const { s } = settingsRead!;
+      mountPlaceholderSpeech(h, audioSettings(), {
+        accents: PLACEHOLDER_ACCENTS.map((a) => [a.code, a.label]),
+        impliedAccent: accentForLanguage(s.localeDefault),
+        chooseKeyFile: () => window.patter.speechChooseKey(),
+        keyStatus: (keyFile) => window.patter.speechKeyStatus(keyFile),
+        openKeyGuide: () => window.patter.openExternal("https://patterkit.dev/production/placeholder-speech/#getting-a-key"),
+      });
+      return {};
+    }, disabled: () => !live.voiced?.checked ? "Enable Voiced (General tab) first." : audioSettings().foldersOn() ? null : "Turn on Use Audio Folders (Recording status) first: Placeholder Speech goes in a status's folder." },
     { id: "captions", label: "Closed captions", mount: (host): SettingsSectionHandle => {
       const { s } = settingsRead!;
       host.append(sNote("settings-note", "Closed captions describe sounds inside dialogue. A game can turn them off at runtime, and every cue between these delimiters is then removed from the line. Lines spoken by the caption character are removed entirely."));
@@ -4281,6 +4346,53 @@ function buildSettingsDialog(): SettingsDialog {
 }
 let settingsDlg = buildSettingsDialog();
 
+/** The Cast editor's Hear: the voice says the character's name. */
+async function hearVoice(voice: string, name: string): Promise<void> {
+  const r = await window.patter.speechHear(voice, `This is ${name.charAt(0) + name.slice(1).toLowerCase()}, speaking as a placeholder.`);
+  if (!r.ok) { toast(r.error, "error"); return; }
+  const url = URL.createObjectURL(new Blob([r.bytes as BlobPart], { type: "audio/wav" }));
+  const a = new Audio(url);
+  a.addEventListener("ended", () => URL.revokeObjectURL(url));
+  void a.play();
+}
+
+/** After a settings save: the characters whose Placeholder Speech voice changed (their own voice, their
+ *  gender, the accent), so their lines can be made again; and, turned on just now, an offer to make it all. */
+async function afterSpeechSettings(before: ProjectSettingsDto, after: { cast: CastMember[]; placeholderSpeech: ProjectSettingsDto["placeholderSpeech"]; localeDefault: string }, renames: Record<string, string>): Promise<void> {
+  const ps = after.placeholderSpeech;
+  if (!ps) return;
+  if (!before.placeholderSpeech) { void makeProjectSpeech(); return; }
+  const accentWas = before.placeholderSpeech.accent ?? accentForLanguage(before.localeDefault);
+  const accent = ps.accent ?? accentForLanguage(after.localeDefault);
+  const voiceOf = (m: CastMember | undefined, name: string, acc: string | undefined): string | undefined => m?.placeholderVoice ?? defaultPlaceholderVoice(name, acc, m?.gender);
+  const byNewName = new Map(Object.entries(renames).map(([from, to]) => [to, from]));
+  const changed = after.cast.filter((m) => {
+    const was = byNewName.get(m.name) ?? m.name;
+    return voiceOf(m, m.name, accent) !== voiceOf(before.cast.find((c) => c.name === was), was, accentWas);
+  }).map((m) => m.name);
+  if (!changed.length) return;
+  const n = await window.patter.speechCount({ characters: changed });
+  if (n === 0) return;
+  const who = changed.length === 1 ? changed[0]! : `${changed.length} characters`;
+  const go = await confirmDialog({
+    title: `Make ${n} line${n === 1 ? "" : "s"} again for ${who}?`,
+    body: "Their Placeholder Speech voice changed. If you'd rather wait, Production > Make Placeholder Speech does it later.",
+    confirmLabel: "Make Again",
+  });
+  if (go) void window.patter.speechMake({ characters: changed });
+}
+
+/** The open dialog's audio state, shared by its three audio pages: made on first use after each open, and
+ *  refreshing the dialog's tabs when Audio Folders comes and goes. */
+function audioSettings(): AudioSettings {
+  if (live.audio) return live.audio;
+  const { s } = settingsRead!;
+  const a = createAudioSettings({ trackAudioStatus: s.trackAudioStatus, statuses: s.recordingStatuses, audioFolders: s.audioFolders, audioRoot: s.audioRoot, scratchStatus: s.scratchStatus, placeholderSpeech: s.placeholderSpeech });
+  a.onChange(() => settingsDlg.refreshTabs());
+  live.audio = a;
+  return a;
+}
+
 /** File > Project Settings: read the project-level settings, open the dialog on a tab (General by default;
  *  the coverage window's "Game scopes…" and a `@world` pill's "Go to definition" open "world"). */
 async function openProjectSettings(initialTab = "general"): Promise<void> {
@@ -4309,7 +4421,7 @@ async function saveSettingsFromDialog(): Promise<boolean> {
   const read = settingsRead;
   const l = live as LiveSettings; // every section mounted on open(), so every handle is set
   if (!read || !l.name) return true;
-  return saveProjectSettings({
+  const dto: ProjectSettingsDto = {
     name: l.name.value.trim(), vcs: l.vcs.value as VcsKind, ...(l.start.value ? { start: { scene: l.start.value } } : {}),
     voiced: l.voiced.checked, formatting: l.formatting.checked,
     padAfterDefault: l.padAfter.value.trim() === "" ? DEFAULT_PAD_AFTER : Number(l.padAfter.value), // the gate checked its range
@@ -4328,7 +4440,11 @@ async function saveSettingsFromDialog(): Promise<boolean> {
     writingStatuses: l.writingStatus.value(), estimating: l.estimating.value(), ...l.audio.value(),
     ...l.dictionary.value(),
     ...(Object.keys(settingsExtensionEdits).length ? { extensionValues: { ...settingsExtensionEdits } } : {}),
-  });
+  };
+  const saved = await saveProjectSettings(dto);
+  // Once the dialog has closed: a changed voice offers to remake its lines; turned on, to make them all.
+  if (saved) setTimeout(() => void afterSpeechSettings(read.s, { cast: dto.cast, placeholderSpeech: dto.placeholderSpeech, localeDefault: dto.localeDefault }, dto.castRenames ?? {}), 0);
+  return saved;
 }
 
 /** Save the project's settings; false (after saying why) when the write was refused, so the Settings dialog
@@ -4828,6 +4944,9 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "toggle-auto-rebuild") void window.patter.toggleAutoRebuild();
   else if (cmd === "publish-web") void exportWeb();
   else if (cmd === "audio-manifest") void buildAudioManifest();
+  else if (cmd === "speech-scene") { if (currentSceneId) void window.patter.speechMake({ scene: currentSceneId }); }
+  else if (cmd === "speech-project") void makeProjectSpeech();
+  else if (cmd === "remove-deleted-takes") void removeDeletedTakes();
   else if (cmd === "production-report") void openReport();
   else if (cmd === "export-production-info") void exportProductionInfo();
   else if (cmd === "localisation") void openLocalisation();
@@ -4920,7 +5039,16 @@ window.patter.onUpdaterReady((info) => { showUpdateReady(info, { host: shell.top
 void window.patter.whatsNewState().then((st) => whatsNewAfterUpdate(st, { ...whatsNewOpts, onClose: () => window.patter.whatsNewSeen() }));
 // A publish path that reports through the ops layer turns the strip determinate (the shell flips the
 // band to the bar on the first positive total); none does yet.
-window.patter.onJobProgress((p) => { if (p.kind === "publish") jobView.update(p.done, p.total, p.elapsedMs); });
+window.patter.onJobProgress((p) => {
+  if (p.kind === "publish") jobView.update(p.done, p.total, p.elapsedMs);
+  if (p.kind === "placeholder") {
+    if (!speechJobView.visible) speechJobView.begin("Placeholder Speech");
+    speechJobView.update(p.done, p.total, p.elapsedMs);
+    if (p.done >= p.total) setTimeout(() => speechJobView.end(), 600);
+  }
+});
+// Placeholder Speech says what happened (or why it can't run) as a toast: once per session for a missing key.
+window.patter.onSpeechNote((message, kind) => toast(message, kind));
 
 // A `.patter` document package opened from Finder while the app is running: render the delivered project.
 window.patter.onOpenProject((result) => void showProject(result));

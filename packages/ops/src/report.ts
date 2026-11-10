@@ -122,6 +122,9 @@ export interface ReportData {
   recordingTracked: boolean;
   writingLadder: string[];
   recordingLadder: string[];
+  /** With Placeholder Speech on: voiced lines still to record, counting those with only placeholder speech (and
+   *  those flagged for re-record) with the ones with nothing. Undefined when Placeholder Speech is off. */
+  toRecord?: number;
   scenes: SceneReport[];
   characters: CharacterReport[];
   locales: LocaleReport[];
@@ -338,6 +341,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
     // Recording tracking is opt-in (default off) even for a voiced project (#206).
     recordingTracked: (project.voiced ?? false) && (project.trackAudioStatus ?? false),
     writingLadder, recordingLadder: reportedRecordingLadder,
+    ...(project.placeholderSpeech ? { toRecord: [recordingLadder[0]!, project.placeholderSpeech.status, RERECORD_STATUS].reduce((n, st, i, all) => all.indexOf(st) === i ? n + (totals.voiced.byRecording[st] ?? 0) : n, 0) } : {}),
     scenes: reports,
     characters: [...characters.values()].sort((a, b) => (b.lines + b.estimatedLines) - (a.lines + a.estimatedLines)),
     locales, cut, estimating: estimatingOn, scenesByStatus, coverage, totals,
@@ -428,6 +432,7 @@ export function renderReportText(data: ReportData): string[] {
   if (data.voiced) out.push(`ready to record: ${t.voiced.readyToRecord} / ready to ship: ${t.voiced.readyToShip} (voiced)`);
   // The recording-status breakdown is audio-status-tracking only (#206), a narrower gate than voiced.
   if (data.recordingTracked) out.push(`recording: ${Object.entries(t.voiced.byRecording).map(([k, v]) => `${k} ${v}`).join(", ")}`);
+  if (data.recordingTracked && data.toRecord !== undefined) out.push(`still to record: ${data.toRecord} (counting lines with only placeholder speech)`);
   if (data.estimating) {
     const estLines = data.scenes.reduce((n, s) => n + (s.estimated ? (s.estimate ?? 0) : 0), 0);
     out.push(`estimating: ${data.coverage.estimated}/${data.coverage.totalScenes} scene(s) estimated (${estLines} lines)`);

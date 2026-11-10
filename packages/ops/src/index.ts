@@ -27,8 +27,11 @@ export { runExport, runExportFull, planBuild } from "./export.js";
 export type { ExportOptions, BuildPlan } from "./export.js";
 export { compileLoaded, loadedExtensions, bundleOutputPath, defaultBundlePath, besideBundlePath } from "./compile.js";
 export { runExportHtml, runExportWeb } from "./export-html.js";
-export { scanAudio, scanAudioStatus, pickAudio, audioFolderRungs, audioFoldersActive, audioManifest, audioManifestWrite, AUDIO_MANIFEST_FILE, AUDIO_MANIFEST_SCHEMA } from "./audio-index.js";
+export { scanAudio, scanAudioStatus, pickAudio, audioFolderRungs, audioFoldersActive, audioManifest, audioManifestWrite, manifestLineIds, AUDIO_MANIFEST_FILE, AUDIO_MANIFEST_SCHEMA } from "./audio-index.js";
 export type { AudioRung, AudioEntry, AudioSnapshot } from "./audio-index.js";
+// Placeholder Speech: stand-in speech made by Google from each spoken line, shared by Patterpad and the CLI
+export { planPlaceholderSpeech, runPlaceholderSpeech, resolveKeyFile, expandKeyPath, storedKeyPath, readServiceAccount, mintToken, tokenSource, synthesize, finishTake, requestHash, readGeneratedStampFromFile, voiceFor, placeholderAccentOf, describeSpeechError, SpeechError, PLACEHOLDER_SAMPLE_RATE } from "./placeholder-speech.js";
+export type { PlaceholderPlan, PlaceholderTask, PlaceholderSkip, PlanOptions, RunOptions, RunResult, ServiceAccount, SpeechRequest, SpeechErrorKind } from "./placeholder-speech.js";
 export type { WebExport } from "./export-html.js";
 export { runPlay, renderPlay } from "./play.js";
 export type { PlayOptions, PlayResult, PlayEvent, PlayOutcome } from "./play.js";
@@ -48,6 +51,8 @@ export type { LocEntry, LocCatalog, ApplyStats, ActionTextChange, LocImportRepor
 export { catalogToJson, jsonToCatalog, catalogToPo, poToCatalog } from "./loc-format.js";
 export { catalogToXlsx, xlsxToCatalog } from "./loc-xlsx.js";
 export { runVoiceScript } from "./voice-script.js";
+// A project's source-language strings by id (Placeholder Speech matches a pasted line's words to a take)
+export { sourceStrings } from "./loaded-helpers.js";
 export type { VoiceScript, VoiceLine } from "./voice-script.js";
 export { voiceScriptToXlsx } from "./voice-script-xlsx.js";
 export { runScriptDoc, cueLabel, qualifierNamer, effectDescriber, characterColour, castColours } from "./script-doc.js";
@@ -83,7 +88,7 @@ export type { Resolution, ResolutionDecision, UnresolvedClash, ClashPathSegment,
 export { manifestPath, readProjectManifest, soundManifest, projectManifests, planExtensionUpgrades, renameCastKeys } from "./extensions.js";
 export type { ExtensionUpgrade, CastKeyRewrite } from "./extensions.js";
 // A cast member renamed: the lines and project-level strings that name them (extension data: renameCastKeys)
-export { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, keepCastColours } from "./cast-rename.js";
+export { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, keepCastColours, keepPlaceholderVoices } from "./cast-rename.js";
 // Editable-script handoff records and markers (patterkit/design/proposals/editable-script-handoff.md)
 export {
   HANDOFF_DIR, handoffPath, handoffWrite, serialiseHandoff, parseHandoff, readHandoffs, readHandoff,

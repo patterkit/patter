@@ -31,9 +31,8 @@ node serve.mjs     # http://localhost:8093/
 
 In the repo there is no local `assets/` folder, so the server maps `/assets/tour.patterc` and
 `/assets/audio/*` straight onto the shared files in `examples/projects/`; nothing is copied, and
-the tour plays its current takes (Patterpad **scratch** placeholders today - the moment better
-takes land in the audio folder and the manifest is re-exported, the demo plays those instead,
-untouched).
+the tour plays its current takes (Patterpad **scratch** takes today; when better takes land in the
+audio folder and the manifest is re-exported, the demo plays those instead, untouched).
 
 In your own game you'd deploy the audio folder next to your bundle and point the resolver's base
 path at it; the runtime resolves, **you** play (here, one `<audio>` element).

@@ -3,7 +3,7 @@
 // hash through a real WAV's LIST/INFO/DINK chunk. Pure functions, so no Web Audio / browser needed.
 
 import { describe, it, expect } from "vitest";
-import { textHash, trimSilence, encodeScratchWav, readDinkHash } from "./src/wav.js";
+import { textHash, trimSilence, encodeScratchWav, readTextStamp } from "./src/wav.js";
 
 const ascii = (b: Uint8Array, o: number, n: number): string => String.fromCharCode(...b.slice(o, o + n));
 
@@ -42,8 +42,8 @@ describe("wav: silence trim", () => {
   });
 });
 
-describe("wav: encode + read back the DINK hash", () => {
-  it("produces a valid RIFF/WAVE file with the hash stamped in a LIST/INFO/DINK chunk", () => {
+describe("wav: encode + read back the PTRK text stamp", () => {
+  it("produces a valid RIFF/WAVE file with the hash stamped in a LIST/INFO/PTRK chunk", () => {
     const sr = 8000;
     const ch = new Float32Array(sr); // 1s
     for (let i = 1000; i < 7000; i++) ch[i] = Math.sin(i / 10) * 0.6; // some non-silent signal
@@ -52,19 +52,20 @@ describe("wav: encode + read back the DINK hash", () => {
 
     expect(ascii(wav, 0, 4)).toBe("RIFF");
     expect(ascii(wav, 8, 4)).toBe("WAVE");
-    expect(readDinkHash(wav)).toBe(hash);
+    expect(readTextStamp(wav)).toBe(hash);
+    expect(ascii(wav, wav.length - 16, 4)).toBe("PTRK"); // the list sits after the audio, PTRK its one entry
   });
 
   it("round-trips a hash that needs an odd-length pad byte", () => {
     const wav = encodeScratchWav([new Float32Array(10)], 8000, "abc"); // 3 bytes -> needs padding
-    expect(readDinkHash(wav)).toBe("abc");
+    expect(readTextStamp(wav)).toBe("abc");
   });
 
-  it("returns null reading a buffer with no DINK chunk", () => {
+  it("returns null reading a buffer with no stamp", () => {
     // a bare RIFF/WAVE with just a fmt-less data stub is enough to exercise the walk
     const buf = new Uint8Array(12);
     const dv = new DataView(buf.buffer);
     for (const [o, s] of [[0, "RIFF"], [8, "WAVE"]] as const) for (let i = 0; i < 4; i++) dv.setUint8(o + i, s.charCodeAt(i));
-    expect(readDinkHash(buf)).toBeNull();
+    expect(readTextStamp(buf)).toBeNull();
   });
 });

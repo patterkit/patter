@@ -10,7 +10,7 @@ sidebar:
 **File ▸ Project Settings…** (`⌘,`) opens a tabbed dialog.
 
 <figure class="doc-shot">
-  <img src="/doc-images/ProjectSettings.png" alt="The Project settings dialog: a grouped tab list on the left (Project, Story data, Writing and audio, Localisation) with the Recording status tab open, showing a Track audio status checkbox, an audio root folder, a ladder of recording-status folders, and Use Audio Folders and scratch-recording options." />
+  <img src="/doc-images/ProjectSettings.png" alt="The Project settings dialog: a grouped tab list on the left (Project, Story data, Writing and audio, Localisation) with the Recording status tab open, showing a Track audio status checkbox, Use Audio Folders and its audio root folder, and a ladder of recording-status folders." />
   <figcaption>Project settings, with tabs grouped down the left (Project / Story data / Writing &amp; audio / Localisation). The <strong>Recording status</strong> tab is shown here, mapping each recording stage to a folder on disk.</figcaption>
 </figure>
 
@@ -77,7 +77,9 @@ shows a qualified speaker's name.
 The **Writing status** and **Recording status** tabs hold the status ladders, each stage with
 its own colour. Recording status is opt-in (a **Track audio status** switch) and needs the
 project to be **Voiced**; see [Recording status &
-audio](/production/audio/#recording-status).
+audio](/production/audio/#recording-status). With Audio Folders on, the **Scratch recording** and
+[**Placeholder Speech**](/production/placeholder-speech/) tabs set up recording takes in Patterpad and
+stand-in speech for every spoken line.
 
 The **Estimating** tab sizes still-unwritten scenes by a guess instead of their
 placeholder lines, so the report shows the work ahead. See

@@ -1,10 +1,10 @@
-// Scratch-recording WAV codec (#224): turn captured PCM into a 16-bit WAV with a text-hash stamped into a
-// LIST/INFO/DINK chunk and trimmed silence. No Web Audio here - the recorder pulls
-// Float32 channels off an AudioBuffer and hands them in - so this is fully unit-testable in node. The
-// portable hash helpers (textHash / readDinkHash) live in shared/ so the main-process indexer shares them.
+// Scratch-recording WAV codec (#224): turn captured PCM into a 16-bit WAV with the line's text hash stamped
+// into a LIST/INFO/PTRK chunk and trimmed silence. No Web Audio here - the recorder pulls Float32 channels off
+// an AudioBuffer and hands them in - so this is fully unit-testable in node. The stamp helpers come from
+// @patterkit/core (via shared/), so the main-process indexer, ops, and the CLI read and write the same thing.
 
-import { textHash, readDinkHash } from "../../shared/wav-hash.js";
-export { textHash, readDinkHash };
+import { textHash, readTextStamp, infoListChunk, TEXT_STAMP } from "../../shared/wav-hash.js";
+export { textHash, readTextStamp };
 
 const THRESHOLD = 0.01;   // amplitude below this counts as silence
 const PAD_SECONDS = 0.05; // keep 50ms either side of the speech so it doesn't sound clipped
@@ -28,7 +28,7 @@ function writeAscii(view: DataView, offset: number, s: string): void {
 
 /**
  * Encode PCM channels to a 16-bit WAV, with leading/trailing silence trimmed and `hash` stamped into a
- * trailing LIST/INFO/DINK chunk. Returns the file bytes.
+ * trailing LIST/INFO/PTRK chunk. Returns the file bytes.
  */
 export function encodeScratchWav(channels: Float32Array[], sampleRate: number, hash: string): Uint8Array {
   const numChannels = channels.length || 1;
@@ -36,17 +36,12 @@ export function encodeScratchWav(channels: Float32Array[], sampleRate: number, h
   const { start, end } = trimSilence(channels, sampleRate);
   const frames = Math.max(0, end - start + 1);
   const dataLength = frames * numChannels * (bitsPerSample / 8);
+  const list = infoListChunk([[TEXT_STAMP, hash || ""]]);
 
-  const hashBytes = new TextEncoder().encode(hash || "");
-  const pad = hashBytes.length % 2 !== 0 ? 1 : 0;
-  const dinkSize = 8 + hashBytes.length + pad; // "DINK" + uint32 size + data (+pad)
-  const listContent = 4 + dinkSize;            // "INFO" + DINK subchunk
-  const listTotal = 8 + listContent;           // "LIST" + uint32 size + content
-
-  const buffer = new ArrayBuffer(44 + dataLength + listTotal);
+  const buffer = new ArrayBuffer(44 + dataLength + list.length);
   const view = new DataView(buffer);
   writeAscii(view, 0, "RIFF");
-  view.setUint32(4, 36 + dataLength + listTotal, true);
+  view.setUint32(4, 36 + dataLength + list.length, true);
   writeAscii(view, 8, "WAVE");
   writeAscii(view, 12, "fmt ");
   view.setUint32(16, 16, true);
@@ -67,13 +62,6 @@ export function encodeScratchWav(channels: Float32Array[], sampleRate: number, h
       offset += 2;
     }
   }
-  writeAscii(view, offset, "LIST"); offset += 4;
-  view.setUint32(offset, listContent, true); offset += 4;
-  writeAscii(view, offset, "INFO"); offset += 4;
-  writeAscii(view, offset, "DINK"); offset += 4;
-  view.setUint32(offset, hashBytes.length, true); offset += 4;
-  for (let i = 0; i < hashBytes.length; i++) view.setUint8(offset + i, hashBytes[i]!);
-  // trailing pad byte (already zero-filled by ArrayBuffer)
-
+  new Uint8Array(buffer).set(list, offset);
   return new Uint8Array(buffer);
 }

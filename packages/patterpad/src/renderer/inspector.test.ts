@@ -22,7 +22,7 @@ const handlers: InspectorHandlers = {
   writingStatuses: () => [], lineStatus: () => null, setLineStatus: noop, statusBeats: () => [], setStatusOf: () => {},
   recordingStatuses: () => [], recordingStatus: () => null, setRecordingStatus: noop,
   audioFoldersOn: () => false, recordingFolderStatus: () => null, playRecording: noop,
-  scratchStatus: () => null, recordScratch: noop, scratchStale: () => false,
+  scratchStatus: () => null, recordScratch: noop, scratchStale: () => false, placeholderStatus: () => null, makeSpeechAgain: noop,
   needsRerecord: () => false, setNeedsRerecord: noop,
   qualifiers: () => [], setQualifier: noop,
   projectPadAfter: () => 0.6, setPadAfter: noop, setPadAfterDefault: noop,
@@ -250,6 +250,26 @@ describe("inspector: surfaced line ID + copy", () => {
     const fresh = document.createElement("div");
     renderInspector(fresh, ctx({ kind: "leaf", beat: "line", id: "L_x" }), { ...base, scratchStale: () => false });
     expect(recRow(fresh)?.querySelector(".insp-rec-stale")).toBeFalsy();
+  });
+
+  it("placeholder speech gets Make again in place of Needs re-record, and its own out-of-date wording", () => {
+    const ladder = [{ name: "missing", colour: 0 }, { name: "placeholder", colour: 7 }, { name: "scratch", colour: 2 }];
+    const recRow = (host: HTMLElement): HTMLElement | undefined =>
+      [...host.querySelectorAll(".insp-row")].find((r) => r.querySelector(".insp-key")?.textContent === "Audio") as HTMLElement | undefined;
+    const again: string[] = [];
+    const base = { ...handlers, recordingStatuses: () => ladder, audioFoldersOn: () => true, scratchStatus: () => "scratch", placeholderStatus: () => "placeholder",
+      recordingFolderStatus: () => "placeholder", scratchStale: () => true, makeSpeechAgain: (id: string) => { again.push(id); } };
+    const host = document.createElement("div");
+    renderInspector(host, ctx({ kind: "leaf", beat: "line", id: "L_x" }), base);
+    const make = [...recRow(host)!.querySelectorAll("button")].find((b) => b.textContent?.includes("Make again")) as HTMLButtonElement;
+    make.click();
+    expect(again).toEqual(["L_x"]);
+    expect((recRow(host)!.querySelector(".insp-rec-stale") as HTMLElement).dataset.tip).toMatch(/placeholder speech/);
+    expect(host.textContent).not.toContain("Needs re-record");
+    // A scratch take on the same page still has Needs re-record offered and no Make again.
+    const other = document.createElement("div");
+    renderInspector(other, ctx({ kind: "leaf", beat: "line", id: "L_y" }), { ...base, recordingFolderStatus: () => "scratch" });
+    expect([...recRow(other)!.querySelectorAll("button")].some((b) => b.textContent?.includes("Make again"))).toBe(false);
   });
 
   it("a snippet level surfaces no copy icon (no address / loc ID), but does get a note icon", () => {

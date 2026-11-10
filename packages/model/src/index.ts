@@ -528,6 +528,10 @@ export interface CastMember {
    *  setup; renaming a character stamps the old name's slot here, so they keep their colour. Authoring only
    *  (not shipped in the runtime bundle). */
   colour?: number;
+  /** The voice Placeholder Speech gives this character (a Google voice name such as `en-GB-Standard-B`).
+   *  Absent, the default comes from a hash of the name (narrowed by `gender` when it's male or female);
+   *  renaming a character stamps the old default here, so they keep their voice. Authoring only. */
+  placeholderVoice?: string;
   gameData?: GameData;
 }
 
@@ -798,6 +802,23 @@ export const DEFAULT_RECORDING_STATUSES: RecordingStatusDecl[] = [
   { name: "recorded", colour: 4 },   // green
   { name: "final", colour: 9 },      // purple
 ];
+
+/** Placeholder Speech settings (`ProjectFile.placeholderSpeech`). */
+export interface PlaceholderSpeechConfig {
+  /** The recording status whose folder holds the speech. It's the one status that isn't a recording: reports
+   *  count its lines as still to record, and the scratch recorder treats them as missing. */
+  status: string;
+  /** The Google service-account key file, relative to the `.patter` folder (forward slashes) or `~/...`. Absent,
+   *  the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is used. A path, never the key itself. */
+  keyFile?: string;
+  /** The voices' language and accent, as a Google language code (`en-GB`). Absent, from the main language. */
+  accent?: string;
+  /** Keep the speech out of version control: an ignore rule for its folder, and no adds. Default off. */
+  keepOutOfVersionControl?: boolean;
+}
+
+/** The status Placeholder Speech adds when it's turned on and the ladder has none of that name. */
+export const PLACEHOLDER_STATUS = "placeholder";
 
 /** The reserved recording status a line takes when it is flagged **needs re-record** (#227): a recorded
  *  take exists but is unusable (bad quality, wrong take), so it must be redone. It is NOT a ladder rung -
@@ -1124,6 +1145,10 @@ export interface ProjectFile {
    *  scratch take into this rung's folder for any line at or below this rung. Authoring metadata, editor-
    *  only; never reaches the bundle. Unset = scratch recording off. */
   scratchStatus?: string;
+  /** Placeholder Speech: stand-in speech made from each spoken line's text, into one recording status's folder,
+   *  so a scene can be heard before anyone records it. Present means on; absent means off. Authoring metadata,
+   *  editor and CLI only; never reaches the bundle. See `PlaceholderSpeechConfig`. */
+  placeholderSpeech?: PlaceholderSpeechConfig;
   /** Spell-check setup (Patterpad #177): the active dictionary language + the project's custom word list +
    *  an on/off flag. Source-language-only, authoring metadata - it never reaches the runtime bundle. */
   dictionary?: ProjectDictionary;

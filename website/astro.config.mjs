@@ -127,7 +127,7 @@ export default defineConfig({
         },
         {
           label: "Running the project",
-          items: ["production/overview", "production/tracking-and-reports", "production/coverage-testing", "production/audio", "production/localisation", "production/editable-script"],
+          items: ["production/overview", "production/tracking-and-reports", "production/coverage-testing", "production/audio", "production/placeholder-speech", "production/localisation", "production/editable-script"],
         },
         {
           label: "Setting up a project",

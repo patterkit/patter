@@ -294,6 +294,56 @@ describe("loc-export / loc-import", () => {
     expect(readFileSync(out).subarray(0, 2).toString("latin1")).toBe("PK"); // xlsx (zip) magic
   });
 
+  it("export writes a shipping manifest elsewhere, without placeholder speech or deleted lines' takes", async () => {
+    const dir = makeLocProject();
+    writeFileSync(join(dir, "game.patterproj"), JSON.stringify({ schema: "patter/project@0", project: { id: "loc", name: "Loc" },
+      locales: { default: "en", all: ["en", "fr"] }, voiced: true, trackAudioStatus: true, audioFolders: true, audioRoot: "audio",
+      recordingStatuses: [{ name: "missing" }, { name: "placeholder" }, { name: "scratch" }],
+      placeholderSpeech: { status: "placeholder" }, cast: [{ name: "ANNA" }] }));
+    for (const f of ["placeholder", "scratch"]) mkdirSync(join(dir, "audio", f), { recursive: true });
+    writeFileSync(join(dir, "audio/placeholder/L1.wav"), "x");
+    writeFileSync(join(dir, "audio/scratch/L_gone.wav"), "x"); // no such line
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      // Every export writes its bundle inside the project's own folder: the default (../patter-dist) is shared by
+      // every temporary project, and a bundle left there reads as stale to other tests.
+      const bundle = join(dir, "out.patterc");
+      expect(await main(["export", dir, "-o", bundle, "--no-placeholder-speech"])).toBe(2); // needs --audio-manifest-out
+      const ship = join(dir, "build", "patteraudio.json");
+      expect(await main(["export", dir, "-o", bundle, "--audio-manifest-out", ship, "--no-placeholder-speech"])).toBe(0);
+      expect(JSON.parse(readFileSync(ship, "utf8")).clips).toEqual({});
+      expect(existsSync(join(dir, "audio/patteraudio.json"))).toBe(false); // the shipping export left the development one alone
+      expect(await main(["export", dir, "-o", bundle])).toBe(0);
+      const dev = JSON.parse(readFileSync(join(dir, "audio/patteraudio.json"), "utf8")).clips;
+      expect(Object.keys(dev)).toEqual(["L1"]); // the development one: placeholder kept, the deleted line's take gone
+    } finally { log.mockRestore(); err.mockRestore(); }
+  });
+
+  it("placeholder-speech refuses a project without it, lists with --dry-run, and treats no key as soft only on request", async () => {
+    const dir = makeLocProject();
+    expect(await main(["placeholder-speech", dir])).toBe(2); // not on
+    writeFileSync(join(dir, "game.patterproj"), JSON.stringify({ schema: "patter/project@0", project: { id: "loc", name: "Loc" },
+      locales: { default: "en", all: ["en", "fr"] }, voiced: true, trackAudioStatus: true, audioFolders: true, audioRoot: "audio",
+      recordingStatuses: [{ name: "missing" }, { name: "placeholder" }, { name: "scratch" }],
+      placeholderSpeech: { status: "placeholder", accent: "en-GB", keyFile: "no-such-key.json" }, cast: [{ name: "ANNA" }] }));
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((m?: unknown) => { lines.push(String(m)); });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const prior = process.env["GOOGLE_APPLICATION_CREDENTIALS"];
+    delete process.env["GOOGLE_APPLICATION_CREDENTIALS"];
+    try {
+      expect(await main(["placeholder-speech", dir, "--dry-run"])).toBe(0);
+      expect(lines.some((l) => /^  L1  ANNA  en-GB-Standard-[A-Z]$/.test(l))).toBe(true);
+      expect(await main(["placeholder-speech", dir])).toBe(1);            // no key: a failure
+      expect(await main(["placeholder-speech", dir, "--soft"])).toBe(0);  // ...unless asked to be soft
+      expect(await main(["placeholder-speech", dir, "--scene", "nope"])).toBe(2);
+    } finally {
+      spy.mockRestore(); err.mockRestore();
+      if (prior !== undefined) process.env["GOOGLE_APPLICATION_CREDENTIALS"] = prior;
+    }
+  });
+
   it("tells what action text drops out of the loc files, and import drops it", async () => {
     const dir = makeLocProject();
     const projectPath = join(dir, "game.patterproj");

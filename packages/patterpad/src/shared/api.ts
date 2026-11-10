@@ -5,7 +5,7 @@
 import type { ThemeChoice } from "@wildwinter/app-shell/theme";
 import type { MenuCommand } from "@wildwinter/app-shell/menu";
 import type { WhatsNewState } from "@wildwinter/app-shell/whats-new-main";
-import type { GameDataFields, GameDataNodeKind, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier, SceneNavRow } from "@patterkit/model";
+import type { GameDataFields, GameDataNodeKind, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, PlaceholderSpeechConfig, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier, SceneNavRow } from "@patterkit/model";
 
 export type { VcsKind } from "@patterkit/model";
 import type { PairedCard } from "./paired-cards.js";
@@ -143,6 +143,9 @@ export interface OpenedProject {
   /** Scratch recording (#224): the rung whose derived folder receives in-app scratch takes, or null when
    *  off. The inspector offers "Record scratch" for any line at or below this rung. */
   scratchStatus: string | null;
+  /** Placeholder Speech, or null when off: the status its speech goes in (the one status that isn't a
+   *  recording), and the rest of its settings. */
+  placeholderSpeech: PlaceholderSpeechConfig | null;
   /** The Patter extensions the project takes and has a sound manifest for, in id order, each with its
    *  declarations by node kind and the project's own values (shared/extensions.ts). Absent when it takes
    *  none. */
@@ -322,6 +325,8 @@ export interface ProjectSettingsDto {
   /** Scratch recording (#224, the Audio settings tab): the rung whose derived folder receives in-app scratch
    *  takes, or null when scratch recording is off. */
   scratchStatus: string | null;
+  /** Placeholder Speech (its settings page), or null when off. */
+  placeholderSpeech: PlaceholderSpeechConfig | null;
   /** Spell-check (#177, the Dictionary settings tab): the active dictionary id (built-in or imported),
    *  the project's custom word list, and the on/off flag. */
   dictionaryLanguage: string;
@@ -1490,6 +1495,28 @@ export interface PatterApi {
   listDictionaries(): Promise<DictionaryInfo[]>;
   /** The aff/dic text for a dictionary id (built-in or imported); null when not installed on this machine. */
   readDictionary(id: string): Promise<DictionaryData | null>;
+  /** Placeholder Speech: pick the key file (native picker); the path as it's stored (`~/...` or relative to the
+   *  project folder, forward slashes), or null when cancelled. */
+  speechChooseKey(): Promise<string | null>;
+  /** Whether this machine can use the key (the stored path, else the environment), as a line for the page. */
+  speechKeyStatus(keyFile: string): Promise<{ ok: boolean; message: string }>;
+  /** One sentence in a voice (the Cast editor's Hear): a WAV, or why not. */
+  speechHear(voice: string, text: string): Promise<{ ok: true; bytes: Uint8Array } | { ok: false; error: string }>;
+  /** Make Placeholder Speech now: a scene, some lines (`force` remakes them even unchanged: Make again), every
+   *  line some characters speak (a voice change), or the project (none of them). */
+  speechMake(req: { scene?: string; ids?: string[]; characters?: string[]; force?: boolean }): Promise<{ ok: boolean }>;
+  /** How many lines a run would make (a confirmation's count). */
+  speechCount(req: { scene?: string; ids?: string[]; characters?: string[] }): Promise<number>;
+  /** The accent in use (the project's, else the main language's), or null. */
+  speechAccent(): Promise<string | null>;
+  /** The writer moved off a line: make what's waiting now. */
+  speechNudge(): void;
+  /** Scratch and placeholder takes whose line isn't in the project, by file path (for the confirmation). */
+  speechDeletedTakes(): Promise<string[]>;
+  /** Remove them through version control; how many went. */
+  speechRemoveDeletedTakes(): Promise<number>;
+  /** Placeholder Speech says something: a quiet note or a notice. */
+  onSpeechNote(handler: (message: string, kind: "info" | "error") => void): void;
   /** Import a custom Hunspell dictionary (opens a native .dic picker; its .aff sibling comes too). */
   importDictionary(): Promise<{ ok: boolean; error?: string; info?: DictionaryInfo }>;
   /** Remove an imported dictionary (built-ins can't be removed). */

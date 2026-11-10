@@ -43,7 +43,7 @@ function handlersWith(over: Partial<InspectorHandlers> = {}): InspectorHandlers 
     writingStatuses: () => [], lineStatus: () => null, setLineStatus: noop, statusBeats: () => [], setStatusOf: noop,
     recordingStatuses: () => [], recordingStatus: () => null, setRecordingStatus: noop,
     audioFoldersOn: () => false, recordingFolderStatus: () => null, playRecording: noop,
-    scratchStatus: () => null, recordScratch: noop, scratchStale: () => false,
+    scratchStatus: () => null, recordScratch: noop, scratchStale: () => false, placeholderStatus: () => null, makeSpeechAgain: noop,
     needsRerecord: () => false, setNeedsRerecord: noop,
     qualifiers: () => [], setQualifier: noop,
     projectPadAfter: () => 0.6, setPadAfter: noop, setPadAfterDefault: noop,

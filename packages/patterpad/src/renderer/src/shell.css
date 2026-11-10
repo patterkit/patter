@@ -779,6 +779,20 @@ input::placeholder, textarea::placeholder {
 .sp-folder-none { flex: 1 1 auto; min-width: 0; font: italic var(--text-sm) var(--font-ui); color: var(--muted); align-self: center; }
 /* The auto-derived subfolder hint (folder mode): a read-only mono path shown in place of the old manual field. */
 .sp-folder-derived { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--muted); align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The Recording status page (three audio pages since the Placeholder Speech work): the ladder's name column
+   is one width in folder mode, so the folders line up; the folder and the feature that writes into it share
+   the middle column. */
+.sp-heading { font: 600 var(--text-sm) var(--font-ui); color: var(--ink); margin: 14px 0 2px; }
+.sp-ladder-folders .gd-status-line .gd-name { flex: 0 0 9.5em; min-width: 0; }
+.sp-folder-where { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.sp-folder-where .sp-folder-derived, .sp-folder-where .sp-folder-none { flex: 0 1 auto; }
+.sp-folder-tag { flex: 0 0 auto; font: var(--text-xs) var(--font-ui); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.sp-folder-root { margin: 6px 0 2px; }
+.sp-key-row .sp-key-choose { margin: 0; flex: 0 0 auto; }
+.sp-key-status { margin: 4px 0 0 1.5px; }
+.sp-key-status.is-good { color: var(--muted); }
+.sp-key-status.is-bad, .settings-fieldnote.is-bad { color: var(--warn); }
+.sp-key-guide { margin: 2px 0 8px 1.5px; font-size: var(--text-sm); }
 .sp-swatch { width: 17px; height: 17px; border-radius: 50%; padding: 0; cursor: pointer; box-sizing: border-box; border: 1px solid color-mix(in oklab, var(--ink) 18%, transparent); }
 .sp-swatch.active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent); }
 .sp-swatch-none { position: relative; background: var(--bg); }
@@ -922,3 +936,7 @@ body.writing-view #hintbar { padding-right: 192px; }
 /* A scene's or block's writing status when its lines differ (the hands-on fixes review, Q17): quiet, the
    dropdown beside it showing the lowest. */
 .insp-status-mixed { font: var(--text-xs) var(--font-ui); color: var(--muted); cursor: default; }
+/* Placeholder Speech's voice in the Cast editor: the picker and its Hear button on one line. */
+.cast-voice-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cast-voice-row .cast-voice { flex: 1 1 auto; min-width: 0; }
+.cast-voice-row .cast-hear { margin: 0; flex: 0 0 auto; }

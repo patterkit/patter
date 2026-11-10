@@ -7,6 +7,7 @@
 
 import type { CastMember } from "@patterkit/model";
 import { COMMON_GENDERS, DEFAULT_SPEAKER_PATTERN, formatSpeakerLabel } from "@patterkit/model";
+import { placeholderAccent, defaultPlaceholderVoice, describePlaceholderVoice } from "@patterkit/core";
 import { el } from "./dom.js";
 import { iconBtn, labelled, moveItem, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
@@ -17,6 +18,17 @@ export interface CastHandle {
   firstDuplicate(): HTMLInputElement | null;
   /** Repaint the "Shown with" placeholders, after the pattern or a qualifier's name changed elsewhere. */
   refreshLabels(): void;
+  /** Redraw, after Placeholder Speech was turned on or off, or its accent changed, on its own page. */
+  refreshSpeech(): void;
+}
+
+/** Placeholder Speech, for the Voice field: shown only while it's on. */
+export interface CastSpeech {
+  on(): boolean;
+  /** The accent in use, or undefined when none is chosen yet. */
+  accent(): string | undefined;
+  /** Say a sentence in this voice (the Hear button). */
+  hear(voice: string, characterName: string): void;
 }
 
 /** What the "Shown with" fields need from outside the tab. */
@@ -31,7 +43,7 @@ export interface CastLabelSource {
 
 let genderListSeq = 0; // unique <datalist> ids so each gender input binds to its own suggestion list
 
-export function mountCast(host: HTMLElement, initial: CastMember[], labels?: CastLabelSource): CastHandle {
+export function mountCast(host: HTMLElement, initial: CastMember[], labels?: CastLabelSource, speech?: CastSpeech): CastHandle {
   const state: CastMember[] = structuredClone(initial ?? []);
   // The name each member had when the tab opened, by the row's own object (rows move, and are removed, as
   // objects): what the lines still say. A member added here has none.
@@ -111,7 +123,37 @@ export function mountCast(host: HTMLElement, initial: CastMember[], labels?: Cas
 
     const genderField = labelled("Grammatical gender", gender);
     genderField.append(genderList); // a <datalist> renders nothing; it just needs to be in the DOM
-    return expandableRow({ line: [name, display, actor, acts], details: [genderField, labelled("Notes", notes), ...shownWith.fields] });
+    return expandableRow({ line: [name, display, actor, acts], details: [genderField, ...voiceField(m, gender), labelled("Notes", notes), ...shownWith.fields] });
+  };
+
+  /** Placeholder Speech's voice for a member, only while it's on: the default (from the name and, when male or
+   *  female, the gender) or one chosen from the accent's voices, in words, with Hear. */
+  const voiceField = (m: CastMember, gender: HTMLInputElement): HTMLElement[] => {
+    if (!speech?.on()) return [];
+    const accent = speech.accent();
+    const voices = placeholderAccent(accent)?.voices ?? [];
+    const sel = el("select", "gd-input cast-voice") as HTMLSelectElement;
+    const defaultOption = (): string => {
+      const d = defaultPlaceholderVoice(m.name || "?", accent, m.gender);
+      return d ? `Default: ${describePlaceholderVoice(d)}` : "Default (choose an accent first)";
+    };
+    const def = new Option(defaultOption(), "");
+    sel.append(def);
+    for (const v of voices) sel.append(new Option(describePlaceholderVoice(v.name), v.name));
+    // A voice from another accent (set before the accent changed) stays, named as it is.
+    if (m.placeholderVoice && !voices.some((v) => v.name === m.placeholderVoice)) sel.append(new Option(describePlaceholderVoice(m.placeholderVoice), m.placeholderVoice));
+    sel.value = m.placeholderVoice ?? "";
+    sel.addEventListener("change", () => { m.placeholderVoice = sel.value || undefined; });
+    // The default follows the gender as it's typed (male or female, any case, narrows it when they disagree).
+    gender.addEventListener("input", () => { def.text = defaultOption(); });
+    const hear = el("button", "gd-add cast-hear", "Hear") as HTMLButtonElement; hear.type = "button";
+    hear.dataset.tip = "Hear this voice say the character's name";
+    hear.addEventListener("click", () => {
+      const v = sel.value || defaultPlaceholderVoice(m.name || "?", accent, m.gender);
+      if (v) speech.hear(v, m.displayName || m.name);
+    });
+    const wrap = el("div", "cast-voice-row"); wrap.append(sel, hear);
+    return [labelled("Placeholder Speech voice", wrap, "With no voice chosen, the name picks one; a gender of male or female narrows it.")];
   };
 
   /** One "Shown with" field for each qualifier this character's lines use, then one for each label it has
@@ -166,6 +208,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[], labels?: Cas
   return {
     firstDuplicate: () => guard.firstDuplicate(),
     refreshLabels: () => { for (const r of repaints) r(); },
+    refreshSpeech: () => render(),
     renames(): Record<string, string> {
       const out: Record<string, string> = {};
       for (const m of state) {
@@ -184,6 +227,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[], labels?: Cas
         if (m.qualifierLabels && Object.keys(m.qualifierLabels).length) c.qualifierLabels = { ...m.qualifierLabels };
         if (m.gameData) c.gameData = m.gameData; // preserve any host gameData on the member
         if (m.colour !== undefined) c.colour = m.colour; // the colour a rename kept (stamped by the save)
+        if (m.placeholderVoice) c.placeholderVoice = m.placeholderVoice; // kept while Placeholder Speech is off, just not shown
         return c;
       });
     },

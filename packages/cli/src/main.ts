@@ -25,6 +25,7 @@ import {
   planShareScopes, defaultGameScopesDir, GAME_SCOPES_DIR,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, qualifierNamer,
   scriptFontLicences,
+  planPlaceholderSpeech, runPlaceholderSpeech, resolveKeyFile, readServiceAccount, tokenSource, describeSpeechError,
   findProjectFile, readProjectManifest, detectMergeType, // merge: an extension shard merges by the project's own manifest
 } from "@patterkit/ops";
 import type { InitVcs, BundlePosture, MergeFileType, MergeResult, PlannedWrite, LocCatalog, ImportPlan, LoadedProject } from "@patterkit/ops";
@@ -109,6 +110,10 @@ Usage:
                  [--ids]          IDs-only build: ship no strings; the game localises from beat IDs
                  [--source-debug] IDs-only but embed the source language for debug playback (not shippable)
                  [--allow-invalid] Build even when validate finds errors in the content (not shippable)
+                 [--audio-manifest-out file]  Write the audio manifest there instead of beside the audio
+                                  (a shipping manifest; its files stay relative to the audio root)
+                 [--no-placeholder-speech]   Leave Placeholder Speech out of that manifest (needs
+                                  --audio-manifest-out, so the development one keeps it)
   patter export-html [path] [-o file]  A single self-contained, playable .html (runtime + story inlined;
                  send it to anyone, opens in any browser; default: beside the bundle; -o - for stdout)
   patter play    [path]           Play a project through Patterplay and print the transcript
@@ -133,6 +138,11 @@ Usage:
                  beside the bundle, as .pdf. The PDF embeds its fonts and covers any script or emoji.
   patter voice-export [path] -o file.xlsx  The voice (VO) recording script
                  [--all]           Include every voiced line (else only "ready to record")
+  patter placeholder-speech [path]  Make Placeholder Speech: stand-in speech for spoken lines, from Google,
+                 into the project's placeholder status folder (needs a key: the project's key file, else
+                 GOOGLE_APPLICATION_CREDENTIALS)
+                 [--scene id|name] [--dry-run] [--force]   (--force remakes every line, even unchanged)
+                 [--soft]          No key is a note and exit 0, not a failure (for shared CI)
   patter export-editable [path] -o file.docx  An editable script to send to an editor outside Patter
                  [--scene name]... (repeatable; default the whole project) [--recipient "Sam"]
                  [--status] [--cast] [--all-notes] [--by name]   (writes a handoffs/<id>.json record too)
@@ -168,7 +178,7 @@ const FLAGS = {
   init: { boolean: [], valued: ["name", "vcs", "bundle"], positionals: 1 },
   validate: { boolean: [], valued: [], positionals: 1 },
   format: { boolean: ["check"], valued: [], positionals: Infinity },
-  export: { boolean: ["ids", "source-debug", "allow-invalid"], valued: ["o"], positionals: 1 },
+  export: { boolean: ["ids", "source-debug", "allow-invalid", "no-placeholder-speech"], valued: ["o", "audio-manifest-out"], positionals: 1 },
   "export-html": { boolean: [], valued: ["o"], positionals: 1 },
   play: { boolean: [], valued: ["scene", "block", "choices", "seed"], positionals: 1 },
   coverage: { boolean: ["json", "fail-on-gap", "propose"], valued: ["runs", "max-steps", "seed", "scene", "block", "order"], positionals: 1 },
@@ -179,6 +189,7 @@ const FLAGS = {
   "loc-import": { boolean: ["force-locale"], valued: ["locale"], positionals: 2 },
   "voice-export": { boolean: ["all"], valued: ["o"], positionals: 1 },
   "export-script": { boolean: [], valued: ["o"], positionals: 1 },
+  "placeholder-speech": { boolean: ["dry-run", "force", "soft"], valued: ["scene"], positionals: 1 },
   "export-editable": { boolean: ["status", "cast", "all-notes"], valued: ["o", "recipient", "by"], repeatable: ["scene"], positionals: 1 },
   "import-editable": { boolean: ["dry-run", "direct", "strict-quotes"], valued: ["as", "by"], positionals: 2 },
   suggestions: { boolean: ["accept-clean", "json"], valued: ["handoff"], positionals: 1 },
@@ -199,7 +210,7 @@ const SHORT: Record<Command, string> = {
   init: "init [dir] [--name X] [--vcs git|perforce|plastic|svn] [--bundle commit|ignore]",
   validate: "validate [path]",
   format: "format <paths...> [--check]",
-  export: "export [path] [-o FILE] [--ids | --source-debug] [--allow-invalid]",
+  export: "export [path] [-o FILE] [--ids | --source-debug] [--allow-invalid] [--audio-manifest-out FILE [--no-placeholder-speech]]",
   "export-html": "export-html [path] [-o FILE]",
   play: "play [path] [--scene id] [--block id] [--choices a,b,c] [--seed N]",
   coverage: "coverage [path] [--runs N] [--max-steps M] [--seed S] [--scene id] [--block id] [--order least|script] [--json] [--fail-on-gap] [--propose]",
@@ -210,6 +221,7 @@ const SHORT: Record<Command, string> = {
   "loc-import": "loc-import <file> [path] [--locale xx] [--force-locale]",
   "voice-export": "voice-export [path] -o FILE.xlsx [--all]",
   "export-script": "export-script [path] [-o FILE.pdf|FILE.docx]",
+  "placeholder-speech": "placeholder-speech [path] [--scene id|name] [--dry-run] [--force] [--soft]",
   "export-editable": "export-editable [path] -o FILE.docx [--scene name]... [--recipient X] [--status] [--cast] [--all-notes] [--by name]",
   "import-editable": "import-editable <file.docx> [path] [--dry-run] [--direct] [--as name] [--by name] [--strict-quotes]",
   suggestions: "suggestions [path] [--handoff H-XXXX] [--accept-clean | --json]",
@@ -489,7 +501,12 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       // too), so `patter export` alone produces the artifact and validate's staleness gate knows where to
       // find it (spec §11). The plan is the one Patterpad's Build commits: the bundle, the game's scopes
       // file when it changed, and the audio manifest under Audio Folders.
-      const plan = planBuild(loaded, { allowInvalid, ...(typeof flags.o === "string" ? { bundlePath: flags.o } : {}) });
+      // A shipping manifest goes elsewhere, so the one beside the audio (the development one) is never overwritten
+      // without its placeholder speech.
+      if (flags["no-placeholder-speech"] === true && typeof flags["audio-manifest-out"] !== "string") return usage("export", "--no-placeholder-speech needs --audio-manifest-out, so the development manifest keeps its placeholder speech");
+      const plan = planBuild(loaded, { allowInvalid, ...(typeof flags.o === "string" ? { bundlePath: flags.o } : {}),
+        ...(typeof flags["audio-manifest-out"] === "string" ? { audioManifestPath: resolve(flags["audio-manifest-out"]) } : {}),
+        ...(flags["no-placeholder-speech"] === true ? { leaveOutPlaceholderSpeech: true } : {}) });
       if (!commitWrites(plan.writes)) return 1;
       for (const w of plan.writes) console.log(`wrote ${w.path}`);
       return 0;
@@ -689,6 +706,50 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       const n = data.lines.length;
       console.log(`wrote ${flags.o} - ${n} line(s)${flags.all === true ? "" : " (ready to record)"}`);
       return 0;
+    }
+
+    case "placeholder-speech": {
+      const loaded = loadProject(positionals[0] ?? ".");
+      const ps = loaded.project.placeholderSpeech;
+      let scene: string | undefined;
+      if (typeof flags.scene === "string") {
+        const found = loaded.scenes.find((sc) => sc.id === flags.scene || sc.name === flags.scene);
+        if (!found) { console.error(`placeholder-speech: no scene called "${flags.scene}"`); return 2; }
+        scene = found.id;
+      }
+      const plan = planPlaceholderSpeech(loaded, { ...(scene ? { scene } : {}), ...(flags.force === true ? { force: "all" as const } : {}) });
+      if (!ps || !plan) { console.error("placeholder-speech: this project doesn't have Placeholder Speech on (Project settings > Placeholder Speech, which needs Audio Folders)"); return 2; }
+      if (!plan.accent) { console.error("placeholder-speech: choose an accent first (Project settings > Placeholder Speech): the main language doesn't say which"); return 2; }
+      const skipped = Object.entries(plan.skipped).map(([why, n]) => `${n} ${why}`).join(", ");
+      console.log(`${plan.tasks.length} line(s) to make into ${plan.folder}${skipped ? ` (left alone: ${skipped})` : ""}`);
+      if (flags["dry-run"] === true) { for (const t of plan.tasks) console.log(`  ${t.beatId}  ${t.character}  ${t.request.voice}`); return 0; }
+      if (!plan.tasks.length) return 0;
+      const key = resolveKeyFile(loaded.root, ps.keyFile);
+      if (!key.path) {
+        const msg = `placeholder-speech: no Google key on this machine (${ps.keyFile ? `${ps.keyFile} isn't here, and ` : ""}GOOGLE_APPLICATION_CREDENTIALS isn't set)`;
+        if (flags.soft === true) { console.log(msg.replace("placeholder-speech: ", "note: ")); return 0; }
+        console.error(msg); return 1;
+      }
+      let account;
+      try { account = readServiceAccount(key.path); } catch (e) { console.error(`placeholder-speech: ${describeSpeechError(e)}`); return 1; }
+      mkdirSync(plan.folder, { recursive: true });
+      const keepOut = ps.keepOutOfVersionControl === true;
+      const result = await runPlaceholderSpeech(plan.tasks, {
+        token: tokenSource(account),
+        write: async (path, bytes) => {
+          if (keepOut) { writeFileSync(path, bytes); return true; } // ignored by version control: a plain write
+          const r = writeBinaryFile(path, bytes);
+          if (r.success) return true;
+          if (r.status === "locked") return false;
+          throw new Error(r.message);
+        },
+        onProgress: (done, total) => { if (process.stdout.isTTY) process.stdout.write(`\r${done}/${total}`); },
+      });
+      if (process.stdout.isTTY) process.stdout.write("\n");
+      console.log(`made ${result.made.length}${result.skippedLocked.length ? `, skipped ${result.skippedLocked.length} (open elsewhere)` : ""}${result.failed.length ? `, failed ${result.failed.length}` : ""}`);
+      for (const f of result.failed) console.error(`  ${f.beatId}: ${f.error}`);
+      if (result.stopped) { console.error(`placeholder-speech: stopped: ${result.stopped.message}${result.notTried ? ` (${result.notTried} not tried)` : ""}`); return 1; }
+      return result.failed.length ? 1 : 0;
     }
 
     case "loc-import": {

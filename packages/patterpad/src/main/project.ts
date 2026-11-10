@@ -14,7 +14,7 @@ import { loadProject, loadProjectLanding, applySceneNavOrder, sceneIdForShard, f
   patterScopesWrite, previewRegistry, GAME_SCOPES_DIR, GAME_SCOPES_FILE, PATTER_SCOPES_FILE, projectStringSources, authoringPath,
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks, type PlannedWrite } from "@patterkit/ops";
 import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterkit/runtime";
-import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
+import { parseSource, canonicalStringify, newId, slug, accentForLanguage } from "@patterkit/core";
 import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./scene-kits.js";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
 import { projectQualifiers, usedSpeakerPairs, sceneFolderLayout, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER, DEFAULT_SPEAKER_PATTERN, DEFAULT_ESTIMATE_SPEED, estimateLineDuration } from "@patterkit/model";
@@ -30,7 +30,7 @@ import { hostScopesProblem, renameScopesInLocale, renameScopesInScene } from "./
 import type { EditableExportRequest, EditableImportRequest, EditableImportSummary, OpenSuggestionDto } from "../shared/api.js";
 import type { ImportPlan } from "@patterkit/ops";
 import { applyResolutions, findMarkedShards, ResolutionError, CONFLICT_SIDECAR, SHARD_EXTENSIONS, type Resolution } from "@patterkit/ops";
-import { castColours, keepCastColours, cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, renameCastKeys, readProjectManifest, manifestPath, planExtensionUpgrades } from "@patterkit/ops";
+import { castColours, keepCastColours, keepPlaceholderVoices, cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, renameCastKeys, readProjectManifest, manifestPath, planExtensionUpgrades } from "@patterkit/ops";
 import { createHash, randomUUID } from "node:crypto";
 import type { StageRenameDto } from "../shared/api.js";
 import type { SceneExtensionShards, LiveSceneSource, SceneExtensionSourceDto } from "../shared/api.js";
@@ -216,6 +216,42 @@ async function commitAuthoring(s: SceneShards, write: { path: string; content: s
  *  edited; deletions are moot - a gone string has no translation to stale). This is the signal loc
  *  staleness + the production report read: a translated line goes stale when its source `modifiedAt`
  *  postdates the last import's `localisedAt`. Best-effort: a shard that won't parse yields no ids. */
+/** The source strings a save took away: a deleted line's (or a line cut and pasted, which takes a new id). */
+function removedSourceStringIds(prevLocSource: string | null, nextLocSource: string): string[] {
+  const strings = (src: string | null): Record<string, string> => {
+    if (!src) return {};
+    try { return (parseSource(src) as LocaleFile)?.strings ?? {}; } catch { return {}; }
+  };
+  const before = strings(prevLocSource), after = strings(nextLocSource);
+  return Object.keys(before).filter((id) => !(id in after));
+}
+
+/** The lines whose speaker a flow change altered, by id (their words are the same, their voice isn't). */
+function changedSpeakerIds(prevFlow: string | null, nextFlow: string): string[] {
+  const speakers = (src: string | null): Map<string, string> => {
+    const out = new Map<string, string>();
+    const walk = (n: unknown): void => {
+      if (Array.isArray(n)) { for (const x of n) walk(x); return; }
+      if (!n || typeof n !== "object") return;
+      const o = n as Record<string, unknown>;
+      if (typeof o["id"] === "string" && o["kind"] === "line" && typeof o["character"] === "string") out.set(o["id"], o["character"]);
+      for (const v of Object.values(o)) if (v && typeof v === "object") walk(v);
+    };
+    if (src) { try { walk(parseSource(src)); } catch { /* unreadable: nothing */ } }
+    return out;
+  };
+  const before = speakers(prevFlow), after = speakers(nextFlow);
+  return [...after].filter(([id, who]) => before.has(id) && before.get(id) !== who).map(([id]) => id);
+}
+
+let linesSavedListener: ((sceneId: string, changed: string[], removed: string[]) => void) | null = null;
+/** Hear each scene save's changed lines (words or speaker) and removed lines, by id. */
+export function onLinesSaved(cb: (sceneId: string, changed: string[], removed: string[]) => void): void { linesSavedListener = cb; }
+/** The open project, for Placeholder Speech (read-only use). */
+export function loadedProject(): LoadedProject | null { return loaded; }
+/** Ask the audio indexer to look again (after Placeholder Speech wrote takes). */
+export function rescanAudio(): void { audioIndex?.rescan(); }
+
 function changedSourceStringIds(prevLocSource: string | null, nextLocSource: string): string[] {
   const strings = (src: string | null): Record<string, string> => {
     if (!src) return {};
@@ -299,12 +335,14 @@ const autoRerecord = new Map<string, { scene: string; spoken: string }>();
 const spokenText = (text: string): string => text.replace(/<\/?(?:b|i|bi)>/g, "").replace(/\s+/g, " ").trim();
 
 /** Whether a line's recording status means a usable take exists (recorded or final): any rung but the lowest
- *  (no take) and the scratch rung (the project's `scratchStatus`, else one named "scratch"). */
+ *  (no take), the scratch rung (the project's `scratchStatus`, else one named "scratch"), and Placeholder
+ *  Speech's. */
 function hasRecordedTake(status: string | undefined, project: ProjectFile): boolean {
   if (!status) return false;
   const ladder = (project.recordingStatuses ?? DEFAULT_RECORDING_STATUSES).map((r) => r.name);
   const scratch = project.scratchStatus ?? (ladder.includes("scratch") ? "scratch" : undefined);
-  return ladder.includes(status) && status !== ladder[0] && status !== scratch;
+  // Placeholder Speech's status isn't a recording either: an edit remakes it on its own, so nobody needs a to-do.
+  return ladder.includes(status) && status !== ladder[0] && status !== scratch && status !== project.placeholderSpeech?.status;
 }
 
 /**
@@ -407,6 +445,7 @@ function summarise(p: LoadedProject): OpenedProject {
     audioFolders: p.project.audioFolders ?? false,
     audioRoot: p.project.audioRoot ?? null,
     scratchStatus: p.project.scratchStatus ?? null,
+    placeholderSpeech: p.project.placeholderSpeech ?? null,
     ...extensionSummary(p),
   };
 }
@@ -927,6 +966,16 @@ export function saveScratchAudio(beatId: string, bytes: Uint8Array): Promise<Sav
   });
 }
 
+/** The statuses whose takes carry stamps worth reading (#224): every one above the lowest, up to and including
+ *  the scratch status (the project's `scratchStatus`, else one named "scratch"), whether or not the in-app
+ *  recorder is on, since scratch takes come from other tools too. Recorded and final takes aren't read. */
+export function stampRungs(p: Pick<ProjectFile, "recordingStatuses" | "scratchStatus">): string[] {
+  const ladder = (p.recordingStatuses ?? DEFAULT_RECORDING_STATUSES).map((r) => r.name);
+  const scratch = p.scratchStatus ?? (ladder.includes("scratch") ? "scratch" : undefined);
+  const top = scratch === undefined ? -1 : ladder.indexOf(scratch);
+  return top < 1 ? [] : ladder.slice(1, top + 1);
+}
+
 /** (Re)build or tear down the audio indexer to match the loaded project's audio config. Idempotent;
  *  call on open + whenever the audio settings change. */
 function syncAudioIndex(): void {
@@ -937,10 +986,10 @@ function syncAudioIndex(): void {
   }
   const p = loaded!.project; // audioActive() guarantees a loaded, voiced, folder-mode project
   const rungs = deriveRecordingFolders(p.audioRoot, p.recordingStatuses ?? DEFAULT_RECORDING_STATUSES);
-  const scratch = p.scratchStatus ?? undefined; // read scratch takes' stamped text-hash (staleness, #224)
+  const stamps = stampRungs(p);
   const onSnap = (snap: AudioSnapshot): void => { audioSnapshot = snap; audioListener(snap); };
-  if (audioIndex) audioIndex.update(rungs, scratch);
-  else audioIndex = startAudioIndex(loaded!.root, rungs, onSnap, scratch);
+  if (audioIndex) audioIndex.update(rungs, stamps);
+  else audioIndex = startAudioIndex(loaded!.root, rungs, onSnap, stamps);
 }
 
 /** Pin simple-vc-lib to the project's CONFIGURED version control, so it never auto-detects one the author
@@ -1710,6 +1759,13 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
       // Keep the in-memory project current with the save, so validate / play don't re-read disk.
       try { if (loaded) applyLiveSource(loaded, { sceneId, flow: flowSource, loc: locSource, extensions }); }
       catch (e) { console.warn(`patterpad: saved scene ${sceneId} but couldn't refresh the in-memory copy (reloads on reopen):`, e); }
+      // Placeholder Speech (and the takes of deleted lines) hear, once the in-memory project has the save, which lines this save changed or removed.
+      if (linesSavedListener) {
+        const removed = locChanged ? removedSourceStringIds(prevLoc, locSource) : [];
+        const respoken = prevFlow !== flowSource ? changedSpeakerIds(prevFlow, flowSource) : [];
+        const changed = [...new Set([...changedStringIds, ...respoken])];
+        if (changed.length || removed.length) linesSavedListener(sceneId, changed, removed);
+      }
       // The saved bytes now stand for the scene, so the play window's older stash of it goes: left, a
       // Restart laid it over this save and played the edit before the last one. One pushed while the
       // save was landing is newer, and stays.
@@ -3266,6 +3322,7 @@ export function readSettings(): ProjectSettingsDto | null {
     audioFolders: p.audioFolders ?? false,
     audioRoot: p.audioRoot ?? null,
     scratchStatus: p.scratchStatus ?? null,
+    placeholderSpeech: p.placeholderSpeech ?? null,
     // Spell-check (#177): show the EFFECTIVE language (derived from the source locale when unset) so the
     // Dictionary tab's picker reflects what's actually in use.
     dictionaryLanguage: p.dictionary?.language ?? deriveDictLanguage(p.locales.default),
@@ -3346,6 +3403,8 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
     if (renames) renameQualifierLabels(cast, renames);
     // A renamed character keeps the colour their old name had, stamped in this same save.
     if (castRenames) keepCastColours(cast, castRenames);
+    // ...and their Placeholder Speech voice, so a rename doesn't remake their lines in another (when it's on).
+    if (castRenames && s.placeholderSpeech) keepPlaceholderVoices(cast, castRenames, s.placeholderSpeech.accent ?? accentForLanguage(s.localeDefault));
     const next: ProjectFile = {
       ...loaded.project,
       project: { ...loaded.project.project, name: s.name },
@@ -3396,6 +3455,8 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
       audioRoot: s.audioFolders && s.audioRoot ? s.audioRoot : undefined,
       // Scratch recording (#224): only meaningful in folder mode; store the chosen rung, else drop it (off).
       scratchStatus: s.audioFolders && s.scratchStatus ? s.scratchStatus : undefined,
+      // Placeholder Speech: only meaningful in folder mode; stored while on, dropped when off.
+      placeholderSpeech: s.audioFolders && s.placeholderSpeech ? s.placeholderSpeech : undefined,
       // Spell-check (#177): store the language only when it differs from the source-locale default, the words
       // only when non-empty, and `enabled` only when OFF (default on) - keeping a clean project file.
       dictionary: dictionaryFile(s),

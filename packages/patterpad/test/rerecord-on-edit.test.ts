@@ -93,6 +93,22 @@ describe("editing a recorded line's spoken text flags it for re-record", () => {
     expect(project.readSceneRerecord(SCENE)).toEqual({});
   });
 
+  it("doesn't flag a line whose take is placeholder speech: an edit remakes it on its own", async () => {
+    const dir = join(mkdtempSync(join(tmpdir(), "pp-rerecord-")), "tavern.patter");
+    cpSync(TAVERN, dir, { recursive: true });
+    const projFile = join(dir, "tavern.patterproj");
+    const proj = parseSource(readFileSync(projFile, "utf8")) as ProjectFile;
+    proj.voiced = true; proj.trackAudioStatus = true;
+    proj.recordingStatuses = [{ name: "missing" }, { name: "placeholder" }, { name: "scratch" }, { name: "recorded" }];
+    proj.placeholderSpeech = { status: "placeholder" };
+    writeFileSync(projFile, canonicalStringify(proj));
+    project.openProject(dir);
+    project.hydrate();
+    expect((await project.saveSceneRecording(SCENE, { L_greet: "placeholder", L_work: "recorded" })).ok).toBe(true);
+    await save(withStrings({ L_greet: "Something else entirely.", L_work: "Different words." }));
+    expect(project.readSceneRerecord(SCENE)).toEqual({ L_work: true });
+  });
+
   it("doesn't flag anything in a project that doesn't track audio status", async () => {
     await openTracked(false);
     await save(withStrings({ L_greet: "Something else entirely." }));

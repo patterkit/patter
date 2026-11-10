@@ -106,13 +106,15 @@ export interface BuildPlan {
  * (CLI review 2026-10, item 23). Patterpad's Build wrote bundle, scopes and audio manifest; its Auto
  * Rebuild skipped the scopes file; `patter export` never wrote the manifest. `bundlePath` overrides
  * where the bundle goes (the CLI's `-o`); `audio` is a snapshot the caller already holds (Patterpad's
- * live index), else the folders are scanned now.
+ * live index), else the folders are scanned now. `audioManifestPath` writes the audio manifest elsewhere (a
+ * shipping manifest), and `leaveOutPlaceholderSpeech` leaves Placeholder Speech's takes out of it.
  */
-export function planBuild(loaded: LoadedProject, opts: ExportOptions & { bundlePath?: string; audio?: AudioSnapshot } = {}): BuildPlan {
+export function planBuild(loaded: LoadedProject, opts: ExportOptions & { bundlePath?: string; audio?: AudioSnapshot; audioManifestPath?: string; leaveOutPlaceholderSpeech?: boolean } = {}): BuildPlan {
   const bundle = runExport(loaded, opts);
   const text = canonicalStringify(bundle, { trailingComma: false });
   const scopes = patterScopesWrite(loaded.project, loaded.gameScopes);
-  const audio = audioManifestWrite(loaded, opts.audio ?? scanAudio(loaded));
+  const audio = audioManifestWrite(loaded, opts.audio ?? scanAudio(loaded), {
+    ...(opts.audioManifestPath ? { path: opts.audioManifestPath } : {}), ...(opts.leaveOutPlaceholderSpeech ? { leaveOutPlaceholderSpeech: true } : {}) });
   return {
     bundle,
     text,

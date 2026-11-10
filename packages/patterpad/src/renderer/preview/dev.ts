@@ -144,6 +144,7 @@ const project = {
   // Scratch recording (#224): in folder mode, the "scratch" rung receives in-app takes - so the inspector
   // offers "● Record" on any line at/below it (missing / scratch).
   scratchStatus: new URLSearchParams(location.search).get("view") === "audiofolders" ? "scratch" : null,
+  placeholderSpeech: null,
   // Patter extensions (OpenedProject.extensions): the probe, and a node in another scene its references name.
   extensions: probeDtos(),
   extensionNodes: { line: [{ id: "L_street_call", label: "ANNA: Over here!", scene: "scn_street" }] },
@@ -487,7 +488,7 @@ const stub = {
     // In ?view=audiofolders folder mode + scratch are on with an audio root, so the Audio tab shows the
     // root picker, the derived-subfolder hints, and the scratch-recording controls (#206 / #224).
     recordingStatuses: [{ name: "missing", colour: 0 }, { name: "scratch", colour: 2 }, { name: "recorded", colour: 4 }, { name: "final", colour: 9 }],
-    audioFolders: project.audioFolders, audioRoot: project.audioRoot, scratchStatus: project.scratchStatus,
+    audioFolders: project.audioFolders, audioRoot: project.audioRoot, scratchStatus: project.scratchStatus, placeholderSpeech: project.placeholderSpeech,
     dictionaryLanguage: "en-GB", dictionaryWords: ["Patterpad", "Eldoria"], dictionaryIgnore: [], dictionaryEnabled: true,
     closedCaptions: { open: "[", close: "]", character: "SFX" } }),
   saveSettings: async (s: { name: string; extensionValues?: Record<string, Record<string, unknown>> }) => {
@@ -506,6 +507,17 @@ const stub = {
     { id: "fr_FR", label: "fr_FR", builtin: false },
   ]),
   readDictionary: async (id: string) => DICT_BYTES[id] ?? null,
+  // Placeholder Speech: no Google in the preview; the key reads as ready once a path is set.
+  speechChooseKey: async () => "~/.patter/placeholder-speech-key.json",
+  speechKeyStatus: async (keyFile: string) => keyFile ? { ok: true, message: "Ready: project preview-demo, account speech@preview-demo.iam.gserviceaccount.com." } : { ok: false, message: "No key on this machine: set the key file, or GOOGLE_APPLICATION_CREDENTIALS. Speech made elsewhere still plays." },
+  speechHear: async () => ({ ok: false as const, error: "No Google in the preview." }),
+  speechMake: async () => ({ ok: true }),
+  speechCount: async () => 3,
+  speechAccent: async () => "en-GB",
+  speechNudge: () => {},
+  speechDeletedTakes: async () => [],
+  speechRemoveDeletedTakes: async () => 0,
+  onSpeechNote: () => {},
   importDictionary: async () => ({ ok: true, info: { id: "de_DE", label: "de_DE", builtin: false } }),
   removeDictionary: async () => ({ ok: true }),
   addDictionaryWord: async (word: string) => ({ ok: true, words: [...project.dictionary.words, word] }),

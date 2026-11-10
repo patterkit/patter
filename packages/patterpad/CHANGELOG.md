@@ -6,6 +6,34 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Placeholder Speech: hear a scene before anyone records it.** Turn it on in Project Settings and every spoken
+  line gets stand-in speech, made from its words a moment after you move off it. Any scratch, recorded, or final
+  take is heard instead, and the speech sounds like a stand-in on purpose.
+  - It needs a Google Cloud key file (a team can share one, kept outside version control); a machine without one
+    just doesn't make any, and hears what others made. The docs walk through getting a key.
+  - Each character's voice is in Cast, with Hear; with none chosen, the name picks one. Changing a voice offers to
+    remake that character's lines.
+  - A line with only placeholder speech still counts as to record: the scratch recorder's Next needed stops at it,
+    editing it doesn't flag it for re-record, and Production Information shows how many lines are still to record.
+  - Make again, in the inspector, remakes a line Google cut short. Production > Make Placeholder Speech does a
+    scene or the whole project, and its last item switches it off for this computer.
+- **Moving a line keeps its take.** Cut a line and paste it elsewhere and its scratch take follows it to the new
+  line, rather than being left behind under the old one.
+- **Takes for deleted lines go, in time.** Delete a line and its placeholder speech goes straight away; its
+  scratch take goes a week later, in case you change your mind. Production > Remove Takes for Deleted Lines clears
+  them now, after listing them.
+
+### Changed
+
+- **Audio settings are three pages: Recording status, Scratch recording, and Placeholder Speech.** Use Audio
+  Folders and the audio root now sit above the statuses they decide, and each status's folder lines up.
+- **The tour opens with its voice.** The Interactive Tour now copies into a folder of its own with its audio
+  beside it, where before the copy had none.
+- **Takes are stamped `PTRK`.** The words a take was recorded against are kept in a `PTRK` chunk in the WAV, no
+  longer `DINK`; takes stamped `DINK` still show when they're out of date.
+
 ## [1.1.1] - 2026-11-10
 
 ### Changed

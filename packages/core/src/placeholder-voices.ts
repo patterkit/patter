@@ -1,0 +1,100 @@
+// ---------------------------------------------------------------------------
+// Placeholder Speech's voices: a curated list of Google's Standard voices per accent, and the default voice a
+// character gets from a hash of their name. Standard voices only, on purpose: the speech is a stand-in, and
+// must sound like one.
+//
+// FROZEN ONCE SHIPPED. A default is the name's hash taken modulo a list's length, so adding, removing, or
+// reordering a voice changes characters' defaults and remakes their lines in every project. A new accent gets
+// a new list; an existing list never changes. Before shipping a new list, check every name and gender against
+// Google's voices.list (https://texttospeech.googleapis.com/v1/voices) with a key.
+// ---------------------------------------------------------------------------
+
+import { fnv32 } from "@wildwinter/toolkit"; // FNV-1a, unsigned 32-bit: stable across tools and versions
+
+export type VoiceGender = "female" | "male";
+export interface PlaceholderVoice { name: string; gender: VoiceGender }
+export interface PlaceholderAccent { code: string; label: string; voices: readonly PlaceholderVoice[] }
+
+const v = (name: string, gender: VoiceGender): PlaceholderVoice => ({ name, gender });
+
+/** The accents on offer, in the order the settings page lists them. */
+export const PLACEHOLDER_ACCENTS: readonly PlaceholderAccent[] = [
+  { code: "en-GB", label: "English (British)", voices: [
+    v("en-GB-Standard-A", "female"), v("en-GB-Standard-B", "male"), v("en-GB-Standard-C", "female"),
+    v("en-GB-Standard-D", "male"), v("en-GB-Standard-F", "female") ] },
+  { code: "en-US", label: "English (American)", voices: [
+    v("en-US-Standard-A", "male"), v("en-US-Standard-B", "male"), v("en-US-Standard-C", "female"),
+    v("en-US-Standard-D", "male"), v("en-US-Standard-E", "female"), v("en-US-Standard-F", "female"),
+    v("en-US-Standard-G", "female"), v("en-US-Standard-H", "female"), v("en-US-Standard-I", "male"),
+    v("en-US-Standard-J", "male") ] },
+  { code: "en-AU", label: "English (Australian)", voices: [
+    v("en-AU-Standard-A", "female"), v("en-AU-Standard-B", "male"), v("en-AU-Standard-C", "female"),
+    v("en-AU-Standard-D", "male") ] },
+  { code: "en-IN", label: "English (Indian)", voices: [
+    v("en-IN-Standard-A", "female"), v("en-IN-Standard-B", "male"), v("en-IN-Standard-C", "male"),
+    v("en-IN-Standard-D", "female") ] },
+  { code: "de-DE", label: "German", voices: [
+    v("de-DE-Standard-A", "female"), v("de-DE-Standard-B", "male"), v("de-DE-Standard-C", "female"),
+    v("de-DE-Standard-D", "male"), v("de-DE-Standard-E", "male"), v("de-DE-Standard-F", "female") ] },
+  { code: "fr-FR", label: "French", voices: [
+    v("fr-FR-Standard-A", "female"), v("fr-FR-Standard-B", "male"), v("fr-FR-Standard-C", "female"),
+    v("fr-FR-Standard-D", "male"), v("fr-FR-Standard-E", "female") ] },
+  { code: "es-ES", label: "Spanish (Spain)", voices: [
+    v("es-ES-Standard-A", "female"), v("es-ES-Standard-B", "male"), v("es-ES-Standard-C", "female"),
+    v("es-ES-Standard-D", "female") ] },
+  { code: "it-IT", label: "Italian", voices: [
+    v("it-IT-Standard-A", "female"), v("it-IT-Standard-B", "female"), v("it-IT-Standard-C", "male"),
+    v("it-IT-Standard-D", "male") ] },
+  { code: "sv-SE", label: "Swedish", voices: [
+    v("sv-SE-Standard-A", "female"), v("sv-SE-Standard-B", "female"), v("sv-SE-Standard-C", "female"),
+    v("sv-SE-Standard-D", "male"), v("sv-SE-Standard-E", "male") ] },
+  { code: "ja-JP", label: "Japanese", voices: [
+    v("ja-JP-Standard-A", "female"), v("ja-JP-Standard-B", "female"), v("ja-JP-Standard-C", "male"),
+    v("ja-JP-Standard-D", "male") ] },
+];
+
+/** The accent for a code, or undefined when it isn't one on offer. */
+export function placeholderAccent(code: string | undefined): PlaceholderAccent | undefined {
+  const want = code?.replace(/_/g, "-").toLowerCase();
+  return want === undefined ? undefined : PLACEHOLDER_ACCENTS.find((a) => a.code.toLowerCase() === want);
+}
+
+/** The accent a project's main language implies: an exact match (`en-GB`), else the first accent of that
+ *  language when the code names one with only one accent on offer. A bare `en`, which has several, gives
+ *  undefined: the writer picks. */
+export function accentForLanguage(locale: string | undefined): string | undefined {
+  if (!locale) return undefined;
+  const exact = placeholderAccent(locale);
+  if (exact) return exact.code;
+  const lang = locale.split(/[-_]/)[0]!.toLowerCase();
+  const same = PLACEHOLDER_ACCENTS.filter((a) => a.code.split("-")[0]!.toLowerCase() === lang);
+  return same.length === 1 ? same[0]!.code : undefined;
+}
+
+/** The voice a character gets with none chosen: a hash of their name picks from the accent's voices; when
+ *  their gender is male or female (any case) and that pick is the other, the pick moves within that gender's
+ *  voices. Characters whose pick already fits keep it, so setting a gender changes only the voices that were
+ *  wrong. Undefined when the accent isn't one on offer. */
+export function defaultPlaceholderVoice(name: string, accent: string | undefined, gender?: string): string | undefined {
+  const voices = placeholderAccent(accent)?.voices;
+  if (!voices?.length) return undefined;
+  const h = fnv32(name);
+  const pick = voices[h % voices.length]!;
+  const want = gender?.trim().toLowerCase();
+  if ((want !== "male" && want !== "female") || pick.gender === want) return pick.name;
+  const fitting = voices.filter((x) => x.gender === want);
+  return fitting.length ? fitting[h % fitting.length]!.name : pick.name;
+}
+
+/** A voice's name in words, for the Cast editor: "Female, English (British) 2". Falls back to the raw name. */
+export function describePlaceholderVoice(voice: string): string {
+  for (const a of PLACEHOLDER_ACCENTS) {
+    const sameGender = (g: VoiceGender): PlaceholderVoice[] => a.voices.filter((x) => x.gender === g);
+    const found = a.voices.find((x) => x.name === voice);
+    if (found) {
+      const n = sameGender(found.gender).indexOf(found) + 1;
+      return `${found.gender === "female" ? "Female" : "Male"}, ${a.label} ${n}`;
+    }
+  }
+  return voice;
+}

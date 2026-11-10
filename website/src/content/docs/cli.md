@@ -83,7 +83,12 @@ writes too; `-o -` writes to stdout. `--ids` builds an IDs-only bundle (ships no
 problems listed; `--allow-invalid` builds it anyway, for looking at, never for shipping. Where the game
 shares its scopes, it also writes `game-scopes/patter.scopes.json`, and only when its content would
 change, and in an **Audio Folders** project the `patteraudio.json` manifest beside the audio (neither
-with `-o -`).
+with `-o -`). The manifest names only takes whose line is in the project.
+
+`--audio-manifest-out file` writes the audio manifest there instead of beside the audio: a shipping
+manifest, in your build folder, whose files are still named relative to the audio root.
+`--no-placeholder-speech` leaves [Placeholder Speech](/production/placeholder-speech/) out of it, so it names
+no file you didn't package; it needs `--audio-manifest-out`, so the development manifest keeps it.
 
 ### `patter export-script [path] [-o file.pdf|.docx]`
 Export a **readable screenplay** of the script + flow: dialogue, text, choices (with their
@@ -172,6 +177,18 @@ A voice-recording script. Requires a **Voiced** project (`voiced: true`), or it 
 error. `--all` includes every voiced line (otherwise only those ready to record). In an
 **Audio Folders** project, each line's status column is derived from the takes on disk. The
 spreadsheet has a Direction column with each line's performance direction.
+
+### `patter placeholder-speech [path]`
+Make [Placeholder Speech](/production/placeholder-speech/) for every spoken line that has none, or whose speech
+no longer matches its words or voice, as Patterpad does: the same files, so a team can keep the key on one build
+machine and make the speech there. The key comes from the project's key file, else
+`GOOGLE_APPLICATION_CREDENTIALS`. It exits 1 when there's no key, or when Google stops the run (a refused key, a
+project without the Text-to-Speech API, no network).
+
+- `--scene id|name` makes one scene's.
+- `--dry-run` lists what it would make, and needs no key.
+- `--force` makes every line again, even unchanged ones.
+- `--soft` treats no key as a note and exits 0, for a shared CI job some machines run without one.
 
 ## Sharing & merging
 

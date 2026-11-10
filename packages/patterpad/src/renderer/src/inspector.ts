@@ -370,9 +370,12 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
     chip.dataset.tip = "Derived from audio folders";
     wrap.append(chip);
     // Stale scratch take (#224): the WAV's stamped text-hash no longer matches the line (it was edited).
+    const isSpeech = !!derived && derived === h.placeholderStatus();
     if (derived && h.scratchStale(id)) {
       const warn = el("span", "insp-rec-stale"); warn.append(iconNode("warning", 12), "out of date");
-      warn.dataset.tip = "This scratch take was recorded against an earlier version of the line.";
+      warn.dataset.tip = isSpeech
+        ? "This placeholder speech was made from an earlier version of the line. It's made again a moment after you move on."
+        : "This scratch take was recorded against an earlier version of the line.";
       wrap.append(warn);
     }
     // A play button only when a file actually resolved (not for an implicitly-missing line).
@@ -382,6 +385,13 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
       play.setAttribute("aria-label", "Play audio");
       play.addEventListener("click", () => h.playRecording(id, play));
       wrap.append(play);
+    }
+    // Make again: for placeholder speech Google cut short. In place of Needs re-record, which is a person's to-do.
+    if (isSpeech) {
+      const again = el("button", "insp-rec-record") as HTMLButtonElement;
+      again.type = "button"; again.append(iconNode("restart", 12), "Make again"); again.dataset.tip = "Make this line's placeholder speech again";
+      again.addEventListener("click", () => h.makeSpeechAgain(id));
+      wrap.append(again);
     }
     // Record scratch (#224): offered when the line is AT OR BELOW the scratch rung - i.e. not yet given a
     // more-finished take. (Once it's recorded/final, scratch would only downgrade it, so we don't offer it.)
@@ -417,6 +427,9 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
  *  project tracks recording status); null otherwise. */
 function rerecordPart(id: string | null, h: InspectorHandlers): Part {
   if (!h.recordingStatuses().length || !id) return null;
+  // A line whose take is placeholder speech has Make again instead: an edit remakes it on its own.
+  const ps = h.placeholderStatus();
+  if (ps && h.audioFoldersOn() && h.recordingFolderStatus(id) === ps && !h.needsRerecord(id)) return null;
   return h.needsRerecord(id) ? rerecordRow(id, h) : { label: "Needs re-record", act: () => h.setNeedsRerecord(id, true) };
 }
 
@@ -1062,6 +1075,10 @@ export interface InspectorHandlers extends ExtensionHandlers {
   recordScratch: (id: string) => void;
   /** True when a line's scratch take is stale - its WAV's stamped text-hash no longer matches the line. */
   scratchStale: (id: string) => boolean;
+  /** The status Placeholder Speech makes into, or null when it's off. */
+  placeholderStatus: () => string | null;
+  /** Make this line's Placeholder Speech again (a clip Google cut short), regardless of its stamp. */
+  makeSpeechAgain: (id: string) => void;
   /** Replace the author tags (#215) on a node by id (an empty list clears them). */
   setTags: (id: string, tags: string[]) => void;
   /** The project's speaker qualifiers, in display order (the Qualifier dropdown on a dialogue line). */

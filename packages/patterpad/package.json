@@ -73,6 +73,10 @@
         "to": "examples/tour.patter"
       },
       {
+        "from": "../../examples/projects/audio",
+        "to": "examples/audio"
+      },
+      {
         "from": "../../examples/projects/night-ferry.patter",
         "to": "examples/night-ferry.patter"
       }

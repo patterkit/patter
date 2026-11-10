@@ -7,11 +7,11 @@
 // debounced), so it never blocks the main event loop; the editor reads a cached copy in the renderer and
 // can't hitch. Structured for a clean lift into a utilityProcess later (no Electron deps, message-style API).
 
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, open, type FileHandle } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
 import { audioFolderRungs, pickAudio } from "@patterkit/ops";
 import type { AudioRung, AudioSnapshot } from "@patterkit/ops";
-import { readDinkHash } from "../shared/wav-hash.js";
+import { readInfoChunks, TEXT_STAMP, GENERATED_STAMP } from "../shared/wav-hash.js";
 
 // The rules (which take wins, the manifest's shape) are ops', shared with `patter export`; this module is
 // only the live half: watching the folders and re-scanning when they change.
@@ -20,7 +20,7 @@ export { audioManifest, AUDIO_MANIFEST_FILE, AUDIO_MANIFEST_SCHEMA } from "@patt
 
 export interface AudioIndexHandle {
   /** The ladder (folders) or scratch rung changed: re-watch + re-scan. */
-  update(rungs: AudioRung[], scratchStatus?: string): void;
+  update(rungs: AudioRung[], stampRungs?: string[]): void;
   /** Force a re-scan now (e.g. a manual "Rescan audio"). */
   rescan(): void;
   /** Stop watching + release everything. */
@@ -28,13 +28,51 @@ export interface AudioIndexHandle {
 }
 
 
+/** A take's stamps, cached by path against its size and modified time, so a rescan with thousands of takes only
+ *  reads the ones that changed. */
+const stampCache = new Map<string, { size: number; mtimeMs: number; text?: string; generated?: string }>();
+
+/** Read a WAV's stamps without reading its audio: walk the RIFF chunk headers, skipping each chunk's body, and
+ *  read only a LIST chunk (capped, as a stamp list is tiny). Exported for tests. */
+export async function readStamps(path: string): Promise<{ text?: string; generated?: string }> {
+  let fh: FileHandle | undefined;
+  try {
+    fh = await open(path, "r");
+    const { size, mtimeMs } = await fh.stat();
+    const hit = stampCache.get(path);
+    if (hit && hit.size === size && hit.mtimeMs === mtimeMs) return { text: hit.text, generated: hit.generated };
+    const head = Buffer.alloc(12);
+    await fh.read(head, 0, 12, 0);
+    const found: { text?: string; generated?: string } = {};
+    if (head.toString("ascii", 0, 4) === "RIFF" && head.toString("ascii", 8, 12) === "WAVE") {
+      const hdr = Buffer.alloc(8);
+      for (let pos = 12; pos + 8 <= size;) {
+        await fh.read(hdr, 0, 8, pos);
+        const id = hdr.toString("ascii", 0, 4);
+        const len = hdr.readUInt32LE(4);
+        if (id === "LIST" && len <= 64 * 1024) {
+          const list = Buffer.alloc(8 + len);
+          await fh.read(list, 0, list.length, pos);
+          const info = readInfoChunks(new Uint8Array(Buffer.concat([head, list])));
+          found.text ??= info.get(TEXT_STAMP) ?? info.get("DINK");
+          found.generated ??= info.get(GENERATED_STAMP) ?? info.get("PSVT");
+        }
+        pos += 8 + len + (len % 2);
+      }
+    }
+    stampCache.set(path, { size, mtimeMs, ...found });
+    return found;
+  } catch { return {}; } // unreadable -> no stamps
+  finally { await fh?.close(); }
+}
+
 /**
  * Start watching the project's audio folders. `rungs` is the recording ladder lowest -> highest (as stored);
  * lookup runs highest -> lowest so the most-finished take wins. `onSnapshot` fires (debounced) on every change.
  */
-export function startAudioIndex(projectRoot: string, rungs: AudioRung[], onSnapshot: (snap: AudioSnapshot) => void, scratchStatus?: string): AudioIndexHandle {
+export function startAudioIndex(projectRoot: string, rungs: AudioRung[], onSnapshot: (snap: AudioSnapshot) => void, stampRungs: string[] = []): AudioIndexHandle {
   let current = rungs;
-  let scratch = scratchStatus; // the rung whose takes carry a text-hash we read back for staleness (#224)
+  let stamped = new Set(stampRungs); // the statuses whose takes we read stamps from (scratch and below, #224)
   const watchers = new Map<string, FSWatcher>(); // absolute dir -> live watcher
   let debounce: NodeJS.Timeout | undefined;
   let disposed = false;
@@ -56,13 +94,14 @@ export function startAudioIndex(projectRoot: string, rungs: AudioRung[], onSnaps
       listings.push({ name, dir, files });
     }
     const snap: AudioSnapshot = pickAudio(listings);
-    // For lines that resolved to the scratch rung, read the take's stamped text-hash so the editor can flag
-    // a scratch recording that's gone stale against its (edited) line. Scoped to scratch to bound the I/O.
-    if (scratch) {
-      await Promise.all(Object.values(snap).filter((e) => e.status === scratch && e.path.toLowerCase().endsWith(".wav")).map(async (e) => {
-        try { e.textHash = readDinkHash(await readFile(e.path)) ?? undefined; } catch { /* unreadable -> no stamp */ }
-      }));
-    }
+    // For lines that resolved to a status at or below scratch, read the take's stamps: the text hash, so the
+    // editor can flag a take gone out of date against its (edited) line, and Placeholder Speech's mark. Only
+    // the chunk headers are read, and a take unchanged since the last scan is answered from the cache.
+    await Promise.all(Object.values(snap).filter((e) => stamped.has(e.status) && e.path.toLowerCase().endsWith(".wav")).map(async (e) => {
+      const st = await readStamps(e.path);
+      if (st.text) e.textHash = st.text;
+      if (st.generated) e.generated = st.generated;
+    }));
     if (!disposed) onSnapshot(snap);
   };
 
@@ -89,7 +128,7 @@ export function startAudioIndex(projectRoot: string, rungs: AudioRung[], onSnaps
   void scan(); // initial (attaches watchers on the way in)
 
   return {
-    update(next: AudioRung[], nextScratch?: string): void { current = next; scratch = nextScratch; scheduleScan(); },
+    update(next: AudioRung[], nextStampRungs: string[] = []): void { current = next; stamped = new Set(nextStampRungs); scheduleScan(); },
     rescan(): void { scheduleScan(); },
     dispose(): void {
       disposed = true;

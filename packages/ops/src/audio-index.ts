@@ -16,13 +16,21 @@ import { join, relative, resolve, sep } from "node:path";
 import { deriveRecordingFolders, DEFAULT_RECORDING_STATUSES } from "@patterkit/model";
 import type { ProjectFile } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
+import { mergeAuthoring } from "./loaded-helpers.js";
 import type { PlannedWrite } from "./write.js";
 
 /** A recording ladder rung as the indexer needs it: a name and its (optional) project-relative folder. */
 export interface AudioRung { name: string; folder?: string }
 /** One resolved beat: the rung it landed in, the absolute path to its audio file, and (for scratch takes)
  *  the text-hash stamped in the WAV so the editor can flag a take that's gone stale against its line. */
-export interface AudioEntry { status: string; path: string; textHash?: string }
+export interface AudioEntry {
+  status: string;
+  path: string;
+  /** The text hash the take was made from (its `PTRK` stamp), when it has one and the reader looked. */
+  textHash?: string;
+  /** Placeholder Speech's request hash (its `PTPS` stamp): set only on a generated take. */
+  generated?: string;
+}
 /** beatId -> resolved audio. Absent ids are implicitly "missing". */
 export type AudioSnapshot = Record<string, AudioEntry>;
 
@@ -90,21 +98,48 @@ export function scanAudioStatus(loaded: LoadedProject): Map<string, string> | un
 }
 
 /** Serialise a snapshot into the sidecar manifest JSON, with each absolute path made root-relative
- *  (forward-slashed) against `<projectRoot>/<audioRoot>`. */
-export function audioManifest(snapshot: AudioSnapshot, projectRoot: string, audioRoot: string): string {
+ *  (forward-slashed) against `<projectRoot>/<audioRoot>`. `opts.lines` keeps only takes whose line is in the
+ *  project (a deleted line's take is left out straight away); `opts.leaveOut` drops takes on those statuses
+ *  (a shipping manifest without Placeholder Speech). */
+export function audioManifest(snapshot: AudioSnapshot, projectRoot: string, audioRoot: string, opts: { lines?: ReadonlySet<string>; leaveOut?: ReadonlySet<string> } = {}): string {
   const base = resolve(projectRoot, audioRoot);
   const clips: Record<string, { file: string; status: string }> = {};
   for (const beatId of Object.keys(snapshot).sort()) {
     const entry = snapshot[beatId]!;
+    if (opts.lines && !opts.lines.has(beatId)) continue;
+    if (opts.leaveOut?.has(entry.status)) continue;
     clips[beatId] = { file: relative(base, entry.path).split(sep).join("/"), status: entry.status };
   }
   return JSON.stringify({ schema: AUDIO_MANIFEST_SCHEMA, clips }, null, 2) + "\n";
 }
 
-/** The manifest write for a snapshot, beside the audio; undefined when the project does not use Audio
- *  Folders or no take has been found yet. */
-export function audioManifestWrite(loaded: LoadedProject, snapshot: AudioSnapshot | undefined): PlannedWrite | undefined {
+/** The ids a manifest may name: every beat in the project (spoken lines, text, option prompts), less lines
+ *  marked cut. A take for anything else (a deleted line, or one pasted under a new id) is left out. */
+export function manifestLineIds(loaded: LoadedProject): Set<string> {
+  const ids = new Set<string>();
+  const walk = (n: unknown): void => {
+    if (Array.isArray(n)) { for (const x of n) walk(x); return; }
+    if (!n || typeof n !== "object") return;
+    const o = n as Record<string, unknown>;
+    if (typeof o["id"] === "string" && typeof o["kind"] === "string") ids.add(o["id"]);
+    for (const v of Object.values(o)) if (v && typeof v === "object") walk(v);
+  };
+  for (const scene of loaded.scenes) walk(scene);
+  for (const id of mergeAuthoring(loaded).cut) ids.delete(id);
+  return ids;
+}
+
+/** The manifest write for a snapshot: beside the audio, or at `opts.path` (a shipping manifest, written to a
+ *  build folder so it never overwrites the development one). Undefined when the project does not use Audio
+ *  Folders or no take has been found yet; a snapshot whose takes are all for deleted lines still writes, so
+ *  an old manifest naming them doesn't linger. `opts.leaveOutPlaceholderSpeech` drops the Placeholder Speech
+ *  status's takes. */
+export function audioManifestWrite(loaded: LoadedProject, snapshot: AudioSnapshot | undefined, opts: { path?: string; leaveOutPlaceholderSpeech?: boolean } = {}): PlannedWrite | undefined {
   const p = loaded.project;
   if (!snapshot || !audioFoldersActive(p) || !Object.keys(snapshot).length) return undefined;
-  return { path: join(resolve(loaded.root, p.audioRoot!), AUDIO_MANIFEST_FILE), content: audioManifest(snapshot, loaded.root, p.audioRoot!) };
+  const leaveOut = opts.leaveOutPlaceholderSpeech && p.placeholderSpeech ? new Set([p.placeholderSpeech.status]) : undefined;
+  return {
+    path: opts.path ?? join(resolve(loaded.root, p.audioRoot!), AUDIO_MANIFEST_FILE),
+    content: audioManifest(snapshot, loaded.root, p.audioRoot!, { lines: manifestLineIds(loaded), ...(leaveOut ? { leaveOut } : {}) }),
+  };
 }

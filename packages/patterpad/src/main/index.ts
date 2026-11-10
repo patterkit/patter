@@ -40,6 +40,8 @@ import { createProjectSession } from "@wildwinter/app-shell/session";
 import { SCRIPT_FONT_FILES, useScriptFontFiles } from "@patterkit/ops";
 import { PROPERTIES_PLACE } from "../shared/api.js";
 import { EXAMPLES } from "../shared/examples.js";
+import { planExampleCopy } from "./example-copy.js";
+import * as speech from "./placeholder-speech.js";
 import type { SearchEntry, SearchFocus, SearchMode, EditableExportRequest, EditableImportRequest } from "../shared/api.js";
 import type { AppPrompt, SceneKitId, StageRenameDto, SceneExtensionShards, LiveSceneSource } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, RecentProject, ThemePrefs, VcsKind } from "../shared/api.js";
@@ -107,6 +109,14 @@ async function publishJob<T>(work: () => Promise<T>): Promise<T | JobRefused> {
   if (out.value === undefined) return { ok: false, error: "Stopped before it finished." };
   return out.value;
 }
+
+// Placeholder Speech's runs go through the same job host (their own kind, their own strip), and say what
+// happened in the window as a toast.
+speech.initPlaceholderSpeech({
+  jobs,
+  note: (message, kind) => { win?.webContents.send("speech:note", message, kind); },
+  win: () => win,
+});
 
 // Live bundle refresh over the debug link (live-bundle-refresh, phases 2-3): after a save (or a
 // build), recompile the game-facing bundle and push it to a connected game, debounced. Free when
@@ -180,7 +190,9 @@ function refreshMenu(): void {
     add: (extension: string) => { openExtensionsWindow(extension); },
     isView: (w: BrowserWindow | null) => views.isView(w),
   };
-  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined, project.audioFoldersEnabled(), viewMenu, gameConnected);
+  const speechMenu = { on: !!project.loadedProject()?.project.placeholderSpeech && project.audioFoldersEnabled(), optedOut: speech.optedOut(),
+    setOptOut: (off: boolean) => { speech.setOptOut(off); refreshMenu(); } };
+  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined, project.audioFoldersEnabled(), viewMenu, gameConnected, speechMenu);
 }
 
 // Tier 2 view extensions (views.ts): the views the open project offers, their windows, and the Extensions
@@ -318,6 +330,7 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     currentRoot = proj.root; // this project is now the one shown (see the second-instance jump-in-place guard)
     views.closeAll();        // a view of the project before is a view of nothing here
     void views.update();     // the views this one offers, and whether they're installed here
+    speech.projectOpened();  // Placeholder Speech: this project's lines still waiting from last time
     pairedStorylets = findPairedStorylets(proj.root); // Show Card in Storyletter, when a project there pairs with this one
     setPairedStorylets(pairedStorylets);              // and its cards, read now (and again on focus) for the scene warnings
     // A file-association launch onto a specific scene shard (Finder / argv) lands ON that scene;
@@ -729,24 +742,28 @@ async function openExample(file: string): Promise<OpenResult | null> {
     await tellInWindow("The example couldn't be opened", message);
     return null;
   };
-  const source = EXAMPLES.some((x) => x.file === file) ? examplePath(file) : undefined;
-  if (source === undefined) return refuse(`No example called "${file}" shipped with this build.`);
+  const example = EXAMPLES.find((x) => x.file === file);
+  const source = example ? examplePath(file) : undefined;
+  if (source === undefined || !example) return refuse(`No example called "${file}" shipped with this build.`);
+  // An example whose audio sits beside it (the tour) goes into a folder named after it, holding both.
+  const named = basename(planExampleCopy(source, "", example.name).shown);
   const picked = await dialog.showOpenDialog(win, {
     title: "Where should your copy of the example go?",
-    message: `Choose a folder. A copy of "${basename(source)}" goes into it and opens, yours to change.`,
+    message: `Choose a folder. A copy called "${named}" goes into it and opens, yours to change.`,
     buttonLabel: "Copy Here",
     properties: ["openDirectory", "createDirectory"],
   });
   const parent = picked.filePaths[0];
   if (picked.canceled || parent === undefined) return null;
-  const target = join(parent, basename(source));
-  if (existsSync(target)) return refuse(`There is already something called "${basename(source)}" in that folder.`);
+  const plan = planExampleCopy(source, parent, example.name);
+  if (existsSync(plan.shown)) return refuse(`There is already something called "${basename(plan.shown)}" in that folder.`);
   try {
-    await project.copyTreeThroughVc(source, target); // added to version control when it lands inside a working copy
+    // Added to version control when it lands inside a working copy.
+    for (const c of plan.copies) await project.copyTreeThroughVc(c.from, c.to);
   } catch (e) {
     return refuse(`It couldn't be copied: ${e instanceof Error ? e.message : String(e)}`);
   }
-  return openAndRecord(target);
+  return openAndRecord(plan.project);
 }
 
 async function openDialog(): Promise<OpenResult | null> {
@@ -1042,6 +1059,7 @@ function registerIpc(): void {
   // out-of-date view, it is a view of nothing.
   ipcMain.handle("project:close", () => {
     session.closeCurrent();
+    speech.projectOpened(); // nothing open: nothing waits
     for (const w of windows.all()) w.close();
     views.closeAll();
     void views.update();
@@ -1327,6 +1345,17 @@ function registerIpc(): void {
   // Scratch recording (#224): write an in-app take's WAV bytes into the scratch folder (the watcher then
   // picks it up). recording:setMode strips the native menu while recording so accelerators can't fire
   // behind the blocking overlay (restored when it ends).
+  // Placeholder Speech: the settings page's key picker and status, the Cast editor's Hear, the menu's Make
+  // Now and the inspector's Make again, a voice change's lines, and the writer moving off a line.
+  ipcMain.handle("speech:chooseKey", () => (win ? speech.chooseKeyFile(win) : null));
+  ipcMain.handle("speech:keyStatus", (_e, keyFile: string) => speech.keyStatus(String(keyFile ?? "")));
+  ipcMain.handle("speech:hear", (_e, voice: string, text: string) => speech.hear(String(voice), String(text)));
+  ipcMain.handle("speech:make", (_e, req: speech.SpeechRequestScope & { force?: boolean }) => speech.makeNow(req ?? {}));
+  ipcMain.handle("speech:count", (_e, req: speech.SpeechRequestScope) => speech.countToMake(req ?? {}));
+  ipcMain.handle("speech:accent", () => speech.accentInUse() ?? null);
+  ipcMain.on("speech:nudge", () => speech.nudge());
+  ipcMain.handle("speech:deletedTakes", () => speech.takesForDeletedLines());
+  ipcMain.handle("speech:removeDeletedTakes", () => speech.removeTakesForDeletedLines());
   ipcMain.handle("audio:saveScratch", (_e, beatId: string, bytes: Uint8Array) => project.saveScratchAudio(beatId, bytes));
   // macOS gates the mic behind TCC: check (and if undecided, ask) BEFORE the renderer opens the stream,
   // so a denied state surfaces as a clear message instead of a silently-silent recording. Not-darwin

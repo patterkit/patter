@@ -17,6 +17,7 @@
 import { castStringKey, speakerLabelKey, walkNodes } from "@patterkit/model";
 import type { Beat, CastMember, Group, LocaleFile, Scene, Snippet } from "@patterkit/model";
 import { colourIndex, isColourSlot } from "./script-doc.js";
+import { defaultPlaceholderVoice } from "@patterkit/core";
 
 /** A renamed member keeps their colour (the hands-on fixes review): one with no stored slot is given the one
  *  their OLD name hashed to, in place, so the cue, the play window, and the readable script don't recolour
@@ -25,6 +26,18 @@ export function keepCastColours(cast: CastMember[], renames: ReadonlyMap<string,
   for (const [from, to] of renames) {
     const m = cast.find((c) => c.name === to);
     if (m && !isColourSlot(m.colour)) m.colour = colourIndex(from);
+  }
+}
+
+/** A renamed member keeps their Placeholder Speech voice, as they keep their colour: one with no voice of
+ *  their own is given the default their OLD name hashed to, in place, so a rename doesn't remake their lines
+ *  in another voice. Only when the project has Placeholder Speech on (`accent` is its accent in use). */
+export function keepPlaceholderVoices(cast: CastMember[], renames: ReadonlyMap<string, string>, accent: string | undefined): void {
+  for (const [from, to] of renames) {
+    const m = cast.find((c) => c.name === to);
+    if (!m || m.placeholderVoice) continue;
+    const voice = defaultPlaceholderVoice(from, accent, m.gender);
+    if (voice) m.placeholderVoice = voice;
   }
 }
 

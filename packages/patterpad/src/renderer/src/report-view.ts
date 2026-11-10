@@ -90,6 +90,8 @@ export function renderReport(host: HTMLElement, data: ReportData): void {
   if (data.voiced) {
     cards.append(card("Ready to record", num(t.voiced.readyToRecord), "voiced lines"));
     cards.append(card("Ready to ship", num(t.voiced.readyToShip), "voiced lines"));
+    // With Placeholder Speech on, a line with only placeholder speech is still to record, not done.
+    if (data.recordingTracked && data.toRecord !== undefined) cards.append(card("Still to record", num(data.toRecord), "voiced lines, placeholder speech included"));
   }
   host.append(cards);
 

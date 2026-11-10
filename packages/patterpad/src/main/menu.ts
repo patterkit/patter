@@ -110,7 +110,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
   /** The view extensions the open project offers (the Window menu). */
   views?: ViewMenu,
   /** A game is connected on the Live Link, so Play Block in Game has somewhere to go. */
-  gameConnected = false): void {
+  gameConnected = false,
+  /** Placeholder Speech: on for this project, and whether this machine is set not to make any. */
+  speech: { on: boolean; optedOut: boolean; setOptOut(off: boolean): void } = { on: false, optedOut: false, setOptOut: () => {} }): void {
   const send = (cmd: string): void => win.webContents.send("menu", cmd);
   const shownStatuses = panes.lineStatusShown ?? [];
   // One rule, the family's (Storyletter's review, 2026-10): every item that acts on a project is disabled
@@ -358,6 +360,13 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { label: "Export Production Info…", enabled: hasProject, click: () => send("export-production-info") },
         { label: "Export Voice Script…", enabled: voiced, click: () => send("voice-script") }, // VO script only for a voiced project (#206)
         { label: "Update Audio Manifest…", enabled: audioFolders, click: () => send("audio-manifest") }, // #206: rewrite patteraudio.json from the audio folders
+        { type: "separator" },
+        // Placeholder Speech: stand-in speech from each spoken line. Made for edited lines on its own; these
+        // make a scene's or the whole project's at once. The checkbox is this machine's, not the project's.
+        { label: "Make Placeholder Speech for This Scene", enabled: speech.on && !speech.optedOut, click: () => send("speech-scene") },
+        { label: "Make Placeholder Speech for the Project…", enabled: speech.on && !speech.optedOut, click: () => send("speech-project") },
+        { label: "Make Placeholder Speech on This Computer", type: "checkbox", checked: !speech.optedOut, enabled: speech.on, click: (item) => speech.setOptOut(!item.checked) },
+        { label: "Remove Takes for Deleted Lines…", enabled: audioFolders, click: () => send("remove-deleted-takes") },
         { label: "Export / Import Localisation…", enabled: hasProject, click: () => send("localisation") },
       ],
     },
