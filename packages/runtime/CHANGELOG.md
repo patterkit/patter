@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-10
+
 ### Changed
 
 - **`+` on two strings is now an error at play**, as it already was at compile. Text built from pieces can't be

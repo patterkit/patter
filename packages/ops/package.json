@@ -49,7 +49,7 @@
     "@patterkit/core": "1.0.0",
     "@patterkit/dialect": "1.0.0",
     "@patterkit/model": "1.0.0",
-    "@patterkit/runtime": "1.0.0",
+    "@patterkit/runtime": "1.0.1",
     "@wildwinter/expr": "^1.0.1",
     "@wildwinter/toolkit": "^1.1.0",
     "@xmldom/xmldom": "^0.8.15",
