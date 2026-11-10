@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-10
+
 ### Added
 
 - **Placeholder Speech: hear a scene before anyone records it.** Turn it on in Project Settings and every spoken
