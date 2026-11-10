@@ -6,6 +6,11 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **`+` on two strings is now an error at play**, as it already was at compile. Text built from pieces can't be
+  translated, so put the value into the line's own text instead. It comes from expr 1.0.1, on every runtime.
+
 ## [1.0.0] - 2026-11-08
 
 ### Changed
