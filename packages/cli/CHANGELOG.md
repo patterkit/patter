@@ -1,5 +1,17 @@
 # @patterkit/cli
 
+## 1.0.1
+
+### Patch Changes
+
+- 1405a9a: **Extensions can start a group of fields closed.** The toolkit moves to ^1.1.0, so a manifest's `groups` table is
+  checked and read rather than warned of as a key it doesn't know.
+- Updated dependencies [cb64278]
+- Updated dependencies [af3677d]
+- Updated dependencies [1405a9a]
+  - @patterkit/core@1.0.1
+  - @patterkit/ops@1.0.1
+
 ## 1.0.0
 
 ### Major Changes

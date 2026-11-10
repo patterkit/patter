@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Patter core: stable id generation, readable-handle computation, canonical (de)serialisation, and the structural validator.",
   "keywords": [
     "patter",
@@ -46,7 +46,7 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --clean"
   },
   "dependencies": {
-    "@patterkit/model": "1.0.0",
+    "@patterkit/model": "1.0.1",
     "@wildwinter/expr": "^1.0.1",
     "@wildwinter/toolkit": "^1.1.0",
     "json5": "^2.2.3"
