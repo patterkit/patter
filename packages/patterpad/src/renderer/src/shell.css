@@ -434,6 +434,9 @@
 /* the host's custom fields, grouped in the lower part of the level under a subtle divider */
 .insp-gd-section { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: var(--hairline) solid var(--line-soft); }
 .insp-gd-cap { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); margin-bottom: 1.5px; }
+/* A heading for a group of an extension's fields (its manifest's `group`), a step below the caption; a closed
+   group's holds the shell's disclosure (.shell-group-cap). */
+.insp-ext-group { font: 500 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); margin-top: 6px; }
 .insp-check { accent-color: var(--accent); cursor: pointer; }
 .value-list { display: flex; flex-direction: column; gap: 1.5px; max-height: 60vh; overflow: auto; }
 /* THE #30 fix (from when this list was the jump picker's). A long list overflows the 60vh cap - and flex then

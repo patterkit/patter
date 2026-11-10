@@ -42,9 +42,18 @@ fieldsChannel.onmessage = (e: MessageEvent<{ t: string; id?: string; extension?:
 };
 const PROBE_TAKEN = { probe: { version: "1.0.0" } };
 const probeProject = { values: { studio: "Wildwinter" } as Record<string, unknown> };
+// A closed group, as Pattershot's "More" (its brief extension-closed-field-groups): the line's marks and act, and
+// the project's lens, under a heading that starts closed.
+const probeManifest = (() => {
+  const m = parseManifest(probeManifestText) as unknown as { targets: { patter: Record<string, { fields: { name: string; group?: string; type: string }[] }> }; groups?: unknown };
+  for (const f of m.targets.patter["line"]!.fields) if (f.name === "marks" || f.name === "act") f.group = "More";
+  m.targets.patter["project"]!.fields.push({ name: "lens", type: "number", group: "More" });
+  m.groups = { More: { closed: true } };
+  return m as unknown as ReturnType<typeof parseManifest>;
+})();
 const probeDtos = (): ReturnType<typeof extensionDtos> => extensionDtos(
   { project: { id: "proj_tavern", name: "The Tavern" }, extensions: PROBE_TAKEN } as unknown as ProjectFile,
-  new Map([["probe", parseManifest(probeManifestText)]]),
+  new Map([["probe", probeManifest]]),
   new Map([["probe", { entries: { project: { proj_tavern: probeProject.values } } }]]),
 );
 // The tavern's probe shard: every type on the greeting (its cue missing the sound it requires, its act a

@@ -13,8 +13,8 @@
 // ---------------------------------------------------------------------------
 
 import { el } from "./dom.js";
-import { extensionFold, isRecordMap, recordMapSummary, valueRows } from "@wildwinter/app-shell/value-rows";
-import type { ValueAdapter, ValueDecl, ValueRows } from "@wildwinter/app-shell/value-rows";
+import { extensionFold, fieldGroups, isRecordMap, recordMapSummary, valueRows } from "@wildwinter/app-shell/value-rows";
+import type { FieldGroups, ValueAdapter, ValueDecl, ValueRows } from "@wildwinter/app-shell/value-rows";
 import { entryProblems, pickLists, valueProblems } from "@wildwinter/toolkit/extensions";
 import type { TargetDecl, TypeDecl } from "@wildwinter/toolkit/extensions";
 import type { ExtensionDto, ExtensionFieldDto, ExtensionNodeDto, Problem } from "../../shared/api.js";
@@ -192,17 +192,19 @@ function recordMapSummaryRow(decl: ExtensionFieldDto, value: unknown, adapter: V
   return row;
 }
 
+/** Whether one of an extension's groups starts closed (its manifest's `groups`). */
+const closedOf = (extension: ExtensionDto) => (group: string): boolean => extension.closedGroups?.includes(group) ?? false;
+
 /** One extension's rows for one node, every field: its fields in the manifest's order, a heading wherever the
- *  manifest's group changes, then any key the node holds that the extension doesn't declare. */
-function extensionRows(o: RowsFor): HTMLElement[] {
+ *  manifest's group changes (a closed group's a disclosure, the shell's fieldGroups), then any key the node holds
+ *  that the extension doesn't declare. `node` keys what a closed group keeps on screen. */
+function extensionRows(o: RowsFor, groups: FieldGroups, node: string): HTMLElement[] {
   const parts = extensionParts(o);
-  const out: HTMLElement[] = [...parts.lead];
-  let group: string | undefined;
-  for (const decl of parts.fields) {
-    if (decl.group !== undefined && decl.group !== group) { group = decl.group; out.push(parts.group(group)); }
-    out.push(parts.row(decl));
-  }
-  return [...out, ...parts.tail];
+  const rows = groups.rows({
+    extension: o.extension.id, node, fields: parts.fields as unknown as ValueDecl[], entry: o.entry,
+    row: (decl) => parts.row(decl as unknown as ExtensionFieldDto), group: parts.group, closed: closedOf(o.extension),
+  });
+  return [...parts.lead, ...rows, ...parts.tail];
 }
 
 /** The inspector's fold, kept across its redraws: each extension's section stays folded or open, as the author
@@ -237,7 +239,7 @@ export function extensionSections(kind: string, id: string | null, ext: Record<s
       extension: extension.id, caption: extension.name, node: `${kind}\u0000${id ?? ""}`,
       fields: parts.fields as unknown as ValueDecl[], entry,
       row: (decl) => parts.row(decl as unknown as ExtensionFieldDto),
-      group: parts.group, lead: parts.lead, tail: parts.tail,
+      group: parts.group, lead: parts.lead, tail: parts.tail, closed: closedOf(extension),
       className: "insp-gd-section insp-ext-section", captionClassName: "insp-gd-cap",
     }));
   }
@@ -262,9 +264,18 @@ export interface ProjectSectionOptions {
   onChange: (entry: Record<string, unknown>) => void;
 }
 
+/** Project Settings' closed groups, by extension: open or closed as the author left them for the session, apart
+ *  from the inspector's. One per extension, so one section's sweep never forgets another's rows. */
+const settingsGroups = new Map<string, FieldGroups>();
+let settingsMounts = 0;
+
 /** An extension's section in Project Settings: what the project takes it at and its settings, read only,
  *  then a row for each project field. The values are the dialog's until Save. */
 export function mountProjectSection(host: HTMLElement, o: ProjectSectionOptions): void {
+  const groups = settingsGroups.get(o.extension.id) ?? fieldGroups();
+  settingsGroups.set(o.extension.id, groups);
+  // Each opening of Settings is a node of its own: a value cleared while its group is closed stays until it shuts.
+  const node = `project\u0000${++settingsMounts}`;
   let entry: Record<string, unknown> = { ...(o.extension.projectValues ?? {}) };
   const rows = el("div", "insp-ext-section settings-ext-rows");
   // Its own rows, not the inspector's: the inspector sweeps its cache on every redraw, which would dispose a
@@ -281,8 +292,9 @@ export function mountProjectSection(host: HTMLElement, o: ProjectSectionOptions)
         o.onChange(entry);
         draw();
       },
-    }));
+    }, groups, node));
     cache.sweep();
+    groups.sweep();
   };
   host.append(el("p", "settings-note settings-ext-taken", takenLine(o.extension)), rows);
   draw();

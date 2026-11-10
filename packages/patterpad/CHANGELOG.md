@@ -6,6 +6,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Extensions can tuck their extra fields away.** An extension can say a group of its fields starts closed, so
+  the inspector and Project Settings show the group's heading and only the fields you've set in it, such as
+  "More (2 set)". Click the heading to see the rest; it stays open as you move between nodes.
+
+### Fixed
+
+- **An extension's fields stay read-only in a scene someone else holds.** Opening an extension's section in the
+  inspector used to show its fields ready to edit, even while the scene was locked.
+
 ## [1.0.1] - 2026-11-08
 
 ### Changed

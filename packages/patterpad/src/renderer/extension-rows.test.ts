@@ -446,3 +446,48 @@ describe("an extension's problem in the problems bar", () => {
     expect(problemLineFor({ ...p, detail: "brand-new" }, undefined, ctx)).toBe(p.message);
   });
 });
+
+// Pattershot's brief extension-closed-field-groups: a manifest's `groups` can say a group starts closed. Within an
+// open section, and in Project Settings, it's a heading with a disclosure and a count, and only the set fields.
+describe("a group that starts closed", () => {
+  const grouped = (): ExtensionDto => {
+    const m = JSON.parse(probeText);
+    for (const f of m.targets.patter.line.fields) if (f.name === "marks" || f.name === "act") f.group = "More";
+    m.targets.patter.project.fields.push({ name: "lens", type: "number", group: "More" });
+    m.groups = { More: { closed: true } };
+    return extensionDtos(
+      { project: { id: "proj_t", name: "T" }, extensions: { probe: { version: "1.1.0" } } } as unknown as ProjectFile,
+      new Map([["probe", m]]), new Map([["probe", { entries: { project: { proj_t: { lens: 35 } } } }]]),
+    )![0]!;
+  };
+  const line = (ext?: Record<string, unknown>): unknown => ({ kind: "leaf", beat: "line", id: "L_bell", ...(ext ? { ext: { probe: ext } } : {}) });
+  const labels = (host: ParentNode): string[] => [...host.querySelectorAll<HTMLElement>(".shell-fieldrow > .shell-fieldrow-label")].map((l) => l.textContent ?? "");
+  const groupCap = (host: ParentNode): HTMLButtonElement | null => host.querySelector<HTMLButtonElement>(".shell-group-cap");
+
+  it("carries the closed groups the manifest names, and none for a manifest without", () => {
+    expect(grouped().closedGroups).toEqual(["More"]);
+    expect(probe()[0]!.closedGroups).toBeUndefined();
+  });
+
+  it("is a disclosure in the open inspector section, counting and showing what the node sets", () => {
+    const x = grouped();
+    const host = draw(handlersWith({ extensions: () => [x] }), line({ act: "turn" }));
+    expect(groupCap(host)?.textContent).toBe("More (1 set)");
+    expect(groupCap(host)?.closest(".insp-ext-group")).not.toBeNull();
+    expect(labels(host)).toContain("act");
+    expect(labels(host)).not.toContain("marks");
+    groupCap(host)!.click();
+    expect(labels(host)).toContain("marks");
+    // Open stays open on the next node; close it again for the other tests.
+    const next = draw(handlersWith({ extensions: () => [x] }), line());
+    expect(labels(next)).toContain("marks");
+    inspectorFold.groups.setOpen("probe", "More", false);
+  });
+
+  it("is a disclosure in Project Settings too", () => {
+    const host = document.createElement("div");
+    mountProjectSection(host, { extension: grouped(), adapter, locked: null, onChange: noop });
+    expect(groupCap(host)?.textContent).toBe("More (1 set)");
+    expect(labels(host)).toEqual(["studio", "lens"]);
+  });
+});

@@ -9,7 +9,7 @@
 // disk, so the summary works before the rest of the project has been read.
 // ---------------------------------------------------------------------------
 
-import { missingRequirements, viewsFor } from "@wildwinter/toolkit/extensions";
+import { groupClosed, missingRequirements, viewsFor } from "@wildwinter/toolkit/extensions";
 import type { Manifest } from "@wildwinter/toolkit/extensions";
 import type { Beat, Group, ProjectFile, Scene, Snippet } from "@patterkit/model";
 import type { ExtensionDto, ExtensionFieldDto, ExtensionNodeDto, ExtensionTargetDto } from "./api.js";
@@ -48,6 +48,7 @@ export function extensionDtos(
       ...(projectValues && Object.keys(projectValues).length ? { projectValues: { ...projectValues } } : {}),
       ...viewFacts(manifest),
       ...missingFacts(manifest, Object.keys(taken)),
+      ...closedFacts(manifest, targets),
     });
   }
   return out.length ? out : undefined;
@@ -58,6 +59,13 @@ function viewFacts(manifest: Manifest): Pick<ExtensionDto, "views" | "reads"> {
   const views = viewsFor(manifest, "patter").map((v) => ({ id: v.id, name: v.name }));
   const reads = Array.isArray(manifest.reads) ? manifest.reads.filter((r): r is string => typeof r === "string") : [];
   return { ...(views.length ? { views } : {}), ...(reads.length ? { reads } : {}) };
+}
+
+/** The groups of a manifest's Patter fields that start closed, when there are any. */
+function closedFacts(manifest: Manifest, targets: Record<string, ExtensionTargetDto>): Pick<ExtensionDto, "closedGroups"> {
+  const names = new Set(Object.values(targets).flatMap((t) => t.fields.map((f) => f.group).filter((g): g is string => g !== undefined)));
+  const closedGroups = [...names].filter((g) => groupClosed(manifest, g));
+  return closedGroups.length ? { closedGroups } : {};
 }
 
 /** The extensions a manifest requires that the project doesn't take, when there are any. */

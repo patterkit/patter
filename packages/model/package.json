@@ -46,6 +46,6 @@
   },
   "dependencies": {
     "@wildwinter/expr": "^1.0.1",
-    "@wildwinter/toolkit": "^1.0.0"
+    "@wildwinter/toolkit": "^1.1.0"
   }
 }

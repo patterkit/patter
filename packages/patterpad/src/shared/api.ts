@@ -187,6 +187,9 @@ export interface ExtensionDto {
   reads?: string[];
   /** The extensions its manifest requires that the project doesn't take, by id. Absent when none. */
   missing?: string[];
+  /** The groups of fields its manifest says start closed (`groups`), by name, among those its Patter fields carry.
+   *  Absent when none. */
+  closedGroups?: string[];
 }
 
 export interface ExtensionTargetDto {

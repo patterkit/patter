@@ -45,6 +45,6 @@
     "@patterkit/core": "1.0.0",
     "@patterkit/ops": "1.0.0",
     "@wildwinter/simple-vc-lib": "^0.5.2",
-    "@wildwinter/toolkit": "^1.0.0"
+    "@wildwinter/toolkit": "^1.1.0"
   }
 }

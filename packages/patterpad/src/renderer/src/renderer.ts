@@ -197,6 +197,12 @@ const propsDocEl = $("props-doc");            // the Properties document (@patte
 shell.centre.append(editorEl, propsDocEl);
 const inspectorStackEl = $("inspector-stack");
 shell.inspector.append(inspectorStackEl); // no "Inspector" header: the pane is named by its contents (and its label)
+// Opening an extension's section, or a closed group in it, draws rows the scene's lock never saw: lock them as it
+// locked the rest (Storyletter does the same). The disclosure's own listener has redrawn by the time this runs.
+inspectorStackEl.addEventListener("click", (e) => {
+  if (!(e.target instanceof Element) || !e.target.closest(".shell-fold-cap, .shell-group-cap")) return;
+  if (inspectorStackEl.classList.contains("vc-readonly")) lockControls(inspectorStackEl, true, STAYS_LIVE);
+});
 shell.inspector.setAttribute("aria-label", "Inspector");
 frameHost.hidden = false;
 // The banner for a project holding clashes a merge left (Q21): under the title bar, above everything the
