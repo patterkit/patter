@@ -1,5 +1,14 @@
 # @patterkit/dialect
 
+## 1.0.1
+
+### Patch Changes
+
+- cb64278: Uses `@wildwinter/expr` 1.0.1, where `+` on two strings is an error at play as it already was at compile: text built from pieces can't be translated.
+- Updated dependencies [cb64278]
+- Updated dependencies [1405a9a]
+  - @patterkit/model@1.0.1
+
 ## 1.0.0
 
 ### Major Changes

@@ -1,5 +1,16 @@
 # @patterkit/core
 
+## 1.0.1
+
+### Patch Changes
+
+- cb64278: Uses `@wildwinter/expr` 1.0.1, where `+` on two strings is an error at play as it already was at compile: text built from pieces can't be translated.
+- 1405a9a: **Extensions can start a group of fields closed.** The toolkit moves to ^1.1.0, so a manifest's `groups` table is
+  checked and read rather than warned of as a key it doesn't know.
+- Updated dependencies [cb64278]
+- Updated dependencies [1405a9a]
+  - @patterkit/model@1.0.1
+
 ## 1.0.0
 
 ### Major Changes
