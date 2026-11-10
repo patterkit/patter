@@ -12,8 +12,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   line gets stand-in speech, made from its words a moment after you move off it. Any scratch, recorded, or final
   voice clip is heard instead, and the speech sounds like a stand-in on purpose.
   - It needs a Google Cloud key file (a team can share one, kept outside version control); a machine without one
-    just doesn't make any, and hears what others made. The docs walk through getting a key. If you already use gcloud, your own
-    sign-in (`gcloud auth application-default login`) works too.
+    just doesn't make any, and hears what others made. The docs walk through getting a key. If you already use
+    gcloud, your own sign-in (`gcloud auth application-default login`) works too.
   - Each character's voice is in Cast, with Hear; with none chosen, the name picks one. Changing a voice offers to
     remake that character's lines.
   - A line with only placeholder speech still counts as to record: the scratch recorder's Next needed stops at it,
@@ -26,11 +26,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   choices and the cast above them. Arrow keys and Enter pick one; anything else you type is kept as it is. Two
   names that differ only in capitals, spaces, or punctuation show in Problems, so a typo doesn't become a second
   name.
-- **Moving a line keeps its voice clip.** Cut a line and paste it elsewhere and its scratch voice clip follows it to the new
-  line, rather than being left behind under the old one.
+- **Moving a line keeps its voice clip.** Cut a line and paste it elsewhere and its scratch voice clip follows it to
+  the new line, rather than being left behind under the old one.
 - **Voice clips for deleted lines go, in time.** Delete a line and its placeholder speech goes straight away; its
-  scratch voice clip goes a week later, in case you change your mind. Production > Remove Voice Clips for Deleted Lines clears
-  them now, after listing them.
+  scratch voice clip goes a week later, in case you change your mind. Production > Remove Voice Clips for Deleted
+  Lines clears them now, after listing them.
 
 ### Changed
 
@@ -41,9 +41,21 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **Takes are voice clips.** Everywhere Patterpad used the recording studio's word "take" for a line's audio, it
   now says "voice clip": the scratch recorder's badges, the inspector, the audio settings, and Production > Remove
   Voice Clips for Deleted Lines.
+- **An extension's settings are easier to read.** A field's help is a tooltip on its name (or shows when you reach
+  the field from the keyboard), lists and maps are tables, and a group of fields that starts closed shows what
+  you've set above it. In Project Settings, each setting's name stands out from the note under it.
+- **Extensions in plain words.** File > Extensions says which installed version of an extension this project uses,
+  and says what the project loses before you uninstall that one. Each extension's page in Project Settings says what it is and
+  which version, under its own Extensions heading.
 - **Voice clips are stamped `PTRK`.** The words a voice clip was recorded against are now kept in a `PTRK` chunk in
   the WAV, no longer `DINK`. Voice clips you've already recorded keep working: `DINK` is still read, so they still
   show when they're out of date.
+
+### Fixed
+
+- **Opening a project from another kept the first one's audio.** With Audio Folders on in both, every line of the
+  second project showed as missing and wouldn't play.
+- **Project Settings no longer scrolls as a whole** when you turn the mouse wheel over its Cancel and Save buttons.
 
 ## [1.1.1] - 2026-11-10
 
