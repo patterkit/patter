@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-10
+
 ### Changed
 
 - **Patterplay 1.0.1 inside: joining strings with `+` now fails in Play**, as it already did when compiling. Text
