@@ -51,7 +51,7 @@
     "@patterkit/model": "1.0.1",
     "@patterkit/runtime": "1.0.1",
     "@wildwinter/expr": "^1.0.1",
-    "@wildwinter/toolkit": "^1.1.0",
+    "@wildwinter/toolkit": "^1.2.0",
     "@xmldom/xmldom": "^0.8.15",
     "docx": "^9.7.1",
     "exceljs": "^4.4.0",
