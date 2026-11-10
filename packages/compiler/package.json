@@ -48,7 +48,7 @@
     "@patterkit/model": "1.0.0",
     "@patterkit/core": "1.0.0",
     "@patterkit/dialect": "1.0.0",
-    "@wildwinter/expr": "^1.0.0",
+    "@wildwinter/expr": "^1.0.1",
     "@wildwinter/toolkit": "^1.0.0"
   },
   "peerDependencies": {

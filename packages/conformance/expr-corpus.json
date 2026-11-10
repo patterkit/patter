@@ -1552,7 +1552,7 @@
       "expected": 0.6
     },
     {
-      "name": "addition concatenates two strings",
+      "name": "addition rejects two strings",
       "src": "@v.s + @v.t",
       "ast": [
         "bin",
@@ -1609,7 +1609,7 @@
           "empty": []
         }
       },
-      "expected": "abcd"
+      "expectError": true
     },
     {
       "name": "addition rejects a number and a string",

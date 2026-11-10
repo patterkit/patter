@@ -11,8 +11,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k481740d0_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0x481740d0
-#define WILDWINTER_EXPR_k481740d0_PROPERTYBAG_H
+#if !defined(WILDWINTER_EXPR_ke14a776a_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0xe14a776a
+#define WILDWINTER_EXPR_ke14a776a_PROPERTYBAG_H
 
 #include <algorithm>
 #include <cctype>
@@ -26,7 +26,7 @@
 #include "OrderedMap.h"
 #include "Value.h"
 
-namespace wildwinter { namespace expr { inline namespace k481740d0
+namespace wildwinter { namespace expr { inline namespace ke14a776a
 {
     /** The property type vocabulary (boolean / number / string / enum /
      *  flags). Kept as strings, exactly as the kernel and the bundle carry

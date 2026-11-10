@@ -239,11 +239,12 @@ static func _eval_binary(node: Array, ctx: Dictionary, dialect: Dictionary, run:
 				_:
 					return lf <= rf
 		"+":
-			if is_number(left) and is_number(right):
-				return float(left) + float(right)
-			if left is String and right is String:
-				return left + right
-			return error("'+' requires two numbers or two strings, got %s and %s" % [type_name(left), type_name(right)])
+			# Numbers only: text joined by '+' cannot be translated.
+			if left is String or right is String:
+				return error("'+' cannot join text: put the value into the text itself, so it can be translated")
+			if not is_number(left) or not is_number(right):
+				return error("'+' requires numeric operands, got %s and %s" % [type_name(left), type_name(right)])
+			return float(left) + float(right)
 		"-", "*", "/":
 			if not is_number(left) or not is_number(right):
 				return error("'%s' requires numeric operands, got %s and %s" % [op, type_name(left), type_name(right)])

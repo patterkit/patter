@@ -4721,7 +4721,7 @@ export const cases: Fixtures = {
       scopes: { patter: { hp: 10 }, scene: { locked: false } }, expected: true },
     { name: "arithmetic precedence", src: "2 + 3 * 4", scopes: {}, expected: 14 },
     { name: "division yields a float", src: "@a / @b", scopes: { patter: { a: 10, b: 4 } }, expected: 2.5 },
-    { name: "string concatenation", src: '@greet + "!"', scopes: { patter: { greet: "hi" } }, expected: "hi!" },
+    // `+` on strings is an error (expr 1.0.1); expr-corpus.json's "addition rejects two strings" covers it in every host.
     // Pins the mulberry32 PRNG: seed 42's first draw -> random(1, 6) == 4.
     { name: "seeded random is deterministic", src: "random(1, 6)", scopes: {}, seed: 42, expected: 4 },
   ],

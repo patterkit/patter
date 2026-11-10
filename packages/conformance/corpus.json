@@ -264,29 +264,6 @@
       "expected": 2.5
     },
     {
-      "name": "string concatenation",
-      "src": "@greet + \"!\"",
-      "ast": [
-        "bin",
-        "+",
-        [
-          "sv",
-          "patter",
-          "greet"
-        ],
-        [
-          "s",
-          "!"
-        ]
-      ],
-      "scopes": {
-        "patter": {
-          "greet": "hi"
-        }
-      },
-      "expected": "hi!"
-    },
-    {
       "name": "seeded random is deterministic",
       "src": "random(1, 6)",
       "ast": [

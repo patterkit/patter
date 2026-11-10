@@ -33,8 +33,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k481740d0_EXPR_H) && WILDWINTER_EXPR_KERNEL == 0x481740d0
-#define WILDWINTER_EXPR_k481740d0_EXPR_H
+#if !defined(WILDWINTER_EXPR_ke14a776a_EXPR_H) && WILDWINTER_EXPR_KERNEL == 0xe14a776a
+#define WILDWINTER_EXPR_ke14a776a_EXPR_H
 
 #include <algorithm>
 #include <functional>
@@ -47,7 +47,7 @@
 #include "Value.h"
 #include "Ast.h"
 
-namespace wildwinter { namespace expr { inline namespace k481740d0
+namespace wildwinter { namespace expr { inline namespace ke14a776a
 {
     /** A scope readable by the evaluator: a static bag or a host resolver.
      *  get returns nullopt when the property is not present (TS undefined). */
@@ -341,9 +341,10 @@ namespace wildwinter { namespace expr { inline namespace k481740d0
                         }
                         if (n->op == "+")
                         {
-                            if (left.isNumber() && right.isNumber()) return ExprValue::Num(left.asNumber() + right.asNumber());
-                            if (left.isString() && right.isString()) return ExprValue::Str(left.asString() + right.asString());
-                            throw ExprError("'+' requires two numbers or two strings, got " + TypeOf(left) + " and " + TypeOf(right));
+                            // Numbers only: text joined by '+' cannot be translated.
+                            if (left.isString() || right.isString()) throw ExprError("'+' cannot join text: put the value into the text itself, so it can be translated");
+                            AssertNumbers(left, right, "+");
+                            return ExprValue::Num(left.asNumber() + right.asNumber());
                         }
                         if (n->op == "-")
                         {

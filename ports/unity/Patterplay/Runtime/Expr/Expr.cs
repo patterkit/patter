@@ -254,9 +254,9 @@ namespace Wildwinter.Expr
                             case "<": AssertNumbers(left, right, "<"); return ExprValue.Bool(left.AsNumber < right.AsNumber);
                             case "<=": AssertNumbers(left, right, "<="); return ExprValue.Bool(left.AsNumber <= right.AsNumber);
                             case "+":
-                                if (left.IsNumber && right.IsNumber) return ExprValue.Num(left.AsNumber + right.AsNumber);
-                                if (left.IsString && right.IsString) return ExprValue.Str(left.AsString + right.AsString);
-                                throw new ExprError($"'+' requires two numbers or two strings, got {TypeOf(left)} and {TypeOf(right)}");
+                                // Numbers only: text joined by '+' cannot be translated.
+                                if (left.IsString || right.IsString) throw new ExprError("'+' cannot join text: put the value into the text itself, so it can be translated");
+                                AssertNumbers(left, right, "+"); return ExprValue.Num(left.AsNumber + right.AsNumber);
                             case "-": AssertNumbers(left, right, "-"); return ExprValue.Num(left.AsNumber - right.AsNumber);
                             case "*": AssertNumbers(left, right, "*"); return ExprValue.Num(left.AsNumber * right.AsNumber);
                             case "/":

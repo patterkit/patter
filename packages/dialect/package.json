@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "@patterkit/model": "1.0.0",
-    "@wildwinter/expr": "^1.0.0"
+    "@wildwinter/expr": "^1.0.1"
   },
   "peerDependencies": {
     "@wildwinter/scoperegistry": ">=1.0.0 <2.0.0"

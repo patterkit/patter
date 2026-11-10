@@ -45,7 +45,7 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --clean"
   },
   "dependencies": {
-    "@wildwinter/expr": "^1.0.0",
+    "@wildwinter/expr": "^1.0.1",
     "@wildwinter/toolkit": "^1.0.0"
   }
 }
