@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/compiler",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Patter compiler: compile condition/effect expressions, validate them, and export source to the runtime bundle.",
   "keywords": [
     "patter",
@@ -45,9 +45,9 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --clean"
   },
   "dependencies": {
-    "@patterkit/model": "1.1.0",
-    "@patterkit/core": "1.1.0",
-    "@patterkit/dialect": "1.0.2",
+    "@patterkit/model": "1.1.1",
+    "@patterkit/core": "1.1.1",
+    "@patterkit/dialect": "1.0.3",
     "@wildwinter/expr": "^1.0.1",
     "@wildwinter/toolkit": "^1.3.0"
   },
