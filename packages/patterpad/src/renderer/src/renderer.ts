@@ -62,7 +62,7 @@ import { applyTheme } from "./apply-theme.js";
 import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
   paintVcBadges, lockControls, createNavHistory, historyNav, mountPaneShell, mountSettingsDialog, revealRowWhenReady,
   askIdentity, confirmDialog, dialogFrame, openContextMenu, promptDialog, setDialogFocusFallback, type ShardVc, type SettingsSectionHandle, type SettingsSection, type SettingsDialog } from "@wildwinter/app-shell";
-import { extensionAdapter, mountProjectSection, problemSettingsSection, settingsExtensions, settingsSectionId } from "./extension-rows.js";
+import { extensionAdapter, mountProjectSection, openExtensionSection, problemSettingsSection, settingsExtensions, settingsSectionId } from "./extension-rows.js";
 import { fieldsState, followTarget, selectedNodes, withoutViewEdited, type FieldsNode } from "./fields-state.js";
 import { createViewHost, takeLengths } from "./view-extensions.js";
 import { parseSource } from "@patterkit/core";
@@ -72,7 +72,7 @@ import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
 import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way for both apps
-import { isThemeChoice, stageGateNote, toast, type ToastKind } from "@wildwinter/app-shell";
+import { isThemeChoice, stageGateNote, toast, type ToastKind, projectTitle } from "@wildwinter/app-shell";
 import { describePlayAnswer } from "../../shared/play-in-game.js";
 // The family's clash resolver (ruling Q21): the dialog and the banner are the shell's; the adapter is ours.
 import { openClashResolver, clashBanner, type ClashAdapter, type ClashResolver } from "@wildwinter/app-shell";
@@ -181,9 +181,17 @@ if (navigator.platform.toUpperCase().includes("MAC")) shell.topbar.classList.add
 // clicks on anything that is not a button / input / select / a, so the two spans in the bar that DO
 // respond carry `no-drag`: the VC chip in the markup, the save indicator once it is built below.)
 const histNavHostEl = $("histnav"); // the back/forward pair, left of the project name
-const projectNameEl = $("project-name");
+// The project's name is the shell's projectTitle, as in Storyletter: a button (so the title bar's drag region
+// leaves it alone) whose rollover says where the project lives and whose click is the way back to the
+// project overview (#3a). Two projects can share a name; the path is what tells them apart.
+const projectTitleView = projectTitle({
+  name: "Patterpad",
+  onOpen: () => { if (project && overviewEl.hidden) void showOverview(); },
+});
+/** Show the open project's name and path in the top bar. */
+const showProjectTitle = (p: { name: string; root: string }): void => projectTitleView.update({ name: p.name, path: p.root });
 const sceneSuffixEl = $("scene-suffix");
-shell.topbarLead.append(histNavHostEl, projectNameEl, sceneSuffixEl);
+shell.topbarLead.append(histNavHostEl, projectTitleView.el, sceneSuffixEl);
 const playTopEl = $<HTMLButtonElement>("play-topbtn");
 const vcsSceneEl = $("vcs-scene"); // topbar chip: the CURRENT scene's VC state (locked / out-of-date)
 const saveIndicatorHost = $("save-indicator"); // the shell's indicator mounts here
@@ -1713,7 +1721,7 @@ async function afterProjectHistory(r: ProjectHistoryOutcome): Promise<void> {
   if (!r.project || !project) return;
   project = r.project;
   views.changed("all");
-  projectNameEl.textContent = project.name;
+  showProjectTitle(project);
   renderNav();
   // Kept scenes the step rewrote, or took away, can't come back as they were.
   for (const id of [...keptScenes.keys()]) if (r.scenes.includes(id) || !project.sceneIds.includes(id)) forgetScene(id);
@@ -1781,7 +1789,17 @@ async function goToProblem(p: Problem | undefined): Promise<void> {
   if (section) { await openProjectSettings(section); return; }
   if (!p?.nodeId) return;
   if (p.sceneId && p.sceneId !== currentSceneId) await loadScene(p.sceneId);
+  // A problem in an extension's values is said inside its section, which closed draws no rows (and with
+  // nothing set isn't drawn at all): open it on that kind of node, so the inspector shows the field.
+  const kind = p.extension ? extensionProblemKind(p.message) : null;
+  if (p.extension && kind) { openExtensionSection(p.extension, kind); lastInspectorSig = null; }
   surface?.revealNode(p.nodeId);
+  if (p.extension && kind && lastInspectorCtx) showInspector(lastInspectorCtx);
+}
+
+/** The kind of node an extension problem is about, read off its path ("entries.line.L_greet.cue: ..."). */
+function extensionProblemKind(message: string): string | null {
+  return /^entries\.([A-Za-z]+)\./.exec(message)?.[1] ?? null;
 }
 
 async function applyCurrentFix(): Promise<void> {
@@ -2662,6 +2680,7 @@ onCreateProperty: (name) => createPatterProperty(name) }),
     setExtensionValue: (id, extension, field, value) => { surface?.setExtensionValue(id, extension, field, value); },
     extensionLock: (extension) => lockedLine(extensionLocksOf(currentSceneId ? vcMap.get(currentSceneId) : undefined)[extension]?.by),
     extensionAdapter: () => currentExtensionAdapter(),
+    redrawInspector: () => { lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); },
     openFields: (kind, id) => openFieldsOn(kind, id),
     viewInstalled,
     openView: (extension, view, kind, id) => {
@@ -3326,10 +3345,7 @@ async function showProject(open: OpenResult): Promise<void> {
   project = open.project;
   scenesPending = true; // main opens it landing scene first; hydrateProject brings the rest
   debugLink.setVisible(true); // the bottom-right live-debug-link control is available once a project is open
-  projectNameEl.textContent = project.name;
-  // Two projects can share a name; the disk path is what tells them apart. The topbar name carries it
-  // as a tooltip, and the overview shows it in full (with a click-to-reveal).
-  projectNameEl.dataset.tip = project.root;
+  showProjectTitle(project);
   currentSceneId = null;
   pairedCards = []; void refreshPairedCards(); // the paired Storylets project's cards, for the scene warnings (Q19)
   journal.clear(); // main's history starts again with the project, so the journal does too
@@ -3397,8 +3413,7 @@ async function showOverview(): Promise<void> {
   welcomeEl.hidden = true; panesEl.hidden = true; overviewEl.hidden = false;
   toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true; healthEl.hidden = true;
   problembarEl.hidden = true; reviewbarEl.hidden = true; // the overview is a calm screen, no bars
-  projectNameEl.textContent = project.name;
-  projectNameEl.dataset.tip = project.root;
+  showProjectTitle(project);
   titleObserver?.disconnect(); titleObserver = null; sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = "";
   await hydrateProject(); // the index needs every scene, not just the lazy-loaded landing one
   renderOverview();
@@ -3644,8 +3659,7 @@ function showWelcome(state: Pick<BootState, "recents">): void {
   panesEl.hidden = true; overviewEl.hidden = true; welcomeEl.hidden = false;
   problembarEl.hidden = true; inspectorStackEl.replaceChildren(); lastInspectorCtx = null; lastInspectorSig = null; // no script -> nothing to inspect
   toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true; healthEl.hidden = true;
-  projectNameEl.textContent = "Patterpad";
-  delete projectNameEl.dataset.tip; // no project, no path
+  projectTitleView.update({ name: "Patterpad" }); // no project: the app's name, leading nowhere
   setWelcomeRecents(state.recents);
   welcome.setError(undefined); // a failure is said once, by the open that failed (openPath), not on every visit
   signalReady(); // the welcome screen is up - safe to reveal the window (no-op if already revealed)
@@ -4459,7 +4473,7 @@ async function saveProjectSettings(s: ProjectSettingsDto, opts: { propertiesOnly
   const res = await tracked(window.patter.saveSettings(s, opts.undo));
   if (!landed(res, "Couldn't save the project settings")) return false;
   if (res.project) {
-    project = res.project; projectNameEl.textContent = project.name;
+    project = res.project; showProjectTitle(project);
     // The project's @patter properties may have changed (added / renamed / re-typed / enum values edited):
     // rebuild the condition-editor catalogue so they're selectable immediately, without a scene reload or a
     // restart. Mirrors openSceneProps for the scene scope; keeps the load-time order (@patter first). New
@@ -4534,7 +4548,7 @@ function landExtension(r: AddExtensionResult | null): void {
   }
   noteStep(r.step);
   if (!landed(r, "Couldn't add the extension")) return;
-  if (r.project) { project = r.project; projectNameEl.textContent = project.name; }
+  if (r.project) { project = r.project; showProjectTitle(project); }
   views.changed("all"); // over the project as it is now: a view's requirement may be met
   lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
   void refreshVcStatus();
@@ -4555,7 +4569,7 @@ async function removeExtension(id: string): Promise<void> {
   if (!r) return; // refused or cancelled (main has said why)
   noteStep(r.step);
   if (!landed(r, "Couldn't remove the extension")) return;
-  if (r.project) { project = r.project; projectNameEl.textContent = project.name; }
+  if (r.project) { project = r.project; showProjectTitle(project); }
   views.changed("all");
   lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
   void refreshVcStatus();
@@ -4825,9 +4839,6 @@ async function boot(): Promise<void> {
 }
 
 // (The welcome screen's actions are wired where it is mounted, at the top of the module.)
-// The project name is the way back to the project overview (#3a) - a no-op on the welcome screen.
-projectNameEl.addEventListener("click", () => { if (project && overviewEl.hidden) void showOverview(); });
-projectNameEl.style.cursor = "pointer";
 
 // Find (⌘/Ctrl-F) and Replace (⌘⌥F on macOS, Ctrl-H elsewhere) open the detached search window via the
 // Edit-menu accelerators (relayed through onMenu below as "find" / "replace"), so they fire regardless of

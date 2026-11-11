@@ -38,7 +38,13 @@ export interface ExtensionHandlers {
   viewInstalled?: (extension: string, view: string) => boolean;
   /** Open a view of an extension on a node: the node selected, the view's window opened or brought forward. */
   openView?: (extension: string, view: string, kind: string, id: string) => void;
+  /** Rebuild the inspector as it stands: a section opened from Add, or closed with nothing set, changes which
+   *  sections are drawn at all. */
+  redrawInspector?: () => void;
 }
+
+/** An extension a node could have data for but doesn't show: the level's Add menu offers it, by name. */
+export interface ExtensionOffer { label: string; extension: true; act: () => void }
 
 /** The rows, kept across the inspector's redraws (it rebuilds its whole stack), so a value typed into a row
  *  keeps its focus and caret. Swept at the end of each redraw, beside the game-data rows. */
@@ -78,6 +84,15 @@ export function fieldProblems(fields: readonly ExtensionFieldDto[], entry: Recor
     out.set(p.path, [out.get(p.path), sentence(p.message)].filter(Boolean).join(" "));
   }
   return out;
+}
+
+/** Every problem in a node's values for an extension, as sentences, for a closed section's caption (closed, it
+ *  draws no row to say them). None for a node with no entry. */
+export function sectionProblems(fields: readonly ExtensionFieldDto[], entry: Record<string, unknown> | undefined, adapter?: ValueAdapter): string[] {
+  if (entry === undefined) return [];
+  return entryProblems({ fields } as unknown as TargetDecl, entry, adapter
+    ? { exists: existsOf(adapter), ...(adapter.list ? { list: (name: string) => adapter.list!(name) } : {}) } : {})
+    .map((p) => sentence(p.message));
 }
 
 /** What a value would get wrong in a field, as sentences ("" when it's fine): the toolkit's checks with the
@@ -127,7 +142,7 @@ interface FieldEditor { name: string; open?: () => void }
 /** One extension's parts for one node: the lock line, a row per field, a heading per group, and any key the
  *  node holds that the extension doesn't declare, read-only. The inspector folds them (`extensionSections`);
  *  Project Settings draws them all (`extensionRows`). */
-function extensionParts(o: RowsFor): { fields: readonly ExtensionFieldDto[]; lead: HTMLElement[]; row: (decl: ExtensionFieldDto) => HTMLElement; group: (name: string) => HTMLElement; tail: HTMLElement[] } {
+function extensionParts(o: RowsFor): { fields: readonly ExtensionFieldDto[]; lead: HTMLElement[]; row: (decl: ExtensionFieldDto) => HTMLElement; group: (name: string) => HTMLElement; tail: HTMLElement[]; said: string[] } {
   const fields = o.extension.targets[o.kind]?.fields ?? [];
   // A project's own rows read its lists as they stand in the entry being edited, not as last saved.
   const adapter = extensionScoped(o.adapter, o.extension, o.kind === "project" ? o.entry ?? {} : o.extension.projectValues);
@@ -163,7 +178,7 @@ function extensionParts(o: RowsFor): { fields: readonly ExtensionFieldDto[]; lea
     if (said) r.dataset["tip"] = said; // the shell's tooltip, never a native title
     tail.push(r);
   }
-  return { fields, lead, row, group: (name) => el("div", "insp-ext-group", name), tail };
+  return { fields, lead, row, group: (name) => el("div", "insp-ext-group", name), tail, said: sectionProblems(fields, o.entry, adapter) };
 }
 
 /**
@@ -216,16 +231,27 @@ function extensionRows(o: RowsFor, groups: FieldGroups, node: string): HTMLEleme
  *  left it, from node to node (the shell's extensionFold; Pattershot's brief, F4). */
 export const inspectorFold = extensionFold();
 
+/** The section to put focus in once it's drawn: the one just opened from the Add menu. */
+let focusWhenDrawn: string | null = null;
+
+/** Open an extension's section on a kind of node, for whatever the inspector draws next: Go to issue, for a
+ *  problem inside a section that's closed (or not drawn at all). */
+export function openExtensionSection(extension: string, kind: string): void {
+  inspectorFold.setOpen(extension, true, kind);
+}
+
 /**
- * The inspector's sections for a node: one per extension declaring fields for its kind, each captioned with the
- * extension's name and drawn after the node's Game Data. Folded to the fields the node sets until the author
- * opens it (the caption is the disclosure, and counts what's set). Empty when no extension targets the kind.
+ * The inspector's sections for a node, after its Game Data: one per extension that has something to show here
+ * (a value set, a problem, or its section opened), captioned with the extension's name. Closed, a section is its
+ * caption alone, counting what's set and what's wrong; open, every field, inset. An extension with nothing to
+ * show is an offer for the level's Add menu instead, by its name: "you see what's attached, and Add offers the
+ * rest" (patterkit design/proposals/inspector-one-door.md). Empty when no extension targets the kind.
  */
-export function extensionSections(kind: string, id: string | null, ext: Record<string, Record<string, unknown>> | undefined, h: ExtensionHandlers): HTMLElement[] {
+export function extensionSections(kind: string, id: string | null, ext: Record<string, Record<string, unknown>> | undefined, h: ExtensionHandlers): Array<HTMLElement | ExtensionOffer> {
   const all = h.extensions();
   if (!all.length) return [];
   const adapter = h.extensionAdapter();
-  const out: HTMLElement[] = [];
+  const out: Array<HTMLElement | ExtensionOffer> = [];
   for (const extension of all) {
     if (!(extension.targets[kind]?.fields.length)) continue;
     const entry = ext?.[extension.id];
@@ -240,13 +266,30 @@ export function extensionSections(kind: string, id: string | null, ext: Record<s
         return { name: view.name, ...(here ? { open: () => { if (id) h.openView!(extension.id, view.id, kind, id); } } : {}) };
       },
     });
-    out.push(inspectorFold.section({
-      extension: extension.id, caption: extension.name, node: `${kind}\u0000${id ?? ""}`,
-      fields: parts.fields as unknown as ValueDecl[], entry,
+    const node = `${kind}\u0000${id ?? ""}`;
+    const state = { extension: extension.id, kind, fields: parts.fields as unknown as ValueDecl[], entry, tail: parts.tail, problems: parts.said };
+    if (!inspectorFold.drawn(state)) {
+      // Add ▸ the extension's name: its section opens here, every field, focus in the first.
+      out.push({ label: extension.name, extension: true, act: () => {
+        inspectorFold.setOpen(extension.id, true, kind);
+        focusWhenDrawn = `${extension.id}\u0000${node}`;
+        h.redrawInspector?.();
+      } });
+      continue;
+    }
+    const section = inspectorFold.section({
+      ...state, caption: extension.name, node,
       row: (decl) => parts.row(decl as unknown as ExtensionFieldDto),
-      group: parts.group, lead: parts.lead, tail: parts.tail, closed: closedOf(extension),
+      group: parts.group, lead: parts.lead, closed: closedOf(extension),
       className: "insp-gd-section insp-ext-section", captionClassName: "insp-gd-cap",
-    }));
+      // Closed with nothing to show, it leaves the level and goes back to Add.
+      onToggle: (open) => { if (!open && !inspectorFold.drawn(state)) h.redrawInspector?.(); },
+    });
+    if (focusWhenDrawn === `${extension.id}\u0000${node}`) {
+      focusWhenDrawn = null;
+      queueMicrotask(() => section.querySelector<HTMLElement>(".shell-fold-body :is(input, select, textarea, button)")?.focus());
+    }
+    out.push(section);
   }
   return out;
 }

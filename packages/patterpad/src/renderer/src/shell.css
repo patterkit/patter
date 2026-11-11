@@ -433,6 +433,10 @@
 .insp-tag-input { flex: 1 1 64px; min-width: 64px; font: var(--text-sm) var(--font-ui); color: var(--ink); background: transparent; border: 0; padding: 1.5px 2.5px; }
 /* the host's custom fields, grouped in the lower part of the level under a subtle divider */
 .insp-gd-section { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: var(--hairline) solid var(--line-soft); }
+/* Game Data's rows, and an open extension's (the shell's .shell-fold-body), are inset behind the same thin rule:
+   attached data reads as its caption's, not as the level's own rows. */
+.insp-gd-body { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 2px 5px; padding-left: 10px; border-left: var(--hairline) solid var(--line-soft); }
+.insp-ext-section.shell-fold-open > .shell-fold-body { display: flex; flex-direction: column; gap: 2px; }
 .insp-gd-cap { font: 600 var(--text-sm)/1.2 var(--font-ui); color: var(--muted); margin-bottom: 1.5px; }
 /* A heading for a group of an extension's fields (its manifest's `group`), a step below the caption; a closed
    group's holds the shell's disclosure (.shell-group-cap). */

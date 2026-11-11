@@ -6,7 +6,7 @@
 // to the surface, a gameData field drawn as the project declares it, locks, the inline problems validation
 // would raise, the Settings section, and where a problem about an extension goes.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import probeText from "../../../conformance/fixtures/probe.extension.json?raw";
 import { parseManifest } from "@wildwinter/toolkit/extensions";
 import type { ProjectFile, GameDataField } from "@patterkit/model";
@@ -59,8 +59,12 @@ const sections = (host: HTMLElement): HTMLElement[] => [...host.querySelectorAll
 const rowOf = (host: ParentNode, caption: string): HTMLElement | undefined =>
   [...host.querySelectorAll<HTMLElement>(".insp-ext-section .shell-fieldrow")].find((r) => r.querySelector(".shell-fieldrow-label")?.textContent === caption);
 
+// The fold remembers open by extension and kind of node: open (or close) one on every kind a test draws.
+const KINDS = ["line", "text", "gameEvent", "snippet", "option", "block", "scene"];
+const openOn = (extension: string, on: boolean): void => { for (const k of KINDS) inspectorFold.setOpen(extension, on, k); };
+
 // Opened, so every field draws; the fold itself is "the inspector's fold" below.
-beforeEach(() => { inspectorFold.setOpen("probe", true); });
+beforeEach(() => { openOn("probe", true); });
 
 describe("extension sections in the inspector", () => {
   it("draws one per level that the extension has fields for, captioned with its name, after Game Data", () => {
@@ -175,36 +179,57 @@ describe("extension sections in the inspector", () => {
 // Pattershot's brief, "extension fields folded" (F1 to F9): an extension's section folded to the fields the node
 // sets, by the shell's extensionFold.
 describe("the inspector's fold", () => {
-  beforeEach(() => { inspectorFold.setOpen("probe", false); });
+  beforeEach(() => { openOn("probe", false); });
   const line = (ext?: Record<string, unknown>): unknown => ({ kind: "leaf", beat: "line", id: "L_bell", ...(ext ? { ext: { probe: ext } } : {}) });
   const shown = (host: HTMLElement): string[] =>
     [...host.querySelectorAll<HTMLElement>(".insp-ext-section .shell-fold-body > .shell-fieldrow > .shell-fieldrow-label")].map((l) => l.textContent ?? "");
   const cap = (host: HTMLElement): HTMLButtonElement => host.querySelector<HTMLButtonElement>(".insp-ext-section .insp-gd-cap")!;
 
-  it("is folded to the caption alone where a node sets nothing, defaults included", () => {
-    const host = draw(handlersWith(), line({ marks: [], perf: {} }));
-    expect(shown(host)).toEqual([]);
-    expect(cap(host).textContent).toBe("Probe");
-    expect(cap(host).getAttribute("aria-expanded")).toBe("false");
+  // "You see what's attached, and Add offers the rest" (patterkit design/proposals/inspector-one-door.md).
+  it("isn't drawn where a node sets nothing, defaults included: Add offers it, and choosing it opens it here", () => {
+    let redraws = 0;
+    const host = draw(handlersWith({ redrawInspector: () => { redraws++; } }), line({ marks: [], perf: {} }));
+    expect(sections(host)).toEqual([]);
+    document.body.append(host);
+    host.querySelector<HTMLButtonElement>(".insp-add")!.click();
+    const menu = document.querySelector(".ctxmenu")!;
+    expect(menu.querySelector(".ctxmenu-heading")?.textContent).toBe("Extensions");
+    const item = [...menu.querySelectorAll<HTMLButtonElement>(".ctxmenu-item")].find((b) => b.textContent === "Probe")!;
+    item.click();
+    expect(inspectorFold.isOpen("probe", "line")).toBe(true);
+    expect(inspectorFold.isOpen("probe", "block")).toBe(false);
+    expect(redraws).toBe(1);
+    // Drawn again, it's there, open, and no longer offered.
+    const again = draw(handlersWith(), line({ marks: [], perf: {} }));
+    expect(shown(again).length).toBeGreaterThan(2);
+    host.remove();
   });
 
-  it("shows only the set fields, counted in the caption, and opens to every field on a click", () => {
+  it("closed with nothing set, it leaves the level again", () => {
+    let redraws = 0;
+    openOn("probe", true);
+    const host = draw(handlersWith({ redrawInspector: () => { redraws++; } }), line());
+    cap(host).click();
+    expect(redraws).toBe(1);
+    expect(sections(draw(handlersWith(), line()))).toEqual([]);
+  });
+
+  it("says a closed section's problems on its caption", () => {
+    const host = draw(handlersWith(), line({ tone: "tense", stage: "nonsense" }));
+    expect(cap(host).textContent).toMatch(/^Probe \(\d+ set, \d+ problems?\)$/);
+    expect(cap(host).classList.contains("has-problem")).toBe(true);
+    expect(shown(host)).toEqual([]);
+  });
+
+  it("closed, is its caption and count alone, and opens to every field on a click (closed means closed)", () => {
     const host = draw(handlersWith(), line({ tone: "tense", perf: { ANNA: { expression: "frown" } } }));
-    expect(shown(host)).toEqual(["tone", "perf"]);
+    expect(shown(host)).toEqual([]);
     expect(cap(host).textContent).toBe("Probe (2 set)");
     cap(host).click();
     expect(shown(host).length).toBeGreaterThan(2);
-    expect(inspectorFold.isOpen("probe")).toBe(true);
+    expect(inspectorFold.isOpen("probe", "line")).toBe(true);
     // Open stays open on the next node.
     expect(shown(draw(handlersWith(), line())).length).toBeGreaterThan(2);
-  });
-
-  it("keeps a row cleared while folded until the author leaves the node", () => {
-    expect(shown(draw(handlersWith(), line({ tone: "tense" })))).toEqual(["tone"]);
-    expect(shown(draw(handlersWith(), line({})))).toEqual(["tone"]);   // cleared: redrawn, still there
-    const other = { kind: "leaf", beat: "line", id: "L_reply" };
-    draw(handlersWith(), other);
-    expect(shown(draw(handlersWith(), line({})))).toEqual([]);           // left and back: gone
   });
 
   it("leaves Project Settings unfolded", () => {
@@ -237,9 +262,12 @@ describe("a map of records in the inspector", () => {
     const row = host.querySelector<HTMLElement>(".insp-ext-summary")!;
     expect(row.querySelector(".insp-ext-summary-lines")).toBeNull();
     expect(row.querySelector(".insp-ext-edit")).not.toBeNull();
-    inspectorFold.setOpen("probe", false);
+    // Closed, the section is its caption alone, the map counted when it holds a key.
+    openOn("probe", false);
     expect(draw(h, { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: {} } } }).querySelector(".insp-ext-summary")).toBeNull();
-    expect(draw(h, { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: { ANNA: {} } } } }).querySelector(".insp-ext-summary")).not.toBeNull();
+    const closed = draw(h, { kind: "leaf", beat: "line", id: "L_bell", ext: { probe: { perf: { ANNA: {} } } } });
+    expect(closed.querySelector(".insp-ext-summary")).toBeNull();
+    expect(closed.querySelector(".insp-ext-section .insp-gd-cap")?.textContent).toBe("Probe (1 set)");
   });
 
   it("opens the view its field names as editor, once installed here, else the fields window, saying so", () => {
@@ -291,6 +319,9 @@ describe("a pick", () => {
   )!;
   const options = (row: HTMLElement): string[] =>
     [...row.querySelector("select")!.querySelectorAll("option")].map((o) => o.textContent ?? "");
+  // The section open, as a writer opens it to edit (closed, it draws no fields).
+  beforeEach(() => { openOn("shot", true); });
+  afterEach(() => { openOn("shot", false); });
 
   it("offers its words, the cast and the extension's project list in the inspector, and checks against them", () => {
     const seen: unknown[] = [];

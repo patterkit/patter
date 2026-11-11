@@ -28,7 +28,9 @@ type Reveal = (id: string) => void;
  *  either builds the row (inserted at the foot, its control focused, or its editor opened) or acts at once
  *  (`act`, anchored to the Add button), for a property whose row would only be a button to the same place.
  *  `gameData` puts the row in the level's Game Data section. */
-interface Addable { label: string; build?: () => HTMLElement | null; act?: (anchor: HTMLElement) => void; gameData?: boolean }
+/** `gameData` and `extension` say which part of the Add menu it's in: the level's own properties, then the
+ *  project's Game Data fields, then the extensions with nothing shown here. */
+interface Addable { label: string; build?: () => HTMLElement | null; act?: (anchor: HTMLElement) => void; gameData?: boolean; extension?: boolean }
 /** What a body builder returns: rows to draw, properties to offer, and nothing. */
 type Part = HTMLElement | Addable | null;
 const isAddable = (p: Part): p is Addable => p != null && !(p instanceof HTMLElement);
@@ -108,7 +110,10 @@ function gameDataSection(kind: GameDataNodeKind, id: string | null, gd: GameData
 /** The Game Data section's box: its caption, then the rows. */
 function gameDataBox(rows: HTMLElement[]): HTMLElement {
   const sec = el("div", "insp-gd-section");
-  sec.append(el("div", "insp-gd-cap", "Game Data"), ...rows);
+  // The rows inset under the caption, as an open extension's are, so attached data reads as one kind of thing.
+  const body = el("div", "insp-gd-body");
+  body.append(...rows);
+  sec.append(el("div", "insp-gd-cap", "Game Data"), body);
   return sec;
 }
 
@@ -925,15 +930,26 @@ function addButton(body: HTMLElement, offers: Addable[]): HTMLElement {
   btn.setAttribute("aria-haspopup", "menu");
   btn.addEventListener("click", () => {
     const r = btn.getBoundingClientRect();
-    openContextMenu(r.left, r.bottom + 4, offers.map((o) => ({
+    // One menu in three parts: the level's own properties, the project's Game Data fields, the extensions. A
+    // heading starts each later part.
+    const part = (o: Addable): number => (o.extension ? 2 : o.gameData ? 1 : 0);
+    const ordered = [...offers].sort((a, b) => part(a) - part(b));
+    const HEADINGS = ["", "Game data", "Extensions"];
+    openContextMenu(r.left, r.bottom + 4, ordered.map((o, i) => ({
       label: o.label,
+      ...(part(o) > 0 && (i === 0 || part(ordered[i - 1]!) !== part(o)) ? { heading: HEADINGS[part(o)]! } : {}),
       onClick: () => {
         if (o.act) { o.act(btn); return; }
         const row = o.build?.();
         if (!row) return;
         if (o.gameData) {
-          const box = body.querySelector<HTMLElement>(":scope > .insp-gd-section");
-          if (box) box.append(row); else body.insertBefore(gameDataBox([row]), btn);
+          const box = body.querySelector<HTMLElement>(":scope > .insp-gd-section:not(.insp-ext-section) > .insp-gd-body");
+          if (box) box.append(row);
+          else {
+            // Game Data sits above the extensions' sections, as a redraw draws it.
+            const before = body.querySelector<HTMLElement>(":scope > .insp-ext-section") ?? btn;
+            body.insertBefore(gameDataBox([row]), before);
+          }
         } else body.insertBefore(row, btn);
         offers.splice(offers.indexOf(o), 1);
         if (!offers.length) btn.remove();
