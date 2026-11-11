@@ -6,6 +6,33 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Tables can show what an extension already has built in.** Where an extension comes with entries of its own
+  (Pattershot's relationship classes, say), Project Settings lists them first, so you can see what's there and in
+  use rather than an empty table. Change one and it becomes your project's own; Reset puts it back.
+  - A built-in entry's name is fixed, and it can't be removed, only reset. Setting it back to its built-in value
+    resets it too. You can't add a new entry with a built-in name.
+  - A field that offers the table's names offers the built-in ones first.
+
+### Changed
+
+- **The inspector shows what's attached, and Add offers the rest.** An extension now appears on a line, snippet,
+  block, or scene only when something is set there, something is wrong there, or you've opened it. Otherwise it's
+  under Extensions in that level's Add menu, beside the line's own properties and Game Data.
+  - Add ▸ an extension opens its fields there, ready to type in. It stays open from line to line (or block to
+    block) until you close it, which suits a staging pass. Close it with nothing set and it goes back into Add.
+  - A closed extension shows only its name and a count, "Pattershot (2 set)", never some of its fields.
+  - An open extension's fields, and Game Data's, are set in behind a thin line, so they read as theirs and not as
+    the line's own.
+
+### Fixed
+
+- **Problems in a closed extension show on its name.** It reads "Pattershot (1 set, 1 problem)", with the problem as
+  its tooltip, and Go to issue opens it at the field.
+- **The project's name in the title bar works.** Hover it to see where the project lives on disk; click it for the
+  project overview. Neither did anything in the app before, though both worked in the preview.
+
 ## [1.2.0] - 2026-11-10
 
 ### Added
