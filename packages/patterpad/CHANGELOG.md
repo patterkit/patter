@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-11
+
 ### Added
 
 - **Tables can show what an extension already has built in.** Where an extension comes with entries of its own
