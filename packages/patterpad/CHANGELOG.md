@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-12
+
 ### Changed
 
 - **A calmer welcome.** With no project open, Patterpad shows its name, a few buttons, and your recent projects, and
