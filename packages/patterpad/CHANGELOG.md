@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-12
+
 ### Added
 
 - **HD voices for Placeholder Speech.** Choose HD under Voices in Project Settings ▸ Placeholder Speech and the stand-in
