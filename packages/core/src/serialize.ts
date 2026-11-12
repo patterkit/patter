@@ -18,8 +18,6 @@
 // is the canonical writer and hand-edit comments are the unprivileged path.)
 // ---------------------------------------------------------------------------
 
-import JSON5 from "json5";
-
 // JSON5 + a tolerated BOM, from @wildwinter/toolkit: four lines both families
 // had written identically. Re-exported so nothing that imports it has to move.
 export { parseSource } from "@wildwinter/toolkit";
