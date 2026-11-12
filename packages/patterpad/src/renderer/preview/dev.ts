@@ -515,6 +515,7 @@ const stub = {
   speechMake: async () => ({ ok: true }),
   speechCount: async () => 3,
   speechAccent: async () => "en-GB",
+  speechTier: async () => "standard",
   speechNudge: () => {},
   speechDeletedTakes: async () => [],
   speechRemoveDeletedTakes: async () => 0,

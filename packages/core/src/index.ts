@@ -10,9 +10,9 @@ export { slug, hash4, hash32 } from "./handle.js";
 export { gameIdify, isValidGameId, effectiveGameId } from "@patterkit/model";
 export { humanizeNodeRefs } from "./noderefs.js";
 // Audio take stamps (the text hash a take was made from, and Placeholder Speech's request hash), kept in the WAV
-// Placeholder Speech's voices: the curated Standard voices per accent and the default a name hashes to
-export { PLACEHOLDER_ACCENTS, placeholderAccent, accentForLanguage, defaultPlaceholderVoice, describePlaceholderVoice } from "./placeholder-voices.js";
-export type { PlaceholderAccent, PlaceholderVoice, VoiceGender } from "./placeholder-voices.js";
+// Placeholder Speech's voices: the curated Standard and HD voices per accent and the default a name hashes to
+export { PLACEHOLDER_ACCENTS, PLACEHOLDER_HD_ACCENTS, placeholderAccent, placeholderVoiceTier, accentForLanguage, defaultPlaceholderVoice, describePlaceholderVoice } from "./placeholder-voices.js";
+export type { PlaceholderAccent, PlaceholderVoice, PlaceholderTier, VoiceGender } from "./placeholder-voices.js";
 export { textHash, readInfoChunks, readTextStamp, readGeneratedStamp, infoListChunk, withStamps, isWav, TEXT_STAMP, GENERATED_STAMP } from "./take-stamp.js";
 export { parseSource, canonicalStringify } from "./serialize.js";
 export type { StringifyOptions } from "./serialize.js";

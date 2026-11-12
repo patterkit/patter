@@ -129,7 +129,7 @@ export function mountWritingStatus(host: HTMLElement, initial: WritingStatusDecl
 // two. Each page re-renders when the state changes. The scratch and Placeholder Speech statuses are held as
 // the status objects themselves, so a rename carries them; value() turns them back into names.
 
-export interface PlaceholderSpeechValue { status: string; keyFile?: string; accent?: string; keepOutOfVersionControl?: boolean }
+export interface PlaceholderSpeechValue { status: string; keyFile?: string; accent?: string; tier?: "standard" | "hd"; keepOutOfVersionControl?: boolean }
 export interface AudioValue {
   trackAudioStatus: boolean; recordingStatuses: RecordingStatusDecl[]; audioFolders: boolean; audioRoot: string | null;
   scratchStatus: string | null; placeholderSpeech: PlaceholderSpeechValue | null;
@@ -154,7 +154,9 @@ interface AudioState {
   audioFolders: boolean;
   audioRoot: string;
   scratch: RecordingStatusDecl | null;
-  placeholder: { rung: RecordingStatusDecl | null; on: boolean; keyFile: string; accent: string; keepOut: boolean };
+  /** `savedTier` is the tier as the dialog opened (null when Placeholder Speech was off), so a change can be
+   *  warned of before it's saved. */
+  placeholder: { rung: RecordingStatusDecl | null; on: boolean; keyFile: string; accent: string; tier: "standard" | "hd"; savedTier: "standard" | "hd" | null; keepOut: boolean };
 }
 
 const PLACEHOLDER_STATUS = "placeholder";
@@ -169,7 +171,7 @@ export function createAudioSettings(initial: AudioInitial): AudioSettings {
     audioFolders: !!initial.audioFolders,
     audioRoot: initial.audioRoot ?? "",
     scratch: byName(initial.scratchStatus),
-    placeholder: { rung: byName(ps?.status), on: !!ps, keyFile: ps?.keyFile ?? "", accent: ps?.accent ?? "", keepOut: !!ps?.keepOutOfVersionControl },
+    placeholder: { rung: byName(ps?.status), on: !!ps, keyFile: ps?.keyFile ?? "", accent: ps?.accent ?? "", tier: ps?.tier === "hd" ? "hd" : "standard", savedTier: ps ? (ps.tier === "hd" ? "hd" : "standard") : null, keepOut: !!ps?.keepOutOfVersionControl },
   };
   const listeners: Array<() => void> = [];
   const live = (r: RecordingStatusDecl | null): boolean => !!r && recording.includes(r) && recording.indexOf(r) > 0 && !!r.name.trim();
@@ -192,6 +194,7 @@ export function createAudioSettings(initial: AudioInitial): AudioSettings {
         status: p.rung!.name.trim(),
         ...(p.keyFile.trim() ? { keyFile: p.keyFile.trim() } : {}),
         ...(p.accent ? { accent: p.accent } : {}),
+        ...(p.tier === "hd" ? { tier: "hd" as const } : {}),
         ...(p.keepOut ? { keepOutOfVersionControl: true } : {}),
       } : null;
       return { trackAudioStatus: s.trackAudioStatus, recordingStatuses, audioFolders: s.audioFolders, audioRoot: root || null, scratchStatus, placeholderSpeech };
@@ -341,6 +344,8 @@ export interface PlaceholderPageOptions {
   keyStatus(keyFile: string): Promise<{ ok: boolean; message: string }>;
   /** Opens the docs page on getting a key. */
   openKeyGuide(): void;
+  /** Opens Google's Text-to-Speech pricing page. */
+  openPricing(): void;
 }
 
 /** Project settings > Placeholder Speech. */
@@ -358,7 +363,7 @@ export function mountPlaceholderSpeech(host: HTMLElement, a: AudioSettings, opts
   const render = (): void => {
     host.replaceChildren();
     const ready = a.foldersOn();
-    host.append(el("p", "settings-note", "Stand-in speech for every spoken line, made from its words, so a scene can be heard before anyone records it. It sounds like a stand-in on purpose. Any scratch, recorded, or final voice clip is heard instead."));
+    host.append(el("p", "settings-note", "Stand-in speech for every spoken line, made from its words, so a scene can be heard before anyone records it. Any scratch, recorded, or final voice clip is heard instead."));
     host.append(labelledToggle("Generate Placeholder Speech", {
       checked: p.on, disabled: !ready,
       hint: ready ? `Speech goes in the ${p.rung && p.on ? `"${p.rung.name.trim()}"` : `"${PLACEHOLDER_STATUS}"`} status's folder, below scratch.` : "Placeholder Speech goes in a status's folder: set up Audio Folders first.",
@@ -395,7 +400,7 @@ export function mountPlaceholderSpeech(host: HTMLElement, a: AudioSettings, opts
     host.append(el("div", "sp-group", keyRow, status, guide));
     check();
 
-    // The accent: which of Google's Standard voices the cast draws on.
+    // The accent: which of Google's voices the cast draws on, in the tier chosen below.
     const accentRow = el("label", "sp-folder");
     accentRow.append(el("span", "sp-folder-cap sp-field-cap", "Accent"));
     const accent = el("select", "gd-input sp-folder-input") as HTMLSelectElement;
@@ -407,6 +412,30 @@ export function mountPlaceholderSpeech(host: HTMLElement, a: AudioSettings, opts
     const accentGroup = el("div", "sp-group", accentRow);
     if (!p.accent) accentGroup.append(el("p", "settings-fieldnote is-bad", "Choose an accent: none is on offer for the project's main language."));
     host.append(accentGroup);
+
+    // The voices' tier: Standard (the default), or HD, which costs the user more on their own Google account.
+    const tierRow = el("label", "sp-folder");
+    tierRow.append(el("span", "sp-folder-cap sp-field-cap", "Voices"));
+    const tier = el("select", "gd-input sp-folder-input sp-tier") as HTMLSelectElement;
+    tier.append(new Option("Standard", "standard"), new Option("HD (costs more)", "hd"));
+    tier.value = p.tier;
+    tier.addEventListener("change", () => { p.tier = tier.value === "hd" ? "hd" : "standard"; a.changed(); });
+    tierRow.append(tier);
+    const tierGroup = el("div", "sp-group", tierRow);
+    if (p.tier === "hd") {
+      tierGroup.append(el("p", "settings-fieldnote sp-tier-cost", "HD voices (Google's Chirp 3 HD) sound much more natural. Google bills them at a higher rate per character than Standard voices, on your own Google account, and gives fewer free characters a month."));
+      const pricing = el("button", "linklike sp-tier-pricing", "Google's Text-to-Speech pricing") as HTMLButtonElement; pricing.type = "button";
+      pricing.addEventListener("click", () => opts.openPricing());
+      tierGroup.append(pricing);
+    } else {
+      tierGroup.append(el("p", "settings-fieldnote", "Standard voices sound like the stand-in they are. HD voices sound much more natural, and cost more."));
+    }
+    if (p.savedTier && p.tier !== p.savedTier) {
+      tierGroup.append(el("p", "settings-fieldnote is-bad sp-tier-remake", p.tier === "hd"
+        ? "Saving gives every character without a voice of their own a new HD voice, so all their lines are made again, at the HD rate."
+        : "Saving gives every character without a voice of their own a new Standard voice, so all their lines are made again."));
+    }
+    host.append(tierGroup);
 
     host.append(labelledToggle("Keep Placeholder Speech out of version control", {
       checked: p.keepOut,

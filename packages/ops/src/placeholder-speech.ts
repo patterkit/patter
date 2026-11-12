@@ -3,8 +3,8 @@
 // words, into the folder of one recording status (`project.placeholderSpeech.status`). Shared by Patterpad and
 // `patter placeholder-speech`, so the two make identical files.
 //
-// It sounds like a stand-in on purpose: Google's Standard voices only, 16 kHz mono, trimmed of silence as
-// scratch takes are. Each file is a WAV stamped with PTRK (the text hash, so the editor flags it out of date)
+// Standard voices by default, at 16 kHz mono, which sound like the stand-in they are; a project can opt into
+// HD (Chirp 3 HD, at its natural 24 kHz), billed at a higher rate to the user. Trimmed of silence as scratch takes are. Each file is a WAV stamped with PTRK (the text hash, so the editor flags it out of date)
 // and PTPS (a hash of the whole request, so a changed voice or line remakes it, and so a file without it is a
 // person's and never touched).
 //
@@ -19,14 +19,23 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { DEFAULT_CAPTION_CHARACTER, DEFAULT_CAPTION_DELIMITERS, DEFAULT_RECORDING_STATUSES, deriveRecordingFolders } from "@patterkit/model";
 import type { CastMember, ProjectFile } from "@patterkit/model";
 import { stripCaptions } from "@patterkit/dialect";
-import { textHash, withStamps, readInfoChunks, accentForLanguage, defaultPlaceholderVoice, TEXT_STAMP, GENERATED_STAMP } from "@patterkit/core";
+import { textHash, withStamps, readInfoChunks, accentForLanguage, defaultPlaceholderVoice, placeholderVoiceTier, TEXT_STAMP, GENERATED_STAMP } from "@patterkit/core";
+import type { PlaceholderTier } from "@patterkit/core";
 import { runVoiceScript } from "./voice-script.js";
 import { scanAudio } from "./audio-index.js";
 import type { AudioSnapshot } from "./audio-index.js";
 import type { LoadedProject } from "./load.js";
 
-/** The fixed output: low on purpose. */
+/** The Standard tier's output: low on purpose. */
 export const PLACEHOLDER_SAMPLE_RATE = 16000;
+/** The HD tier's output: Chirp 3 HD's natural rate. */
+export const PLACEHOLDER_HD_SAMPLE_RATE = 24000;
+
+/** The rate a voice is asked for: its tier's (an HD voice at 24 kHz wherever it's named; any other at 16 kHz, as
+ *  before HD, so a Standard project's request hashes, and so its files, are unchanged). */
+export function placeholderSampleRate(voice: string): number {
+  return placeholderVoiceTier(voice) === "hd" ? PLACEHOLDER_HD_SAMPLE_RATE : PLACEHOLDER_SAMPLE_RATE;
+}
 const TRIM_THRESHOLD = 0.01;   // amplitude below this counts as silence (as scratch takes)
 const TRIM_PAD_SECONDS = 0.05; // keep 50 ms either side
 
@@ -181,7 +190,7 @@ export interface SpeechRequest { text: string; voice: string; languageCode: stri
 
 /** The request hash stamped as PTPS: everything that shapes the audio. */
 export function requestHash(r: SpeechRequest): string {
-  const shape = { text: r.text, voice: r.voice, languageCode: r.languageCode, encoding: "LINEAR16", sampleRate: PLACEHOLDER_SAMPLE_RATE, trim: TRIM_PAD_SECONDS };
+  const shape = { text: r.text, voice: r.voice, languageCode: r.languageCode, encoding: "LINEAR16", sampleRate: placeholderSampleRate(r.voice), trim: TRIM_PAD_SECONDS };
   return createHash("sha256").update(JSON.stringify(shape)).digest("hex").slice(0, 16);
 }
 
@@ -193,7 +202,7 @@ export async function synthesize(auth: string | GoogleAuth, r: SpeechRequest, fe
     res = await fetchFn("https://texttospeech.googleapis.com/v1/text:synthesize", {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...(quotaProject ? { "x-goog-user-project": quotaProject } : {}) },
-      body: JSON.stringify({ input: { text: r.text }, voice: { languageCode: r.languageCode, name: r.voice }, audioConfig: { audioEncoding: "LINEAR16", sampleRateHertz: PLACEHOLDER_SAMPLE_RATE } }),
+      body: JSON.stringify({ input: { text: r.text }, voice: { languageCode: r.languageCode, name: r.voice }, audioConfig: { audioEncoding: "LINEAR16", sampleRateHertz: placeholderSampleRate(r.voice) } }),
     });
   } catch (e) {
     if (isNetworkError(e)) throw new SpeechError("offline", "Couldn't reach Google: no network connection.");
@@ -286,6 +295,10 @@ export interface PlaceholderPlan {
   status: string;
   folder: string;
   accent: string | undefined;
+  tier: PlaceholderTier;
+  /** Cast members whose own voice is from the other tier than the project's: used as given, and warned of
+   *  (an HD voice in a Standard project is billed at HD rates). */
+  otherTier: string[];
   tasks: PlaceholderTask[];
   skipped: Partial<Record<PlaceholderSkip, number>>;
 }
@@ -301,10 +314,21 @@ export interface PlanOptions {
   snapshot?: AudioSnapshot;
 }
 
-/** The voice a character speaks with: their own, else the default from the name and gender. */
-export function voiceFor(cast: CastMember[] | undefined, character: string, accent: string | undefined): string | undefined {
+/** The voice a character speaks with: their own, else the default from the name and gender in the tier. */
+export function voiceFor(cast: CastMember[] | undefined, character: string, accent: string | undefined, tier?: PlaceholderTier): string | undefined {
   const m = cast?.find((c) => c.name === character);
-  return m?.placeholderVoice ?? defaultPlaceholderVoice(character, accent, m?.gender);
+  return m?.placeholderVoice ?? defaultPlaceholderVoice(character, accent, m?.gender, tier);
+}
+
+/** The tier in use: the project's choice, else Standard. */
+export function placeholderTierOf(p: ProjectFile): PlaceholderTier {
+  return p.placeholderSpeech?.tier === "hd" ? "hd" : "standard";
+}
+
+/** Cast members whose own voice is from the other tier than `tier` (a voice from neither list is taken as given
+ *  and not counted). Their voice is used as it is; the settings page and the CLI say so. */
+export function voicesOutsideTier(cast: CastMember[] | undefined, tier: PlaceholderTier): string[] {
+  return (cast ?? []).filter((m) => { const t = m.placeholderVoice ? placeholderVoiceTier(m.placeholderVoice) : undefined; return t !== undefined && t !== tier; }).map((m) => m.name);
 }
 
 /** The accent in use: the project's choice, else the one its main language implies. */
@@ -327,11 +351,12 @@ export function planPlaceholderSpeech(loaded: LoadedProject, opts: PlanOptions =
   const rank = new Map(ladder.map((r, i) => [r.name, i]));
   const myRank = rank.get(ps.status) ?? 0;
   const accent = placeholderAccentOf(p);
+  const tier = placeholderTierOf(p);
   const snap = opts.snapshot ?? scanAudio(loaded) ?? {};
   const caps = { open: p.closedCaptions?.open ?? DEFAULT_CAPTION_DELIMITERS.open, close: p.closedCaptions?.close ?? DEFAULT_CAPTION_DELIMITERS.close };
   const captionCharacter = p.closedCaptions?.character ?? DEFAULT_CAPTION_CHARACTER;
   const sceneIds = opts.scene ? new Set([opts.scene]) : undefined;
-  const plan: PlaceholderPlan = { status: ps.status, folder, accent, tasks: [], skipped: {} };
+  const plan: PlaceholderPlan = { status: ps.status, folder, accent, tier, otherTier: voicesOutsideTier(p.cast, tier), tasks: [], skipped: {} };
   const skip = (why: PlaceholderSkip): void => { plan.skipped[why] = (plan.skipped[why] ?? 0) + 1; };
   const script = runVoiceScript(loaded, { everything: true });
   const inScene = sceneIds ? lineIdsInScenes(loaded, sceneIds) : undefined;
@@ -342,7 +367,7 @@ export function planPlaceholderSpeech(loaded: LoadedProject, opts: PlanOptions =
     if (!text || line.character === captionCharacter) { skip("unspoken"); continue; }
     const have = snap[line.id];
     if (have && (rank.get(have.status) ?? 0) > myRank) { skip("better"); continue; }
-    const voice = voiceFor(p.cast, line.character, accent);
+    const voice = voiceFor(p.cast, line.character, accent, tier);
     if (!voice) { skip("no-voice"); continue; }
     const request: SpeechRequest = { text, voice, languageCode: voice.split("-").slice(0, 2).join("-") };
     const hash = requestHash(request);

@@ -75,7 +75,7 @@ What your game can use depends on what imports it:
 Unity, Unreal, and Godot import all three (Unreal plays imported sound assets, not the files themselves).
 Wwise takes WAV, so a Wwise project keeps its voice clips as WAV. OGG is much smaller than WAV, so it suits a game
 that ships a lot of voice. Safari's support for Ogg Vorbis came late and isn't dependable, so if a web game
-has to play in Safari, use MP3. [Placeholder Speech](/production/placeholder-speech/) is WAV, at 16 kHz.
+has to play in Safari, use MP3. [Placeholder Speech](/production/placeholder-speech/) is WAV, at 16 kHz (24 kHz with HD voices).
 
 Every status folder names a line's voice clip the same way, so never merge status folders into one: a line's
 scratch voice clip and its recorded voice clip would have the same name, and one would overwrite the other. Copy the

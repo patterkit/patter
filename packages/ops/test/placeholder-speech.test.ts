@@ -4,8 +4,8 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
-import { generateKeyPairSync } from "node:crypto";
-import { loadProject, runReport, planPlaceholderSpeech, runPlaceholderSpeech, finishTake, requestHash, expandKeyPath, storedKeyPath, resolveKeyFile, readGoogleKey, tokenSource, describeSpeechError, SpeechError } from "../src/index.js";
+import { generateKeyPairSync, createHash } from "node:crypto";
+import { loadProject, runReport, planPlaceholderSpeech, runPlaceholderSpeech, finishTake, requestHash, expandKeyPath, storedKeyPath, resolveKeyFile, readGoogleKey, tokenSource, describeSpeechError, SpeechError, synthesize, placeholderSampleRate } from "../src/index.js";
 import { readTextStamp, readGeneratedStamp, textHash, withStamps, defaultPlaceholderVoice } from "@patterkit/core";
 
 const LADDER = [{ name: "missing" }, { name: "placeholder" }, { name: "scratch" }, { name: "recorded" }];
@@ -52,6 +52,21 @@ describe("Placeholder Speech: planning", () => {
     expect(plan.skipped.unspoken).toBe(1);
   });
 
+  it("uses the project's tier: HD defaults when chosen, and a voice from the other tier as given, with a warning", () => {
+    const standard = planPlaceholderSpeech(loadProject(makeProject()))!;
+    expect(standard.tier).toBe("standard");
+    expect(standard.otherTier).toEqual([]);
+    const hd = planPlaceholderSpeech(loadProject(makeProject({ ...ON, placeholderSpeech: { status: "placeholder", accent: "en-GB", tier: "hd" } })))!;
+    expect(hd.tier).toBe("hd");
+    expect(hd.tasks[0]!.request.voice).toBe(defaultPlaceholderVoice("TAM", "en-GB", "male", "hd"));
+    expect(hd.tasks[0]!.request.voice).toMatch(/^en-GB-Chirp3-HD-/);
+    expect(hd.tasks[1]!.request.voice).toBe("en-GB-Standard-C"); // ANNA's own Standard voice, kept
+    expect(hd.otherTier).toEqual(["ANNA"]);
+    const mixed = planPlaceholderSpeech(loadProject(makeProject({ ...ON, cast: [{ name: "TAM", placeholderVoice: "en-GB-Chirp3-HD-Puck" }] })))!;
+    expect(mixed.tasks[0]!.request.voice).toBe("en-GB-Chirp3-HD-Puck");
+    expect(mixed.otherTier).toEqual(["TAM"]);
+  });
+
   it("is off without Audio Folders or the setting", () => {
     expect(planPlaceholderSpeech(loadProject(makeProject({ ...ON, placeholderSpeech: undefined })))).toBeUndefined();
     expect(planPlaceholderSpeech(loadProject(makeProject({ ...ON, audioFolders: false })))).toBeUndefined();
@@ -71,6 +86,27 @@ describe("Placeholder Speech: planning", () => {
     // Make again remakes an unchanged one; a changed voice remakes too.
     expect(planPlaceholderSpeech(loadProject(dir), { force: new Set(["L2"]) })!.tasks.map((t) => t.beatId)).toEqual(["L2"]);
     expect(planPlaceholderSpeech(loadProject(dir), { only: new Set(["L1"]) })!.tasks).toEqual([]);
+  });
+
+  it("keeps a Standard request's hash exactly as before HD, so no Standard project remakes a line", () => {
+    const r = { text: "Hi.", voice: "en-GB-Standard-A", languageCode: "en-GB" };
+    const before = createHash("sha256").update(JSON.stringify({ ...r, encoding: "LINEAR16", sampleRate: 16000, trim: 0.05 })).digest("hex").slice(0, 16);
+    expect(requestHash(r)).toBe(before);
+  });
+
+  it("asks for an HD voice at 24 kHz and a Standard one at 16 kHz", async () => {
+    expect(placeholderSampleRate("en-GB-Chirp3-HD-Kore")).toBe(24000);
+    expect(placeholderSampleRate("en-GB-Standard-A")).toBe(16000);
+    const rates: number[] = [];
+    const fake = (async (_url: string, init: RequestInit) => {
+      rates.push(JSON.parse(String(init.body)).audioConfig.sampleRateHertz);
+      return new Response(JSON.stringify({ audioContent: Buffer.from(googleWav()).toString("base64") }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await synthesize("t", { text: "Hi.", voice: "en-GB-Chirp3-HD-Kore", languageCode: "en-GB" }, fake);
+    await synthesize("t", { text: "Hi.", voice: "en-GB-Standard-A", languageCode: "en-GB" }, fake);
+    expect(rates).toEqual([24000, 16000]);
+    const hd = requestHash({ text: "Hi.", voice: "en-GB-Chirp3-HD-Kore", languageCode: "en-GB" });
+    expect(hd).toBe(createHash("sha256").update(JSON.stringify({ text: "Hi.", voice: "en-GB-Chirp3-HD-Kore", languageCode: "en-GB", encoding: "LINEAR16", sampleRate: 24000, trim: 0.05 })).digest("hex").slice(0, 16));
   });
 
   it("hashes the whole request, so a voice change or a rewording remakes", () => {

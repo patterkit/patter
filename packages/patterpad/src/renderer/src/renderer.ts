@@ -3972,9 +3972,10 @@ function confirmPackMerge(summary: PackMergeSummary): Promise<boolean> {
 async function makeProjectSpeech(): Promise<void> {
   const n = await window.patter.speechCount({});
   if (n === 0) { toast("Placeholder Speech is up to date.", "info"); return; }
+  const hd = (await window.patter.speechTier()) === "hd";
   const go = await confirmDialog({
     title: `Make Placeholder Speech for ${n} line${n === 1 ? "" : "s"}?`,
-    body: "Each is made by Google on the project's key, in the background. You can carry on writing, and cancel from the strip.",
+    body: `Each is made by Google on the project's key, in the background. You can carry on writing, and cancel from the strip.${hd ? " The project uses HD voices, which Google bills at a higher rate per character on your own Google account." : ""}`,
     confirmLabel: "Make Speech",
   });
   if (go) void window.patter.speechMake({});
@@ -4258,6 +4259,7 @@ function buildSettingsDialog(): SettingsDialog {
         // Placeholder Speech's Voice field, read live from the dialog's own audio pages.
         on: () => audioSettings().value().placeholderSpeech != null,
         accent: () => audioSettings().value().placeholderSpeech?.accent ?? accentForLanguage(s.localeDefault),
+        tier: () => (audioSettings().value().placeholderSpeech?.tier === "hd" ? "hd" : "standard"),
         hear: (voice, name) => void hearVoice(voice, name),
       });
       audioSettings().onChange(() => cast.refreshSpeech());
@@ -4304,6 +4306,7 @@ function buildSettingsDialog(): SettingsDialog {
         chooseKeyFile: () => window.patter.speechChooseKey(),
         keyStatus: (keyFile) => window.patter.speechKeyStatus(keyFile),
         openKeyGuide: () => window.patter.openExternal("https://patterkit.dev/production/placeholder-speech/#getting-a-key"),
+        openPricing: () => window.patter.openExternal("https://cloud.google.com/text-to-speech/pricing"),
       });
       return {};
     }, disabled: () => !live.voiced?.checked ? "Enable Voiced (General tab) first." : audioSettings().foldersOn() ? null : "Turn on Use Audio Folders (Recording status) first: Placeholder Speech goes in a status's folder." },
@@ -4375,11 +4378,13 @@ async function afterSpeechSettings(before: ProjectSettingsDto, after: { cast: Ca
   if (!before.placeholderSpeech) { void makeProjectSpeech(); return; }
   const accentWas = before.placeholderSpeech.accent ?? accentForLanguage(before.localeDefault);
   const accent = ps.accent ?? accentForLanguage(after.localeDefault);
-  const voiceOf = (m: CastMember | undefined, name: string, acc: string | undefined): string | undefined => m?.placeholderVoice ?? defaultPlaceholderVoice(name, acc, m?.gender);
+  const tierWas = before.placeholderSpeech.tier === "hd" ? "hd" : "standard";
+  const tier = ps.tier === "hd" ? "hd" : "standard";
+  const voiceOf = (m: CastMember | undefined, name: string, acc: string | undefined, t: "standard" | "hd"): string | undefined => m?.placeholderVoice ?? defaultPlaceholderVoice(name, acc, m?.gender, t);
   const byNewName = new Map(Object.entries(renames).map(([from, to]) => [to, from]));
   const changed = after.cast.filter((m) => {
     const was = byNewName.get(m.name) ?? m.name;
-    return voiceOf(m, m.name, accent) !== voiceOf(before.cast.find((c) => c.name === was), was, accentWas);
+    return voiceOf(m, m.name, accent, tier) !== voiceOf(before.cast.find((c) => c.name === was), was, accentWas, tierWas);
   }).map((m) => m.name);
   if (!changed.length) return;
   const n = await window.patter.speechCount({ characters: changed });
@@ -4387,7 +4392,9 @@ async function afterSpeechSettings(before: ProjectSettingsDto, after: { cast: Ca
   const who = changed.length === 1 ? changed[0]! : `${changed.length} characters`;
   const go = await confirmDialog({
     title: `Make ${n} line${n === 1 ? "" : "s"} again for ${who}?`,
-    body: "Their Placeholder Speech voice changed. If you'd rather wait, Production > Placeholder Speech makes it later.",
+    body: tier === "hd" && tierWas !== "hd"
+      ? "Their Placeholder Speech voice changed to an HD voice, which Google bills at a higher rate on your own Google account. If you'd rather wait, Production > Placeholder Speech makes it later."
+      : "Their Placeholder Speech voice changed. If you'd rather wait, Production > Placeholder Speech makes it later.",
     confirmLabel: "Make Again",
   });
   if (go) void window.patter.speechMake({ characters: changed });

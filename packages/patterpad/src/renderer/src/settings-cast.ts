@@ -7,7 +7,8 @@
 
 import type { CastMember } from "@patterkit/model";
 import { COMMON_GENDERS, DEFAULT_SPEAKER_PATTERN, formatSpeakerLabel } from "@patterkit/model";
-import { placeholderAccent, defaultPlaceholderVoice, describePlaceholderVoice } from "@patterkit/core";
+import { placeholderAccent, placeholderVoiceTier, defaultPlaceholderVoice, describePlaceholderVoice } from "@patterkit/core";
+import type { PlaceholderTier } from "@patterkit/core";
 import { el } from "./dom.js";
 import { iconBtn, labelled, moveItem, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
@@ -27,6 +28,8 @@ export interface CastSpeech {
   on(): boolean;
   /** The accent in use, or undefined when none is chosen yet. */
   accent(): string | undefined;
+  /** The voices' tier in use: Standard or HD. */
+  tier(): PlaceholderTier;
   /** Say a sentence in this voice (the Hear button). */
   hear(voice: string, characterName: string): void;
 }
@@ -131,29 +134,40 @@ export function mountCast(host: HTMLElement, initial: CastMember[], labels?: Cas
   const voiceField = (m: CastMember, gender: HTMLInputElement): HTMLElement[] => {
     if (!speech?.on()) return [];
     const accent = speech.accent();
-    const voices = placeholderAccent(accent)?.voices ?? [];
+    const tier = speech.tier();
+    const voices = placeholderAccent(accent, tier)?.voices ?? [];
     const sel = el("select", "gd-input cast-voice") as HTMLSelectElement;
     const defaultOption = (): string => {
-      const d = defaultPlaceholderVoice(m.name || "?", accent, m.gender);
+      const d = defaultPlaceholderVoice(m.name || "?", accent, m.gender, tier);
       return d ? `Default: ${describePlaceholderVoice(d)}` : "Default (choose an accent first)";
     };
     const def = new Option(defaultOption(), "");
     sel.append(def);
     for (const v of voices) sel.append(new Option(describePlaceholderVoice(v.name), v.name));
-    // A voice from another accent (set before the accent changed) stays, named as it is.
+    // A voice from another accent or tier (set before either changed) stays, named as it is, and is used as chosen.
     if (m.placeholderVoice && !voices.some((v) => v.name === m.placeholderVoice)) sel.append(new Option(describePlaceholderVoice(m.placeholderVoice), m.placeholderVoice));
     sel.value = m.placeholderVoice ?? "";
-    sel.addEventListener("change", () => { m.placeholderVoice = sel.value || undefined; });
+    // A voice from the other tier is used as chosen, and said so: an HD one in a Standard project costs HD rates.
+    const otherTier = el("p", "settings-fieldnote is-bad cast-voice-tier");
+    const syncTier = (): void => {
+      const t = sel.value ? placeholderVoiceTier(sel.value) : undefined;
+      otherTier.hidden = !t || t === tier;
+      otherTier.textContent = t === "hd" ? "An HD voice: used as chosen, though the project uses Standard voices, and billed at the HD rate." : "A Standard voice: used as chosen, though the project uses HD voices.";
+    };
+    syncTier();
+    sel.addEventListener("change", () => { m.placeholderVoice = sel.value || undefined; syncTier(); });
     // The default follows the gender as it's typed (male or female, any case, narrows it when they disagree).
     gender.addEventListener("input", () => { def.text = defaultOption(); });
     const hear = el("button", "gd-add cast-hear", "Hear") as HTMLButtonElement; hear.type = "button";
     hear.dataset.tip = "Hear this voice say the character's name";
     hear.addEventListener("click", () => {
-      const v = sel.value || defaultPlaceholderVoice(m.name || "?", accent, m.gender);
+      const v = sel.value || defaultPlaceholderVoice(m.name || "?", accent, m.gender, tier);
       if (v) speech.hear(v, m.displayName || m.name);
     });
     const wrap = el("div", "cast-voice-row"); wrap.append(sel, hear);
-    return [labelled("Placeholder Speech voice", wrap, "With no voice chosen, the name picks one; a gender of male or female narrows it.")];
+    const field = labelled("Placeholder Speech voice", wrap, "With no voice chosen, the name picks one; a gender of male or female narrows it.");
+    field.append(otherTier);
+    return [field];
   };
 
   /** One "Shown with" field for each qualifier this character's lines use, then one for each label it has

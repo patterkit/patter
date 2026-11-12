@@ -9,8 +9,9 @@ sidebar:
 time it, and play it in your game before anyone records a line. Google's Text-to-Speech makes it, on a key your
 team provides.
 
-It sounds like a stand-in on purpose. It uses Google's plainer voices at a low sample rate, so nobody mistakes it
-for the finished thing, and any real voice clip replaces it: a scratch voice clip, a recorded one, or a final one is always
+By default it sounds like a stand-in on purpose. It uses Google's plainer Standard voices at a low sample rate, so
+nobody mistakes it for the finished thing. For a better read, a project can choose [HD voices](#hd-voices), which cost
+more. Either way, any real voice clip replaces it: a scratch voice clip, a recorded one, or a final one is always
 heard instead.
 
 ## Turning it on
@@ -24,6 +25,8 @@ Placeholder Speech**:
 2. Set the **Google Cloud key file** (see [getting a key](#getting-a-key)).
 3. Check the **accent**. It follows your project's main language: a project written in `en-US` speaks with an
    American accent, and one written in plain `en` with a British one, so choose another there if you want it.
+4. Leave **Voices** on **Standard**, or choose **HD** for more natural voices that cost more (see
+   [HD voices](#hd-voices)).
 
 Then carry on writing. A moment after you move off a line you've edited, its speech is made in the background,
 with a strip at the bottom of the window while it works. Lines still waiting when you close Patterpad are made
@@ -45,6 +48,27 @@ it. Renaming a character keeps their voice.
 Change a voice, a gender, or the accent and Patterpad offers to make that character's lines again. If you'd
 rather wait, **Production ▸ Placeholder Speech** does it later.
 
+## HD voices
+
+**HD voices** are Google's Chirp 3 HD voices. They read a line far more naturally than the Standard ones, which
+helps when you play a scene to someone. They're still placeholders: any real voice clip replaces them, and a line
+with only HD speech is still to record.
+
+**They cost more.** Placeholder Speech is billed to your own Google account, and Google charges HD voices a higher
+rate per character than Standard ones, with fewer free characters each month. In November 2026, Standard voices
+were US$4 per million characters with 4 million free a month, and Chirp 3 HD voices US$30 per million with 1
+million free. Prices change, so check [Google's Text-to-Speech pricing](https://cloud.google.com/text-to-speech/pricing)
+before you switch.
+
+To switch, choose **HD** under **Voices** in **Project Settings ▸ Placeholder Speech**. HD has its own voices, so
+every character without a voice of their own gets a new one, and **all their lines are made again, at the HD
+rate**. The settings page says so before you save, and Patterpad asks before it starts making them.
+
+To switch back, choose **Standard**. The lines are made again with Standard voices.
+
+A character's own voice stays as it is when you switch, even one from the other kind, and Cast marks it. An HD
+voice chosen for a character in a Standard project is billed at the HD rate.
+
 ## What it means for the rest of the project
 
 - **A line with only placeholder speech is still to record.** The recording script and **Production Information**
@@ -57,7 +81,7 @@ rather wait, **Production ▸ Placeholder Speech** does it later.
   so a development build can be heard all the way through. For a release, leave the placeholder folder out of
   what you package and write a shipping manifest without it:
   `patter export --audio-manifest-out build/patteraudio.json --no-placeholder-speech`.
-- **Its files are WAV, 16 kHz, trimmed of silence** at each end, as scratch voice clips are, so lines are timed by their
+- **Its files are WAV, 16 kHz (24 kHz with HD voices), trimmed of silence** at each end, as scratch voice clips are, so lines are timed by their
   speech and not by Google's pauses.
 - **A file you put in the placeholder folder yourself is never touched.** Placeholder Speech marks its own files,
   and only remakes or removes those. The settings page lists any it didn't make.
@@ -68,8 +92,8 @@ Placeholder Speech uses a **service account key**: a small `.json` file from Goo
 for speech on your project's account. One person usually makes it, and the team shares the file.
 
 1. Sign in to the [Google Cloud console](https://console.cloud.google.com/) and **create a project** for your game.
-2. **Set up billing** on it. Text-to-Speech has a free monthly allowance, and the plainer voices Placeholder Speech
-   uses go a long way within it, but Google needs a billing account first. Set a **budget alert** in Billing while
+2. **Set up billing** on it. Text-to-Speech has a free monthly allowance, and the Standard voices Placeholder
+   Speech uses by default go a long way within it (HD voices less far), but Google needs a billing account first. Set a **budget alert** in Billing while
    you're there, so you hear about it before anything is charged.
 3. In **APIs & Services**, **enable the Cloud Text-to-Speech API**.
 4. In **IAM & Admin ▸ Service Accounts**, **create a service account**. It needs no role.

@@ -1352,6 +1352,7 @@ function registerIpc(): void {
   ipcMain.handle("speech:make", (_e, req: speech.SpeechRequestScope & { force?: boolean }) => speech.makeNow(req ?? {}));
   ipcMain.handle("speech:count", (_e, req: speech.SpeechRequestScope) => speech.countToMake(req ?? {}));
   ipcMain.handle("speech:accent", () => speech.accentInUse() ?? null);
+  ipcMain.handle("speech:tier", () => speech.tierInUse());
   ipcMain.on("speech:nudge", () => speech.nudge());
   ipcMain.handle("speech:deletedTakes", () => speech.takesForDeletedLines());
   ipcMain.handle("speech:removeDeletedTakes", () => speech.removeTakesForDeletedLines());

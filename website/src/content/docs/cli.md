@@ -183,7 +183,8 @@ Make [Placeholder Speech](/production/placeholder-speech/) for every spoken line
 no longer matches its words or voice, as Patterpad does: the same files, so a team can keep the key on one build
 machine and make the speech there. The key comes from the project's key file, else
 `GOOGLE_APPLICATION_CREDENTIALS`. It exits 1 when there's no key, or when Google stops the run (a refused key, a
-project without the Text-to-Speech API, no network).
+project without the Text-to-Speech API, no network). It uses the project's voices, Standard or
+[HD](/production/placeholder-speech/#hd-voices), and notes when they're HD, which Google bills at a higher rate.
 
 - `--scene id|name` makes one scene's.
 - `--dry-run` lists what it would make, and needs no key.

@@ -10,7 +10,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { writeBinaryFileAsync, deleteFileAsync, renameFileAsync } from "@wildwinter/simple-vc-lib";
 import {
   planPlaceholderSpeech, runPlaceholderSpeech, resolveKeyFile, storedKeyPath, readGoogleKey, tokenSource, synthesize, finishTake,
-  describeSpeechError, placeholderAccentOf, requestHash, runVoiceScript, manifestLineIds, sourceStrings, type RunResult, type GoogleKey, type GoogleAuth,
+  describeSpeechError, placeholderAccentOf, placeholderTierOf, requestHash, runVoiceScript, manifestLineIds, sourceStrings, type RunResult, type GoogleKey, type GoogleAuth,
 } from "@patterkit/ops";
 import { textHash, readTextStamp, readGeneratedStamp } from "@patterkit/core";
 import type { JobHost } from "@wildwinter/app-shell/job";
@@ -269,6 +269,12 @@ export async function hear(voice: string, text: string): Promise<{ ok: true; byt
     const raw = await synthesize(await tokens.get(), request);
     return { ok: true, bytes: finishTake(raw, { text: textHash(text), request: requestHash(request) }) };
   } catch (e) { return { ok: false, error: describeSpeechError(e) }; }
+}
+
+/** The voices' tier in use: Standard unless the project chose HD. */
+export function tierInUse(): "standard" | "hd" {
+  const p = project.loadedProject()?.project;
+  return p ? placeholderTierOf(p) : "standard";
 }
 
 /** The accent in use, for the Cast editor's default voices. */

@@ -528,7 +528,8 @@ export interface CastMember {
    *  setup; renaming a character stamps the old name's slot here, so they keep their colour. Authoring only
    *  (not shipped in the runtime bundle). */
   colour?: number;
-  /** The voice Placeholder Speech gives this character (a Google voice name such as `en-GB-Standard-B`).
+  /** The voice Placeholder Speech gives this character (a Google voice name such as `en-GB-Standard-B`, or an HD
+   *  one such as `en-GB-Chirp3-HD-Kore`; one from the other tier than the project's is used, with a warning).
    *  Absent, the default comes from a hash of the name (narrowed by `gender` when it's male or female);
    *  renaming a character stamps the old default here, so they keep their voice. Authoring only. */
   placeholderVoice?: string;
@@ -813,6 +814,10 @@ export interface PlaceholderSpeechConfig {
   keyFile?: string;
   /** The voices' language and accent, as a Google language code (`en-GB`). Absent, from the main language. */
   accent?: string;
+  /** Which of Google's voices: `standard` (absent means this) or `hd`, Google's Chirp 3 HD voices, which sound
+   *  better and are billed at a higher rate per character on the user's own Google account. Changing it changes
+   *  every character's default voice, so every line is made again. */
+  tier?: "standard" | "hd";
   /** Keep the speech out of version control: an ignore rule for its folder, and no adds. Default off. */
   keepOutOfVersionControl?: boolean;
 }

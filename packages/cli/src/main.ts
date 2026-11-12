@@ -140,7 +140,8 @@ Usage:
                  [--all]           Include every voiced line (else only "ready to record")
   patter placeholder-speech [path]  Make Placeholder Speech: stand-in speech for spoken lines, from Google,
                  into the project's placeholder status folder (needs a key: the project's key file, else
-                 GOOGLE_APPLICATION_CREDENTIALS)
+                 GOOGLE_APPLICATION_CREDENTIALS). Standard voices, or HD voices (Chirp 3 HD) when the
+                 project chooses them, billed at Google's higher HD rate
                  [--scene id|name] [--dry-run] [--force]   (--force remakes every line, even unchanged)
                  [--soft]          No key is a note and exit 0, not a failure (for shared CI)
   patter export-editable [path] -o file.docx  An editable script to send to an editor outside Patter
@@ -722,6 +723,8 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       if (!plan.accent) { console.error("placeholder-speech: choose an accent first (Project settings > Placeholder Speech): the main language doesn't say which"); return 2; }
       const skipped = Object.entries(plan.skipped).map(([why, n]) => `${n} ${why}`).join(", ");
       console.log(`${plan.tasks.length} line(s) to make into ${plan.folder}${skipped ? ` (left alone: ${skipped})` : ""}`);
+      if (plan.tier === "hd" && plan.tasks.length) console.log("note: HD voices (Chirp 3 HD), billed at Google's higher HD rate on your own Google account: https://cloud.google.com/text-to-speech/pricing");
+      if (plan.otherTier.length) console.log(`note: ${plan.otherTier.join(", ")} ${plan.otherTier.length === 1 ? "has" : "have"} a voice from the ${plan.tier === "hd" ? "Standard" : "HD"} tier, not the project's ${plan.tier === "hd" ? "HD" : "Standard"} one; used as chosen${plan.tier === "hd" ? "" : ", and billed at the HD rate"}`);
       if (flags["dry-run"] === true) { for (const t of plan.tasks) console.log(`  ${t.beatId}  ${t.character}  ${t.request.voice}`); return 0; }
       if (!plan.tasks.length) return 0;
       const key = resolveKeyFile(loaded.root, ps.keyFile);

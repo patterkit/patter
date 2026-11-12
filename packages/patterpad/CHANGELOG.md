@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **HD voices for Placeholder Speech.** Choose HD under Voices in Project Settings ▸ Placeholder Speech and the stand-in
+  speech reads far more naturally. HD voices cost more on your own Google account, so Standard stays the default.
+  - The settings page links to Google's pricing, and says before you save that switching makes every line again.
+  - A character's own voice stays as it is when you switch, and Cast marks one from the other kind.
+
 ## [1.4.0] - 2026-11-12
 
 ### Changed

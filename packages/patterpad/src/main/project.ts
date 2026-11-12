@@ -3410,7 +3410,7 @@ export function saveSettings(s: ProjectSettingsDto, undo: { label?: string; key?
     // A renamed character keeps the colour their old name had, stamped in this same save.
     if (castRenames) keepCastColours(cast, castRenames);
     // ...and their Placeholder Speech voice, so a rename doesn't remake their lines in another (when it's on).
-    if (castRenames && s.placeholderSpeech) keepPlaceholderVoices(cast, castRenames, s.placeholderSpeech.accent ?? accentForLanguage(s.localeDefault));
+    if (castRenames && s.placeholderSpeech) keepPlaceholderVoices(cast, castRenames, s.placeholderSpeech.accent ?? accentForLanguage(s.localeDefault), s.placeholderSpeech.tier === "hd" ? "hd" : "standard");
     const next: ProjectFile = {
       ...loaded.project,
       project: { ...loaded.project.project, name: s.name },

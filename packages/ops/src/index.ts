@@ -30,7 +30,7 @@ export { runExportHtml, runExportWeb } from "./export-html.js";
 export { scanAudio, scanAudioStatus, pickAudio, audioFolderRungs, audioFoldersActive, audioManifest, audioManifestWrite, manifestLineIds, AUDIO_MANIFEST_FILE, AUDIO_MANIFEST_SCHEMA } from "./audio-index.js";
 export type { AudioRung, AudioEntry, AudioSnapshot } from "./audio-index.js";
 // Placeholder Speech: stand-in speech made by Google from each spoken line, shared by Patterpad and the CLI
-export { planPlaceholderSpeech, runPlaceholderSpeech, resolveKeyFile, gcloudCredentialsPath, expandKeyPath, storedKeyPath, readGoogleKey, mintToken, tokenSource, synthesize, finishTake, requestHash, readGeneratedStampFromFile, voiceFor, placeholderAccentOf, describeSpeechError, SpeechError, PLACEHOLDER_SAMPLE_RATE } from "./placeholder-speech.js";
+export { planPlaceholderSpeech, runPlaceholderSpeech, resolveKeyFile, gcloudCredentialsPath, expandKeyPath, storedKeyPath, readGoogleKey, mintToken, tokenSource, synthesize, finishTake, requestHash, readGeneratedStampFromFile, voiceFor, placeholderAccentOf, placeholderTierOf, voicesOutsideTier, placeholderSampleRate, describeSpeechError, SpeechError, PLACEHOLDER_SAMPLE_RATE, PLACEHOLDER_HD_SAMPLE_RATE } from "./placeholder-speech.js";
 export type { PlaceholderPlan, PlaceholderTask, PlaceholderSkip, PlanOptions, RunOptions, RunResult, GoogleKey, GoogleAuth, SpeechRequest, SpeechErrorKind } from "./placeholder-speech.js";
 export type { WebExport } from "./export-html.js";
 export { runPlay, renderPlay } from "./play.js";

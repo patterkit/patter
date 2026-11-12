@@ -77,6 +77,7 @@ const api: PatterApi = {
   speechMake: (req) => ipcRenderer.invoke("speech:make", req),
   speechCount: (req) => ipcRenderer.invoke("speech:count", req),
   speechAccent: () => ipcRenderer.invoke("speech:accent"),
+  speechTier: () => ipcRenderer.invoke("speech:tier"),
   speechNudge: () => { ipcRenderer.send("speech:nudge"); },
   speechDeletedTakes: () => ipcRenderer.invoke("speech:deletedTakes"),
   speechRemoveDeletedTakes: () => ipcRenderer.invoke("speech:removeDeletedTakes"),

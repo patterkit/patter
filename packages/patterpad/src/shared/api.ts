@@ -1515,6 +1515,8 @@ export interface PatterApi {
   speechCount(req: { scene?: string; ids?: string[]; characters?: string[] }): Promise<number>;
   /** The accent in use (the project's, else the main language's), or null. */
   speechAccent(): Promise<string | null>;
+  /** The voices' tier in use (Standard or HD), for the make-everything dialog's cost line. */
+  speechTier(): Promise<"standard" | "hd">;
   /** The writer moved off a line: make what's waiting now. */
   speechNudge(): void;
   /** Scratch and placeholder takes whose line isn't in the project, by file path (for the confirmation). */
