@@ -18,3 +18,10 @@ export const PATTERKIT_WORDMARK =
   '<g transform="translate(3.3,56) rotate(90 50 50)"><path fill="#d2603e" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"/></g></g>' +
   '<text x="232" y="150" font-family="Newsreader, Georgia, serif" font-weight="500" font-size="120" letter-spacing="-2" fill="var(--ink)">Patter<tspan style="fill:light-dark(#214f4b,#6fa39c)">kit</tspan></text>' +
   "</svg>";
+
+// The mark alone: the wordmark's two leaves, for the welcome's slot above the title. Same geometry and colours.
+export const PATTERKIT_MARK =
+  '<svg viewBox="0 0 140 160" role="img" aria-label="Patterkit" xmlns="http://www.w3.org/2000/svg">' +
+  '<g transform="translate(36.7,6) rotate(270 50 50)"><path style="fill:light-dark(#214f4b,#6fa39c)" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"/></g>' +
+  '<g transform="translate(3.3,56) rotate(90 50 50)"><path fill="#d2603e" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"/></g>' +
+  "</svg>";

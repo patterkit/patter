@@ -187,7 +187,9 @@ const FAKE_AUDIO_INDEX: Record<string, { status: string; path: string; textHash?
   L_greet: { status: "recorded", path: "/audio/recorded/L_greet.wav" },
   L_bo_reply: { status: "scratch", path: "/audio/scratch/L_bo_reply.mp3", textHash: "0" }, // never matches -> "take out of date" badge
 };
-const recents = [
+const view = new URLSearchParams(location.search).get("view");
+// A first run has none, so ?view=firstrun shows the welcome's first-run state.
+const recents = view === "firstrun" ? [] : [
   { path: "/Users/ian/Projects/the-tavern.patter", name: "The Tavern" },
   { path: "/Users/ian/Projects/the-heist.patter", name: "The Heist" },
 ];
@@ -203,7 +205,6 @@ const SEARCH_INDEX = [
   { id: "L_bo_reply", kind: "beat", text: "We don't get many new faces down this way.", location: ["The Tavern", "Intro"], sceneId: "scn_tavern" },
 ];
 
-const view = new URLSearchParams(location.search).get("view");
 let identity: { name: string; email?: string } | null = view === "firstrun" ? null : { name: "Ian Thomas" };
 // ?view=overview -> the #3a landing (open with no remembered scene); default -> the editor on a scene.
 // Live debug link (#181): a fake link over the REAL follow state (shared/debug-follow.ts), so the flow

@@ -3,7 +3,7 @@
 // lifecycle + window + native dialogs + IPC wiring; the project session lives in project.ts and the
 // open-where-you-left-off / recents / identity store in store.ts.
 
-import { app, autoUpdater, BrowserWindow, dialog, ipcMain, protocol, screen, shell, systemPreferences, Menu } from "electron";
+import { app, autoUpdater, BrowserWindow, dialog, ipcMain, protocol, shell, systemPreferences, Menu } from "electron";
 import { guardAllWindows } from "@wildwinter/app-shell/window-guard";
 import { viewSchemePrivileges } from "@wildwinter/app-shell/view-host";
 import { createViewExtensions, viewsDir, VIEW_SCHEME } from "./views.js";
@@ -26,7 +26,6 @@ import { createStore, type ToolWindowName } from "./store.js";
 import { applyMenu, setUndoLabels, setMoveEnabled, setClashCount } from "./menu.js";
 import { createDebugServer, type DebugServer } from "./debug-link.js";
 import { centeredOnPrimary, defineToolWindows, frontForModal, pinToolWindow } from "@wildwinter/app-shell/tool-window";
-import { plural } from "@wildwinter/app-shell/util";
 // The updater is the shell's. It IS this app's, generalised: the stall watchdog,
 // the retry budget, the surfaced background error and the live progress that
 // 0.6.6 grew after #33 all went into it, so this is a swap and not a downgrade.

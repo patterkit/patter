@@ -91,7 +91,7 @@ import "@wildwinter/app-shell/keys.css"; // the keycaps every hint in this windo
 // line, never joined with a typed dot (design-language §4): no "⌘" and no " · " in a string in this file.
 import { keyHint, tipWithKey, metaLine, labelled, labelledToggle } from "@wildwinter/app-shell";
 import { problemLineFor, type ExtensionProblemContext } from "./problem-copy.js";
-import { PATTERKIT_WORDMARK } from "./wordmark.js";
+import { PATTERKIT_WORDMARK, PATTERKIT_MARK } from "./wordmark.js";
 import { gameIdify, isValidGameId } from "@patterkit/core";
 import { PANEL_KEEP_CLEAR } from "./panel.js";
 import { mountGameDataFields } from "./gamedata-fields.js";
@@ -236,30 +236,21 @@ const PROJECT_KITS = [
 
 const welcomeEl = $("welcome");
 const hintbarEl = $("hintbar");
-// The welcome is the shell's `mountWelcome` (ui-review-2026-09, finding 10): title, one line, the two
-// actions, the kits, the shipped examples and the recents. The examples are tiles, as Storyletter's welcome draws
-// its own (2026-09-30): the Tour and the Night Ferry ship inside the app, so the teaching door that used
-// to open the download page is a tile now, and each opens as the writer's own copy.
+// The welcome is the shell's `mountWelcome`, in its two states (patterkit design/proposals/quiet-welcome-and-whats-new.md,
+// W1 and W2; Ian, 2026-11-12): a first run is the mark, the title, and the tour, New, and Open; with recents it's Open
+// and New, the recent names, and the tour as a line. The kits and the other examples are New Project's, and only there.
+// The tour opens New Project with it chosen, so the writer sees it opens as their own copy, in a folder they choose,
+// BEFORE anything asks for a folder.
+const welcomeMark = el("div", "welcome-mark-art");
+welcomeMark.innerHTML = PATTERKIT_MARK;
 const welcome = mountWelcome(welcomeEl, {
   title: "Patterpad",
   sub: "Write the script. Play it in your game.",
-  actions: [
-    { label: "Open a project…", primary: true, onClick: () => void openDialog() },
-    { label: "New project…", onClick: () => createDialog() },
-  ],
+  mark: welcomeMark,
+  open: { label: "Open a project…", onClick: () => void openDialog() },
+  create: { label: "New project…", onClick: () => createDialog() },
+  tour: { label: "Take the tour", prompt: "New to Patter?", onClick: () => createDialog("example:tour.patter") },
   recents: [],
-  // Start, then Learn (storylet-studio/design/kit-gallery.md, section 6), as Storyletter's welcome has
-  // them: a kit tile opens New Project with that kit chosen, its details panel already showing.
-  groups: [
-    { caption: "Start from a kit", tiles: true,
-      items: PROJECT_KITS.map((k) => ({ name: k.name, hint: k.tile, features: [...k.features], onOpen: () => createDialog(k.id) })) },
-    // An example is never opened in place (it lives inside the installed app, which is read-only and
-    // replaced by the next update), so opening one asks for a folder. Say so BEFORE the click.
-    { caption: "Learn from a finished project", note: "Each opens as your own copy, in a folder you choose.", tiles: true,
-      items: EXAMPLES.map((x) => ({ name: x.name, hint: x.tile ?? x.hint, ...(x.features ? { features: [...x.features] } : {}),
-        ...(x.badge !== undefined ? { badge: x.badge } : {}), onOpen: () => createDialog(`example:${x.file}`) })) },
-  ],
-  maxRecents: 8, // the store keeps eight; the welcome shows what the menu shows
 });
 function setWelcomeRecents(recents: RecentProject[]): void {
   welcome.setRecents(recents.map((r) => ({ name: r.name, path: r.path, onOpen: () => void openPath(r.path) })));
@@ -5052,8 +5043,9 @@ window.patter.onUpdaterDownloadProgress(feedUpdaterDownloadProgress);
 // An update that downloaded on its own: a "Restart to update" chip in the bar and one remark, never a
 // dialog over the work (the October 2026 review). It installs on quit if the chip is never clicked.
 window.patter.onUpdaterReady((info) => { showUpdateReady(info, { host: shell.topbarTrail, restart: () => window.patter.updaterRestart() }); });
-// The first launch after an update says what's new in it (main gives this answer once per launch).
-void window.patter.whatsNewState().then((st) => whatsNewAfterUpdate(st, { ...whatsNewOpts, onClose: () => window.patter.whatsNewSeen() }));
+// The first launch after an update puts a quiet "What's new" chip in the top bar (main gives this answer once per
+// launch); the dialog opens only from it, or from Help (patterkit design/proposals/quiet-welcome-and-whats-new.md, W3).
+void window.patter.whatsNewState().then((st) => whatsNewAfterUpdate(st, { ...whatsNewOpts, host: shell.topbarTrail, onClose: () => window.patter.whatsNewSeen() }));
 // A publish path that reports through the ops layer turns the strip determinate (the shell flips the
 // band to the bar on the first positive total); none does yet.
 window.patter.onJobProgress((p) => {

@@ -52,7 +52,7 @@
   "dependencies": {
     "@patterkit/model": "^1.0.1",
     "@patterkit/runtime": "1.0.1",
-    "@wildwinter/app-shell": ">=1.0.0 <2.0.0"
+    "@wildwinter/app-shell": ">=1.0.0 <3.0.0"
   },
   "peerDependencies": {
     "@wildwinter/scoperegistry": ">=1.0.0 <2.0.0"

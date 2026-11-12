@@ -32,7 +32,6 @@
 
 import type { DebugStatus, PlayInGameAnswer } from "../shared/api.js";
 import { createFlowFollower, type DebugFrame } from "../shared/debug-follow.js";
-import { isLocalOrigin } from "@wildwinter/app-shell/util";
 import { createLiveLinkServer } from "@wildwinter/app-shell/live-link";
 
 const DEFAULT_PORT = 4471;
@@ -45,7 +44,7 @@ const DEFAULT_PORT = 4471;
  * libwebsockets sends the bare address; a browser game on a local dev server sends its page). Refused:
  * every other site, and `null`. Re-exported so the tests and any caller keep their import.
  */
-export { isLocalOrigin };
+export { isLocalOrigin } from "@wildwinter/app-shell/util";
 
 export type { DebugFrame };
 

@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **A calmer welcome.** With no project open, Patterpad shows its name, a few buttons, and your recent projects, and
+  nothing else. The first time, it starts you off with the interactive tour. The kits and examples are all in New Project.
+- **What's new waits until you ask.** After an update nothing opens over your work: a "What's new" button in the
+  top bar opens a short list of what changed, with a link to the full notes.
+
 ## [1.3.0] - 2026-11-11
 
 ### Added
