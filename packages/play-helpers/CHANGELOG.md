@@ -1,5 +1,11 @@
 # @patterkit/play-helpers
 
+## 1.0.4
+
+### Patch Changes
+
+- b1703dd: Uses `@patterkit/runtime` 1.0.3, the Patterplay 1.0.3 release.
+
 ## 1.0.3
 
 ### Patch Changes
