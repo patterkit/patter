@@ -961,10 +961,7 @@ export function saveScratchAudio(beatId: string, bytes: Uint8Array): Promise<Sav
       audioIndex?.rescan();
       return { ok: true };
     }
-    catch {
-      try { writeFileSync(path, Buffer.from(bytes)); audioIndex?.rescan(); return { ok: true }; } // VC layer unavailable -> direct write
-      catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
-    }
+    catch (e) { return { ok: false, error: `Couldn't save the voice clip: ${e instanceof Error ? e.message : String(e)}` }; }
   });
 }
 

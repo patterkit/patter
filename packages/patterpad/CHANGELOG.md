@@ -6,6 +6,18 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Placeholder Speech key warning now knows about ignored files.** A key file kept in a folder your version
+  control ignores no longer gets a warning. A key that version control already has gets a stronger one, telling you to
+  take it out.
+- **Files someone else has locked on Perforce are reported properly.** When another person has a file opened
+  exclusively, saving it is refused, and the message names who holds it, where before it could look as if the save had
+  worked. "Checked out by" now shows real names from a Perforce server.
+- **Voice clips someone else has locked stay put.** Patterpad no longer moves or deletes a locked scratch or
+  Placeholder Speech clip behind version control's back when its line is cut, pasted, or deleted, and a voice clip
+  that can't be saved says why instead of being written straight to disk.
+
 ## [1.5.0] - 2026-11-12
 
 ### Added

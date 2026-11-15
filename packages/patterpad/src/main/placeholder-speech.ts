@@ -7,7 +7,7 @@
 import { app, dialog, type BrowserWindow } from "electron";
 import { mkdirSync, readFileSync, writeFileSync, realpathSync, existsSync, unlinkSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
-import { writeBinaryFileAsync, deleteFileAsync, renameFileAsync } from "@wildwinter/simple-vc-lib";
+import { writeBinaryFileAsync, deleteFileAsync, renameFileAsync, fileStatusAsync, type VCFileStatus } from "@wildwinter/simple-vc-lib";
 import {
   planPlaceholderSpeech, runPlaceholderSpeech, resolveKeyFile, storedKeyPath, readGoogleKey, tokenSource, synthesize, finishTake,
   describeSpeechError, placeholderAccentOf, placeholderTierOf, requestHash, runVoiceScript, manifestLineIds, sourceStrings, type RunResult, type GoogleKey, type GoogleAuth,
@@ -233,7 +233,7 @@ export async function chooseKeyFile(win: BrowserWindow): Promise<string | null> 
 }
 
 /** Whether this machine can use the key: the stored path, else the environment. A line for the page. */
-export function keyStatus(keyFile: string): { ok: boolean; message: string } {
+export async function keyStatus(keyFile: string): Promise<{ ok: boolean; message: string }> {
   const root = project.currentRoot();
   if (!root) return { ok: false, message: "No project is open." };
   if (optedOut()) return { ok: false, message: "This machine is set not to make Placeholder Speech (Preferences)." };
@@ -250,12 +250,25 @@ export function keyStatus(keyFile: string): { ok: boolean; message: string } {
   const who = account.kind === "user"
     ? `your Google sign-in${account.account ? ` (${account.account})` : ""}, billed to project ${account.projectId}`
     : `project ${account.projectId}, account ${account.account}`;
-  // A key inside the project's working copy can be committed by accident: say so. (Telling "ignored" needs
-  // simple-vc-lib to report it; until then, inside the folder that holds the project is the test.)
+  // A key version control has, or would pick up, can be committed by accident: say so.
   const checkout = dirname(resolve(root));
   const inside = resolve(key.path).startsWith(checkout + sep);
-  if (inside) return { ok: false, message: `Ready: ${who}${where}. But the key sits beside your project, where version control can pick it up: move it outside, or make sure it's ignored.` };
+  let status: VCFileStatus | undefined;
+  try { [status] = await fileStatusAsync([key.path]); } catch { status = undefined; }
+  const exposure = keyExposure(status, inside);
+  if (exposure === "tracked") return { ok: false, message: `Ready: ${who}${where}. But the key is in version control, where it can be committed and shared: remove it from version control and move it outside your project.` };
+  if (exposure === "untracked") return { ok: false, message: `Ready: ${who}${where}. But the key sits where version control can pick it up: move it outside your project, or make sure it's ignored.` };
   return { ok: true, message: `Ready: ${who}${where}.` };
+}
+
+/** Whether the key file is at risk of being committed: "tracked" when version control already has it,
+ *  "untracked" when it would be picked up (not tracked and not ignored), else null. When the provider can't
+ *  say (no version control, or a file outside any working copy), a key inside the folder holding the
+ *  project counts as "untracked". */
+export function keyExposure(status: Pick<VCFileStatus, "tracked" | "ignored"> | undefined, insideCheckout: boolean): "tracked" | "untracked" | null {
+  if (status?.tracked === true) return "tracked";
+  if (status?.tracked === false) return status.ignored === true ? null : "untracked";
+  return insideCheckout ? "untracked" : null;
 }
 
 /** One sentence in a voice, for the Cast editor's Hear button: the WAV bytes, or why not. */
@@ -295,9 +308,10 @@ const stampOf = (path: string): { text: string | null; generated: string | null 
   catch { return { text: null, generated: null }; }
 };
 
-/** Delete a take through version control (falling back to the disk), quietly. */
+/** Delete a take through version control, quietly. A refusal (someone else has it locked) leaves the file
+ *  alone; only a version-control layer that fails outright falls back to the disk. */
 async function removeTake(path: string): Promise<boolean> {
-  try { const r = await deleteFileAsync(path); if (r.success) return true; } catch { /* no VC layer */ }
+  try { return (await deleteFileAsync(path)).success; } catch { /* no VC layer */ }
   try { if (existsSync(path)) unlinkSync(path); return true; } catch { return false; }
 }
 
@@ -327,9 +341,11 @@ async function linesSaved(changed: string[], removed: string[]): Promise<void> {
     const match = homeless.find((id) => textHash(strings[id]!) === stamp);
     if (!match) continue;
     const to = join(dirname(take.path), `${match}${take.path.slice(take.path.lastIndexOf("."))}`);
+    // A refusal (someone else has it locked) leaves the take where it is; only a version-control layer that
+    // fails outright falls back to moving it on disk.
     let ok = false;
-    try { ok = (await renameFileAsync(take.path, to)).success; } catch { /* no VC layer */ }
-    if (!ok) { try { writeFileSync(to, readFileSync(take.path)); unlinkSync(take.path); ok = true; } catch { ok = false; } }
+    try { ok = (await renameFileAsync(take.path, to)).success; }
+    catch { try { writeFileSync(to, readFileSync(take.path)); unlinkSync(take.path); ok = true; } catch { ok = false; } }
     if (ok) { moved++; homeless.splice(homeless.indexOf(match), 1); delete deleted[gone]; }
   }
 

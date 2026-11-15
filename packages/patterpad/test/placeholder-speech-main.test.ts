@@ -108,3 +108,20 @@ describe("takes for cut, pasted, and deleted lines", () => {
     expect(await speech.removeTakesForDeletedLines()).toBe(1);
   });
 });
+
+describe("the key file warning (simple-vc-lib's ignored status)", () => {
+  it("warns for a tracked key, and for one version control would pick up", () => {
+    expect(speech.keyExposure({ tracked: true, ignored: false }, true)).toBe("tracked");
+    expect(speech.keyExposure({ tracked: true }, false)).toBe("tracked");
+    expect(speech.keyExposure({ tracked: false, ignored: false }, true)).toBe("untracked");
+    expect(speech.keyExposure({ tracked: false }, false)).toBe("untracked");
+  });
+  it("stays quiet for an ignored key, even inside the project's folder", () => {
+    expect(speech.keyExposure({ tracked: false, ignored: true }, true)).toBeNull();
+  });
+  it("falls back to where the key sits when version control can't say", () => {
+    expect(speech.keyExposure({}, true)).toBe("untracked");
+    expect(speech.keyExposure(undefined, true)).toBe("untracked");
+    expect(speech.keyExposure({}, false)).toBeNull();
+  });
+});
