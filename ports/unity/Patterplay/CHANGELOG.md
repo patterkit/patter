@@ -6,6 +6,11 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **No changes in this runtime.** This lockstep release ships the Godot runtime's fix for C# games that crashed as
+  they quit.
+
 ## [1.0.2] - 2026-11-15
 
 ### Fixed
