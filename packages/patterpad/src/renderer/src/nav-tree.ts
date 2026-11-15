@@ -54,6 +54,17 @@ export function syncSceneName(): void {
   if (adoptSceneName(c.project, c.currentSceneId, name)) relabelNavScene(c.navListEl, c.currentSceneId, name);
 }
 
+/** Open scene `id`'s block list and close the rest. A closed list stays drawn so it can fold shut, but at no
+ *  height: inert keeps its rows out of the Tab order and away from screen readers. */
+export function openNavScene(id: string): void {
+  c.navListEl.querySelectorAll<HTMLElement>(".nav-scene").forEach((el) => {
+    const open = el.dataset["id"] === id;
+    el.classList.toggle("open", open);
+    const blocks = el.querySelector<HTMLElement>(":scope > .nav-blocks");
+    if (blocks) blocks.inert = !open;
+  });
+}
+
 export function refreshNavBlocks(force = false): void {
   const holder = c.navListEl.querySelector<HTMLElement>(`.nav-scene[data-id="${CSS.escape(c.currentSceneId ?? "")}"] .nav-blocks-inner`);
   if (!holder) return;
@@ -143,6 +154,7 @@ export function renderNav(): void {
     // The block sub-list: rendered for every scene (rows fill lazily), revealed only while `.open`.
     const blocks = document.createElement("div");
     blocks.className = "nav-blocks";
+    blocks.inert = true; // closed until highlightNav opens the current scene: hidden rows take no focus
     blocks.appendChild(Object.assign(document.createElement("div"), { className: "nav-blocks-inner" }));
     row.appendChild(blocks);
     wireReorder(row, s.id, "y", dropRow);

@@ -17,6 +17,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **Voice clips someone else has locked stay put.** Patterpad no longer moves or deletes a locked scratch or
   Placeholder Speech clip behind version control's back when its line is cut, pasted, or deleted, and a voice clip
   that can't be saved says why instead of being written straight to disk.
+- **Tab no longer stops on blocks you can't see.** After you switch scenes, the Scenes list's hidden block rows for the
+  scene you left are skipped by Tab and by screen readers, and only the open scene's block is marked as the one the
+  cursor is in.
 
 ## [1.5.0] - 2026-11-12
 

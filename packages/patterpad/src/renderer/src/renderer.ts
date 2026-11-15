@@ -78,7 +78,7 @@ import { openClashResolver, clashBanner, type ClashAdapter, type ClashResolver }
 import "@wildwinter/app-shell/clashes.css";
 import { landed } from "./results.js";
 import { initProjectSettings, bundlePathHint, DUP_MESSAGE, VCS_OPTIONS, addExtension, fillStageNote, live, openProjectSettings, removeExtension, saveProjectSettings, shareScopes, updateExtension } from "./project-settings.js";
-import { initNavTree, moveToFolderMenu, newFolderNow, refreshNavBlocks, renderNav, revealInNav, syncSceneName, visibleFolderOf } from "./nav-tree.js";
+import { initNavTree, moveToFolderMenu, newFolderNow, openNavScene, refreshNavBlocks, renderNav, revealInNav, syncSceneName, visibleFolderOf } from "./nav-tree.js";
 import { fileSafeName, untitledSceneName } from "../../shared/file-name.js";
 // The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
 // (plural / formatCount / debounce) are the shell's (ui-review-2026-09, shell step 6).
@@ -575,14 +575,16 @@ function highlightNav(id: string): void {
   const shown = navListEl.querySelector(`.nav-item[data-id="${CSS.escape(id)}"]`) !== null;
   const holder = shown || !id ? undefined : visibleFolderOf(id);
   navListEl.querySelectorAll<HTMLElement>(".nav-folder-item").forEach((el) => markCurrent(el, el.dataset["id"] === holder));
-  navListEl.querySelectorAll<HTMLElement>(".nav-scene").forEach((el) => el.classList.toggle("open", el.dataset["id"] === id));
+  openNavScene(id);
   refreshNavBlocks();
 }
 
 /** Mark the block the caret sits in (`.active` on its sub-row); null clears (caret at scene level). */
 function highlightNavBlock(blockId: string | null): void {
+  // Block ids repeat between scenes, and a closed scene's rows are hidden: only the open scene's row is
+  // marked, and every other row is cleared, so a mark left from when another scene was open doesn't linger.
   navListEl.querySelectorAll<HTMLElement>(".nav-block").forEach((el) => {
-    const on = el.dataset["id"] === blockId;
+    const on = el.dataset["id"] === blockId && el.closest(".nav-scene.open") !== null;
     el.classList.toggle("active", on);
     if (on) el.scrollIntoView({ block: "nearest" });
   });
