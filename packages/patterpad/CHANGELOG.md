@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-15
+
 ### Fixed
 
 - **The Placeholder Speech key warning now knows about ignored files.** A key file kept in a folder your version
