@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-11-15
+
 ### Fixed
 
 - **A C# game no longer crashes as it quits.** In Godot's .NET build, a game whose C# scripts kept hold of
