@@ -74,7 +74,7 @@ const PLAY_LIMIT = 2 * 1024 * 1024; // a play page is one file with everything i
 // requests, so nothing else is needed for them.
 export const PLAY_FOLDERS = {
   audio: { types: [".ogg", ".mp3", ".json"], limit: 6 * 1024 * 1024 },
-  models: { types: [".glb"], limit: 12 * 1024 * 1024 },
+  models: { types: [".glb"], limit: 30 * 1024 * 1024 },
   downloads: { types: [".zip"], limit: 2 * 1024 * 1024 },
 };
 
