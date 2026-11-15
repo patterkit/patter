@@ -1,5 +1,24 @@
 # @patterkit/cli
 
+## 1.2.1
+
+### Patch Changes
+
+- c964518: **One walk over every line, and quicker exports.** `@patterkit/model` adds `walkBeats`, which visits every line,
+  text, and choice prompt under a scene's content, and `beatsOf`, a single node's own. The tools use them in place of
+  their own copies, so a new kind of line can't be missed in one place and caught in another.
+
+  - `export`, `format`, and `pack` look through the project folder once instead of once per kind of file, and export
+    rereads only the files that changed since the last check, which saves time on every Auto Rebuild of a project
+    with many voice clips beside it.
+  - `validate` and `export` now share one set of content checks, so a check added later reaches both.
+
+- 2b2b238: **Writes to a file someone else has locked on Perforce now say so.** When another person has a file opened exclusively,
+  the CLI reports that write as refused and names who holds it, where before it counted the write as done.
+- Updated dependencies [c964518]
+  - @patterkit/ops@1.2.1
+  - @patterkit/core@1.2.1
+
 ## 1.2.0
 
 ### Minor Changes
