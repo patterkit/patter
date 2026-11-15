@@ -6,9 +6,9 @@
   "description": "The Patter marketing + docs site: a static Astro + Starlight build for GitHub Pages.",
   "scripts": {
     "predev": "node scripts/whats-new.mjs",
-  "dev": "astro dev",
+    "dev": "astro dev",
     "prebuild": "node scripts/whats-new.mjs",
-  "build": "astro build",
+    "build": "astro build",
     "whats-new": "node scripts/whats-new.mjs",
     "preview": "astro preview",
     "postbuild": "node scripts/search-index.mjs && node scripts/check-docs.mjs",
@@ -23,7 +23,7 @@
     "@fontsource-variable/newsreader": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@ibm/plex-mono": "1.0.0",
-    "astro": "^7.4.4",
+    "astro": "^7.4.12",
     "pagefind": "^1.5.2",
     "sharp": "^0.35.4"
   },
