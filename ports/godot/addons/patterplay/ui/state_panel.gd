@@ -253,7 +253,7 @@ func _build_log(e) -> void:
 	auto_cb.text = "Autoscroll"
 	auto_cb.tooltip_text = "Scroll to the latest entry on every refresh."
 	auto_cb.button_pressed = _log_autoscroll
-	auto_cb.toggled.connect(func(on: bool) -> void: _log_autoscroll = on)
+	auto_cb.toggled.connect(_on_log_autoscroll)
 	tools_row.add_child(auto_cb)
 	var copy_btn := Button.new()
 	copy_btn.text = "Copy"
@@ -281,6 +281,12 @@ func _build_log(e) -> void:
 func _on_log_kind(on: bool, kind: String) -> void:
 	_log_kind_on[kind] = on
 	_refresh_log()
+
+
+# A method, not a lambda: a signal keeps its Callable, and in Godot's .NET build a kept lambda aborts
+# the process on quit (godotengine/godot#122532).
+func _on_log_autoscroll(on: bool) -> void:
+	_log_autoscroll = on
 
 
 func _clear_log(e) -> void:

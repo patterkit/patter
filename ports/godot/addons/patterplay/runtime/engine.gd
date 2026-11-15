@@ -414,11 +414,17 @@ func on_trace(handler: Callable) -> Callable:
 	host.next_trace_handler += 1
 	host.trace_handlers.append([handler_id, handler])
 	host.tracing = true
-	return func() -> void:
-		for i in range(host.trace_handlers.size() - 1, -1, -1):
-			if host.trace_handlers[i][0] == handler_id:
-				host.trace_handlers.remove_at(i)
-		host.tracing = host.log_enabled or not host.trace_handlers.is_empty()
+	# A static function with the data bound, never a lambda: a game may keep this until it quits, and
+	# in Godot's .NET build a kept lambda aborts the process on quit (godotengine/godot#122532).
+	return _off_trace.bind(host, handler_id)
+
+
+## on_trace's unsubscribe: drop the handler, and stop building entries if nothing else takes them.
+static func _off_trace(host, handler_id: int) -> void:
+	for i in range(host.trace_handlers.size() - 1, -1, -1):
+		if host.trace_handlers[i][0] == handler_id:
+			host.trace_handlers.remove_at(i)
+	host.tracing = host.log_enabled or not host.trace_handlers.is_empty()
 
 
 ## Open (and start) a named flow; re-opening a name replaces it. Returns null (with push_error, and

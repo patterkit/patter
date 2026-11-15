@@ -6,6 +6,13 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A C# game that keeps an `on_trace` unsubscribe no longer crashes as it quits.** 1.0.3 fixed the shared kernel,
+  but Patterplay's own code still kept GDScript lambdas in three places: the function `on_trace` hands back, the
+  state logger, and the state panel's Autoscroll checkbox. In Godot's .NET build, a game whose C# scripts held the
+  `on_trace` unsubscribe until quit aborted every time (godotengine/godot#122532). None of them keeps a lambda now.
+
 ## [1.0.3] - 2026-11-15
 
 ### Fixed

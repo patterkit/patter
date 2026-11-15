@@ -29,11 +29,10 @@ func _init(engine, sink: Callable = Callable(), label: String = "") -> void:
 	if sink.is_valid():
 		opts["sink"] = sink
 	# Re-read on every capture: open_flow and load_game both replace bags, and the core
-	# re-mounts whatever it is handed.
-	super._init(
-		func() -> Array: return PatterStateLogger._all_mounts(engine),
-		func() -> Dictionary: return PatterStateLogger._visit_state(engine),
-		opts)
+	# re-mounts whatever it is handed. Static functions with the engine bound, never lambdas: the core
+	# keeps both for the logger's life, and in Godot's .NET build a kept lambda aborts the process on
+	# quit (godotengine/godot#122532).
+	super._init(_all_mounts.bind(engine), _visit_state.bind(engine), opts)
 
 
 ## Every bag the engine and its flows hold, with the path each answers to in a log.

@@ -100,6 +100,23 @@ func _initialize() -> void:
 			restarted = true
 	_expect(not restarted, "the engine's seq keeps counting after clear_log")
 
+	# on_trace's unsubscribe is a bound static function, not a lambda (a kept lambda aborts a .NET
+	# game on quit), so check it still does its job: the handler goes, and with the log off and no
+	# other handler, the engine stops building entries. A second call is harmless.
+	var tapped := []
+	var stop_a: Callable = quiet.on_trace(func(_f, e) -> void: tapped.append(e))
+	var stop_b: Callable = quiet.on_trace(func(_f, _e) -> void: pass)
+	_expect(stop_a.get_method() == &"_off_trace",
+		"on_trace's unsubscribe is the static _off_trace, not a lambda")
+	stop_a.call()
+	_drain(quiet.open_flow("tapped", "s", "b"))
+	_expect(tapped.is_empty(), "an unsubscribed handler hears nothing more")
+	_expect(quiet._host.tracing, "another handler keeps the engine tracing")
+	stop_b.call()
+	_expect(not quiet._host.tracing, "with the log off and no handlers left, tracing stops")
+	stop_b.call()
+	_expect(quiet._host.trace_handlers.is_empty(), "calling an unsubscribe twice is harmless")
+
 	print("test_trace_log: %s" % ("ALL PASS" if _fails == 0 else "%d FAILED" % _fails))
 	quit(1 if _fails > 0 else 0)
 
