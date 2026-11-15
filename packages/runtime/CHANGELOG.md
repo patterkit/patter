@@ -7,6 +7,11 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **Installing it brings the story model up to date.** This version needs `@patterkit/model` 1.3.0 or later, so an
+  older one your lockfile holds is updated with it. Nothing about how a story plays changes.
+
 ## [1.0.1] - 2026-11-10
 
 ### Changed
