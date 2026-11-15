@@ -1,5 +1,11 @@
 # @patterkit/ops
 
+## 1.2.2
+
+### Patch Changes
+
+- e52d221: Uses `@patterkit/runtime` 1.0.2, the Patterplay 1.0.2 release.
+
 ## 1.2.1
 
 ### Patch Changes
