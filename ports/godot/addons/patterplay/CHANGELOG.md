@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **An engine dropped while a checkpoint is open is now freed.** Before, letting go of an engine part way through a
+  checkpoint, without `commit` or `rollback`, kept the engine and its flows in memory until the game quit. It now goes
+  as soon as nothing else holds it, taking the checkpoint with it.
+
 ## [1.0.1] - 2026-11-10
 
 ### Changed

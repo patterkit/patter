@@ -56,6 +56,7 @@ func _initialize() -> void:
 	_check_replaced_flow_is_freed()
 	_check_refused_open_keeps_and_frees()
 	_check_checkpoint_flows_are_freed()
+	_check_open_checkpoint_does_not_hold_the_engine()
 	_check_save_load_and_hot_swap_free_the_old()
 	_check_run_flow_and_log()
 
@@ -150,6 +151,41 @@ func _check_checkpoint_flows_are_freed() -> void:
 	kept = null
 	engine = null
 	_expect_freed(refs, "an engine and a flow after a committed checkpoint")
+
+
+# An engine the game drops while a checkpoint is still open (a "would this say anything?" probe it never
+# finished, or a save loaded into a fresh engine part way through one) is freed with its flows. The open
+# journal's undo steps hold the flows, and the flows hold the state that holds the journal: until
+# 2026-11 that loop kept every such engine and its flows until the game quit (8 objects each). A flow
+# opened inside the checkpoint is the case whose undo step used to hold the engine itself.
+func _check_open_checkpoint_does_not_hold_the_engine() -> void:
+	var engine := PatterEngine.new(_bundle(), {"seed": 7})
+	var before := engine.open_flow("before", "s")
+	var cp = engine.checkpoint()
+	before.advance()
+	var inside := engine.open_flow("inside", "s")
+	_play_to_choice(inside)
+	var refs := _weak_parts(before) + _weak_parts(inside)
+	refs.append(weakref(engine))
+	refs.append(weakref(cp))
+	before = null
+	inside = null
+	engine = null
+	cp = null
+	_expect_freed(refs, "an engine dropped with a checkpoint open, and its flows")
+
+	# The game keeps a flow but lets the engine go, checkpoint still open: the engine goes, taking the
+	# checkpoint with it, and the flow goes as soon as the game lets go of it too.
+	engine = PatterEngine.new(_bundle(), {"seed": 7})
+	var kept := engine.open_flow("kept", "s")
+	engine.checkpoint()
+	kept.advance()
+	var engine_ref: WeakRef = weakref(engine)
+	engine = null
+	_expect(engine_ref.get_ref() == null, "an engine with a checkpoint open is freed while the game still holds one of its flows")
+	refs = _weak_parts(kept)
+	kept = null
+	_expect_freed(refs, "that flow, once the game lets go of it")
 
 
 # Loading into a fresh engine and hot-swapping both leave the old engine and its flows to be freed.

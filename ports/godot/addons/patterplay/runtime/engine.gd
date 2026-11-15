@@ -461,7 +461,10 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 		# Opened inside the checkpoint: rolling back closes it and puts back whatever the name meant.
 		journal["flows"][flow] = true
 		journal["opened"][flow] = true
-		journal["undo"].append(_undo_open_flow.bind(id, flow, prior))
+		# Bound to the flows Dictionary, not the engine: an undo holding the engine would keep it alive
+		# through the journal (see _notification). Every call that replaces _flows is refused while a
+		# checkpoint is open, so this is the Dictionary rollback() will find.
+		journal["undo"].append(PatterEngine._undo_open_flow.bind(_flows, id, flow, prior))
 	_flows[id] = flow
 	flow._begin(scene_id, block_id)
 	return flow
@@ -532,12 +535,12 @@ func block_address(block_id: String):
 
 ## The undo of an open_flow made inside a checkpoint: close the new flow and give the name back to
 ## whatever it meant before (the prior flow, or nothing).
-func _undo_open_flow(id: String, flow: PatterFlow, prior: PatterFlow) -> void:
+static func _undo_open_flow(flows: Dictionary, id: String, flow: PatterFlow, prior: PatterFlow) -> void:
 	flow.close()
 	if prior != null:
-		_flows[id] = prior
+		flows[id] = prior
 	else:
-		_flows.erase(id)
+		flows.erase(id)
 
 
 ## Open a checkpoint: from here until rollback() or commit(), the engine keeps what it needs to undo
@@ -586,6 +589,15 @@ func commit(cp: Checkpoint) -> void:
 ## True while a checkpoint is open.
 func in_checkpoint() -> bool:
 	return _host.journal != null
+
+
+## An engine dropped with a checkpoint still open lets the checkpoint go with it. Its undo steps hold the
+## flows, and each flow holds the state it shares with the engine, which holds the journal: a loop that
+## reference counting never frees, so without this every such engine and its flows stayed until the game quit.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _host != null and _host.journal != null:
+		_clear_journal(_host.journal)
+		_host.journal = null
 
 
 ## Empty a finished journal, so a checkpoint handle a game keeps holds nothing.
