@@ -10172,6 +10172,178 @@
       ]
     },
     {
+      "name": "getVisitCounts returns a copy: a kept read survives play and a reset",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1m1b4g2",
+          "structureHash": "0ctotd9"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "scn_v": {
+            "id": "scn_v",
+            "type": "scene",
+            "name": "Room",
+            "blocks": [
+              {
+                "id": "b_v",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_a",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "A",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_b",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "B",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "A": "a",
+            "B": "b"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "room"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "A",
+              "text": "a"
+            }
+          ]
+        },
+        {
+          "op": "keepVisitCounts",
+          "onFlow": true,
+          "into": "flowAfterA"
+        },
+        {
+          "op": "keepVisitCounts",
+          "into": "engineAfterA"
+        },
+        {
+          "op": "expectVisitCounts",
+          "onFlow": true,
+          "expectResult": {
+            "scn_v": 1,
+            "b_v": 1,
+            "sn_a": 1
+          }
+        },
+        {
+          "op": "expectVisitCounts",
+          "expectResult": {
+            "scn_v": 1,
+            "b_v": 1,
+            "sn_a": 1
+          }
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "B",
+              "text": "b"
+            }
+          ]
+        },
+        {
+          "op": "expectVisitCounts",
+          "onFlow": true,
+          "expectResult": {
+            "scn_v": 1,
+            "b_v": 1,
+            "sn_a": 1,
+            "sn_b": 1
+          }
+        },
+        {
+          "op": "expectVisitCounts",
+          "onFlow": true,
+          "from": "flowAfterA",
+          "expectResult": {
+            "scn_v": 1,
+            "b_v": 1,
+            "sn_a": 1
+          }
+        },
+        {
+          "op": "expectVisitCounts",
+          "from": "engineAfterA",
+          "expectResult": {
+            "scn_v": 1,
+            "b_v": 1,
+            "sn_a": 1
+          }
+        },
+        {
+          "op": "resetFlow"
+        },
+        {
+          "op": "expectVisitCounts",
+          "onFlow": true,
+          "from": "flowAfterA",
+          "expectResult": {
+            "scn_v": 1,
+            "b_v": 1,
+            "sn_a": 1
+          }
+        },
+        {
+          "op": "expectVisitCounts",
+          "from": "engineAfterA",
+          "expectResult": {
+            "scn_v": 1,
+            "b_v": 1,
+            "sn_a": 1
+          }
+        }
+      ]
+    },
+    {
       "name": "openFlow with no scene starts on the first authored scene, not the first by id",
       "bundle": {
         "schema": "patter/bundle@0",

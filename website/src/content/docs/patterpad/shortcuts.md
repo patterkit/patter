@@ -19,9 +19,12 @@ the editor always shows the keys that matter right where your cursor is.
 | `⇧⌘N` | New Scene (an Untitled scene, its title ready to type over) |
 | `⌘,` | Project Settings |
 | `⌘Z` / `⇧⌘Z` | Undo / Redo |
+| `⌘A` | Select All (in the editor, the field the cursor is in) |
 | `⌘D` | Duplicate the selected snippet, group, option, or block (contents and all) |
+| `⌃⌘↑` / `⌃⌘↓` | Move the selected snippet, group, or block (or the focused scene) up / down a place (`Ctrl+Alt`+arrows off the Mac) |
 | `⇧⌘E` | Cycle the current line's [speaker qualifier](/patterpad/writing-surface/#speaker-qualifiers-vo-os-radio) (V.O., O.S., …, none) |
 | `⌘P` | Play |
+| `⇧⌘P` | Play from Start |
 | `⌘F` | Search (go to anything) |
 | `⌘⌥F` / `Ctrl-H` | Replace text across the project |
 | `⌘1` / `⌘2` | Show Navigator / Show Inspector |

@@ -1099,6 +1099,7 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
     };
     const auto refusing = [](const JsonValue& op) { const JsonValue* r = op.find("expectRefused"); return r && r->isBool() && r->b; };
     std::map<std::string, patter::FlowState> captured; // captureFlow states, by name, for restoreFlow
+    std::map<std::string, std::map<std::string, int>> keptVisits; // keepVisitCounts results, by name
     const Bundle* playing = &bundle; // the bundle the live engine plays, for applyLiveBundle's comparison
     // What the last advance or stepFor handed the host, for `scribble`: its own copy, which it may deface.
     std::optional<StepResult> handed;
@@ -1388,6 +1389,30 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                     caseErrors.clear();
                 }
                 // The locale in use (engine.locale) and the bundle's locales (engine.locales).
+                // Visit counts as the game reads them: the engine's, or (onFlow) the current flow's. getVisitCounts
+                // returns a copy, so a kept read is that copy; one taken by reference would dangle after a reset.
+                else if (kind == "keepVisitCounts" || kind == "expectVisitCounts")
+                {
+                    const JsonValue* onFlowV = op.find("onFlow");
+                    const bool onFlow = onFlowV && onFlowV->b;
+                    auto read = [&]() { return onFlow ? engine->getFlow(current)->getVisitCounts() : engine->getVisitCounts(); };
+                    if (kind == "keepVisitCounts") keptVisits[op.at("into").str] = read();
+                    else
+                    {
+                        std::map<std::string, int> counts;
+                        if (const JsonValue* from = op.find("from"))
+                        {
+                            auto it = keptVisits.find(from->str);
+                            if (it == keptVisits.end()) throw std::runtime_error("expectVisitCounts: nothing kept under '" + from->str + "'");
+                            counts = it->second;
+                        }
+                        else counts = read();
+                        JsonValue got = JsonValue::Obj();
+                        for (const auto& kv : counts) got.set(kv.first, JsonValue::Num(kv.second));
+                        if (!matchValue(got, op.at("expectResult")))
+                            throw std::runtime_error("expectVisitCounts: expected " + dump(op.at("expectResult")) + ", got " + dump(got));
+                    }
+                }
                 else if (kind == "expectLocale")
                 {
                     const Locales locales = engine->locales();

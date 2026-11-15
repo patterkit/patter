@@ -19,3 +19,10 @@ since each flow has its own: `setProperties(flow, { "@scene.locked": false })`.
 
 For debugging there's `createStateLogger(engine)`, which traces each step and diffs state over time
 while you're working.
+
+The package has a few more helpers, each covered where you'd use it:
+
+- `Runner`, which plays a flow a beat at a time and hands each beat to your game: [The runner](/play/runner/).
+- `createAudioResolver`, which finds the voice clip for a line: [Audio](/play/audio/).
+- `createDebugLink` and `applyLiveBundle`, for Patterpad's Live Link: [Live refresh and debug](/play/live-debug/).
+- `createPropertyInspector`, an on-screen view of your properties while you work: [JavaScript](/play/javascript/).

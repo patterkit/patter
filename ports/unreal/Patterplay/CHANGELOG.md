@@ -7,6 +7,12 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`getVisitCounts()` in C++ now hands you a copy you can keep**, on the engine and a flow, as the other runtimes
+  already did. Before, it returned a reference to the engine's own map, which a reset cleared and which could be
+  left dangling after a hot swap, a load, or closing the flow. Blueprint's `GetVisitCounts` always copied.
+
 ## [1.0.1] - 2026-11-10
 
 ### Changed

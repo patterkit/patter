@@ -951,6 +951,7 @@ namespace Patterkit.Patterplay.TestHost
             Checkpoint checkpoint = null;
             StepResult handed = null; // what the last advance or stepFor handed the host, for `scribble`
             var captured = new Dictionary<string, FlowState>(); // captureFlow states, by name, for restoreFlow
+            var keptVisits = new Dictionary<string, IReadOnlyDictionary<string, int>>(); // keepVisitCounts, as returned
             Bundle playing = bundle; // the bundle the live engine plays, for applyLiveBundle's comparison
                     foreach (var op in script.EnumerateArray())
                     {
@@ -1131,6 +1132,26 @@ namespace Patterkit.Patterplay.TestHost
                                 if (!same)
                                     throw new Exception($"expectErrors: expected {op.GetProperty("expectResult").GetRawText()}, got [{string.Join(", ", _errors.Select(e => $"{{kind:{e.Kind}, node:{e.Node}, flow:{e.Flow}}}"))}]");
                                 _errors.Clear();
+                                break;
+                            }
+                            case "keepVisitCounts":
+                            case "expectVisitCounts":
+                            {
+                                // Visit counts as the game reads them: the engine's, or (onFlow) the current flow's. A
+                                // kept read is held as returned, so a live map handed back shows up as changed.
+                                bool onFlow = op.TryGetProperty("onFlow", out var vf) && vf.ValueKind == JsonValueKind.True;
+                                IReadOnlyDictionary<string, int> Read() => onFlow ? engine.GetFlow(current).GetVisitCounts() : engine.GetVisitCounts();
+                                if (kind == "keepVisitCounts") { keptVisits[op.GetProperty("into").GetString()] = Read(); break; }
+                                IReadOnlyDictionary<string, int> counts;
+                                if (op.TryGetProperty("from", out var vfrom))
+                                {
+                                    if (!keptVisits.TryGetValue(vfrom.GetString(), out counts))
+                                        throw new Exception($"expectVisitCounts: nothing kept under '{vfrom.GetString()}'");
+                                }
+                                else counts = Read();
+                                var got = counts.ToDictionary(kv => kv.Key, kv => (object)(double)kv.Value);
+                                if (!Match(got, op.GetProperty("expectResult")))
+                                    throw new Exception($"expectVisitCounts: expected {op.GetProperty("expectResult").GetRawText()}, got {Dump(got)}");
                                 break;
                             }
                             case "expectLocale":

@@ -235,7 +235,7 @@ pack.
 
 ### `patter merge BASE OURS THEIRS`
 A 3-way structural merge of Patter source **by node id**. `-o out` (otherwise stdout),
-`--type flow|loc|authoring|project` (otherwise auto-detected), and `--json`. Conflicts
+`--type flow|loc|authoring|project|extension` (otherwise auto-detected), and `--json`. Conflicts
 write a provisional result (our side) with each clash recorded under its `unresolved` entry, plus a
 `.patterconflict` sidecar saying what each side had, and exit **1**. Validate, export, and pack refuse
 both until the clash is resolved. From the command line, that's by hand: make the content right,

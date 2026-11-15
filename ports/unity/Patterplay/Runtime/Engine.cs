@@ -599,8 +599,9 @@ namespace Patterkit.Patterplay
         public IReadOnlyList<LogEntry> Log() => _engineLog;
 
         /// <summary>How many times each node has been entered across every flow, by node id: the shared count.
-        /// With a flow's own GetVisitCounts, every visit count the run keeps, read without a save.</summary>
-        public IReadOnlyDictionary<string, int> GetVisitCounts() => _host.SharedVisits;
+        /// With a flow's own GetVisitCounts, every visit count the run keeps, read without a save. A copy, the
+        /// game's to keep.</summary>
+        public IReadOnlyDictionary<string, int> GetVisitCounts() => new Dictionary<string, int>(_host.SharedVisits);
 
         /// <summary>Drop the retained entries. Seq does NOT restart, so two reads either side of
         /// a clear still agree about what came first.</summary>

@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`GetVisitCounts()` now hands you a copy you can keep**, on `Engine` and `Flow`, as the other runtimes already
+  did. Before, it was the engine's own live dictionary: a flow's reset cleared what you were holding, and reading
+  it while the story played could throw.
+
 ## [1.0.1] - 2026-11-10
 
 ### Changed

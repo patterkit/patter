@@ -276,6 +276,13 @@ export type ScriptOp =
   // The engine's locales: `locale` is `engine.locale`, the locale in use (what the one locale rule resolved
   // the asked-for one to), and `default` and `included` are `engine.locales`. No transcript.
   | { op: "expectLocale"; expectResult: { locale: string; default: string; included: string[] } }
+  // Visit counts as game code reads them (getVisitCounts): the engine's shared counts, or the current flow's own
+  // with `onFlow`, by node id. `keepVisitCounts` holds what the call returned under `into`, as returned, never
+  // copied by the runner; `expectVisitCounts` with `from` compares that held result as it stands now, so a
+  // runtime handing back its live map (cleared by a reset, grown by play) fails. Without `from`, a fresh read.
+  // Key order is not part of the contract. No transcript.
+  | { op: "keepVisitCounts"; onFlow?: boolean; into: string }
+  | { op: "expectVisitCounts"; onFlow?: boolean; from?: string; expectResult: Record<string, number> }
   // A careless host (corpus 8): deface what the last `advance` or `stepFor` handed it, in place. In the step's
   // gameData, or each option's on a choice, every flags list gains the item "scribbled", then every value
   // becomes "scribbled" and the map gains the key "scribbled" too. Extension values are left alone: they are

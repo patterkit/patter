@@ -473,8 +473,8 @@ namespace Patterkit.Patterplay
                 foreach (var h in _host.TraceHandlers.ToArray()) h(Id, wide);
         }
 
-        /// <summary>How many times this flow has entered each node, by node id.</summary>
-        public IReadOnlyDictionary<string, int> GetVisitCounts() => _visitCounts;
+        /// <summary>How many times this flow has entered each node, by node id: a copy, the game's to keep.</summary>
+        public IReadOnlyDictionary<string, int> GetVisitCounts() => new Dictionary<string, int>(_visitCounts);
 
         public void Choose(string id)
         {

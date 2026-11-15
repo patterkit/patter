@@ -1186,8 +1186,8 @@ namespace patter
         /** This flow's id, as the engine knows it. */
         const std::string& id() const { return id_; }
 
-        /** How many times this flow has entered each node, by node id. */
-        const std::map<std::string, int>& getVisitCounts() const { return visitCounts_; }
+        /** How many times this flow has entered each node, by node id: a copy, the game's to keep. */
+        std::map<std::string, int> getVisitCounts() const { return visitCounts_; }
 
         /**
          * The step this flow would deliver for beat `beatId` right now, as advance() would give it: its text in
@@ -2997,8 +2997,9 @@ namespace patter
         const std::vector<LogEntry>& log() const { return engineLog_; }
 
         /** How many times each node has been entered across every flow, by node id: the shared count. With a
-         *  flow's own getVisitCounts, every visit count the run keeps, read without a save. */
-        const std::map<std::string, int>& getVisitCounts() const { return host_.sharedVisits; }
+         *  flow's own getVisitCounts, every visit count the run keeps, read without a save. A copy, the game's to
+         *  keep. */
+        std::map<std::string, int> getVisitCounts() const { return host_.sharedVisits; }
 
         /// Drop the retained entries. `seq` does NOT restart, so two reads either side of a
         /// clear still agree about what came first.

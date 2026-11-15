@@ -130,8 +130,8 @@ In `demo/` (delete the folder freely):
   (no address), `"scene"`, `"block"` (`"scene/block"`), or a `"snippet"`, `"option"`, `"line"`, `"text"` or
   `"gameEvent"` by id.
 - **Which Patterplay this is**: `PatterplayVersion.CURRENT` is this runtime's version, as in its
-  `plugin.cfg` (`"0.41.0"`). An extension that ships apart from Patterplay checks it at start-up with
-  `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "0.41.0", "0.42.0")`: at least the first version and
+  `plugin.cfg`. An extension that ships apart from Patterplay checks it at start-up with
+  `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "1.0.0", "2.0.0")`: at least the first version and
   below the second, by semantic-version order. Every runtime has the same pair.
 - **Your game's state and one registry per game**: bind `@world` to your own store with the
   `host_scopes` option, or hand the engine your game's `PatterScopeRegistry` with the `registry`

@@ -112,6 +112,7 @@ export function runScript(
   let checkpoint: Checkpoint | undefined;
   let handed: StepResult | undefined; // what the last advance or stepFor handed the host, for `scribble`
   const captured = new Map<string, FlowState>(); // captureFlow states, by name, for restoreFlow
+  const kept = new Map<string, Record<string, number>>(); // keepVisitCounts results, as returned
   let playing = ctx.bundle; // the bundle the live engine plays, for applyLiveBundle's comparison
   // A call the runtime must refuse: it throws, and the engine is as it was (still inside its checkpoint).
   const refused = (what: string, call: () => unknown): void => {
@@ -310,6 +311,22 @@ export function runScript(
         const got = { locale: engine.locale, ...engine.locales };
         if (JSON.stringify(got) !== JSON.stringify(op.expectResult)) {
           throw new Error(`expectLocale: expected ${JSON.stringify(op.expectResult)}, got ${JSON.stringify(got)}`);
+        }
+        break;
+      }
+      case "keepVisitCounts":
+        kept.set(op.into, (op.onFlow ? engine.getFlow(current)! : engine).getVisitCounts());
+        break;
+      case "expectVisitCounts": {
+        let got: Record<string, number>;
+        if (op.from !== undefined) {
+          const held = kept.get(op.from);
+          if (!held) throw new Error(`expectVisitCounts: nothing kept under '${op.from}'`);
+          got = held;
+        } else got = (op.onFlow ? engine.getFlow(current)! : engine).getVisitCounts();
+        const sorted = (m: Record<string, number>): string => JSON.stringify(Object.keys(m).sort().map((k) => [k, m[k]]));
+        if (sorted(got) !== sorted(op.expectResult)) {
+          throw new Error(`expectVisitCounts: expected ${JSON.stringify(op.expectResult)}, got ${JSON.stringify(got)}`);
         }
         break;
       }

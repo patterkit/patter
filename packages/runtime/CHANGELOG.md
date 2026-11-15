@@ -1,31 +1,5 @@
 # Changelog
 
-## 0.5.1
-
-### Patch Changes
-
-- Updated dependencies [f97f6eb]
-  - @patterkit/model@0.4.0
-  - @patterkit/dialect@0.1.6
-
-## 0.4.1
-
-### Patch Changes
-
-- Updated dependencies [614eaa8]
-  - @patterkit/model@0.3.0
-  - @patterkit/dialect@0.1.5
-
-## 0.2.1
-
-### Patch Changes
-
-- Updated dependencies [34429f0]
-- Updated dependencies [34429f0]
-- Updated dependencies [c61c146]
-  - @patterkit/model@0.2.0
-  - @patterkit/dialect@0.1.3
-
 All notable changes to `@patterkit/runtime` (Patterplay JS) are documented here. The
 Patterplay runtimes - JS, Unity, Unreal, and Godot - are versioned in lockstep: the same
 version number always means the same runtime behaviour. This package is versioned by

@@ -1115,6 +1115,36 @@ const scriptedResetFlow = {
   ],
 } satisfies ScriptedFixture;
 
+// getVisitCounts hands game code its own copy: a read kept across a reset or more play still says
+// what it said when it was taken. Unity and Unreal handed back their live maps (2026-11-15), which a flow's reset
+// cleared under the game and play grew while it was being read.
+const scriptedVisitCounts = {
+  name: "getVisitCounts returns a copy: a kept read survives play and a reset",
+  project: project({}),
+  scenes: [
+    { id: "scn_v", type: "scene", name: "Room", blocks: [{ id: "b_v", type: "block", name: "B", children: [
+      { id: "sn_a", type: "snippet", beats: [{ id: "A", kind: "text" }] },
+      { id: "sn_b", type: "snippet", beats: [{ id: "B", kind: "text" }], jump: { to: "END" } },
+    ] }] },
+  ],
+  locales: [loc("scn_v", { A: "a", B: "b" })],
+  script: <ScriptOp[]>[
+    { op: "openFlow", flow: "f", scene: "room" },
+    { op: "advance", expect: [{ type: "text", id: "A", text: "a" }] },
+    { op: "keepVisitCounts", onFlow: true, into: "flowAfterA" },
+    { op: "keepVisitCounts", into: "engineAfterA" },
+    { op: "expectVisitCounts", onFlow: true, expectResult: { scn_v: 1, b_v: 1, sn_a: 1 } },
+    { op: "expectVisitCounts", expectResult: { scn_v: 1, b_v: 1, sn_a: 1 } },
+    { op: "advance", expect: [{ type: "text", id: "B", text: "b" }] },
+    { op: "expectVisitCounts", onFlow: true, expectResult: { scn_v: 1, b_v: 1, sn_a: 1, sn_b: 1 } },
+    { op: "expectVisitCounts", onFlow: true, from: "flowAfterA", expectResult: { scn_v: 1, b_v: 1, sn_a: 1 } },
+    { op: "expectVisitCounts", from: "engineAfterA", expectResult: { scn_v: 1, b_v: 1, sn_a: 1 } },
+    { op: "resetFlow" },
+    { op: "expectVisitCounts", onFlow: true, from: "flowAfterA", expectResult: { scn_v: 1, b_v: 1, sn_a: 1 } },
+    { op: "expectVisitCounts", from: "engineAfterA", expectResult: { scn_v: 1, b_v: 1, sn_a: 1 } },
+  ],
+} satisfies ScriptedFixture;
+
 // The default start scene is the first AUTHORED scene (the bundle's key order, which is the project's
 // nav order), never the first by id. Scene ids are random, so a runtime that sorts them opens a game on
 // an arbitrary scene: Unreal kept its scenes in a sorted map and did exactly that (2026-10-06). The ids
@@ -4758,7 +4788,7 @@ export const cases: Fixtures = {
     linePadding, linePaddingPrompt, actionText, actionTextLocalised,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ruleErrorsPlayThrough, ruleBestMatchFailingPart, ruleNumberText, rulePromptTags, ruleAllGreyedRunsDry],
-  scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedProjectStart, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedEscapedEmojiSaveLoad, scriptedSetLocale,
+  scripted: [scriptedMultiFlow, scriptedVisitCounts, scriptedDefaultStartScene, scriptedProjectStart, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedEscapedEmojiSaveLoad, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedApplyLiveBundleText, scriptedApplyLiveBundleStructure,

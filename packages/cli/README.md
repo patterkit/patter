@@ -45,6 +45,7 @@ walks up to the nearest `*.patterproj`. It defaults to the current folder.
 | `loc-export [path]` | Export strings for translation (JSON, Excel, or PO). |
 | `loc-import <file> [path]` | Import a translated file back. |
 | `voice-export [path]` | The voice-recording script, as a spreadsheet. |
+| `placeholder-speech [path]` | Make Placeholder Speech for spoken lines that have none or whose speech is out of date, as Patterpad does. |
 | `export-editable [path]` | An editable `.docx` script for an editor outside Patter. |
 | `import-editable <file> [path]` | Bring that file back as suggestions and comments. |
 | `suggestions [path]` | List open suggestions; `--accept-clean` accepts the clean ones. |

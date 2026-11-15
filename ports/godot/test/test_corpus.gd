@@ -864,6 +864,7 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 	var cp = null   # the open checkpoint, between a "checkpoint" op and its "rollback" / "commit"
 	var handed = null   # what the last advance or stepFor handed the host, for `scribble`
 	var captured := {}   # captureFlow states, by name, for restoreFlow
+	var kept_visits := {}   # keepVisitCounts results, as returned
 	var ok := true
 	for op in ops:
 		var chunk: Array = []
@@ -1142,6 +1143,24 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 					_fail("scripted", name, "expectErrors: expected %s, got %s" % [JSON.stringify(want_errors), JSON.stringify(seen_errors)])
 					return false
 				_errors.clear()
+			"keepVisitCounts", "expectVisitCounts":
+				# Visit counts as the game reads them: the engine's, or (onFlow) the current flow's. A kept read is
+				# held as returned, so a live dictionary handed back shows up as changed.
+				var visits_on = holder["engine"].get_flow(current) if op.get("onFlow", false) else holder["engine"]
+				if op["op"] == "keepVisitCounts":
+					kept_visits[op["into"]] = visits_on.get_visit_counts()
+				else:
+					var counts: Dictionary
+					if op.has("from"):
+						if not kept_visits.has(op["from"]):
+							_fail("scripted", name, "expectVisitCounts: nothing kept under '%s'" % op["from"])
+							return false
+						counts = kept_visits[op["from"]]
+					else:
+						counts = visits_on.get_visit_counts()
+					if not _deep_equal(counts, op["expectResult"]):
+						_fail("scripted", name, "expectVisitCounts: expected %s, got %s" % [JSON.stringify(op["expectResult"]), JSON.stringify(counts)])
+						return false
 			"expectLocale":
 				var got_locale: Dictionary = {"locale": holder["engine"].locale()}
 				got_locale.merge(holder["engine"].locales())
