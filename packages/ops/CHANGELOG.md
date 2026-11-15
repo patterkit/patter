@@ -1,5 +1,11 @@
 # @patterkit/ops
 
+## 1.2.3
+
+### Patch Changes
+
+- b1703dd: Uses `@patterkit/runtime` 1.0.3, the Patterplay 1.0.3 release.
+
 ## 1.2.2
 
 ### Patch Changes
