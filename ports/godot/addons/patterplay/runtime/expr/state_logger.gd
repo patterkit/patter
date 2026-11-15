@@ -46,7 +46,7 @@ func _init(mounts_provider: Callable, extra_provider: Callable, opts: Dictionary
 	_mounts_provider = mounts_provider
 	_extra_provider = extra_provider
 	var sink = opts.get("sink")
-	_sink = sink if sink is Callable else func(line: String) -> void: print(line)
+	_sink = sink if sink is Callable else _default_sink()
 	_label = str(opts.get("label", ""))
 	_baseline = _full()
 	_mount()
@@ -92,15 +92,9 @@ func _full() -> Dictionary:
 func _hook(prefix: String, bag) -> void:
 	# The write logs as it lands, `from` straight off the audit event; the baseline moves
 	# with it so capture() never re-reports what was already said.
-	var auditor := func(change: Dictionary) -> void:
-		var c := {
-			"path": prefix + str(change["name"]),
-			"from": _copy(change.get("prev")),
-			"to": _copy(change["next"]),
-		}
-		_emit(c)
-		_pushed.append(c)
-		_baseline[c["path"]] = _copy(change["next"])
+	# A method Callable, so the bag holds no reference back to this logger: a freed logger's
+	# auditor is skipped and dropped by the bag (see the note at the end of this file).
+	var auditor := _audited.bind(prefix)
 	# Typed explicitly: `bag` is untyped here (the shared source cannot name a family's bag
 	# class), so := has nothing to infer from.
 	var off: Callable = bag.on_audit(auditor)
@@ -163,3 +157,26 @@ static func diff_state(prev: Dictionary, next: Dictionary) -> Array:
 		if not equal:
 			changes.append({"path": path, "from": from, "to": to})
 	return changes
+
+
+func _audited(change: Dictionary, prefix: String) -> void:
+	var c := {
+		"path": prefix + str(change["name"]),
+		"from": _copy(change.get("prev")),
+		"to": _copy(change["next"]),
+	}
+	_emit(c)
+	_pushed.append(c)
+	_baseline[c["path"]] = _copy(change["next"])
+
+
+# No lambda is kept past the call that makes it: a stored Callable is a method Callable.
+# In Godot's .NET build a GDScript lambda freed after its own script aborts the process
+# on quit (godotengine/godot#122532, fixed for Godot 4.8), and an object a C# script has
+# touched is freed late. Built in static functions, so they hold no instance either.
+static func _default_sink() -> Callable:
+	return _print_line
+
+
+static func _print_line(line: String) -> void:
+	print(line)

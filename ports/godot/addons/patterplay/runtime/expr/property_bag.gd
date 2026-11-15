@@ -46,7 +46,7 @@ var _normalise: Callable
 
 func _init(declarations: Array = [], opts: Dictionary = {}) -> void:
 	var norm = opts.get("normalise")
-	_normalise = norm if norm is Callable else func(n: String) -> String: return n.to_lower()
+	_normalise = norm if norm is Callable else _default_normalise()
 	path_prefix = str(opts.get("path_prefix", ""))
 	_seed(declarations)
 
@@ -203,13 +203,13 @@ func is_writable(name: String) -> bool:
 ## Notified of engine (non-silent) writes. Returns the unsubscribe Callable.
 func subscribe(fn: Callable) -> Callable:
 	_subscribers.append(fn)
-	return func() -> void: _subscribers.erase(fn)
+	return _unsubscriber(_subscribers, fn)
 
 
 ## Notified of EVERY write, silent or not. Returns the unsubscribe Callable.
 func on_audit(fn: Callable) -> Callable:
 	_auditors.append(fn)
-	return func() -> void: _auditors.erase(fn)
+	return _unsubscriber(_auditors, fn)
 
 
 ## Examiner rows: the declared surface only (stray values are storage, not
@@ -293,3 +293,25 @@ func load(saved: Dictionary, opts: Dictionary = {}) -> Array:
 		misfits.append({"name": name, "value": values[name]})
 		values[name] = _copy_value(Values.to_value(default_for(_decls[name])))
 	return misfits
+
+
+# No lambda is kept past the call that makes it: a stored Callable is a method Callable.
+# In Godot's .NET build a GDScript lambda freed after its own script aborts the process
+# on quit (godotengine/godot#122532, fixed for Godot 4.8), and an object a C# script has
+# touched is freed late. Built in static functions, so they hold no instance either.
+static func _default_normalise() -> Callable:
+	return _lower_name
+
+
+static func _lower_name(n: String) -> String:
+	return n.to_lower()
+
+
+## Binds the listener list itself (Arrays are shared), so unsubscribing after the bag has
+## gone is harmless.
+static func _unsubscriber(listeners: Array, fn: Callable) -> Callable:
+	return _erase_from.bind(listeners, fn)
+
+
+static func _erase_from(listeners: Array, fn: Callable) -> void:
+	listeners.erase(fn)

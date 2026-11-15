@@ -6,6 +6,14 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A C# game no longer crashes as it quits.** In Godot's .NET build, a game whose C# scripts kept hold of
+  something from the runtime's state layer, such as the function `subscribe` hands back, played correctly but
+  aborted on quit. The shared expression kernel no longer keeps GDScript lambdas, which Godot 4.7 can't free safely
+  once their script has gone (godotengine/godot#122532, fixed for Godot 4.8). A state logger also no longer keeps
+  itself alive through the bags it watches.
+
 ## [1.0.2] - 2026-11-15
 
 ### Fixed

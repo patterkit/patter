@@ -429,11 +429,7 @@ func to_eval_context(host = null, opts: Dictionary = {}) -> Dictionary:
 	# when a quality exists, so contexts stay identical for products that declare none.
 	var qualities := _quality_ladders(entries)
 	if not qualities.is_empty():
-		ctx["qualities"] = func(scope: String, name: String):
-			var e = entries.get(scope)
-			if e == null or not qualities.has(scope):
-				return null
-			return qualities[scope].get(_norm_of(e).call(name))
+		ctx["qualities"] = _qualities_reader(entries, qualities)
 	return ctx
 
 
@@ -560,3 +556,18 @@ func _refuse(msg: String) -> String:
 
 static func _copy(v) -> Variant:
 	return (v as Array).duplicate() if v is Array else v
+
+
+# No lambda is kept past the call that makes it: a stored Callable is a method Callable.
+# In Godot's .NET build a GDScript lambda freed after its own script aborts the process
+# on quit (godotengine/godot#122532, fixed for Godot 4.8), and an object a C# script has
+# touched is freed late. Built in static functions, so they hold no instance either.
+static func _qualities_reader(entries: Dictionary, qualities: Dictionary) -> Callable:
+	return _quality_ladder.bind(entries, qualities)
+
+
+static func _quality_ladder(scope: String, name: String, entries: Dictionary, qualities: Dictionary):
+	var e = entries.get(scope)
+	if e == null or not qualities.has(scope):
+		return null
+	return qualities[scope].get(_norm_of(e).call(name))

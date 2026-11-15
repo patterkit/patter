@@ -273,6 +273,86 @@ To sanity-check a build before you ship it, in the EXPORTED game rather than the
 print(FileAccess.file_exists("res://story.patterc"))   # must print true
 ```
 
+## Using C#
+
+A game written in C# with Godot's .NET build uses this same addon. Godot runs GDScript and C# side by
+side, so your C# scripts call Patterplay directly. There's nothing extra to install, and the editor
+half (the importer, the bundle inspector, and the export hook) works as it does for a GDScript game.
+
+C# can't name a GDScript `class_name`, so load each class you need by its script path. The calls are
+the GDScript ones by name, and what comes back are Godot types: a step is a `Godot.Collections.Dictionary`.
+
+```csharp
+using Godot;
+using Godot.Collections;
+
+public partial class Story : Node
+{
+    static readonly GDScript PatterBundle = GD.Load<GDScript>("res://addons/patterplay/runtime/bundle.gd");
+    static readonly GDScript PatterEngine = GD.Load<GDScript>("res://addons/patterplay/runtime/engine.gd");
+
+    GodotObject _engine;
+    GodotObject _flow;
+
+    public override void _Ready()
+    {
+        var bundle = PatterBundle.Call("load_from_string", FileAccess.GetFileAsString("res://story.patterc"));
+        _engine = PatterEngine.New(bundle).AsGodotObject();
+        _flow = _engine.Call("open_flow", "main", "intro").AsGodotObject();
+    }
+
+    // Call when the player is ready for the next beat.
+    public void Next()
+    {
+        var step = _flow.Call("advance").AsGodotDictionary();
+        switch (step["type"].AsString())
+        {
+            case "line":
+                GD.Print($"{(step.ContainsKey("speakerLabel") ? step["speakerLabel"] : "")}: {step["text"]}");
+                break;
+            case "text":
+                GD.Print(step["text"]);
+                break;
+            case "choice":
+                var first = step["options"].AsGodotArray()[0].AsGodotDictionary();   // your UI picks
+                _flow.Call("choose", first["id"]);
+                break;
+        }
+    }
+}
+```
+
+Everything on this page works the same way: `set_property` hands back its refusal as a string,
+`PatterSave` (from `res://addons/patterplay/runtime/save.gd`) saves and loads, and the option keys are
+the GDScript ones. Errors are values and `push_error`s, never C# exceptions.
+
+**Your game's own C# state** goes behind `host_scopes` as a `get` / `set` pair of C# lambdas, so the story
+reads and writes your C# objects directly, with no copy kept on the GDScript side:
+
+```csharp
+var world = new System.Collections.Generic.Dictionary<string, Variant> { ["time_of_day"] = "night" };
+_engine = PatterEngine.New(bundle, new Dictionary
+{
+    ["host_scopes"] = new Dictionary
+    {
+        ["world"] = new Dictionary
+        {
+            ["get"] = Callable.From((string name) => world.TryGetValue(name, out var v) ? v : default),
+            ["set"] = Callable.From((string name, Variant value) => { world[name] = value; }),
+        },
+    },
+    ["on_error"] = Callable.From((Dictionary e) => GD.PushWarning($"{e["kind"]}: {e["message"]}")),
+}).AsGodotObject();
+```
+
+Returning `default` (a nil `Variant`) means unset.
+
+Names are strings and values are `Variant`s, so a typo shows up when the game runs, not when it
+compiles. If you call Patterplay from many places, wrap the calls you use in a small typed class of
+your own.
+
+Godot's C# builds don't export to the web yet, so a game that has to run in a browser needs GDScript.
+
 ## Which Patterplay is this?
 
 **`PatterplayVersion.CURRENT`** is this runtime's version, as in its `plugin.cfg` (`"1.0.0"`). An extension that
