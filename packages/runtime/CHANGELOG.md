@@ -7,6 +7,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-15
+
 ### Changed
 
 - **Installing it brings the story model up to date.** This version needs `@patterkit/model` 1.3.0 or later, so an

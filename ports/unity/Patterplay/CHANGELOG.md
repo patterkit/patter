@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-15
+
 ### Fixed
 
 - **`GetVisitCounts()` now hands you a copy you can keep**, on `Engine` and `Flow`, as the other runtimes already

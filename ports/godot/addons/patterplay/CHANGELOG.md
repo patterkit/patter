@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-15
+
 ### Fixed
 
 - **An engine dropped while a checkpoint is open is now freed.** Before, letting go of an engine part way through a

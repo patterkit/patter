@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-15
+
 ### Fixed
 
 - **`getVisitCounts()` in C++ now hands you a copy you can keep**, on the engine and a flow, as the other runtimes
