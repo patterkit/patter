@@ -27,10 +27,7 @@
 
 import { basename, dirname, join, sep } from "node:path";
 import { canonicalStringify } from "@patterkit/core";
-import {
-  walkNodes, textIsAction, castStringKey, qualifierStringKey, speakerLabelKey, usedQualifiers, usedSpeakerPairs, projectQualifiers,
-  SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, PROJECT_LOCALE_SCENE, projectLayout, STRINGS_SCHEMA, AUTHORING_SCHEMA,
-} from "@patterkit/model";
+import { walkNodes, textIsAction, castStringKey, qualifierStringKey, speakerLabelKey, usedQualifiers, usedSpeakerPairs, projectQualifiers, SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, PROJECT_LOCALE_SCENE, projectLayout, STRINGS_SCHEMA, AUTHORING_SCHEMA, walkBeats } from "@patterkit/model";
 import type { AuthoringFile, GrammaticalGender, Group, LocaleFile, ProjectFile, Scene, Snippet } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import { tableFor, mergeAuthoring } from "./loaded-helpers.js";
@@ -381,10 +378,7 @@ export function locLineHomes(loaded: Pick<LoadedProject, "project" | "scenes">, 
   const out = new Map<string, string>();
   for (const scene of loaded.scenes) {
     for (const block of scene.blocks) {
-      walkNodes<Group | Snippet>(block.children, (node) => {
-        if (node.type === "group") { if (node.prompt) out.set(node.prompt.id, scene.id); return; }
-        for (const beat of node.beats ?? []) if (beat.kind !== "gameEvent") out.set(beat.id, scene.id);
-      });
+      walkBeats<Group | Snippet>(block.children, (beat) => { if (beat.kind !== "gameEvent") out.set(beat.id, scene.id); });
     }
   }
   for (const id of Object.keys(projectStringSources(loaded.project, sourceTable))) out.set(id, PROJECT_LOCALE_SCENE);

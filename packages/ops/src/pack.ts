@@ -24,7 +24,7 @@ import { dirname, join, relative, sep } from "node:path";
 import { parseSource } from "@patterkit/core";
 import { EXTENSION_SHARD, EXTENSIONS_DIR, MANIFEST_EXTENSION } from "@patterkit/model";
 import type { ProjectFile } from "@patterkit/model";
-import { findProjectFile, walkFiles } from "./load.js";
+import { findProjectFile, walkFiles, walkFilesByExt } from "./load.js";
 import { sidecarIssues, unresolvedMarkIssues, CONFLICT_SIDECAR } from "./merge.js";
 import { ARCHIVE_ENTRY_OPTS } from "@wildwinter/toolkit/archive";
 import { gameScopesSnapshot, GAME_SCOPES_DIR } from "./game-scopes.js";
@@ -32,6 +32,10 @@ import { HANDOFF_DIR, parseHandoff } from "./handoff.js";
 
 /** The source-shard extensions a document carries (the merge-friendly truth). */
 export const SHARD_EXTENSIONS = [".patterflow", ".patterloc", ".patterx", ".patterproj", EXTENSION_SHARD] as const;
+
+/** Every source shard in a `walkFilesByExt` result that asked for `SHARD_EXTENSIONS`: each kind sorted, the kinds in
+ *  that order. */
+export const shardsIn = (tree: ReadonlyMap<string, string[]>): string[] => SHARD_EXTENSIONS.flatMap((ext) => tree.get(ext) ?? []);
 
 /** Manifest embedded at the document root - what this envelope is and contains. */
 export interface DocumentManifest {
@@ -66,7 +70,9 @@ export async function runPack(startPath: string): Promise<Buffer> {
   // the worse of the two holes that rule left: a pack carries SHARDS and not sidecars, so the
   // recipient gets conflicted values provisionally resolved to our side with nothing at all to say
   // they were in dispute - and somebody else opening it is the whole point of a pack.
-  const unresolved = sidecarIssues(walkFiles(root, CONFLICT_SIDECAR));
+  // One walk of the tree for the sidecars and every shard.
+  const tree = walkFilesByExt(root, [CONFLICT_SIDECAR, ...SHARD_EXTENSIONS]);
+  const unresolved = sidecarIssues(tree.get(CONFLICT_SIDECAR)!);
   if (unresolved.length) {
     throw new Error(
       `${unresolved.length} unresolved merge conflict(s) - resolve them before packing, or the recipient ` +
@@ -76,7 +82,7 @@ export async function runPack(startPath: string): Promise<Buffer> {
   }
 
   // Gather every source shard under the project root, layout-independent.
-  const shardFiles = SHARD_EXTENSIONS.flatMap((ext) => walkFiles(root, ext))
+  const shardFiles = shardsIn(tree)
     .map((abs) => ({ abs, rel: relative(root, abs).split(sep).join("/") }));
 
   // The same rule for the mark a merge writes into a shard (`unresolved`), which is the record that

@@ -6,7 +6,7 @@
 // to. Pure: indexes the loaded project and returns matches.
 // ---------------------------------------------------------------------------
 
-import { walkNodes, effectiveGameId, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES } from "@patterkit/model";
+import { walkNodes, effectiveGameId, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, beatsOf } from "@patterkit/model";
 import type { Group, Snippet, GameData, GameDataField, GameDataFieldType, GameDataNodeKind } from "@patterkit/model";
 import { defaultFor } from "@wildwinter/scoperegistry";
 import { parseFieldQuery, fieldNameMatches, fieldValueMatches, fieldValueText } from "@wildwinter/toolkit";
@@ -148,8 +148,7 @@ export function runStatusBrowse(loaded: LoadedProject, status: string, dimension
       walkNodes<Group | Snippet>(block.children, (node) => {
         // A choice option's prompt is a real line/text beat (the choice text), so its status is tracked like
         // any other line - browsing by status must surface it too (else a prompt set to "final" is unfindable).
-        if (node.type === "group") { if (node.prompt) consider(node.prompt); return; }
-        for (const beat of node.beats ?? []) consider(beat);
+        for (const beat of beatsOf(node)) consider(beat);
       });
     }
   }
@@ -172,8 +171,7 @@ export function listProjectTags(loaded: LoadedProject): Array<{ name: string; co
       add(block.tags);
       walkNodes<Group | Snippet>(block.children, (node) => {
         add(node.tags);
-        if (node.type === "group") { add(node.prompt?.tags); return; }
-        for (const beat of node.beats ?? []) add(beat.tags);
+        for (const beat of beatsOf(node)) add(beat.tags);
       });
     }
   }

@@ -12,7 +12,7 @@ import type { ScopeRegistrySpec } from "@wildwinter/scoperegistry";
 import { referenceNote } from "@wildwinter/scoperegistry/scopes";
 import type { MergedScopes } from "@wildwinter/scoperegistry/scopes";
 import { externalGameScopes, projectScopes } from "./game-scopes.js";
-import { walkNodes } from "@patterkit/model";
+import { walkNodes, walkBeats } from "@patterkit/model";
 import type {
   Expression, ProjectFile, Scene, Block, Effect, Beat, LocaleFile,
 } from "@patterkit/model";
@@ -288,11 +288,8 @@ export function validateInterpolation(
     };
 
     for (const block of scene.blocks) {
-      walkNodes(block.children, (node) => {
-        if (node.type === "snippet") { for (const beat of node.beats ?? []) checkBeat(beat); return; }
-        // An option group's `prompt` is on-screen choice text - a localised line/text beat (spec §5).
-        if (node.prompt) checkBeat(node.prompt);
-      });
+      // An option group's `prompt` is on-screen choice text - a localised line/text beat (spec §5).
+      walkBeats(block.children, (beat) => checkBeat(beat));
     }
   }
 

@@ -37,7 +37,7 @@ import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { defaultFor, PropertyBag } from "@wildwinter/scoperegistry";
 import type { LoadMisfit, LogMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
-import { walkNodes, effectiveGameId, resolveSceneRef, castStringKey, qualifierStringKey, speakerLabelKey, formatSpeakerLabel, SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, DEFAULT_PAD_AFTER, DEFAULT_ESTIMATE_SPEED, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
+import { walkNodes, beatsOf, effectiveGameId, resolveSceneRef, castStringKey, qualifierStringKey, speakerLabelKey, formatSpeakerLabel, SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, DEFAULT_PAD_AFTER, DEFAULT_ESTIMATE_SPEED, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, walkBeats } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
 import { buildPadIndex, type BeatPad } from "./pads.js";
 import { SAVE_VERSION } from "@patterkit/model";
@@ -54,59 +54,42 @@ type SelectableNode = CompiledGroup | CompiledSnippet;
 // per evaluation was the engine's hottest path (every condition / effect / slot).
 const astCache = new WeakMap<Expression, ExprNode>();
 
-// The tag index depends only on the bundle's structure, so it is built once per bundle object rather than
-// once per engine. A tool that builds a fresh engine for every run over one bundle (coverage does, to keep
-// the runs independent) spent over a third of its time rebuilding it. A changed bundle is a new object
-// (hotSwap takes one; replaceStrings touches only strings), so the cache never answers for stale content.
-const tagIndexCache = new WeakMap<Bundle, Map<string, string[]>>();
-function tagIndexFor(bundle: Bundle): Map<string, string[]> {
-  let index = tagIndexCache.get(bundle);
-  if (!index) { index = buildTagIndex(bundle); tagIndexCache.set(bundle, index); }
-  return index;
-}
-// The line-padding index (pads.ts) is structural too, cached per bundle the same way.
-const padIndexCache = new WeakMap<Bundle, Map<string, BeatPad>>();
-function padIndexFor(bundle: Bundle): Map<string, BeatPad> {
-  let index = padIndexCache.get(bundle);
-  if (!index) { index = buildPadIndex(bundle); padIndexCache.set(bundle, index); }
-  return index;
+/** A value built once per bundle object and cached against it, rather than once per engine. Everything cached
+ *  this way depends only on the bundle's structure: a tool that builds a fresh engine for every run over one
+ *  bundle (coverage does, to keep the runs independent) spent over a third of its time rebuilding the tag index.
+ *  A changed bundle is a new object (hotSwap takes one; replaceStrings touches only strings), so the cache never
+ *  answers for stale content. */
+function perBundle<T>(build: (bundle: Bundle) => T): (bundle: Bundle) => T {
+  const cache = new WeakMap<Bundle, T>();
+  return (bundle) => {
+    let value = cache.get(bundle);
+    if (value === undefined) { value = build(bundle); cache.set(bundle, value); }
+    return value;
+  };
 }
 
-// Each option of a choice, by its id, to the id of the choice it belongs to: a save stamps the frame an option's content
-// runs in with its choice (`StackFrame.choiceId`). Structural, cached the same way.
-const optionChoiceCache = new WeakMap<Bundle, Map<string, string>>();
-function optionChoiceFor(bundle: Bundle): Map<string, string> {
-  let index = optionChoiceCache.get(bundle);
-  if (index) return index;
-  index = new Map<string, string>();
+const tagIndexFor = perBundle(buildTagIndex);
+// The line-padding index (pads.ts).
+const padIndexFor = perBundle(buildPadIndex);
+
+// In one walk of the tree: each option of a choice, by its id, to the id of the choice it belongs to (a save
+// stamps the frame an option's content runs in with its choice, `StackFrame.choiceId`), and every beat by its id
+// (a snippet's beats and an option's prompt), for `Flow.stepFor`.
+const nodeIndexFor = perBundle((bundle) => {
+  const optionChoice = new Map<string, string>();
+  const beats = new Map<string, Beat>();
   for (const scene of Object.values(bundle.scenes)) {
     for (const block of scene.blocks) {
       walkNodes<SelectableNode>(block.children, (n) => {
-        if (n.type === "group" && n.selector === "choice") for (const option of n.children) index!.set(option.id, n.id);
+        if (n.type === "group" && n.selector === "choice") for (const option of n.children) optionChoice.set(option.id, n.id);
+        for (const beat of beatsOf(n)) beats.set(beat.id, beat);
       });
     }
   }
-  optionChoiceCache.set(bundle, index);
-  return index;
-}
-
-// Every beat by its id (a snippet's beats and an option's prompt), for `Flow.stepFor`; structural, cached the same way.
-const beatIndexCache = new WeakMap<Bundle, Map<string, Beat>>();
-function beatIndexFor(bundle: Bundle): Map<string, Beat> {
-  let index = beatIndexCache.get(bundle);
-  if (index) return index;
-  index = new Map<string, Beat>();
-  for (const scene of Object.values(bundle.scenes)) {
-    for (const block of scene.blocks) {
-      walkNodes<SelectableNode>(block.children, (n) => {
-        if (n.type === "group") { if (n.prompt) index!.set(n.prompt.id, n.prompt); return; }
-        for (const beat of n.beats ?? []) index!.set(beat.id, beat);
-      });
-    }
-  }
-  beatIndexCache.set(bundle, index);
-  return index;
-}
+  return { optionChoice, beats };
+});
+const optionChoiceFor = (bundle: Bundle): Map<string, string> => nodeIndexFor(bundle).optionChoice;
+const beatIndexFor = (bundle: Bundle): Map<string, Beat> => nodeIndexFor(bundle).beats;
 
 /** A node's gameData as a COPY, its flags lists too: the bundle's own object is shared by every engine on the
  *  bundle, so a game that edits what it was handed (a step's, an option's, an outline entry's) must not change
@@ -3203,13 +3186,7 @@ export class Flow {
  *  result order). Groups contribute their option prompt's speaker - a prompt is a line | text beat, so
  *  a line prompt is spoken by someone - and `walkNodes` carries the recursion into nested groups. */
 function collectCast(nodes: Array<CompiledGroup | CompiledSnippet>, out: Set<string>): void {
-  walkNodes<SelectableNode>(nodes, (n) => {
-    if (n.type === "group") {
-      if (n.prompt?.kind === "line" && n.prompt.character) out.add(n.prompt.character);
-      return;
-    }
-    for (const beat of n.beats ?? []) if (beat.kind === "line" && beat.character) out.add(beat.character);
-  });
+  walkBeats<SelectableNode>(nodes, (beat) => { if (beat.kind === "line" && beat.character) out.add(beat.character); });
 }
 
 /**

@@ -381,555 +381,609 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
-async function run(cmd: Command, positionals: string[], flags: Record<string, string | boolean | string[]>): Promise<number> {
-  switch (cmd) {
-    case "init": {
-      const vcs = typeof flags.vcs === "string" ? (flags.vcs as InitVcs) : undefined;
-      if (vcs && !["git", "perforce", "plastic", "svn"].includes(vcs)) {
-        return usage("init", `unknown --vcs '${vcs}' (git | perforce | plastic | svn)`);
-      }
-      const bundle = typeof flags.bundle === "string" ? (flags.bundle as BundlePosture) : undefined;
-      if (bundle && !["commit", "ignore"].includes(bundle)) {
-        return usage("init", `unknown --bundle '${bundle}' (commit | ignore)`);
-      }
-      // The canonical project folder carries the .patter extension (a macOS
-      // package / a clear project boundary in any tree). Append it to a named
-      // target; an in-place init (".") stays a plain folder.
-      const raw = positionals[0] ?? ".";
-      const dir = raw !== "." && raw !== "" && !raw.endsWith(".patter") ? `${raw}.patter` : raw;
-      const result = runInit({
-        dir,
-        name: typeof flags.name === "string" ? flags.name : undefined,
-        vcs,
-        bundle,
-      });
-      // All or nothing, and the project file last (runInit's order): a scaffold that half landed would
-      // refuse every rerun on the files it left.
-      if (!commitWrites(result.writes, { allOrNothing: true })) return 1;
-      for (const w of result.writes) console.log(`created: ${w.path}`);
-      console.log(`\n"${result.name}" is ready - try: patter play ${dir}`);
-      return 0;
+type Flags = Record<string, string | boolean | string[]>;
+
+/** One command: its positionals and flags in, its exit code out. */
+type Handler = (positionals: string[], flags: Flags) => number | Promise<number>;
+
+async function run(cmd: Command, positionals: string[], flags: Flags): Promise<number> {
+  return await HANDLERS[cmd](positionals, flags);
+}
+
+/** `patter init`. */
+function cmdInit(positionals: string[], flags: Flags): number {
+  const vcs = typeof flags.vcs === "string" ? (flags.vcs as InitVcs) : undefined;
+  if (vcs && !["git", "perforce", "plastic", "svn"].includes(vcs)) {
+    return usage("init", `unknown --vcs '${vcs}' (git | perforce | plastic | svn)`);
+  }
+  const bundle = typeof flags.bundle === "string" ? (flags.bundle as BundlePosture) : undefined;
+  if (bundle && !["commit", "ignore"].includes(bundle)) {
+    return usage("init", `unknown --bundle '${bundle}' (commit | ignore)`);
+  }
+  // The canonical project folder carries the .patter extension (a macOS
+  // package / a clear project boundary in any tree). Append it to a named
+  // target; an in-place init (".") stays a plain folder.
+  const raw = positionals[0] ?? ".";
+  const dir = raw !== "." && raw !== "" && !raw.endsWith(".patter") ? `${raw}.patter` : raw;
+  const result = runInit({
+    dir,
+    name: typeof flags.name === "string" ? flags.name : undefined,
+    vcs,
+    bundle,
+  });
+  // All or nothing, and the project file last (runInit's order): a scaffold that half landed would
+  // refuse every rerun on the files it left.
+  if (!commitWrites(result.writes, { allOrNothing: true })) return 1;
+  for (const w of result.writes) console.log(`created: ${w.path}`);
+  console.log(`\n"${result.name}" is ready - try: patter play ${dir}`);
+  return 0;
+}
+
+/** `patter resolve`. */
+function cmdResolve(positionals: string[], _flags: Flags): number {
+  const query = positionals[0];
+  if (!query) return usage("resolve", "no query given");
+  const loaded = loadProject(positionals[1] ?? ".");
+  const entries = runResolve(loaded, query);
+  if (entries.length === 0) { console.error(`no match for '${query}'`); return 1; }
+  for (const e of entries) {
+    const name = e.name ? ` "${e.name}"` : "";
+    const gid = e.gameId ? `  ${e.gameId}` : "";
+    const loc = e.location.length ? `  ${e.location.join(" > ")}` : "";
+    const snip = e.text ? `  «${e.text.length > 60 ? `${e.text.slice(0, 59)}…` : e.text}»` : ""; // the line it names
+    console.log(`${e.id}  [${e.kind}]${name}${gid}${loc}${snip}${e.file ? `  (${e.file})` : ""}`);
+  }
+  return 0;
+}
+
+/** `patter usage`. */
+function cmdUsage(positionals: string[], flags: Flags): number {
+  const query = positionals[0];
+  if (!query) return usage("usage", "no property given (e.g. @gold, world.threat, \"faction rebels\")");
+  const loaded = loadProject(positionals[1] ?? ".");
+  const entries = runPropertyUsage(loaded, query);
+  if (flags.json === true) { console.log(JSON.stringify(entries)); return 0; }
+  if (entries.length === 0) { console.error(`no usages of '${query}'`); return 0; } // unused is a valid answer
+  for (const e of entries) console.log(`[${e.kind}] ${e.text ?? ""}   ${e.location.join(" > ")}  (${e.id})`);
+  return 0;
+}
+
+/** `patter validate`. */
+function cmdValidate(positionals: string[], _flags: Flags): number {
+  const loaded = loadProject(positionals[0] ?? ".");
+  const { structural, conditions, interpolation, hygiene, staleBundles, unresolvedMerges, orphans, reachability, gameScopes, localisation, extensions, ok } = runValidate(loaded);
+  // A warning (another tool's scope, say) is printed as one and never fails the run.
+  const warn = (i: { severity: "error" | "warning" }): string => (i.severity === "warning" ? "warning: " : "");
+  for (const i of structural) console.error(`  [${i.code}] ${i.severity ? `${i.severity === "info" ? "note" : "warning"}: ` : ""}${i.message}`);
+  for (const i of conditions) console.error(`  [${i.field}] ${i.nodeId}: ${warn(i)}${i.message}  (${i.src})`);
+  for (const i of interpolation) console.error(`  [${i.field}] ${i.nodeId}: ${warn(i)}${i.message}  (${i.src})`);
+  for (const i of hygiene) console.error(`  [hygiene] ${i.file}: ${i.message}`);
+  for (const i of staleBundles) console.error(`  [stale-bundle] ${i.file}: ${i.message}`);
+  for (const i of unresolvedMerges) console.error(`  [unresolved-merge] ${i.file}: ${i.message}`);
+  for (const i of orphans) console.error(`  [not-in-project] ${i.message}`); // the message names the file
+  for (const i of gameScopes) console.error(`  [game-scopes] ${i.file}: ${warn(i)}${i.message}`);
+  for (const i of localisation) console.error(`  [localisation] ${i.file}: ${warn(i)}${i.message}`);
+  for (const i of extensions) console.error(`  [extension] ${i.file}: ${warn(i)}${i.message}`);
+  // Advisory, and outside `ok` and the count: a gate whose writer is not authored yet is the normal
+  // state mid-work, and must never fail a build.
+  for (const i of reachability) console.error(`  [unreachable] ${i.nodeId}: ${i.message}  (${i.src})`);
+  const isError = (i: { severity: "error" | "warning" }): boolean => i.severity === "error";
+  // A note (a choice that can run dry and then carry on) is printed but counts as neither.
+  const structuralWarnings = structural.filter((i) => i.severity === "warning").length;
+  const warnings = reachability.length + structuralWarnings + [...conditions, ...interpolation, ...gameScopes, ...localisation, ...extensions].filter((i) => !isError(i)).length;
+  const count = structural.filter((i) => i.severity === undefined).length + [...conditions, ...interpolation, ...gameScopes, ...localisation, ...extensions].filter(isError).length
+    + hygiene.length + staleBundles.length + unresolvedMerges.length + orphans.length;
+  // A warning is not an issue, but "no issues" printed directly under one reads as a contradiction,
+  // so say what was said.
+  const advisory = warnings ? `, ${warnings} warning(s) above` : "";
+  if (ok) console.log(`ok - ${loaded.scenes.length} scene(s), no issues${advisory}`);
+  else console.error(`\n${count} issue(s)${advisory}`);
+  return ok ? 0 : 1;
+}
+
+/** `patter format`. */
+function cmdFormat(positionals: string[], flags: Flags): number {
+  if (positionals.length === 0) return usage("format", "no files given");
+  const check = flags.check === true;
+  const results = runFormat(positionals);
+  // Anything that is not a shard is left alone (the bundle and the scopes files must stay strict JSON);
+  // said only when nothing named was Patter source, so `format $(git ls-files)` stays quiet.
+  if (results.every((r) => r.skipped)) { console.error("format: no Patter source among the files given (.patterflow, .patterloc, .patterx, .patterproj, .patterextension)"); return 0; }
+  const changed = results.filter((r) => r.changed);
+  if (!check && !commitWrites(changed.map((r) => r.write!))) return 1;
+  for (const r of changed) {
+    console.log(`${check ? "would format" : "formatted"}: ${r.file}`);
+    // On a project folder, an extension taken at a new version: said under the file it changed.
+    for (const n of r.notes ?? []) console.log(`  ${check ? "would have " : ""}${n}`);
+  }
+  if (changed.length === 0) console.log("already canonical");
+  return check && changed.length > 0 ? 1 : 0;
+}
+
+/** `patter export`. */
+function cmdExport(positionals: string[], flags: Flags): number {
+  const loaded = loadProject(positionals[0] ?? ".");
+  // Localisation mode (spec §11): default to the project's export setting; --ids / --source-debug
+  // override it per build. "ids" ships no strings (the game localises from beat IDs); --source-debug
+  // also embeds the source language for debug playback (the runtime warns it is not shippable).
+  if (flags["source-debug"]) loaded.project.export = { ...loaded.project.export, localisation: { mode: "ids", sourceDebug: true } };
+  else if (flags.ids) loaded.project.export = { ...loaded.project.export, localisation: { mode: "ids" } };
+  const allowInvalid = flags["allow-invalid"] === true;
+  // -o -: the bundle alone, to stdout, for pipelines (no scopes or audio manifest written).
+  if (flags.o === "-") { process.stdout.write(canonicalStringify(runExport(loaded, { allowInvalid }), { trailingComma: false })); return 0; }
+  // No -o: the project's bundle path (export.bundle, else the sibling patter-dist/ Patterpad writes
+  // too), so `patter export` alone produces the artifact and validate's staleness gate knows where to
+  // find it (spec §11). The plan is the one Patterpad's Build commits: the bundle, the game's scopes
+  // file when it changed, and the audio manifest under Audio Folders.
+  // A shipping manifest goes elsewhere, so the one beside the audio (the development one) is never overwritten
+  // without its placeholder speech.
+  if (flags["no-placeholder-speech"] === true && typeof flags["audio-manifest-out"] !== "string") return usage("export", "--no-placeholder-speech needs --audio-manifest-out, so the development manifest keeps its placeholder speech");
+  const plan = planBuild(loaded, { allowInvalid, ...(typeof flags.o === "string" ? { bundlePath: flags.o } : {}),
+    ...(typeof flags["audio-manifest-out"] === "string" ? { audioManifestPath: resolve(flags["audio-manifest-out"]) } : {}),
+    ...(flags["no-placeholder-speech"] === true ? { leaveOutPlaceholderSpeech: true } : {}) });
+  if (!commitWrites(plan.writes)) return 1;
+  for (const w of plan.writes) console.log(`wrote ${w.path}`);
+  return 0;
+}
+
+/** `patter export-html`. */
+function cmdExportHtml(positionals: string[], flags: Flags): number {
+  const loaded = loadProject(positionals[0] ?? ".");
+  const html = runExportHtml(loaded);
+  if (flags.o === "-") { process.stdout.write(html); return 0; } // stdout for pipelines
+  const target = typeof flags.o === "string" ? flags.o : besideBundlePath(loaded, ".html");
+  if (resolve(target) === bundleOutputPath(loaded)) return usage("export-html", `-o ${target} is the project's bundle`);
+  if (!commitWrites([{ path: target, content: html }])) return 1;
+  console.log(`wrote ${target}`);
+  return 0;
+}
+
+/** `patter play`. */
+function cmdPlay(positionals: string[], flags: Flags): number {
+  let seed: number | undefined;
+  if (typeof flags.seed === "string") {
+    seed = Number(flags.seed);
+    if (!Number.isInteger(seed)) return usage("play", `--seed '${flags.seed}' is not a whole number`);
+  }
+  const loaded = loadProject(positionals[0] ?? ".");
+  const result = runPlay(loaded, {
+    scene: typeof flags.scene === "string" ? flags.scene : undefined,
+    block: typeof flags.block === "string" ? flags.block : undefined,
+    choices: typeof flags.choices === "string" ? flags.choices.split(",") : undefined,
+    seed,
+  });
+  for (const line of renderPlay(result)) console.log(line);
+  // A playthrough that didn't reach the end (the engine stopped it, or the step bound), or
+  // that hit a condition or effect that failed, is a failure - `play` exists
+  // to drive flows to completion in CI, and the engine plays through a failing
+  // expression rather than stopping, so this is where CI hears about it.
+  return result.outcome === "end" && !result.events.some((e) => e.type === "error") ? 0 : 1;
+}
+
+/** `patter coverage`. */
+function cmdCoverage(positionals: string[], flags: Flags): number {
+  // Validate the numeric flags up front: a run count or step bound is a whole number of at least one
+  // (`--runs 0` ran nothing and reported every beat never reached), and a seed a whole number.
+  const numbers: Record<string, number | undefined> = {};
+  for (const [flag, min] of [["runs", 1], ["max-steps", 1], ["seed", -Infinity]] as const) {
+    if (typeof flags[flag] !== "string") continue;
+    const n = Number(flags[flag]);
+    if (!Number.isInteger(n) || n < min) {
+      return usage("coverage", `--${flag} '${flags[flag]}' is not ${min === 1 ? "a whole number of at least 1" : "a whole number"}`);
     }
+    numbers[flag] = n;
+  }
+  const order = flags.order ?? "least";
+  if (order !== "least" && order !== "script") return usage("coverage", `--order '${order}' is not least or script`);
+  const loaded = loadProject(positionals[0] ?? ".");
+  // --propose: print auto-proposed @world input drivers (from the conditions) instead of running.
+  // The author pastes the chosen ones into the project's `coverageDrivers`.
+  if (flags.propose === true) {
+    const ignored = ["runs", "max-steps", "seed", "scene", "block", "order", "fail-on-gap"].filter((f) => flags[f] !== undefined);
+    if (ignored.length) console.error(`warning: --propose runs nothing, so ${ignored.map((f) => `--${f}`).join(", ")} ${ignored.length > 1 ? "are" : "is"} ignored`);
+    const drivers = proposeCoverageDrivers(loaded);
+    if (flags.json === true) console.log(JSON.stringify(drivers));
+    else if (drivers.length === 0) console.log("no host-scope (@world) inputs to drive");
+    else for (const d of drivers) console.log(`${d.ref}  ${d.kind}/${d.cadence ?? "sometimes"}  [${d.values.join(", ")}]`);
+    return 0;
+  }
+  const report = runCoverage(loaded, {
+    runs: numbers.runs, maxSteps: numbers["max-steps"], seed: numbers.seed,
+    scene: typeof flags.scene === "string" ? flags.scene : undefined,
+    block: typeof flags.block === "string" ? flags.block : undefined,
+  });
+  if (flags.json === true) console.log(JSON.stringify(report));
+  else {
+    const nameOf = (id: string): string => loaded.scenes.find((s) => s.id === id)?.name ?? id;
+    for (const line of renderCoverageText(report, nameOf, { order })) console.log(line);
+  }
+  // --fail-on-gap: a CI gate - any never-reached beat fails the command.
+  return flags["fail-on-gap"] === true && report.totals.neverHit > 0 ? 1 : 0;
+}
 
-    case "resolve": {
-      const query = positionals[0];
-      if (!query) return usage("resolve", "no query given");
-      const loaded = loadProject(positionals[1] ?? ".");
-      const entries = runResolve(loaded, query);
-      if (entries.length === 0) { console.error(`no match for '${query}'`); return 1; }
-      for (const e of entries) {
-        const name = e.name ? ` "${e.name}"` : "";
-        const gid = e.gameId ? `  ${e.gameId}` : "";
-        const loc = e.location.length ? `  ${e.location.join(" > ")}` : "";
-        const snip = e.text ? `  «${e.text.length > 60 ? `${e.text.slice(0, 59)}…` : e.text}»` : ""; // the line it names
-        console.log(`${e.id}  [${e.kind}]${name}${gid}${loc}${snip}${e.file ? `  (${e.file})` : ""}`);
-      }
-      return 0;
+/** `patter report`. */
+async function cmdReport(positionals: string[], flags: Flags): Promise<number> {
+  const loaded = loadProject(positionals[0] ?? ".");
+  // Audio Folders projects derive recording status from the takes on disk - the same
+  // pipeline Patterpad's report uses (undefined = the manual map, exactly as there).
+  const data = runReport(loaded, scanAudioStatus(loaded));
+  // --xlsx is honoured independently of the stdout view; in --json mode its
+  // confirmation goes to stderr so stdout stays pure JSON for pipelines.
+  if (flags.xlsx === "-") return usage("report", "--xlsx - is not supported: a spreadsheet is not text (--json streams the report)");
+  if (typeof flags.xlsx === "string") {
+    if (!commitBinary(flags.xlsx, await runReportXlsx(data))) return 1;
+    (flags.json === true ? console.error : console.log)(`wrote ${flags.xlsx}`);
+  }
+  if (flags.json === true) { console.log(JSON.stringify(data)); return 0; }
+  for (const line of renderReportText(data)) console.log(line);
+  return 0;
+}
+
+/** `patter loc-export`. */
+async function cmdLocExport(positionals: string[], flags: Flags): Promise<number> {
+  const format = typeof flags.format === "string" ? flags.format : "";
+  if (!["json", "xlsx", "po"].includes(format)) return usage("loc-export", "--format json|xlsx|po is required");
+  if (typeof flags.o !== "string") return usage("loc-export", "-o <file> is required");
+  const loaded = loadProject(positionals[0] ?? ".");
+  const locale = typeof flags.locale === "string" ? flags.locale : undefined; // omitted = blank template / POT
+  const catalog = extractLoc(loaded, { locale });
+  // The action text it left out, and why, and what dropped out of the loc files or came into them since: told
+  // on stderr when the export is on stdout.
+  const changes = describeLocExport(loaded, { locale });
+  if (format === "xlsx") {
+    if (flags.o === "-") return usage("loc-export", "-o - is not supported for --format xlsx: a spreadsheet is not text");
+    if (!commitBinary(flags.o, await catalogToXlsx(catalog, { folders: sceneFolderPaths(loaded) }))) return 1;
+  } else {
+    const content = format === "json" ? catalogToJson(catalog) : catalogToPo(catalog);
+    if (flags.o === "-") { process.stdout.write(content); for (const l of changes) console.error(l); return 0; } // stdout for pipelines
+    if (!commitWrites([{ path: flags.o, content }])) return 1;
+  }
+  const n = catalog.entries.length;
+  console.log(`wrote ${flags.o} - ${n} string(s)${locale ? `, ${locale}` : " (template)"}`);
+  for (const l of changes) console.log(l);
+  return 0;
+}
+
+/** `patter export-script`. */
+async function cmdExportScript(positionals: string[], flags: Flags): Promise<number> {
+  const loaded = loadProject(positionals[0] ?? ".");
+  if (flags.o === "-") return usage("export-script", "-o - is not supported: a PDF or Word file is not text");
+  const target = typeof flags.o === "string" ? flags.o : besideBundlePath(loaded, ".pdf");
+  if (resolve(target) === bundleOutputPath(loaded)) return usage("export-script", `-o ${target} is the project's bundle`);
+  const isDocx = /\.docx$/i.test(target);
+  if (!isDocx && !/\.pdf$/i.test(target)) return usage("export-script", "-o must end in .pdf or .docx");
+  const doc = runScriptDoc(loaded);
+  const buf = isDocx ? await scriptToDocx(doc) : await scriptToPdf(doc);
+  if (!commitBinary(target, buf)) return 1;
+  console.log(`wrote ${target}`);
+  return 0;
+}
+
+/** `patter export-editable`. */
+async function cmdExportEditable(positionals: string[], flags: Flags): Promise<number> {
+  if (typeof flags.o !== "string") return usage("export-editable", "-o <file.docx> is required");
+  if (!/\.docx$/i.test(flags.o)) return usage("export-editable", "-o must end in .docx");
+  const loaded = loadProject(positionals[0] ?? ".");
+  const scenes = Array.isArray(flags.scene) ? resolveScenes(loaded, flags.scene) : undefined;
+  if (scenes === null) return 2;
+  const out = await exportEditableScript(loaded, {
+    by: who(loaded, flags.by), ...(scenes ? { scenes } : {}),
+    ...(typeof flags.recipient === "string" ? { recipient: flags.recipient } : {}),
+    notes: flags["all-notes"] === true ? "all" : "editor", status: flags.status === true, cast: flags.cast === true,
+  });
+  if (!commitBinary(flags.o, out.docx)) return 1;
+  if (!commitWrites(out.writes)) return 1;
+  console.log(`wrote ${flags.o} - ${Object.keys(out.handoff.lines).length} line(s), handoff ${out.handoff.id}`);
+  return 0;
+}
+
+/** `patter import-editable`. */
+async function cmdImportEditable(positionals: string[], flags: Flags): Promise<number> {
+  const file = positionals[0];
+  if (!file) return usage("import-editable", "no file given");
+  const loaded = loadProject(positionals[1] ?? ".");
+  const bytes = readFileSync(file);
+  const plan = planEditableImport(loaded, await readEditableDocx(bytes), {
+    by: who(loaded, flags.by), fileHash: createHash("sha256").update(bytes).digest("hex"),
+    ...(typeof flags.as === "string" ? { as: flags.as } : {}),
+    strictQuotes: flags["strict-quotes"] === true, direct: flags.direct === true,
+  });
+  console.log(renderImportReport(plan));
+  if (plan.report.refused) return 1;
+  if (flags["dry-run"] === true) { console.log("dry run: nothing written"); return 0; }
+  // All or nothing: under lock-based version control, a file someone else holds means no file is written.
+  if (!commitWrites(plan.writes, { allOrNothing: true })) return 1;
+  console.log(`imported into ${plan.writes.length} file(s)`);
+  return 0;
+}
+
+/** `patter suggestions`. */
+function cmdSuggestions(positionals: string[], flags: Flags): number {
+  const loaded = loadProject(positionals[0] ?? ".");
+  const open = listOpenSuggestions(loaded, typeof flags.handoff === "string" ? { handoff: flags.handoff } : {});
+  if (flags.json === true) { console.log(JSON.stringify(open)); return 0; } // compact, as every --json is
+  if (flags["accept-clean"] === true) {
+    const clean = open.filter((o) => o.stale.length === 0);
+    if (!clean.length) { console.log("no clean suggestions to accept"); return 0; }
+    const plan = applySuggestionDecisions(loaded, clean.map((o) => ({ id: o.suggestion.id, accept: true })), { by: who(loaded, undefined) });
+    if (!commitWrites(plan.writes, { allOrNothing: true })) return 1;
+    const accepted = plan.results.filter((r) => r.outcome === "accepted").length;
+    console.log(`accepted ${accepted} suggestion(s)${open.length > clean.length ? `; ${open.length - clean.length} out of date, left open` : ""}`);
+    return 0;
+  }
+  if (!open.length) { console.log("no open suggestions"); return 0; }
+  const nameOf = qualifierNamer(loaded.project);
+  for (const o of open) console.log(describeSuggestion(o, nameOf));
+  const stale = open.filter((o) => o.stale.length).length;
+  console.log(`${open.length} open suggestion(s)${stale ? `, ${stale} out of date` : ""}`);
+  return 0;
+}
+
+/** `patter voice-export`. */
+async function cmdVoiceExport(positionals: string[], flags: Flags): Promise<number> {
+  if (typeof flags.o !== "string") return usage("voice-export", "-o <file.xlsx> is required");
+  if (flags.o === "-") return usage("voice-export", "-o - is not supported: a spreadsheet is not text");
+  const loaded = loadProject(positionals[0] ?? ".");
+  if (!loaded.project.voiced) { console.error("voice-export: this project is not voiced (set `voiced: true` in the project file)"); return 2; } // #206
+  const data = runVoiceScript(loaded, { everything: flags.all === true, recordingOverride: scanAudioStatus(loaded) });
+  if (!commitBinary(flags.o, await voiceScriptToXlsx(data))) return 1;
+  const n = data.lines.length;
+  console.log(`wrote ${flags.o} - ${n} line(s)${flags.all === true ? "" : " (ready to record)"}`);
+  return 0;
+}
+
+/** `patter placeholder-speech`. */
+async function cmdPlaceholderSpeech(positionals: string[], flags: Flags): Promise<number> {
+  const loaded = loadProject(positionals[0] ?? ".");
+  const ps = loaded.project.placeholderSpeech;
+  let scene: string | undefined;
+  if (typeof flags.scene === "string") {
+    const found = loaded.scenes.find((sc) => sc.id === flags.scene || sc.name === flags.scene);
+    if (!found) { console.error(`placeholder-speech: no scene called "${flags.scene}"`); return 2; }
+    scene = found.id;
+  }
+  const plan = planPlaceholderSpeech(loaded, { ...(scene ? { scene } : {}), ...(flags.force === true ? { force: "all" as const } : {}) });
+  if (!ps || !plan) { console.error("placeholder-speech: this project doesn't have Placeholder Speech on (Project settings > Placeholder Speech, which needs Audio Folders)"); return 2; }
+  if (!plan.accent) { console.error("placeholder-speech: choose an accent first (Project settings > Placeholder Speech): the main language doesn't say which"); return 2; }
+  const skipped = Object.entries(plan.skipped).map(([why, n]) => `${n} ${why}`).join(", ");
+  console.log(`${plan.tasks.length} line(s) to make into ${plan.folder}${skipped ? ` (left alone: ${skipped})` : ""}`);
+  if (plan.tier === "hd" && plan.tasks.length) console.log("note: HD voices (Chirp 3 HD), billed at Google's higher HD rate on your own Google account: https://cloud.google.com/text-to-speech/pricing");
+  if (plan.otherTier.length) console.log(`note: ${plan.otherTier.join(", ")} ${plan.otherTier.length === 1 ? "has" : "have"} a voice from the ${plan.tier === "hd" ? "Standard" : "HD"} tier, not the project's ${plan.tier === "hd" ? "HD" : "Standard"} one; used as chosen${plan.tier === "hd" ? "" : ", and billed at the HD rate"}`);
+  if (flags["dry-run"] === true) { for (const t of plan.tasks) console.log(`  ${t.beatId}  ${t.character}  ${t.request.voice}`); return 0; }
+  if (!plan.tasks.length) return 0;
+  const key = resolveKeyFile(loaded.root, ps.keyFile);
+  if (!key.path) {
+    const msg = `placeholder-speech: no Google key on this machine (${ps.keyFile ? `${ps.keyFile} isn't here, and ` : ""}GOOGLE_APPLICATION_CREDENTIALS isn't set, and there's no gcloud sign-in)`;
+    if (flags.soft === true) { console.log(msg.replace("placeholder-speech: ", "note: ")); return 0; }
+    console.error(msg); return 1;
+  }
+  let account;
+  try { account = readGoogleKey(key.path); } catch (e) { console.error(`placeholder-speech: ${describeSpeechError(e)}`); return 1; }
+  mkdirSync(plan.folder, { recursive: true });
+  const keepOut = ps.keepOutOfVersionControl === true;
+  const result = await runPlaceholderSpeech(plan.tasks, {
+    token: tokenSource(account),
+    write: async (path, bytes) => {
+      if (keepOut) { writeFileSync(path, bytes); return true; } // ignored by version control: a plain write
+      const r = writeBinaryFile(path, bytes);
+      if (r.success) return true;
+      if (r.status === "locked") return false;
+      throw new Error(r.message);
+    },
+    onProgress: (done, total) => { if (process.stdout.isTTY) process.stdout.write(`\r${done}/${total}`); },
+  });
+  if (process.stdout.isTTY) process.stdout.write("\n");
+  console.log(`made ${result.made.length}${result.skippedLocked.length ? `, skipped ${result.skippedLocked.length} (open elsewhere)` : ""}${result.failed.length ? `, failed ${result.failed.length}` : ""}`);
+  for (const f of result.failed) console.error(`  ${f.beatId}: ${f.error}`);
+  if (result.stopped) { console.error(`placeholder-speech: stopped: ${result.stopped.message}${result.notTried ? ` (${result.notTried} not tried)` : ""}`); return 1; }
+  return result.failed.length ? 1 : 0;
+}
+
+/** `patter loc-import`. */
+async function cmdLocImport(positionals: string[], flags: Flags): Promise<number> {
+  const file = positionals[0];
+  if (!file) return usage("loc-import", "no file given");
+  const loaded = loadProject(positionals[1] ?? ".");
+  const ext = file.slice(file.lastIndexOf(".")).toLowerCase();
+  let catalog: LocCatalog;
+  if (ext === ".json") catalog = jsonToCatalog(readFileSync(file, "utf8"));
+  else if (ext === ".po" || ext === ".pot") catalog = poToCatalog(readFileSync(file, "utf8"));
+  else if (ext === ".xlsx") catalog = await xlsxToCatalog(readFileSync(file));
+  else return usage("loc-import", `unknown format '${ext}' (.json | .po | .xlsx)`);
+  // A file for one language is refused as another (the 2026-10-28 rulings): --locale names the language
+  // to import as, and only --force-locale overrides the file's own. A file naming none (an older
+  // spreadsheet) takes --locale, with a warning.
+  const chosen = typeof flags.locale === "string" ? flags.locale : undefined;
+  const picked = importLocale(catalog.locale, chosen, { force: flags["force-locale"] === true });
+  if (!picked.ok) {
+    return usage("loc-import", picked.reason === "mismatch"
+      ? `${picked.error} Pass --locale ${catalog.locale}, or add --force-locale to import it as '${chosen}' anyway.`
+      : `${picked.error} Pass --locale xx.`);
+  }
+  const locale = picked.locale;
+  if (locale === loaded.project.locales.default) return usage("loc-import", `'${locale}' is the source locale - nothing to import`);
+  if (picked.warning) console.log(picked.warning);
+  const { writes, stats, report } = applyLoc(loaded, { ...catalog, locale });
+  const told = describeLocImport(loaded, report); // what it skipped, and what to check
+  if (writes.length === 0) { console.log("no translations to import"); for (const l of told) console.log(l); return 0; }
+  if (!commitWrites(writes)) return 1;
+  console.log(`imported ${stats.updated} string(s) for ${locale} across ${stats.files} scene(s)`);
+  if (stats.dropped) console.log(`dropped ${stats.dropped} translation(s) of action text, which isn't localised while "Localise text lines in dialogue scenes" (localiseDialogueText) is off`);
+  for (const l of told) console.log(l);
+  return 0;
+}
+
+/** `patter share-scopes`. */
+function cmdShareScopes(positionals: string[], flags: Flags): number {
+  // The CLI twin of Patterpad's File > Share Scopes with Other Tools (patterkit design/shared-scopes.md):
+  // the same plan, so the two can't disagree about what the folder holds.
+  const loaded = loadProject(positionals[0] ?? ".");
+  if (loaded.gameScopes) { console.error(`share-scopes: this project already shares its scopes through ${loaded.gameScopes.dir}`); return 1; }
+  const dir = typeof flags.at === "string" ? join(resolve(flags.at), GAME_SCOPES_DIR) : defaultGameScopesDir(loaded.root);
+  const plan = planShareScopes(loaded.root, loaded.project, dir);
+  if ("error" in plan) { console.error(`share-scopes: ${plan.error}`); return 1; }
+  const named = plan.project.gameScopes !== loaded.project.gameScopes;
+  const writes = [...plan.writes, ...(named ? [{ path: loaded.projectFile, content: canonicalStringify(plan.project) }] : [])];
+  if (!commitWrites(writes)) return 1;
+  for (const w of writes) console.log(`wrote ${w.path}`);
+  if (named) console.log(`the project names the folder (gameScopes: ${plan.project.gameScopes}), since looking up from the project wouldn't find it`);
+  return 0;
+}
+
+/** `patter pack`. */
+async function cmdPack(positionals: string[], flags: Flags): Promise<number> {
+  if (typeof flags.o !== "string") return usage("pack", "-o <file.patterpack> is required");
+  if (flags.o === "-") return usage("pack", "-o - is not supported: a pack is not text");
+  if (!commitBinary(flags.o, await runPack(positionals[0] ?? "."))) return 1;
+  console.log(`packed ${flags.o}`);
+  return 0;
+}
+
+/** `patter unpack`. */
+async function cmdUnpack(positionals: string[], flags: Flags): Promise<number> {
+  const file = positionals[0];
+  if (!file) return usage("unpack", "no <file.patterpack> given");
+  if (typeof flags.o !== "string") return usage("unpack", "-o <dir> is required");
+  if (flags.o === "-") return usage("unpack", "-o - is not supported: unpack writes a folder");
+
+  if (flags.merge === true) {
+    // Fold a RETURNED document's edits into the existing project at -o, using
+    // the document we originally sent (--base) as the common ancestor.
+    if (typeof flags.base !== "string") return usage("unpack", "--merge needs --base <sent.patterpack>");
+    const res = await runUnpackMerge(readFileSync(file), readFileSync(flags.base), flags.o);
+    // Warn BEFORE the writes, so it is the first thing on screen rather than buried above the
+    // per-shard list. A warning, not a refusal: an id can legitimately differ (a fork, a reissued
+    // id), and the author knows better than we do. See ProvenanceCheck for what this does not catch.
+    if (!res.provenance.ok) {
+      console.error("warning: these do not look like the same project");
+      console.error(`  returned pack: ${res.provenance.returned ?? "(no manifest)"}`);
+      console.error(`  base pack:     ${res.provenance.base ?? "(no manifest)"}`);
+      console.error(`  project at -o: ${res.provenance.target ?? "(no project file)"}`);
+      console.error("  merging anyway; expect spurious conflicts if the ancestor is wrong.");
     }
-
-    case "usage": {
-      const query = positionals[0];
-      if (!query) return usage("usage", "no property given (e.g. @gold, world.threat, \"faction rebels\")");
-      const loaded = loadProject(positionals[1] ?? ".");
-      const entries = runPropertyUsage(loaded, query);
-      if (flags.json === true) { console.log(JSON.stringify(entries)); return 0; }
-      if (entries.length === 0) { console.error(`no usages of '${query}'`); return 0; } // unused is a valid answer
-      for (const e of entries) console.log(`[${e.kind}] ${e.text ?? ""}   ${e.location.join(" > ")}  (${e.id})`);
-      return 0;
+    // Sidecars first: a merged shard whose sidecar never landed is a conflict resolved to ours without a word.
+    if (!commitWrites([...res.sidecars, ...res.writes])) return 1;
+    for (const s of res.shards.filter((sh) => sh.changed)) {
+      const n = s.result ? s.result.conflicts.length : 0;
+      console.log(`${s.added ? "added" : "merged"}: ${s.path}${n > 0 ? ` (${n} conflict(s))` : ""}`);
     }
+    for (const name of res.other) console.error(`warning: not unpacked (not a project file): ${name}`);
+    // Their World edit, taken to the game's shared file so the next save doesn't sync it away. The
+    // returned pack's own copy of the game's scopes is never written: ours is the truth.
+    if (res.gameScopes?.error) console.error(`warning: their World properties were not written to ${res.gameScopes.path}: ${res.gameScopes.error}`);
+    else if (res.gameScopes) console.log(`game scopes: ${res.gameScopes.path} (their World properties)`);
+    // An extension's manifest is never merged: ours stands. A different one means two versions of it.
+    for (const rel of res.manifestsKept ?? []) console.error(`warning: kept this project's ${rel}; the returned pack has a different version of it`);
+    const changed = res.shards.filter((sh) => sh.changed).length;
+    console.log(`\n${changed} of ${res.shards.length} shard(s) changed in ${flags.o}; ${res.conflicts} conflict(s), ${res.warnings} warning(s)`);
+    return res.conflicts > 0 ? 1 : 0;
+  }
 
-    case "validate": {
-      const loaded = loadProject(positionals[0] ?? ".");
-      const { structural, conditions, interpolation, hygiene, staleBundles, unresolvedMerges, orphans, reachability, gameScopes, localisation, extensions, ok } = runValidate(loaded);
-      // A warning (another tool's scope, say) is printed as one and never fails the run.
-      const warn = (i: { severity: "error" | "warning" }): string => (i.severity === "warning" ? "warning: " : "");
-      for (const i of structural) console.error(`  [${i.code}] ${i.severity ? `${i.severity === "info" ? "note" : "warning"}: ` : ""}${i.message}`);
-      for (const i of conditions) console.error(`  [${i.field}] ${i.nodeId}: ${warn(i)}${i.message}  (${i.src})`);
-      for (const i of interpolation) console.error(`  [${i.field}] ${i.nodeId}: ${warn(i)}${i.message}  (${i.src})`);
-      for (const i of hygiene) console.error(`  [hygiene] ${i.file}: ${i.message}`);
-      for (const i of staleBundles) console.error(`  [stale-bundle] ${i.file}: ${i.message}`);
-      for (const i of unresolvedMerges) console.error(`  [unresolved-merge] ${i.file}: ${i.message}`);
-      for (const i of orphans) console.error(`  [not-in-project] ${i.message}`); // the message names the file
-      for (const i of gameScopes) console.error(`  [game-scopes] ${i.file}: ${warn(i)}${i.message}`);
-      for (const i of localisation) console.error(`  [localisation] ${i.file}: ${warn(i)}${i.message}`);
-      for (const i of extensions) console.error(`  [extension] ${i.file}: ${warn(i)}${i.message}`);
-      // Advisory, and outside `ok` and the count: a gate whose writer is not authored yet is the normal
-      // state mid-work, and must never fail a build.
-      for (const i of reachability) console.error(`  [unreachable] ${i.nodeId}: ${i.message}  (${i.src})`);
-      const isError = (i: { severity: "error" | "warning" }): boolean => i.severity === "error";
-      // A note (a choice that can run dry and then carry on) is printed but counts as neither.
-      const structuralWarnings = structural.filter((i) => i.severity === "warning").length;
-      const warnings = reachability.length + structuralWarnings + [...conditions, ...interpolation, ...gameScopes, ...localisation, ...extensions].filter((i) => !isError(i)).length;
-      const count = structural.filter((i) => i.severity === undefined).length + [...conditions, ...interpolation, ...gameScopes, ...localisation, ...extensions].filter(isError).length
-        + hygiene.length + staleBundles.length + unresolvedMerges.length + orphans.length;
-      // A warning is not an issue, but "no issues" printed directly under one reads as a contradiction,
-      // so say what was said.
-      const advisory = warnings ? `, ${warnings} warning(s) above` : "";
-      if (ok) console.log(`ok - ${loaded.scenes.length} scene(s), no issues${advisory}`);
-      else console.error(`\n${count} issue(s)${advisory}`);
-      return ok ? 0 : 1;
+  const { shards, scopes, other } = await runUnpack(readFileSync(file), flags.o);
+  if (!commitWrites([...shards, ...scopes])) return 1;
+  for (const w of [...shards, ...scopes]) console.log(`unpacked: ${w.path}`);
+  for (const name of other) console.error(`warning: not unpacked (not a project file): ${name}`);
+  console.log(`\n${shards.length} shard(s)${scopes.length ? ` and ${scopes.length} game scopes file(s)` : ""} -> ${flags.o}`);
+  return 0;
+}
+
+/** `patter merge`. */
+function cmdMerge(positionals: string[], flags: Flags): number {
+  const [baseP, oursP, theirsP] = positionals;
+  if (!baseP || !oursP || !theirsP) return usage("merge", "needs BASE OURS THEIRS");
+  const src = parseThree(baseP, oursP, theirsP, "merge");
+  if (!src) return 2;
+
+  const typeFlag = typeof flags.type === "string" && flags.type !== "auto" ? (flags.type as MergeFileType) : undefined;
+  // An extension shard merges field by field by its manifest, which the driver reads from the working
+  // tree: git hands it three temp files and the shard's real path (%P), and the project is found from
+  // that path. No manifest, or one mid-conflict itself, merges each node's entry whole.
+  const manifest = mergeManifest(src.ours, typeof flags.path === "string" ? flags.path : typeof flags.o === "string" && flags.o !== "-" ? flags.o : oursP);
+  let result;
+  try {
+    result = runMerge(src.base, src.ours, src.theirs, { type: typeFlag, ...(manifest ? { manifest } : {}) });
+  } catch (e) {
+    if (e instanceof UnsupportedMergeError) { console.error(`merge: ${e.message}`); return 2; }
+    throw e;
+  }
+
+  if (flags.json === true) {
+    console.log(JSON.stringify(result));
+    return result.conflicts.length > 0 ? 1 : 0;
+  }
+
+  const text = canonicalStringify(result.merged);
+  // No -o: stream to stdout (non-destructive). The git driver passes `-o %A --path %P`
+  // so the result lands in git's file, with a conflict sidecar beside the real shard.
+  if (typeof flags.o !== "string" || flags.o === "-") {
+    process.stdout.write(text);
+    if (result.conflicts.length > 0) {
+      console.error(`${result.conflicts.length} conflict(s) (provisional OURS); pass -o to write a .patterconflict sidecar`);
+      return 1;
     }
+    return 0;
+  }
 
-    case "format": {
-      if (positionals.length === 0) return usage("format", "no files given");
-      const check = flags.check === true;
-      const results = runFormat(positionals);
-      // Anything that is not a shard is left alone (the bundle and the scopes files must stay strict JSON);
-      // said only when nothing named was Patter source, so `format $(git ls-files)` stays quiet.
-      if (results.every((r) => r.skipped)) { console.error("format: no Patter source among the files given (.patterflow, .patterloc, .patterx, .patterproj, .patterextension)"); return 0; }
-      const changed = results.filter((r) => r.changed);
-      if (!check && !commitWrites(changed.map((r) => r.write!))) return 1;
-      for (const r of changed) {
-        console.log(`${check ? "would format" : "formatted"}: ${r.file}`);
-        // On a project folder, an extension taken at a new version: said under the file it changed.
-        for (const n of r.notes ?? []) console.log(`  ${check ? "would have " : ""}${n}`);
-      }
-      if (changed.length === 0) console.log("already canonical");
-      return check && changed.length > 0 ? 1 : 0;
-    }
+  return writeMergeResult(result, flags.o, typeof flags.path === "string" ? flags.path : flags.o, true);
+}
 
-    case "export": {
-      const loaded = loadProject(positionals[0] ?? ".");
-      // Localisation mode (spec §11): default to the project's export setting; --ids / --source-debug
-      // override it per build. "ids" ships no strings (the game localises from beat IDs); --source-debug
-      // also embeds the source language for debug playback (the runtime warns it is not shippable).
-      if (flags["source-debug"]) loaded.project.export = { ...loaded.project.export, localisation: { mode: "ids", sourceDebug: true } };
-      else if (flags.ids) loaded.project.export = { ...loaded.project.export, localisation: { mode: "ids" } };
-      const allowInvalid = flags["allow-invalid"] === true;
-      // -o -: the bundle alone, to stdout, for pipelines (no scopes or audio manifest written).
-      if (flags.o === "-") { process.stdout.write(canonicalStringify(runExport(loaded, { allowInvalid }), { trailingComma: false })); return 0; }
-      // No -o: the project's bundle path (export.bundle, else the sibling patter-dist/ Patterpad writes
-      // too), so `patter export` alone produces the artifact and validate's staleness gate knows where to
-      // find it (spec §11). The plan is the one Patterpad's Build commits: the bundle, the game's scopes
-      // file when it changed, and the audio manifest under Audio Folders.
-      // A shipping manifest goes elsewhere, so the one beside the audio (the development one) is never overwritten
-      // without its placeholder speech.
-      if (flags["no-placeholder-speech"] === true && typeof flags["audio-manifest-out"] !== "string") return usage("export", "--no-placeholder-speech needs --audio-manifest-out, so the development manifest keeps its placeholder speech");
-      const plan = planBuild(loaded, { allowInvalid, ...(typeof flags.o === "string" ? { bundlePath: flags.o } : {}),
-        ...(typeof flags["audio-manifest-out"] === "string" ? { audioManifestPath: resolve(flags["audio-manifest-out"]) } : {}),
-        ...(flags["no-placeholder-speech"] === true ? { leaveOutPlaceholderSpeech: true } : {}) });
-      if (!commitWrites(plan.writes)) return 1;
-      for (const w of plan.writes) console.log(`wrote ${w.path}`);
-      return 0;
-    }
-
-    case "export-html": {
-      const loaded = loadProject(positionals[0] ?? ".");
-      const html = runExportHtml(loaded);
-      if (flags.o === "-") { process.stdout.write(html); return 0; } // stdout for pipelines
-      const target = typeof flags.o === "string" ? flags.o : besideBundlePath(loaded, ".html");
-      if (resolve(target) === bundleOutputPath(loaded)) return usage("export-html", `-o ${target} is the project's bundle`);
-      if (!commitWrites([{ path: target, content: html }])) return 1;
-      console.log(`wrote ${target}`);
-      return 0;
-    }
-
-    case "play": {
-      let seed: number | undefined;
-      if (typeof flags.seed === "string") {
-        seed = Number(flags.seed);
-        if (!Number.isInteger(seed)) return usage("play", `--seed '${flags.seed}' is not a whole number`);
-      }
-      const loaded = loadProject(positionals[0] ?? ".");
-      const result = runPlay(loaded, {
-        scene: typeof flags.scene === "string" ? flags.scene : undefined,
-        block: typeof flags.block === "string" ? flags.block : undefined,
-        choices: typeof flags.choices === "string" ? flags.choices.split(",") : undefined,
-        seed,
-      });
-      for (const line of renderPlay(result)) console.log(line);
-      // A playthrough that didn't reach the end (the engine stopped it, or the step bound), or
-      // that hit a condition or effect that failed, is a failure - `play` exists
-      // to drive flows to completion in CI, and the engine plays through a failing
-      // expression rather than stopping, so this is where CI hears about it.
-      return result.outcome === "end" && !result.events.some((e) => e.type === "error") ? 0 : 1;
-    }
-
-    case "coverage": {
-      // Validate the numeric flags up front: a run count or step bound is a whole number of at least one
-      // (`--runs 0` ran nothing and reported every beat never reached), and a seed a whole number.
-      const numbers: Record<string, number | undefined> = {};
-      for (const [flag, min] of [["runs", 1], ["max-steps", 1], ["seed", -Infinity]] as const) {
-        if (typeof flags[flag] !== "string") continue;
-        const n = Number(flags[flag]);
-        if (!Number.isInteger(n) || n < min) {
-          return usage("coverage", `--${flag} '${flags[flag]}' is not ${min === 1 ? "a whole number of at least 1" : "a whole number"}`);
-        }
-        numbers[flag] = n;
-      }
-      const order = flags.order ?? "least";
-      if (order !== "least" && order !== "script") return usage("coverage", `--order '${order}' is not least or script`);
-      const loaded = loadProject(positionals[0] ?? ".");
-      // --propose: print auto-proposed @world input drivers (from the conditions) instead of running.
-      // The author pastes the chosen ones into the project's `coverageDrivers`.
-      if (flags.propose === true) {
-        const ignored = ["runs", "max-steps", "seed", "scene", "block", "order", "fail-on-gap"].filter((f) => flags[f] !== undefined);
-        if (ignored.length) console.error(`warning: --propose runs nothing, so ${ignored.map((f) => `--${f}`).join(", ")} ${ignored.length > 1 ? "are" : "is"} ignored`);
-        const drivers = proposeCoverageDrivers(loaded);
-        if (flags.json === true) console.log(JSON.stringify(drivers));
-        else if (drivers.length === 0) console.log("no host-scope (@world) inputs to drive");
-        else for (const d of drivers) console.log(`${d.ref}  ${d.kind}/${d.cadence ?? "sometimes"}  [${d.values.join(", ")}]`);
-        return 0;
-      }
-      const report = runCoverage(loaded, {
-        runs: numbers.runs, maxSteps: numbers["max-steps"], seed: numbers.seed,
-        scene: typeof flags.scene === "string" ? flags.scene : undefined,
-        block: typeof flags.block === "string" ? flags.block : undefined,
-      });
-      if (flags.json === true) console.log(JSON.stringify(report));
-      else {
-        const nameOf = (id: string): string => loaded.scenes.find((s) => s.id === id)?.name ?? id;
-        for (const line of renderCoverageText(report, nameOf, { order })) console.log(line);
-      }
-      // --fail-on-gap: a CI gate - any never-reached beat fails the command.
-      return flags["fail-on-gap"] === true && report.totals.neverHit > 0 ? 1 : 0;
-    }
-
-    case "report": {
-      const loaded = loadProject(positionals[0] ?? ".");
-      // Audio Folders projects derive recording status from the takes on disk - the same
-      // pipeline Patterpad's report uses (undefined = the manual map, exactly as there).
-      const data = runReport(loaded, scanAudioStatus(loaded));
-      // --xlsx is honoured independently of the stdout view; in --json mode its
-      // confirmation goes to stderr so stdout stays pure JSON for pipelines.
-      if (flags.xlsx === "-") return usage("report", "--xlsx - is not supported: a spreadsheet is not text (--json streams the report)");
-      if (typeof flags.xlsx === "string") {
-        if (!commitBinary(flags.xlsx, await runReportXlsx(data))) return 1;
-        (flags.json === true ? console.error : console.log)(`wrote ${flags.xlsx}`);
-      }
-      if (flags.json === true) { console.log(JSON.stringify(data)); return 0; }
-      for (const line of renderReportText(data)) console.log(line);
-      return 0;
-    }
-
-    case "loc-export": {
-      const format = typeof flags.format === "string" ? flags.format : "";
-      if (!["json", "xlsx", "po"].includes(format)) return usage("loc-export", "--format json|xlsx|po is required");
-      if (typeof flags.o !== "string") return usage("loc-export", "-o <file> is required");
-      const loaded = loadProject(positionals[0] ?? ".");
-      const locale = typeof flags.locale === "string" ? flags.locale : undefined; // omitted = blank template / POT
-      const catalog = extractLoc(loaded, { locale });
-      // The action text it left out, and why, and what dropped out of the loc files or came into them since: told
-      // on stderr when the export is on stdout.
-      const changes = describeLocExport(loaded, { locale });
-      if (format === "xlsx") {
-        if (flags.o === "-") return usage("loc-export", "-o - is not supported for --format xlsx: a spreadsheet is not text");
-        if (!commitBinary(flags.o, await catalogToXlsx(catalog, { folders: sceneFolderPaths(loaded) }))) return 1;
-      } else {
-        const content = format === "json" ? catalogToJson(catalog) : catalogToPo(catalog);
-        if (flags.o === "-") { process.stdout.write(content); for (const l of changes) console.error(l); return 0; } // stdout for pipelines
-        if (!commitWrites([{ path: flags.o, content }])) return 1;
-      }
-      const n = catalog.entries.length;
-      console.log(`wrote ${flags.o} - ${n} string(s)${locale ? `, ${locale}` : " (template)"}`);
-      for (const l of changes) console.log(l);
-      return 0;
-    }
-
-    case "export-script": {
-      const loaded = loadProject(positionals[0] ?? ".");
-      if (flags.o === "-") return usage("export-script", "-o - is not supported: a PDF or Word file is not text");
-      const target = typeof flags.o === "string" ? flags.o : besideBundlePath(loaded, ".pdf");
-      if (resolve(target) === bundleOutputPath(loaded)) return usage("export-script", `-o ${target} is the project's bundle`);
-      const isDocx = /\.docx$/i.test(target);
-      if (!isDocx && !/\.pdf$/i.test(target)) return usage("export-script", "-o must end in .pdf or .docx");
-      const doc = runScriptDoc(loaded);
-      const buf = isDocx ? await scriptToDocx(doc) : await scriptToPdf(doc);
-      if (!commitBinary(target, buf)) return 1;
-      console.log(`wrote ${target}`);
-      return 0;
-    }
-
-    case "export-editable": {
-      if (typeof flags.o !== "string") return usage("export-editable", "-o <file.docx> is required");
-      if (!/\.docx$/i.test(flags.o)) return usage("export-editable", "-o must end in .docx");
-      const loaded = loadProject(positionals[0] ?? ".");
-      const scenes = Array.isArray(flags.scene) ? resolveScenes(loaded, flags.scene) : undefined;
-      if (scenes === null) return 2;
-      const out = await exportEditableScript(loaded, {
-        by: who(loaded, flags.by), ...(scenes ? { scenes } : {}),
-        ...(typeof flags.recipient === "string" ? { recipient: flags.recipient } : {}),
-        notes: flags["all-notes"] === true ? "all" : "editor", status: flags.status === true, cast: flags.cast === true,
-      });
-      if (!commitBinary(flags.o, out.docx)) return 1;
-      if (!commitWrites(out.writes)) return 1;
-      console.log(`wrote ${flags.o} - ${Object.keys(out.handoff.lines).length} line(s), handoff ${out.handoff.id}`);
-      return 0;
-    }
-
-    case "import-editable": {
-      const file = positionals[0];
-      if (!file) return usage("import-editable", "no file given");
-      const loaded = loadProject(positionals[1] ?? ".");
-      const bytes = readFileSync(file);
-      const plan = planEditableImport(loaded, await readEditableDocx(bytes), {
-        by: who(loaded, flags.by), fileHash: createHash("sha256").update(bytes).digest("hex"),
-        ...(typeof flags.as === "string" ? { as: flags.as } : {}),
-        strictQuotes: flags["strict-quotes"] === true, direct: flags.direct === true,
-      });
-      console.log(renderImportReport(plan));
-      if (plan.report.refused) return 1;
-      if (flags["dry-run"] === true) { console.log("dry run: nothing written"); return 0; }
-      // All or nothing: under lock-based version control, a file someone else holds means no file is written.
-      if (!commitWrites(plan.writes, { allOrNothing: true })) return 1;
-      console.log(`imported into ${plan.writes.length} file(s)`);
-      return 0;
-    }
-
-    case "suggestions": {
-      const loaded = loadProject(positionals[0] ?? ".");
-      const open = listOpenSuggestions(loaded, typeof flags.handoff === "string" ? { handoff: flags.handoff } : {});
-      if (flags.json === true) { console.log(JSON.stringify(open)); return 0; } // compact, as every --json is
-      if (flags["accept-clean"] === true) {
-        const clean = open.filter((o) => o.stale.length === 0);
-        if (!clean.length) { console.log("no clean suggestions to accept"); return 0; }
-        const plan = applySuggestionDecisions(loaded, clean.map((o) => ({ id: o.suggestion.id, accept: true })), { by: who(loaded, undefined) });
-        if (!commitWrites(plan.writes, { allOrNothing: true })) return 1;
-        const accepted = plan.results.filter((r) => r.outcome === "accepted").length;
-        console.log(`accepted ${accepted} suggestion(s)${open.length > clean.length ? `; ${open.length - clean.length} out of date, left open` : ""}`);
-        return 0;
-      }
-      if (!open.length) { console.log("no open suggestions"); return 0; }
-      const nameOf = qualifierNamer(loaded.project);
-      for (const o of open) console.log(describeSuggestion(o, nameOf));
-      const stale = open.filter((o) => o.stale.length).length;
-      console.log(`${open.length} open suggestion(s)${stale ? `, ${stale} out of date` : ""}`);
-      return 0;
-    }
-
-    case "voice-export": {
-      if (typeof flags.o !== "string") return usage("voice-export", "-o <file.xlsx> is required");
-      if (flags.o === "-") return usage("voice-export", "-o - is not supported: a spreadsheet is not text");
-      const loaded = loadProject(positionals[0] ?? ".");
-      if (!loaded.project.voiced) { console.error("voice-export: this project is not voiced (set `voiced: true` in the project file)"); return 2; } // #206
-      const data = runVoiceScript(loaded, { everything: flags.all === true, recordingOverride: scanAudioStatus(loaded) });
-      if (!commitBinary(flags.o, await voiceScriptToXlsx(data))) return 1;
-      const n = data.lines.length;
-      console.log(`wrote ${flags.o} - ${n} line(s)${flags.all === true ? "" : " (ready to record)"}`);
-      return 0;
-    }
-
-    case "placeholder-speech": {
-      const loaded = loadProject(positionals[0] ?? ".");
-      const ps = loaded.project.placeholderSpeech;
-      let scene: string | undefined;
-      if (typeof flags.scene === "string") {
-        const found = loaded.scenes.find((sc) => sc.id === flags.scene || sc.name === flags.scene);
-        if (!found) { console.error(`placeholder-speech: no scene called "${flags.scene}"`); return 2; }
-        scene = found.id;
-      }
-      const plan = planPlaceholderSpeech(loaded, { ...(scene ? { scene } : {}), ...(flags.force === true ? { force: "all" as const } : {}) });
-      if (!ps || !plan) { console.error("placeholder-speech: this project doesn't have Placeholder Speech on (Project settings > Placeholder Speech, which needs Audio Folders)"); return 2; }
-      if (!plan.accent) { console.error("placeholder-speech: choose an accent first (Project settings > Placeholder Speech): the main language doesn't say which"); return 2; }
-      const skipped = Object.entries(plan.skipped).map(([why, n]) => `${n} ${why}`).join(", ");
-      console.log(`${plan.tasks.length} line(s) to make into ${plan.folder}${skipped ? ` (left alone: ${skipped})` : ""}`);
-      if (plan.tier === "hd" && plan.tasks.length) console.log("note: HD voices (Chirp 3 HD), billed at Google's higher HD rate on your own Google account: https://cloud.google.com/text-to-speech/pricing");
-      if (plan.otherTier.length) console.log(`note: ${plan.otherTier.join(", ")} ${plan.otherTier.length === 1 ? "has" : "have"} a voice from the ${plan.tier === "hd" ? "Standard" : "HD"} tier, not the project's ${plan.tier === "hd" ? "HD" : "Standard"} one; used as chosen${plan.tier === "hd" ? "" : ", and billed at the HD rate"}`);
-      if (flags["dry-run"] === true) { for (const t of plan.tasks) console.log(`  ${t.beatId}  ${t.character}  ${t.request.voice}`); return 0; }
-      if (!plan.tasks.length) return 0;
-      const key = resolveKeyFile(loaded.root, ps.keyFile);
-      if (!key.path) {
-        const msg = `placeholder-speech: no Google key on this machine (${ps.keyFile ? `${ps.keyFile} isn't here, and ` : ""}GOOGLE_APPLICATION_CREDENTIALS isn't set, and there's no gcloud sign-in)`;
-        if (flags.soft === true) { console.log(msg.replace("placeholder-speech: ", "note: ")); return 0; }
-        console.error(msg); return 1;
-      }
-      let account;
-      try { account = readGoogleKey(key.path); } catch (e) { console.error(`placeholder-speech: ${describeSpeechError(e)}`); return 1; }
-      mkdirSync(plan.folder, { recursive: true });
-      const keepOut = ps.keepOutOfVersionControl === true;
-      const result = await runPlaceholderSpeech(plan.tasks, {
-        token: tokenSource(account),
-        write: async (path, bytes) => {
-          if (keepOut) { writeFileSync(path, bytes); return true; } // ignored by version control: a plain write
-          const r = writeBinaryFile(path, bytes);
-          if (r.success) return true;
-          if (r.status === "locked") return false;
-          throw new Error(r.message);
-        },
-        onProgress: (done, total) => { if (process.stdout.isTTY) process.stdout.write(`\r${done}/${total}`); },
-      });
-      if (process.stdout.isTTY) process.stdout.write("\n");
-      console.log(`made ${result.made.length}${result.skippedLocked.length ? `, skipped ${result.skippedLocked.length} (open elsewhere)` : ""}${result.failed.length ? `, failed ${result.failed.length}` : ""}`);
-      for (const f of result.failed) console.error(`  ${f.beatId}: ${f.error}`);
-      if (result.stopped) { console.error(`placeholder-speech: stopped: ${result.stopped.message}${result.notTried ? ` (${result.notTried} not tried)` : ""}`); return 1; }
-      return result.failed.length ? 1 : 0;
-    }
-
-    case "loc-import": {
-      const file = positionals[0];
-      if (!file) return usage("loc-import", "no file given");
-      const loaded = loadProject(positionals[1] ?? ".");
-      const ext = file.slice(file.lastIndexOf(".")).toLowerCase();
-      let catalog: LocCatalog;
-      if (ext === ".json") catalog = jsonToCatalog(readFileSync(file, "utf8"));
-      else if (ext === ".po" || ext === ".pot") catalog = poToCatalog(readFileSync(file, "utf8"));
-      else if (ext === ".xlsx") catalog = await xlsxToCatalog(readFileSync(file));
-      else return usage("loc-import", `unknown format '${ext}' (.json | .po | .xlsx)`);
-      // A file for one language is refused as another (the 2026-10-28 rulings): --locale names the language
-      // to import as, and only --force-locale overrides the file's own. A file naming none (an older
-      // spreadsheet) takes --locale, with a warning.
-      const chosen = typeof flags.locale === "string" ? flags.locale : undefined;
-      const picked = importLocale(catalog.locale, chosen, { force: flags["force-locale"] === true });
-      if (!picked.ok) {
-        return usage("loc-import", picked.reason === "mismatch"
-          ? `${picked.error} Pass --locale ${catalog.locale}, or add --force-locale to import it as '${chosen}' anyway.`
-          : `${picked.error} Pass --locale xx.`);
-      }
-      const locale = picked.locale;
-      if (locale === loaded.project.locales.default) return usage("loc-import", `'${locale}' is the source locale - nothing to import`);
-      if (picked.warning) console.log(picked.warning);
-      const { writes, stats, report } = applyLoc(loaded, { ...catalog, locale });
-      const told = describeLocImport(loaded, report); // what it skipped, and what to check
-      if (writes.length === 0) { console.log("no translations to import"); for (const l of told) console.log(l); return 0; }
-      if (!commitWrites(writes)) return 1;
-      console.log(`imported ${stats.updated} string(s) for ${locale} across ${stats.files} scene(s)`);
-      if (stats.dropped) console.log(`dropped ${stats.dropped} translation(s) of action text, which isn't localised while "Localise text lines in dialogue scenes" (localiseDialogueText) is off`);
-      for (const l of told) console.log(l);
-      return 0;
-    }
-
-    case "share-scopes": {
-      // The CLI twin of Patterpad's File > Share Scopes with Other Tools (patterkit design/shared-scopes.md):
-      // the same plan, so the two can't disagree about what the folder holds.
-      const loaded = loadProject(positionals[0] ?? ".");
-      if (loaded.gameScopes) { console.error(`share-scopes: this project already shares its scopes through ${loaded.gameScopes.dir}`); return 1; }
-      const dir = typeof flags.at === "string" ? join(resolve(flags.at), GAME_SCOPES_DIR) : defaultGameScopesDir(loaded.root);
-      const plan = planShareScopes(loaded.root, loaded.project, dir);
-      if ("error" in plan) { console.error(`share-scopes: ${plan.error}`); return 1; }
-      const named = plan.project.gameScopes !== loaded.project.gameScopes;
-      const writes = [...plan.writes, ...(named ? [{ path: loaded.projectFile, content: canonicalStringify(plan.project) }] : [])];
-      if (!commitWrites(writes)) return 1;
-      for (const w of writes) console.log(`wrote ${w.path}`);
-      if (named) console.log(`the project names the folder (gameScopes: ${plan.project.gameScopes}), since looking up from the project wouldn't find it`);
-      return 0;
-    }
-
-    case "pack": {
-      if (typeof flags.o !== "string") return usage("pack", "-o <file.patterpack> is required");
-      if (flags.o === "-") return usage("pack", "-o - is not supported: a pack is not text");
-      if (!commitBinary(flags.o, await runPack(positionals[0] ?? "."))) return 1;
-      console.log(`packed ${flags.o}`);
-      return 0;
-    }
-
-    case "unpack": {
-      const file = positionals[0];
-      if (!file) return usage("unpack", "no <file.patterpack> given");
-      if (typeof flags.o !== "string") return usage("unpack", "-o <dir> is required");
-      if (flags.o === "-") return usage("unpack", "-o - is not supported: unpack writes a folder");
-
-      if (flags.merge === true) {
-        // Fold a RETURNED document's edits into the existing project at -o, using
-        // the document we originally sent (--base) as the common ancestor.
-        if (typeof flags.base !== "string") return usage("unpack", "--merge needs --base <sent.patterpack>");
-        const res = await runUnpackMerge(readFileSync(file), readFileSync(flags.base), flags.o);
-        // Warn BEFORE the writes, so it is the first thing on screen rather than buried above the
-        // per-shard list. A warning, not a refusal: an id can legitimately differ (a fork, a reissued
-        // id), and the author knows better than we do. See ProvenanceCheck for what this does not catch.
-        if (!res.provenance.ok) {
-          console.error("warning: these do not look like the same project");
-          console.error(`  returned pack: ${res.provenance.returned ?? "(no manifest)"}`);
-          console.error(`  base pack:     ${res.provenance.base ?? "(no manifest)"}`);
-          console.error(`  project at -o: ${res.provenance.target ?? "(no project file)"}`);
-          console.error("  merging anyway; expect spurious conflicts if the ancestor is wrong.");
-        }
-        // Sidecars first: a merged shard whose sidecar never landed is a conflict resolved to ours without a word.
-        if (!commitWrites([...res.sidecars, ...res.writes])) return 1;
-        for (const s of res.shards.filter((sh) => sh.changed)) {
-          const n = s.result ? s.result.conflicts.length : 0;
-          console.log(`${s.added ? "added" : "merged"}: ${s.path}${n > 0 ? ` (${n} conflict(s))` : ""}`);
-        }
-        for (const name of res.other) console.error(`warning: not unpacked (not a project file): ${name}`);
-        // Their World edit, taken to the game's shared file so the next save doesn't sync it away. The
-        // returned pack's own copy of the game's scopes is never written: ours is the truth.
-        if (res.gameScopes?.error) console.error(`warning: their World properties were not written to ${res.gameScopes.path}: ${res.gameScopes.error}`);
-        else if (res.gameScopes) console.log(`game scopes: ${res.gameScopes.path} (their World properties)`);
-        // An extension's manifest is never merged: ours stands. A different one means two versions of it.
-        for (const rel of res.manifestsKept ?? []) console.error(`warning: kept this project's ${rel}; the returned pack has a different version of it`);
-        const changed = res.shards.filter((sh) => sh.changed).length;
-        console.log(`\n${changed} of ${res.shards.length} shard(s) changed in ${flags.o}; ${res.conflicts} conflict(s), ${res.warnings} warning(s)`);
-        return res.conflicts > 0 ? 1 : 0;
-      }
-
-      const { shards, scopes, other } = await runUnpack(readFileSync(file), flags.o);
-      if (!commitWrites([...shards, ...scopes])) return 1;
-      for (const w of [...shards, ...scopes]) console.log(`unpacked: ${w.path}`);
-      for (const name of other) console.error(`warning: not unpacked (not a project file): ${name}`);
-      console.log(`\n${shards.length} shard(s)${scopes.length ? ` and ${scopes.length} game scopes file(s)` : ""} -> ${flags.o}`);
-      return 0;
-    }
-
-    case "merge": {
-      const [baseP, oursP, theirsP] = positionals;
-      if (!baseP || !oursP || !theirsP) return usage("merge", "needs BASE OURS THEIRS");
-      const src = parseThree(baseP, oursP, theirsP, "merge");
+/** `patter mergetool`. */
+function cmdMergetool(positionals: string[], flags: Flags): number {
+  // The sniff-and-dispatch wrapper (patter-merge.md §4): one global external
+  // merge tool serves the whole depot. Patter source -> the structured merge;
+  // anything else -> the team's normal tool (--fallback). Non-git VCSs pass
+  // their four files in the order BASE THEIRS OURS OUT (Perforce / Plastic /
+  // SVN all agree); git uses the per-path driver and calls `patter merge`.
+  const [baseP, theirsP, oursP, outP] = positionals;
+  if (!baseP || !theirsP || !oursP || !outP) return usage("mergetool", "needs BASE THEIRS OURS OUT");
+  // Patter source -> the structured merge; anything else -> the fallback, by toolkit's shared wrapper
+  // (no shell: the four paths go as separate argv entries; exit 2 with no fallback, 1 when it cannot start).
+  return runMergetool({
+    base: baseP, theirs: theirsP, ours: oursP, out: outP,
+    fallback: typeof flags.fallback === "string" ? flags.fallback : undefined,
+    isSource: isPatterSource,
+    merge: () => {
+      const src = parseThree(baseP, oursP, theirsP, "mergetool");
       if (!src) return 2;
-
-      const typeFlag = typeof flags.type === "string" && flags.type !== "auto" ? (flags.type as MergeFileType) : undefined;
-      // An extension shard merges field by field by its manifest, which the driver reads from the working
-      // tree: git hands it three temp files and the shard's real path (%P), and the project is found from
-      // that path. No manifest, or one mid-conflict itself, merges each node's entry whole.
-      const manifest = mergeManifest(src.ours, typeof flags.path === "string" ? flags.path : typeof flags.o === "string" && flags.o !== "-" ? flags.o : oursP);
-      let result;
       try {
-        result = runMerge(src.base, src.ours, src.theirs, { type: typeFlag, ...(manifest ? { manifest } : {}) });
+        const manifest = mergeManifest(src.ours, outP);
+        return writeMergeResult(runMerge(src.base, src.ours, src.theirs, manifest ? { manifest } : undefined), outP, outP, false);
       } catch (e) {
-        if (e instanceof UnsupportedMergeError) { console.error(`merge: ${e.message}`); return 2; }
+        if (e instanceof UnsupportedMergeError) { console.error(`mergetool: ${e.message}`); return 2; }
         throw e;
       }
-
-      if (flags.json === true) {
-        console.log(JSON.stringify(result));
-        return result.conflicts.length > 0 ? 1 : 0;
-      }
-
-      const text = canonicalStringify(result.merged);
-      // No -o: stream to stdout (non-destructive). The git driver passes `-o %A --path %P`
-      // so the result lands in git's file, with a conflict sidecar beside the real shard.
-      if (typeof flags.o !== "string" || flags.o === "-") {
-        process.stdout.write(text);
-        if (result.conflicts.length > 0) {
-          console.error(`${result.conflicts.length} conflict(s) (provisional OURS); pass -o to write a .patterconflict sidecar`);
-          return 1;
-        }
-        return 0;
-      }
-
-      return writeMergeResult(result, flags.o, typeof flags.path === "string" ? flags.path : flags.o, true);
-    }
-
-    case "mergetool": {
-      // The sniff-and-dispatch wrapper (patter-merge.md §4): one global external
-      // merge tool serves the whole depot. Patter source -> the structured merge;
-      // anything else -> the team's normal tool (--fallback). Non-git VCSs pass
-      // their four files in the order BASE THEIRS OURS OUT (Perforce / Plastic /
-      // SVN all agree); git uses the per-path driver and calls `patter merge`.
-      const [baseP, theirsP, oursP, outP] = positionals;
-      if (!baseP || !theirsP || !oursP || !outP) return usage("mergetool", "needs BASE THEIRS OURS OUT");
-      // Patter source -> the structured merge; anything else -> the fallback, by toolkit's shared wrapper
-      // (no shell: the four paths go as separate argv entries; exit 2 with no fallback, 1 when it cannot start).
-      return runMergetool({
-        base: baseP, theirs: theirsP, ours: oursP, out: outP,
-        fallback: typeof flags.fallback === "string" ? flags.fallback : undefined,
-        isSource: isPatterSource,
-        merge: () => {
-          const src = parseThree(baseP, oursP, theirsP, "mergetool");
-          if (!src) return 2;
-          try {
-            const manifest = mergeManifest(src.ours, outP);
-            return writeMergeResult(runMerge(src.base, src.ours, src.theirs, manifest ? { manifest } : undefined), outP, outP, false);
-          } catch (e) {
-            if (e instanceof UnsupportedMergeError) { console.error(`mergetool: ${e.message}`); return 2; }
-            throw e;
-          }
-        },
-        error: (message) => console.error(message),
-        tool: "patter",
-      });
-    }
-
-  }
+    },
+    error: (message) => console.error(message),
+    tool: "patter",
+  });
 }
+
+/** Every command's handler: typed by `Command`, so a command without one doesn't compile. */
+const HANDLERS: Record<Command, Handler> = {
+  "init": cmdInit,
+  "resolve": cmdResolve,
+  "usage": cmdUsage,
+  "validate": cmdValidate,
+  "format": cmdFormat,
+  "export": cmdExport,
+  "export-html": cmdExportHtml,
+  "play": cmdPlay,
+  "coverage": cmdCoverage,
+  "report": cmdReport,
+  "loc-export": cmdLocExport,
+  "export-script": cmdExportScript,
+  "export-editable": cmdExportEditable,
+  "import-editable": cmdImportEditable,
+  "suggestions": cmdSuggestions,
+  "voice-export": cmdVoiceExport,
+  "placeholder-speech": cmdPlaceholderSpeech,
+  "loc-import": cmdLocImport,
+  "share-scopes": cmdShareScopes,
+  "pack": cmdPack,
+  "unpack": cmdUnpack,
+  "merge": cmdMerge,
+  "mergetool": cmdMergetool,
+};
 
 // ---------------------------------------------------------------------------
 // Editable script helpers

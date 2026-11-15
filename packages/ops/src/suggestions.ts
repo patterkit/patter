@@ -16,7 +16,7 @@
 
 import { readFileSync } from "node:fs";
 import { canonicalStringify, parseSource } from "@patterkit/core";
-import { walkNodes, AUTHORING_SCHEMA } from "@patterkit/model";
+import { walkNodes, AUTHORING_SCHEMA, beatsOf } from "@patterkit/model";
 import type { AuthoringFile, Beat, FlowFile, Group, LineBeat, LocaleFile, Scene, Snippet, Suggestion } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import type { PlannedWrite } from "./write.js";
@@ -89,8 +89,8 @@ export function indexPlaces(loaded: LoadedProject): Map<string, Place> {
       places.set(block.id, { sceneId: scene.id });
       walkNodes<Group | Snippet>(block.children, (node) => {
         places.set(node.id, { sceneId: scene.id });
-        if (node.type === "group") { if (node.prompt) places.set(node.prompt.id, { sceneId: scene.id }); return; }
-        for (const beat of node.beats ?? []) places.set(beat.id, { sceneId: scene.id, beat });
+        // A prompt is placed without its beat; a snippet's beats carry theirs.
+        for (const beat of beatsOf(node)) places.set(beat.id, node.type === "snippet" ? { sceneId: scene.id, beat } : { sceneId: scene.id });
       });
     }
   }

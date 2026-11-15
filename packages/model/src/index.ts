@@ -308,6 +308,30 @@ export function walkNodes<N extends { type: string }>(
   }
 }
 
+const NO_BEATS: ReadonlyArray<Beat> = [];
+
+/**
+ * The beats a node holds itself: an option group's prompt (its on-screen choice text), a snippet's beats, and
+ * none for anything else. Generic over the source and compiled trees, as `walkNodes` is. With `walkNodes`, every
+ * beat under a children list, for a walk that also does something per node; `walkBeats` is the two together.
+ */
+export function beatsOf(node: { type: string; prompt?: PromptBeat; beats?: ReadonlyArray<Beat> }): ReadonlyArray<Beat> {
+  if (node.type === "group") return node.prompt ? [node.prompt] : NO_BEATS;
+  return node.beats ?? NO_BEATS;
+}
+
+/**
+ * Visit every beat under a children list, depth-first in authored order: each option group's prompt and each
+ * snippet's beats (`beatsOf`), with the group or snippet holding it. THE beat walk, over `walkNodes`, so a new
+ * beat-bearing field is added in one place.
+ */
+export function walkBeats<N extends { type: string; prompt?: PromptBeat; beats?: ReadonlyArray<Beat> }>(
+  nodes: ReadonlyArray<N>,
+  visit: (beat: Beat, owner: N) => void,
+): void {
+  walkNodes(nodes, (node) => { for (const beat of beatsOf(node)) visit(beat, node); });
+}
+
 /**
  * A beat with NO content worth keeping: an empty line / text bubble left behind - e.g. a snippet seeded
  * only so a jump could hang off it. Such a beat would render at runtime as a blank line that (lacking any

@@ -14,7 +14,7 @@
 // so when it's reviewed).
 // ---------------------------------------------------------------------------
 
-import { castStringKey, speakerLabelKey, walkNodes } from "@patterkit/model";
+import { castStringKey, speakerLabelKey, walkBeats } from "@patterkit/model";
 import type { Beat, CastMember, Group, LocaleFile, Scene, Snippet } from "@patterkit/model";
 import { colourIndex, isColourSlot } from "./script-doc.js";
 import { defaultPlaceholderVoice } from "@patterkit/core";
@@ -59,10 +59,7 @@ export function renameCastInScene(scene: Scene, renames: ReadonlyMap<string, str
     if (to !== undefined) { beat.character = to; n++; }
   };
   for (const block of scene.blocks ?? []) {
-    walkNodes<Group | Snippet>(block.children, (node) => {
-      if (node.type === "group") { visit(node.prompt); return; }
-      for (const beat of node.beats ?? []) visit(beat);
-    });
+    walkBeats<Group | Snippet>(block.children, (beat) => visit(beat));
   }
   return n;
 }

@@ -20,9 +20,9 @@
 import { readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { canonicalStringify, parseSource } from "@patterkit/core";
-import { findProjectFile, loadProject, walkFiles } from "./load.js";
+import { findProjectFile, loadProject, walkFilesByExt } from "./load.js";
 import { planExtensionUpgrades } from "./extensions.js";
-import { SHARD_EXTENSIONS } from "./pack.js";
+import { SHARD_EXTENSIONS, shardsIn } from "./pack.js";
 import type { PlannedWrite } from "./write.js";
 
 export interface FormatResult {
@@ -45,7 +45,7 @@ function expand(path: string): string[] {
   try { dir = statSync(path).isDirectory(); } catch { /* read below reports it */ }
   if (!dir) return [path];
   const root = dirname(findProjectFile(path));
-  return SHARD_EXTENSIONS.flatMap((ext) => walkFiles(root, ext)).sort();
+  return shardsIn(walkFilesByExt(root, SHARD_EXTENSIONS)).sort();
 }
 
 /** The extension upgrades for each project folder named: new content by path, and the notes for each. */

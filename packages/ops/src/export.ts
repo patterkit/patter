@@ -4,18 +4,17 @@
 // ---------------------------------------------------------------------------
 
 import type { Bundle } from "@patterkit/model";
-import { walkFiles } from "./load.js";
+import { walkFilesByExt } from "./load.js";
 import type { LoadedProject } from "./load.js";
-import { sidecarIssues, unresolvedMarkIssues, CONFLICT_SIDECAR } from "./merge.js";
-import { SHARD_EXTENSIONS } from "./pack.js";
-import { readFileSync } from "node:fs";
+import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
+import { SHARD_EXTENSIONS, shardsIn } from "./pack.js";
 import { compileLoaded, bundleOutputPath } from "./compile.js";
 import { canonicalStringify } from "@patterkit/core";
 import { audioManifestWrite, scanAudio } from "./audio-index.js";
 import type { AudioSnapshot } from "./audio-index.js";
 import { patterScopesWrite } from "./game-scopes.js";
 import type { PlannedWrite } from "./write.js";
-import { exportBlockers } from "./validate.js";
+import { exportBlockers, markedShards } from "./validate.js";
 
 /**
  * Refuse to compile a project with a merge still unresolved (patter-merge.md §3.6, via
@@ -25,7 +24,10 @@ import { exportBlockers } from "./validate.js";
  * without validating first is exactly the person the rule is for.
  */
 function refuseUnresolvedMerge(loaded: LoadedProject): void {
-  const issues = sidecarIssues(walkFiles(loaded.root, CONFLICT_SIDECAR));
+  // One walk of the tree for the sidecars and every shard; the marks are read through validate's cache, so an
+  // Auto Rebuild after a save rereads only the shards that changed.
+  const tree = walkFilesByExt(loaded.root, [CONFLICT_SIDECAR, ...SHARD_EXTENSIONS]);
+  const issues = sidecarIssues(tree.get(CONFLICT_SIDECAR)!);
   if (issues.length) {
     throw new Error(
       `${issues.length} unresolved merge conflict(s) - resolve them and delete the .patterconflict sidecar(s) first:\n` +
@@ -33,8 +35,7 @@ function refuseUnresolvedMerge(loaded: LoadedProject): void {
     );
   }
   // ...and a shard carrying the `unresolved` mark, the record a merge leaves in the file itself.
-  const marked = [...new Set(unresolvedMarkIssues(SHARD_EXTENSIONS.flatMap((ext) => walkFiles(loaded.root, ext))
-    .map((file) => ({ file, text: readFileSync(file, "utf8") }))).map((i) => i.file))];
+  const marked = [...new Set(markedShards(shardsIn(tree)).map((i) => i.file))];
   if (marked.length) {
     throw new Error(
       `${marked.length} shard(s) still marked with an unresolved merge - resolve the clashes each names under "unresolved", then remove the entries:\n` +

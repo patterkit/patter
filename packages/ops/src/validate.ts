@@ -18,7 +18,7 @@ import { EXTENSION_SHARD, PROJECT_LOCALE_SCENE, projectLayout } from "@patterkit
 import { reachabilityIssues } from "./reachability.js";
 import { walkFilesByExt } from "./load.js";
 import { actionTextChanges, existingLocPath } from "./localisation.js";
-import { SHARD_EXTENSIONS } from "./pack.js";
+import { SHARD_EXTENSIONS, shardsIn } from "./pack.js";
 import type { LoadedProject } from "./load.js";
 import { patterScopesStale, previewRegistry } from "./game-scopes.js";
 
@@ -78,22 +78,11 @@ export interface ValidateResult {
 
 /** Run structural + expression + interpolation + hygiene + bundle-staleness + merge validation. */
 export function runValidate(loaded: LoadedProject): ValidateResult {
-  const { project, scenes, locales } = loaded;
-  const structural = validateProject({ project, scenes, authoring: loaded.authoring });
-  // The project's own host scopes (`@world`, ...) are foreign to Patter's owned schema but first-class to
-  // the project: pass them so references into them validate (and read-only writes are flagged). With a
-  // game scopes folder, they are as the folder leaves them, and every other scope in it is checked too,
-  // with warnings.
-  const merged = loaded.gameScopes?.merged;
-  const scopes = projectScopes(project, merged);
-  const foreignScopes = hostScopesToSpec(scopes.host);
-  const conditions = validateConditions({ project, scenes }, { foreignScopes, gameScopes: merged });
-  const interpolation = validateInterpolation({ project, scenes, locales }, { foreignScopes, gameScopes: merged });
-  const gameScopes = gameScopesIssues(loaded, scopes.notes);
+  const { structural, conditions, interpolation, localisation, extensionPassed, scopeNotes } = contentChecks(loaded);
+  const gameScopes = gameScopesIssues(loaded, scopeNotes);
   const hygiene = checkHygiene([loaded.projectFile, ...Object.values(loaded.sceneFiles), ...loaded.localeFiles, ...loaded.authoringFiles, ...loaded.extensionShardFiles]);
   // One walk of the tree for every kind of file the checks below look for.
   const tree = walkFilesByExt(loaded.root, [...SHARD_EXTENSIONS, CONFLICT_SIDECAR, ".patterc"]);
-  const localisation = locIssues(loaded);
   // ONE compile, the one export makes, inside a try: a project the compiler refuses has its cause told
   // above (a clash between loc shards, a broken condition), and must not throw out of validate.
   let compiled: Bundle | undefined;
@@ -102,9 +91,8 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
   if (compiled) gameScopes.push(...unplayableScopes(loaded, compiled));
   // A shard carrying the `unresolved` mark is the record that travels with the file (a sidecar is never
   // committed): refused here, so CI refuses it on every machine. Every shard type, project file included.
-  const unresolvedMerges = [...sidecarIssues(tree.get(CONFLICT_SIDECAR)!), ...markedShards(SHARD_EXTENSIONS.flatMap((ext) => tree.get(ext)!))];
+  const unresolvedMerges = [...sidecarIssues(tree.get(CONFLICT_SIDECAR)!), ...markedShards(shardsIn(tree))];
   const orphans = orphanShards(loaded, tree);
-  const extensionPassed = extensionIssues(loaded);
   const extensions = [...extensionPassed.issues, ...gitattributesHint(loaded)];
   // Only worth asking of a project that compiles: over a broken bundle the answer would be about the
   // breakage, and the real errors are already being told. A structural WARNING (a choice that can run
@@ -138,18 +126,41 @@ const isError = (i: { severity: "error" | "warning" }): boolean => i.severity ==
  * reachability: those say nothing about whether the bundle works. `runExport` refuses on these.
  */
 export function exportBlockers(loaded: LoadedProject): string[] {
-  const { project, scenes, locales } = loaded;
-  const merged = loaded.gameScopes?.merged;
-  const foreignScopes = hostScopesToSpec(projectScopes(project, merged).host);
-  const structural = validateProject({ project, scenes, authoring: loaded.authoring }).filter((i) => i.severity === undefined);
-  const conditions = validateConditions({ project, scenes }, { foreignScopes, gameScopes: merged }).filter(isError);
-  const interpolation = validateInterpolation({ project, scenes, locales }, { foreignScopes, gameScopes: merged }).filter(isError);
+  const { structural, conditions, interpolation, localisation, extensionPassed } = contentChecks(loaded);
   return [
-    ...structural.map((i) => `[${i.code}] ${i.message}`),
-    ...[...conditions, ...interpolation].map((i) => `[${i.field}] ${i.nodeId}: ${i.message}  (${i.src})`),
-    ...locIssues(loaded).filter(isError).map((i) => `[localisation] ${i.file}: ${i.message}`),
-    ...extensionIssues(loaded).issues.filter(isError).map((i) => `[extension] ${i.file}: ${i.message}`),
+    ...structural.filter((i) => i.severity === undefined).map((i) => `[${i.code}] ${i.message}`),
+    ...[...conditions, ...interpolation].filter(isError).map((i) => `[${i.field}] ${i.nodeId}: ${i.message}  (${i.src})`),
+    ...localisation.filter(isError).map((i) => `[localisation] ${i.file}: ${i.message}`),
+    ...extensionPassed.issues.filter(isError).map((i) => `[extension] ${i.file}: ${i.message}`),
   ];
+}
+
+/**
+ * The checks on the content itself, shared by `runValidate` (which reports them all) and `exportBlockers`
+ * (which refuses on their errors), so a check added here reaches both.
+ */
+function contentChecks(loaded: LoadedProject): {
+  structural: ValidationIssue[]; conditions: ConditionIssue[]; interpolation: ConditionIssue[];
+  localisation: GameScopesIssue[]; extensionPassed: { issues: ExtensionIssue[]; pools: ExtensionPools };
+  scopeNotes: ReturnType<typeof projectScopes>["notes"];
+} {
+  const { project, scenes, locales } = loaded;
+  const structural = validateProject({ project, scenes, authoring: loaded.authoring });
+  // The project's own host scopes (`@world`, ...) are foreign to Patter's owned schema but first-class to
+  // the project: pass them so references into them validate (and read-only writes are flagged). With a
+  // game scopes folder, they are as the folder leaves them, and every other scope in it is checked too,
+  // with warnings.
+  const merged = loaded.gameScopes?.merged;
+  const scopes = projectScopes(project, merged);
+  const foreignScopes = hostScopesToSpec(scopes.host);
+  return {
+    structural,
+    conditions: validateConditions({ project, scenes }, { foreignScopes, gameScopes: merged }),
+    interpolation: validateInterpolation({ project, scenes, locales }, { foreignScopes, gameScopes: merged }),
+    localisation: locIssues(loaded),
+    extensionPassed: extensionIssues(loaded),
+    scopeNotes: scopes.notes,
+  };
 }
 
 /**
@@ -374,7 +385,7 @@ const hygieneCache = new Map<string, { mtimeMs: number; issues: HygieneIssue[] }
 const markCache = new Map<string, { mtimeMs: number; issues: HygieneIssue[] }>();
 
 /** The shards carrying the `unresolved` mark (`unresolvedMarkIssues`), read through `markCache`. */
-function markedShards(files: string[]): HygieneIssue[] {
+export function markedShards(files: string[]): HygieneIssue[] {
   const wanted = new Set(files);
   for (const file of markCache.keys()) if (!wanted.has(file)) markCache.delete(file);
   const issues: HygieneIssue[] = [];

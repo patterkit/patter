@@ -27,7 +27,7 @@
 // ---------------------------------------------------------------------------
 
 import { canonicalStringify } from "@patterkit/core";
-import { walkNodes, PROJECT_LOCALE_SCENE, AUTHORING_SCHEMA, FLOW_SCHEMA } from "@patterkit/model";
+import { walkNodes, PROJECT_LOCALE_SCENE, AUTHORING_SCHEMA, FLOW_SCHEMA, walkBeats } from "@patterkit/model";
 import type { Group, Snippet, LocaleFile, AuthoringFile, Scene, FlowFile, GameData, GameDataNodeKind } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import type { PlannedWrite } from "./write.js";
@@ -109,10 +109,7 @@ export function runReplace(loaded: LoadedProject, opts: ReplaceOptions): Replace
     sceneName.set(scene.id, scene.name);
     for (const block of scene.blocks) {
       const segs = [scene.name, block.name];
-      walkNodes<Group | Snippet>(block.children, (node) => {
-        if (node.type === "group") { if (node.prompt) locOf.set(node.prompt.id, segs); return; }
-        for (const b of node.beats ?? []) locOf.set(b.id, segs);
-      });
+      walkBeats<Group | Snippet>(block.children, (b) => { locOf.set(b.id, segs); });
     }
   }
 
