@@ -15,6 +15,7 @@ const search = read("./search/search.css");
 const coverage = read("./coverage/coverage.css");
 const surface = read("../../../patterpad-surface/web/styles.css");
 const renderer = read("./src/renderer.ts");
+const navTree = read("./src/nav-tree.ts");
 
 /** The CSS without its comments, so a prose mention cannot mask (or fake) a unit. */
 const code = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -86,7 +87,7 @@ describe("chrome scale: the sizes the family measures", () => {
 
   it("the navigator rows and the Find button sit on the shell's chrome scale", () => {
     // The scene rows are the shell's navigator row (app-shell 0.65), which sizes them on its scale.
-    expect(renderer).toContain('b.className = "nav-item shell-nav-row"');
+    expect(navTree).toContain('b.className = "nav-item shell-nav-row"');
     expect(rule(shell, ".nav-block")).toContain("font: var(--weight-regular) var(--text-sm) var(--font-ui)");
     expect(rule(shell, ".nav-search")).toContain("font: var(--weight-regular) var(--text-md) var(--font-ui)");
     expect(rule(shell, ".insp-row")).toContain("grid-template-columns: 96px 1fr");

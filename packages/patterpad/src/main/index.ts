@@ -3,7 +3,7 @@
 // lifecycle + window + native dialogs + IPC wiring; the project session lives in project.ts and the
 // open-where-you-left-off / recents / identity store in store.ts.
 
-import { app, autoUpdater, BrowserWindow, dialog, ipcMain, protocol, shell, systemPreferences, Menu } from "electron";
+import { app, autoUpdater, BrowserWindow, dialog, ipcMain, protocol, shell } from "electron";
 import { guardAllWindows } from "@wildwinter/app-shell/window-guard";
 import { viewSchemePrivileges } from "@wildwinter/app-shell/view-host";
 import { createViewExtensions, viewsDir, VIEW_SCHEME } from "./views.js";
@@ -25,7 +25,7 @@ import * as dictionaries from "./dictionaries.js";
 import { createStore, type ToolWindowName } from "./store.js";
 import { applyMenu, setUndoLabels, setMoveEnabled, setClashCount } from "./menu.js";
 import { createDebugServer, type DebugServer } from "./debug-link.js";
-import { centeredOnPrimary, defineToolWindows, frontForModal, pinToolWindow } from "@wildwinter/app-shell/tool-window";
+import { centeredOnPrimary, defineToolWindows, pinToolWindow } from "@wildwinter/app-shell/tool-window";
 // The updater is the shell's. It IS this app's, generalised: the stall watchdog,
 // the retry budget, the surfaced background error and the live progress that
 // 0.6.6 grew after #33 all went into it, so this is a swap and not a downgrade.
@@ -41,6 +41,11 @@ import { PROPERTIES_PLACE } from "../shared/api.js";
 import { EXAMPLES } from "../shared/examples.js";
 import { planExampleCopy } from "./example-copy.js";
 import * as speech from "./placeholder-speech.js";
+import { registerFieldsIpc } from "./ipc-fields.js";
+import { registerExtensionsIpc } from "./ipc-extensions.js";
+import { registerAudioIpc } from "./ipc-audio.js";
+import { registerDictionaryIpc } from "./ipc-dictionary.js";
+import { registerDebugIpc } from "./ipc-debug.js";
 import type { SearchEntry, SearchFocus, SearchMode, EditableExportRequest, EditableImportRequest } from "../shared/api.js";
 import type { AppPrompt, SceneKitId, StageRenameDto, SceneExtensionShards, LiveSceneSource } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, RecentProject, ThemePrefs, VcsKind } from "../shared/api.js";
@@ -1104,90 +1109,12 @@ function registerIpc(): void {
     return result;
   });
   ipcMain.handle("covWin:cancel", () => { jobs.cancel("coverage"); });
-  // Fields window: the editor sends what it should show and applies what it edits; main only relays.
-  ipcMain.handle("fields:open", () => { windows.open("fields"); });
-  ipcMain.on("fields:state", (_e, state: import("../shared/api.js").FieldsWinState) => {
-    fieldsState = state;
-    const w = windows.get("fields");
-    if (w && !w.isDestroyed()) w.webContents.send("fieldsWin:state", state);
+  registerFieldsIpc({
+    get fieldsState() { return fieldsState; }, set fieldsState(v) { fieldsState = v; },
+    get win() { return win; }, store, windows,
   });
-  ipcMain.handle("fieldsWin:info", (): import("../shared/api.js").FieldsWinInfo => ({
-    state: fieldsState, pinned: store.window("fields").pinned(), follow: store.read().fieldsFollow, theme: store.read().theme,
-  }));
-  ipcMain.handle("fieldsWin:commit", (_e, id: string, extension: string, field: string, value: unknown) => {
-    if (typeof id !== "string" || typeof extension !== "string" || typeof field !== "string") return;
-    if (win && !win.isDestroyed()) win.webContents.send("fields:commit", id, extension, field, value);
-  });
-  ipcMain.handle("fieldsWin:setFollow", (_e, on: boolean) => {
-    store.setFieldsFollow(on === true);
-    if (win && !win.isDestroyed()) win.webContents.send("fields:follow", on === true);
-  });
-  ipcMain.handle("fieldsWin:setPin", (_e, on: boolean) => {
-    store.window("fields").setPinned(on);
-    pinToolWindow(windows.get("fields"), win, on);
-  });
-  ipcMain.handle("fieldsWin:close", () => { windows.get("fields")?.close(); });
-  // View extensions: the Extensions window's Add, Remove from Project and Uninstall, and a view's write of the
-  // project's own values for its extension. While one of them asks, the editor comes in front of the pinned
-  // windows, the Extensions window among them, so its question is never hidden under one.
-  ipcMain.handle("extensions:open", (_e, focus?: unknown) => { openExtensionsWindow(typeof focus === "string" ? focus : undefined); });
-  ipcMain.handle("extensions:add", async (_e, expect?: unknown) => {
-    const release = win ? frontForModal(win) : () => {};
-    const r = await views.add(typeof expect === "string" ? expect : undefined).finally(release);
-    // The open scene reloads whether or not its data was rewritten: it opened with the extension's data held
-    // back, untaken, and now takes it. Views installed alone leave the project as it was.
-    if (r?.ok && !r.installedOnly) { win?.webContents.send("replace:applied"); projectChanged(); }
-    return r;
-  });
-  ipcMain.handle("extensions:remove", async (_e, id: unknown) => {
-    if (typeof id !== "string") return null;
-    const release = win ? frontForModal(win) : () => {};
-    const r = await views.remove(id).finally(release);
-    // Its data shards stay, but the open scene's data for it is now another extension's leftovers: reload it.
-    if (r?.ok) { win?.webContents.send("replace:applied"); projectChanged(); }
-    return r;
-  });
-  ipcMain.handle("extensions:update", async (_e, id: unknown) => {
-    if (typeof id !== "string") return null;
-    const release = win ? frontForModal(win) : () => {};
-    const r = await views.upgrade(id).finally(release);
-    if (r?.ok && !r.installedOnly) { win?.webContents.send("replace:applied"); projectChanged(); }
-    return r;
-  });
-  ipcMain.handle("extWin:info", async (): Promise<import("../shared/api.js").ExtensionsWinInfo> => ({
-    state: await extensionsState(), pinned: store.window("extensions").pinned(), theme: store.read().theme,
-  }));
-  // Add, Install and Remove are project steps, so they go through the editor, where undo lives.
-  const toEditor = (cmd: string): void => { if (win && !win.isDestroyed()) win.webContents.send("menu", cmd); };
-  ipcMain.handle("extWin:add", () => { toEditor("add-extension"); });
-  ipcMain.handle("extWin:install", (_e, id: unknown) => { if (typeof id === "string") toEditor(`add-extension:${id}`); });
-  ipcMain.handle("extWin:remove", (_e, id: unknown) => { if (typeof id === "string") toEditor(`remove-extension:${id}`); });
-  // Update… is a project step when a project is open (the editor runs it); with none, only this machine changes.
-  ipcMain.handle("extWin:update", async (_e, id: unknown) => {
-    if (typeof id !== "string") return;
-    if (project.currentRoot() !== null) { toEditor(`update-extension:${id}`); return; }
-    const release = win ? frontForModal(win) : () => {};
-    await views.upgrade(id).finally(release);
-  });
-  // Uninstall is this machine's, not the project's: no undo step, so main does it.
-  ipcMain.handle("extWin:uninstall", async (_e, id: unknown, version: unknown) => {
-    if (typeof id !== "string" || typeof version !== "string") return;
-    const release = win ? frontForModal(win) : () => {};
-    await views.uninstall(id, version).finally(release);
-  });
-  ipcMain.handle("extWin:setPin", (_e, on: boolean) => {
-    store.window("extensions").setPinned(on);
-    pinToolWindow(windows.get("extensions"), win, on);
-  });
-  ipcMain.handle("extWin:close", () => { windows.get("extensions")?.close(); });
-  ipcMain.handle("views:open", async (_e, extension: unknown, view: unknown) => {
-    if (typeof extension === "string" && typeof view === "string") await views.open(extension, view);
-  });
-  ipcMain.handle("extensions:writeProject", async (_e, extension: string, entry: Record<string, unknown>, label: string) => {
-    if (typeof extension !== "string" || typeof label !== "string" || !entry || typeof entry !== "object") return { ok: false, error: "That isn't a write." };
-    const r = await project.saveProjectExtensionValues(extension, entry, label);
-    if (r.ok) projectChanged();
-    return r;
+  registerExtensionsIpc({
+    get win() { return win; }, views, store, windows, openExtensionsWindow, projectChanged, extensionsState,
   });
   // The editor's progress strip: stop the running publish-shaped job at its next yield.
   ipcMain.handle("job:cancel", (_e, kind: string) => { jobs.cancel(kind); });
@@ -1335,54 +1262,18 @@ function registerIpc(): void {
   ipcMain.handle("scene:saveRecording", (_e, id: string, map: Record<string, string>) => project.saveSceneRecording(id, map));
   ipcMain.handle("scene:readRerecord", (_e, id: string) => project.readSceneRerecord(id));
   ipcMain.handle("scene:saveRerecord", (_e, id: string, map: Record<string, boolean>) => project.saveSceneRerecord(id, map));
-  // Audio Folders index (#206): the renderer pulls the current snapshot on load, then receives pushes as
-  // the folders change on disk. The indexer lives in the main process (off the event loop).
-  ipcMain.handle("audio:current", () => project.audioCurrentSnapshot());
-  // Playback (#206 P3): the resolved audio bytes for a beat, for both the inspector play button and the
-  // play window's "Play with audio" (the renderer wraps them in a Blob).
-  ipcMain.handle("audio:read", (_e, beatId: string) => project.audioBytesForBeat(beatId));
-  // Scratch recording (#224): write an in-app take's WAV bytes into the scratch folder (the watcher then
-  // picks it up). recording:setMode strips the native menu while recording so accelerators can't fire
-  // behind the blocking overlay (restored when it ends).
-  // Placeholder Speech: the settings page's key picker and status, the Cast editor's Hear, the menu's Make
-  // Now and the inspector's Make again, a voice change's lines, and the writer moving off a line.
-  ipcMain.handle("speech:chooseKey", () => (win ? speech.chooseKeyFile(win) : null));
-  ipcMain.handle("speech:keyStatus", (_e, keyFile: string) => speech.keyStatus(String(keyFile ?? "")));
-  ipcMain.handle("speech:hear", (_e, voice: string, text: string) => speech.hear(String(voice), String(text)));
-  ipcMain.handle("speech:make", (_e, req: speech.SpeechRequestScope & { force?: boolean }) => speech.makeNow(req ?? {}));
-  ipcMain.handle("speech:count", (_e, req: speech.SpeechRequestScope) => speech.countToMake(req ?? {}));
-  ipcMain.handle("speech:accent", () => speech.accentInUse() ?? null);
-  ipcMain.handle("speech:tier", () => speech.tierInUse());
-  ipcMain.on("speech:nudge", () => speech.nudge());
-  ipcMain.handle("speech:deletedTakes", () => speech.takesForDeletedLines());
-  ipcMain.handle("speech:removeDeletedTakes", () => speech.removeTakesForDeletedLines());
-  ipcMain.handle("audio:saveScratch", (_e, beatId: string, bytes: Uint8Array) => project.saveScratchAudio(beatId, bytes));
-  // macOS gates the mic behind TCC: check (and if undecided, ask) BEFORE the renderer opens the stream,
-  // so a denied state surfaces as a clear message instead of a silently-silent recording. Not-darwin
-  // platforms have no such gate. Needs the audio-input hardened-runtime entitlement in packaged builds.
-  ipcMain.handle("audio:micAccess", async () => {
-    if (process.platform !== "darwin") return true;
-    const status = systemPreferences.getMediaAccessStatus("microphone");
-    if (status === "granted") return true;
-    if (status === "not-determined") return systemPreferences.askForMediaAccess("microphone");
-    return false; // denied or restricted - only the user can flip it, in System Settings
+  registerAudioIpc({
+    get win() { return win; }, refreshMenu,
   });
-  ipcMain.handle("recording:setMode", (_e, on: boolean) => { if (on) Menu.setApplicationMenu(null); else refreshMenu(); });
-  project.onAudioSnapshot((snap) => { if (win && !win.isDestroyed()) win.webContents.send("audio:index", snap); });
   // Every step of the project history, whichever window asked for the write (Replace and suggestion
   // decisions come from the search window), reaches the editor's journal.
   project.onProjectStep((step) => { lastProjectStep = step; if (win && !win.isDestroyed()) win.webContents.send("project:step", step); });
   ipcMain.handle("scene:readSuggestions", (_e, id: string) => project.readSceneSuggestions(id));
   ipcMain.handle("scene:saveSuggestions", (_e, id: string, s: import("@patterkit/model").Suggestion[]) => project.saveSceneSuggestions(id, s));
   ipcMain.handle("review:feedback", (_e, scope?: { resolvedComments?: boolean; resolvedSuggestions?: boolean }) => project.reviewFeedback(scope));
-  ipcMain.handle("dict:list", () => dictionaries.listDictionaries());
-  ipcMain.handle("dict:read", (_e, id: string) => dictionaries.readDictionary(id));
-  ipcMain.handle("dict:import", () => importDictionaryDialog());
-  ipcMain.handle("dict:remove", (_e, id: string) => dictionaries.removeDictionary(id));
-  ipcMain.handle("dict:addWord", (_e, word: string) => project.addDictionaryWord(word));
-  ipcMain.handle("dict:addIgnore", (_e, word: string) => project.addIgnoreWord(word));
-  // Review ▸ Spelling toggle / dictionary pick: persist, then rebuild the menu so its check / tick updates.
-  ipcMain.handle("dict:set", async (_e, patch: { enabled?: boolean; language?: string }) => { const r = await project.setDictionary(patch); refreshMenu(); return r; });
+  registerDictionaryIpc({
+    importDictionaryDialog, refreshMenu,
+  });
   ipcMain.handle("scene:save", async (_e, id: string, flow: string, loc: string, extensions?: SceneExtensionShards) => {
     const r = await project.saveScene(id, flow, loc, store.read().identity?.name, extensions ?? {});
     if (r.ok) scheduleDebugPush(); // live bundle refresh: a saved scene reaches a connected game
@@ -1489,17 +1380,8 @@ function registerIpc(): void {
     try { launchApp(found.executable, pairedStorylets, name); return { ok: true }; }
     catch (e) { return { ok: false, error: `couldn't start Storyletter: ${e instanceof Error ? e.message : String(e)}` }; }
   });
-  // Live debug link (#181): a localhost WS server an external game streams its cursor into. Frames for the
-  // followed flow reuse the SAME play:mark path the in-app Play window uses, so the editor follows the live
-  // playhead; the editor also pushes bundles to it and asks it to play a block (debug-link.ts).
-  ipcMain.handle("debug:start", () => { ensureDebugServer().start(); refreshMenu(); return ensureDebugServer().status(); });
-  ipcMain.handle("debug:stop", () => { ensureDebugServer().stop(); refreshMenu(); return ensureDebugServer().status(); });
-  ipcMain.handle("debug:status", () => ensureDebugServer().status());
-  ipcMain.handle("debug:follow", (_e, flowId: string | null) => { ensureDebugServer().follow(typeof flowId === "string" ? flowId : null); });
-  ipcMain.handle("debug:play-in-game", (_e, sceneId: unknown, blockId: unknown, takeOver: unknown) => {
-    if (typeof sceneId !== "string" || typeof blockId !== "string") return { started: false, reason: "invalid" };
-    if (!debugServer) return { started: false, reason: "noGame" };
-    return debugServer.playInGame({ sceneId, blockId, takeOver: takeOver === true });
+  registerDebugIpc({
+    get debugServer() { return debugServer; }, ensureDebugServer, refreshMenu,
   });
   ipcMain.handle("project:validate", (_e, live?: LiveSceneSource) => project.validate(live));
   // The detached search window (#205): open/focus it, and serve its index queries + jump back to the editor.

@@ -13,7 +13,7 @@
 // than a fault - but it is free to check here, and it catches the rename that moved only one side.
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 /** Source with comments stripped. A commented-out call is not a call, and matching one would let a
@@ -33,7 +33,9 @@ const channels = (src: string, fn: string): string[] =>
   [...src.matchAll(new RegExp(`${fn}\\(\\s*["']([^"']+)["']`, "g"))].map((m) => m[1]!).sort();
 
 const invoked = [...new Set(channels(code("../src/preload/index.ts"), "ipcRenderer\\.invoke"))];
-const handled = [...new Set(channels(code("../src/main/index.ts"), "ipcMain\\.handle"))];
+// main/index.ts registers most handlers, and hands groups of them to main/ipc-*.ts (registerFieldsIpc and the rest).
+const MAIN_HANDLER_FILES = ["index.ts", ...readdirSync(fileURLToPath(new URL("../src/main/", import.meta.url))).filter((f) => /^ipc-.*\.ts$/.test(f))];
+const handled = [...new Set(MAIN_HANDLER_FILES.flatMap((f) => channels(code(`../src/main/${f}`), "ipcMain\\.handle")))];
 // Handlers app-shell registers in main for us: the command palette's menu (registerCommandPalette), What's
 // New's launch state (registerWhatsNew), and the window prompt's reply (createWindowPrompt), all called by
 // main/index.ts at startup.

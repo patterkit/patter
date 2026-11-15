@@ -35,7 +35,7 @@ describe("adoptSceneName writes a rename into the project copy", () => {
 });
 
 describe("relabelNavScene changes that scene's row label and nothing else", () => {
-  /** The Scenes list's real shape (renderer.ts renderNav + refreshNavBlocks): a scene row holding its
+  /** The Scenes list's real shape (nav-tree.ts renderNav + refreshNavBlocks): a scene row holding its
    *  own button, then its block rows, which use the same label class. */
   const nav = (): HTMLElement => {
     const list = document.createElement("div");
