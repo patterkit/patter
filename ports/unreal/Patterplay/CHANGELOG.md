@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-17
+
 ### Added
 
 - **Set up your game's `@world` in the editor**, with a Patter World component on an actor. Add it in Details,

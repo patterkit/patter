@@ -7,6 +7,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-17
+
 ### Changed
 
 - **No changes in this runtime.** This lockstep release lets Unity, Unreal, and Godot games bind `@world` in the

@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-17
+
 ### Added
 
 - **Set your game's `@world` in the Inspector, with no code.** Add a **Patter World** component (Add Component ▸

@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-17
+
 ### Added
 
 - **Bind your game's `@world` with a Patter World node.** Add a `PatterWorld` to your scene, set values on it, and
