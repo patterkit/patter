@@ -120,7 +120,11 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   `SetProperty*` returns `""` when the write landed, and otherwise why it didn't, logged to
   `LogPatterplay` (`"@patter.gold" takes a number; "lots" doesn't fit`). Bind your own containers for
   the host scopes your game owns with `UPatterEngine::Create(Bundle, HostScopes)`, a map of token to
-  `UPatterWorld` (`"world"` for World Properties).
+  `UPatterWorld` (`"world"` for World Properties). To set the world up in the editor instead, add a
+  **Patter World** component (`UPatterWorldComponent`) to an actor, fill its `GetPatterWorld()` from your
+  game, and make the engine with `UPatterEngine::CreateWithWorld(Bundle, World)`;
+  `UPatterWorldComponent::FindPatterWorld(Actor)` finds it on an actor. With nothing bound, `@world` plays
+  from its declared defaults; `UPatterBundle::DeclaresWorld()` says whether the story has an `@world`.
 - **Refusals and reports**: Blueprint can't catch what the engine throws, so a flow keeps the reason its
   last `Advance`, `AdvanceToStop`, `Choose`, `Goto`, or `Reset` was refused in `GetLastError` (cleared by
   the next one that succeeds). `OnError` hears every problem the engine carried on past: a content error,

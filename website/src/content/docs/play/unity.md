@@ -120,9 +120,36 @@ play silently.
 
 ## Your game's state
 
-Hand the engine your `@world` values through **`EngineOptions.HostScopes`**, an `IHostScope` per
-token (`Get` / `Set`, keyed by property name) that the story reads before every condition and writes
-through on an effect. Bind the same object to anything else that shares those values:
+The story reads your game's state as `@world` properties, and you give it that state by binding a
+**World**. The quickest way needs no code to bind it:
+
+1. Add a **Patter World** component (`PatterWorld`) to a GameObject, your game manager say.
+2. Drag that GameObject into the **World** field of the **Patter Runner Behaviour** (or of any
+   component that builds its engine from a bundle asset and has a World field).
+3. Have your game write its state into the Patter World as it changes:
+
+```csharp
+world.SetBool("has_key", true);
+world.SetString("time_of_day", "night");
+world.SetReadOnly("time_of_day", true);   // yours alone: a story write is refused
+world.Changed += (name, value, fromStory) => { /* the story wrote one back */ };
+```
+
+A condition on `@world.has_key` now reads your value, and an effect that sets `@world.reputation`
+writes it back. `PatterWorld` keeps typed `Set*` / `Get*`, `Has`, `Names`, `SetReadOnly`, and a
+`Changed` event that tells your own writes from the story's. Names match case-insensitively, as the
+story's references do. If your state already lives in a component of your own, implement `IHostScope`
+on it (below) and drag that in instead, or subclass `PatterWorld` and override `Get` and `Set`.
+
+**With nothing in World**, the engine still plays: it self-backs `@world` from the declared defaults,
+so "has the key" reads the default and never sees your game. The runner says so once as it wakes,
+with a warning naming the component, so an empty field doesn't go unnoticed.
+
+In code, `Bundle.CreateEngineWithWorld(world)` takes the same World, and `Bundle.DeclaresWorld` says whether the
+story reads `@world` at all. A game that builds engines itself can also hand the engine its `@world`
+values through **`EngineOptions.HostScopes`**, an `IHostScope` per token (`Get` / `Set`, keyed by
+property name) that the story reads before every condition and writes through on an effect. Bind the
+same object to anything else that shares those values:
 
 ```csharp
 using Wildwinter.Expr;   // ExprValue, the value type
@@ -138,8 +165,9 @@ var world = new WorldScope();
 var engine = Bundle.CreateEngine(new EngineOptions { HostScopes = new() { ["world"] = world } });
 ```
 
-Each binding is registered as a **foreign** scope: the values stay in your object, and no Patterplay
-save holds them, so your game saves them. Leave `HostScopes` null and a standalone engine
+A World and `HostScopes` are the same binding, so `CreateEngineWithWorld(world, options)` refuses options that
+also bind `world` (an `ArgumentException`). Each binding is registered as a **foreign** scope: the values
+stay in your object, and no Patterplay save holds them, so your game saves them. Leave `HostScopes` null and a standalone engine
 **self-backs** `@world` from the declared defaults, as a property it stores and saves with the rest of
 the run. A property declared `writable: false` in the project is the *story's* promise, so the engine
 refuses the story's write with `'@world.x' is read-only`, bound or self-backed. Your own `SetProperty`

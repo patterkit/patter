@@ -6,6 +6,20 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Bind your game's `@world` with a Patter World node.** Add a `PatterWorld` to your scene, set values on it, and
+  pass it to the engine as `"host_scopes": {"world": world}`: the story's conditions read what you set, its effects
+  write back, and its `changed` signal tells you when they do. Before, `@world` took a Dictionary of two functions.
+  - `set_value`, `get_value`, `has_value`, and `names` are the game's side; names match whatever their case.
+    `set_read_only` stops the story writing a name the game keeps for itself, while your own `set_value` still
+    lands. The refused write is reported as an error and never lands.
+  - `"host_scopes"` now takes any object with a `get_property` method (and `set_property`, if the story may write)
+    in place of the Dictionary, so you can subclass `PatterWorld`, or bind a node of your own, to read your
+    game's own state. With no `set_property`, the scope is read-only.
+  - `PatterBundle.declares_world(bundle)` says whether a story reads `@world`, so a tool that makes engines can warn
+    when nothing is bound to it and the story would play from its declared defaults.
+
 ### Fixed
 
 - **A C# game that keeps an `on_trace` unsubscribe no longer crashes as it quits.** 1.0.3 fixed the shared kernel,

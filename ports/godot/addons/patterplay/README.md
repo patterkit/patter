@@ -134,7 +134,8 @@ In `demo/` (delete the folder freely):
   `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "1.0.0", "2.0.0")`: at least the first version and
   below the second, by semantic-version order. Every runtime has the same pair.
 - **Your game's state and one registry per game**: bind `@world` to your own store with the
-  `host_scopes` option, or hand the engine your game's `PatterScopeRegistry` with the `registry`
+  `host_scopes` option (a `PatterWorld` node, any object with `get_property` and `set_property`,
+  or a `{"get", "set"}` Dictionary), or hand the engine your game's `PatterScopeRegistry` with the `registry`
   option so every engine in the game shares one set of properties and one save. Without a registry
   the engine makes its own, and its save carries every property value. See
   [One registry per game](https://patterkit.dev/play/godot/#one-registry-per-game).

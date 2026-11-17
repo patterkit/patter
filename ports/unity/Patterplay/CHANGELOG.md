@@ -6,6 +6,27 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Set your game's `@world` in the Inspector, with no code.** Add a **Patter World** component (Add Component ▸
+  Patterplay ▸ Patter World), fill it from your game with `SetBool`, `SetNumber`, `SetString`, and `SetFlags`, and
+  drag it into the Patter Runner's new **World** field. The story's conditions then see your game, and its effects
+  write back into it.
+  - `PatterWorld` reads with `Has`, `GetBool`, `GetNumber`, `GetString`, `GetFlags`, and `Names`, matching names
+    whatever their case, and tells you about every change through `Changed` (and the `OnChanged` UnityEvent), with
+    whether the story made it. `SetReadOnly` keeps a name the game's alone: the story's write to it is refused and
+    reported through `OnError`, and the story plays on. Your own writes always land.
+  - Subclass it and override `Get` and `Set` to read and write state your game already keeps, or put any component
+    of yours that implements `IHostScope` in the World field instead.
+  - `PatterBundleAsset.CreateEngineWithWorld(world, options)` binds a world for an engine you make yourself. It's the same
+    binding `EngineOptions.HostScopes` makes under `"world"`, which still works as before; give a world in one
+    place, not both, or it throws. `PatterBundleAsset.DeclaresWorld` says whether the story declares `@world`.
+  - `[HostScopeField]` gives a World field of your own component the same Inspector behaviour: drop a GameObject
+    and it takes the component that can be bound.
+- **A Patter Runner with no World says so.** When the story declares `@world` and nothing is bound, it plays from
+  the declared defaults and can't see your game, so the runner now logs a warning as it wakes, rather than staying
+  quiet.
+
 ## [1.0.3] - 2026-11-15
 
 ### Changed

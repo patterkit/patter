@@ -124,10 +124,27 @@ it empty to play silently.
 
 ## Your game's state
 
-Give the engine your `@world` values in a **`UPatterWorld`** when you create it, in the host-scopes map
-under the scope's token. The story reads them through it before every condition, effects write back into
-it, and anything else you bind to the same object, your own systems or the Storylet Engine's
-`UStoryletWorld`, sees the same values:
+The story reads your game's state as `@world` properties, held in a **`UPatterWorld`**. The quickest way
+to set one up is in the editor:
+
+1. Add a **Patter World** component (`UPatterWorldComponent`) to an actor, your game state or a
+   manager actor say.
+2. In Details, point the component that builds your engine at that actor (a dialogue manager built on
+   Patterplay has a **World** field for it).
+3. Have your game write its state into the world as it changes: in Blueprint, **Get Patter World** on the
+   component, then **Set Bool**, **Set Number**, **Set String**, or **Set Flags**.
+
+The component makes its world the first time anyone asks for it, so it doesn't matter whether your
+game or the engine gets there first. `UPatterWorldComponent::FindPatterWorld(Actor)` finds it on an
+actor, and **`UPatterEngine::CreateWithWorld(Bundle, World)`** creates an engine with it bound as
+`world`, in C++ or Blueprint. `UPatterBundle::DeclaresWorld()` says whether the story reads `@world` at
+all; if it does and you bind nothing, the engine self-backs `@world` from the declared defaults and
+never sees your game, so check the field is set.
+
+In code you can also make the world yourself and pass it in the host-scopes map under the scope's
+token. The story reads it before every condition, effects write back into it, and anything else you
+bind to the same object, your own systems or the Storylet Engine's `UStoryletWorld`, sees the same
+values:
 
 ```cpp
 UPatterWorld* World = NewObject<UPatterWorld>(this);

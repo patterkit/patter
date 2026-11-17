@@ -55,6 +55,8 @@
     <Compile Include="FoundationsChecks.cs" />
     <!-- The thin runner (PatterRunner): the flow API as events (a port of the JS play-helpers tests). -->
     <Compile Include="RunnerChecks.cs" />
+    <!-- Binding @world without code: the Patter World's store and CreateEngineWithWorld(world) (Runtime/WorldBinding.cs). -->
+    <Compile Include="WorldChecks.cs" />
     <!-- The registry corpus runner, vendored from expr/ports/unity/testing. -->
     <Compile Include="RegistryCorpus.cs" />
     <Compile Include="../Patterplay/Runtime/**/*.cs" />

@@ -125,6 +125,7 @@ namespace Patterkit.Patterplay.TestHost
             RunFoundationsChecks();
             RunPlayInGameChecks();
             RunRunnerChecks();
+            RunWorldChecks();
 
             RunDescribeSmoke();
             RunAudioJoinCheck();

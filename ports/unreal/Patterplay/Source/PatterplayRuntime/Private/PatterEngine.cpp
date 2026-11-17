@@ -378,6 +378,15 @@ UPatterEngine* UPatterEngine::CreateWithOptions(UPatterBundle* Bundle, const FPa
 	return Build(Bundle, HostScopes, nullptr, Options);
 }
 
+UPatterEngine* UPatterEngine::CreateWithWorld(UPatterBundle* Bundle, UPatterWorld* World)
+{
+	// The existing host-scopes path under the one token a Patter project declares. Build already treats a
+	// null container as no binding; leaving it out of the map says the same thing plainly.
+	TMap<FString, UPatterWorld*> HostScopes;
+	if (World) HostScopes.Add(TEXT("world"), World);
+	return Build(Bundle, HostScopes, nullptr, FPatterEngineOptions());
+}
+
 UPatterEngine* UPatterEngine::CreateWithRegistry(UPatterBundle* Bundle, const std::shared_ptr<patter::ScopeRegistry>& Registry,
 	const TMap<FString, UPatterWorld*>& HostScopes, const FPatterEngineOptions& Options)
 {

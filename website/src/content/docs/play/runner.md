@@ -91,7 +91,9 @@ runner.Begin();                              // or runner.Begin("tavern")
 From the Inspector: add **Patter Runner Behaviour** to a GameObject, give it a bundle asset (or call
 `Attach(engine)` from code), and wire **On Line**, **On Text**, **On Game Event**, **On Choice**, and **On Ended**
 to your UI (**On Ended** passes the `FlowEndReason`). Buttons call `Next()` and `Choose(id)`; `Begin()` or
-`Begin(scene)` starts the conversation.
+`Begin(scene)` starts the conversation. If the story reads `@world`, drag your game's **Patter World** (or any
+component of yours that implements `IHostScope`) into the **World** field; left empty, the runner warns once and
+`@world` plays from its declared defaults ([Your game's state](/play/unity/#your-games-state)).
 
 ## Godot
 

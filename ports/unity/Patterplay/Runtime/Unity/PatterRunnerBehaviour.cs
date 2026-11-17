@@ -3,8 +3,8 @@
 // It dictates no UI and no audio, and it never advances on its own: a line carries its beat id, and the
 // game shows it, plays its recording, and calls Next() when it's ready.
 //
-// Give it a Bundle and it makes its own engine as it wakes; or hand it one with Attach(engine). Begin
-// starts the conversation.
+// Give it a Bundle and it makes its own engine as it wakes, with its World (your game's Patter World) bound
+// as @world; or hand it one with Attach(engine). Begin starts the conversation.
 //
 // A fuller dialogue manager for more complex games, Patterstage, is coming.
 
@@ -30,6 +30,10 @@ namespace Patterkit.Patterplay
         [Tooltip("Optional: a compiled .patterc. Set, the component makes its own engine as it wakes; empty, hand it one with Attach(engine).")]
         public PatterBundleAsset Bundle;
 
+        [Tooltip("Your game's Patter World, bound as @world when the runner makes its engine: a Patter World, or any component of yours implementing IHostScope. Empty, @world plays from its declared defaults.")]
+        [HostScopeField]
+        public MonoBehaviour World;
+
         [Tooltip("The flow the runner plays.")]
         public string FlowId = "main";
 
@@ -47,7 +51,24 @@ namespace Patterkit.Patterplay
 
         private void Awake()
         {
-            if (Bundle != null && Runner == null) Attach(Bundle.CreateEngine(), FlowId);
+            if (Bundle == null || Runner != null) return;
+            var world = World as IHostScope;
+            // An empty World is said out loud: the story's @world would otherwise play its declared defaults
+            // and never see the game, silently.
+            if (world == null && Bundle.DeclaresWorld)
+                Debug.LogWarning(WorldBinding.UnboundWarning($"Patter Runner '{gameObject.name}'"), this);
+            Attach(Bundle.CreateEngineWithWorld(world), FlowId);
+        }
+
+        private void OnValidate()
+        {
+            // A World must be something the engine can bind. Given another component, take the one on its
+            // GameObject that can be (the Inspector drops a GameObject's first component); else clear it.
+            if (World == null || World is IHostScope) return;
+            var scope = World.GetComponent<IHostScope>() as MonoBehaviour;
+            if (scope == null)
+                Debug.LogWarning($"Patter Runner '{gameObject.name}': {World.GetType().Name} isn't a Patter World or an IHostScope, so it can't be the World; cleared it.", this);
+            World = scope;
         }
 
         private void OnDestroy() => Detach();

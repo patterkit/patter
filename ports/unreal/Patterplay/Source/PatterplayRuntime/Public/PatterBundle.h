@@ -37,6 +37,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	static UPatterBundle* LoadFromString(const FString& InJson);
 
+	// True when the story declares @world (the bundle's scope registry has a scope with the token "world",
+	// matched case-sensitively, as binding is): it then has game state to read, and an engine made with no
+	// World bound plays @world from its declared defaults. For a component that makes an engine from a
+	// bundle set in Details, to warn when its World is empty. False for a bundle that isn't parsed.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	bool DeclaresWorld() const;
+
 	// (Re)parse Json into the cached patter::Bundle. Called by the importer and PostLoad.
 	bool Parse();
 

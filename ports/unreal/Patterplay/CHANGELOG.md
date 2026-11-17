@@ -7,6 +7,21 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Set up your game's `@world` in the editor**, with a Patter World component on an actor. Add it in Details,
+  fill its world from your game, and make the engine with `CreateWithWorld`: the story reads and writes the
+  same values, with no `HostScopes` map to build in code.
+  - `UPatterWorldComponent` (shown as "Patter World") owns one `UPatterWorld`, made the first time anyone
+    calls `GetPatterWorld`, so your Blueprint and a component making its engine in BeginPlay get the same
+    object whichever runs first. `FindPatterWorld(Actor)` returns the world of the Patter World component
+    on an actor, or none.
+  - `UPatterEngine::CreateWithWorld(Bundle, World)` is `Create` with `World` bound as `"world"`. A null
+    world binds nothing, so `@world` plays from its declared defaults, as before.
+  - `UPatterBundle::DeclaresWorld()` says whether the story declares `@world`, so a component that makes an
+    engine from a bundle set in Details can warn when its World is empty.
+  - The code route, `Create(Bundle, HostScopes)`, is unchanged.
+
 ## [1.0.3] - 2026-11-15
 
 ### Changed

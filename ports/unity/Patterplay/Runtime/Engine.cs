@@ -135,6 +135,10 @@ namespace Patterkit.Patterplay
         /// replacement that has already made its set-up reports, so it makes none. Not public API.</summary>
         internal bool SetupReported;
 
+        /// <summary>A shallow copy (the same delegates, registry, and HostScopes dictionary), for a caller that
+        /// adds to the options without changing the game's own.</summary>
+        internal EngineOptions Copy() => (EngineOptions)MemberwiseClone();
+
         /// <summary>A copy on another registry, for a HotSwap replacement.</summary>
         internal EngineOptions OnRegistry(ScopeRegistry registry, bool ownsRegistry, bool setupReported = false)
         {

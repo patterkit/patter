@@ -169,8 +169,11 @@ scene** - import, open the scene, press Play, nothing to set up:
   position, PRNG, visits, selectors, and its own property values, without its id). Close the flow after
   capturing, keep the state as JSON with `PatterSave.SaveFlowState` / `ReadFlowState`, and
   `engine.RestoreFlow(newId, state)` opens it again later, under any id, without rewinding shared state.
-- **Your game's state**: bind `@world` through `EngineOptions.HostScopes` (an `IHostScope` per
-  token), or leave it unbound and the engine self-backs it from the declared defaults, and saves it.
+- **Your game's state**: add a **Patter World** component (`PatterWorld`), fill it from your game, and
+  drag it into the Patter Runner's **World** field, or pass it to `PatterBundleAsset.CreateEngineWithWorld(world)`.
+  Any component of yours that implements `IHostScope` works there too. In code, `EngineOptions.HostScopes`
+  binds `@world` (an `IHostScope` per token) as before. Leave it unbound and the engine self-backs it from
+  the declared defaults, and saves it; a Patter Runner with no World warns when the story declares `@world`.
   `SetProperty` refuses, by throwing, a value that doesn't fit the property's declaration or a name
   the content doesn't declare.
 - **One registry per game**: every property lives in a `ScopeRegistry`. Pass your own through

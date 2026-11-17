@@ -31,6 +31,15 @@ bool UPatterBundle::Parse()
 	return true;
 }
 
+bool UPatterBundle::DeclaresWorld() const
+{
+	const patter::Bundle* B = Raw();
+	if (!B || !B->scopeRegistry.present) return false;
+	for (const auto& Scope : B->scopeRegistry.scopes)
+		if (Scope.token == "world") return true;
+	return false;
+}
+
 void UPatterBundle::PostInitProperties()
 {
 #if WITH_EDITORONLY_DATA

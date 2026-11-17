@@ -34,6 +34,22 @@ static func external_scopes(bundle: Dictionary) -> Array:
 	return out
 
 
+## Whether the bundle declares the host scope `world`, so its story can read the game's `@world`. An
+## engine made with nothing bound to it self-backs `@world` from the declared defaults, which won't see
+## the game: a component that makes engines from an editor-set bundle asks this to say so out loud.
+static func declares_world(bundle: Dictionary) -> bool:
+	var registry = bundle.get("scopeRegistry")
+	if not (registry is Dictionary):
+		return false
+	var scopes = registry.get("scopes")
+	if not (scopes is Array):
+		return false
+	for spec in scopes:
+		if spec is Dictionary and str(spec.get("token", "")) == "world":
+			return true
+	return false
+
+
 # Split a ref ("@name" / "@scope.name") into [scope, lowercased name], asking `is_scope(token) -> bool`
 # which heads are scopes. The engine asks its registry, so a scope another engine registered (`@story`)
 # splits as one too; without that, "@world.gold" would split to a @patter property literally named

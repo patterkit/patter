@@ -262,10 +262,11 @@ func _register(bundle: Dictionary, options: Dictionary) -> void:
 		registered.append("patter")
 	var specs: Array = bundle.get("scopeRegistry", {}).get("scopes", [])
 	# A scope the game binds through "host_scopes" is EXTERNAL: the game keeps the values, and the
-	# registry reads and writes them through the game's { "get", "set" } resolver but never stores or
+	# registry reads and writes them through the game's { "get", "set" } resolver (or a PatterWorld's,
+	# or any object's, get_property and set_property: see _resolvers_of) but never stores or
 	# saves them. Its declarations (types, read-only) come from the bundle. "writable": false binds the
 	# story and never the game (the registry's rule, ruled across the family 2026-09-05).
-	var bound: Dictionary = options.get("host_scopes", {})
+	var bound := _resolvers_of(options.get("host_scopes", {}))
 	for token in bound.keys():
 		if refused != "":
 			break
@@ -315,6 +316,29 @@ func _register(bundle: Dictionary, options: Dictionary) -> void:
 		_host.host_scopes = []
 		_bound_scopes = []
 		_init_error = refused
+
+
+## The "host_scopes" option as the registry takes it: token -> { "get", "set"? }. A token may be bound
+## to that Dictionary, or to an object with get_property (and optionally set_property) methods, a
+## PatterWorld above all, which becomes { "get": its get_property, "set": its set_property }. Callables
+## to the object's own methods, never lambdas: a kept lambda can crash a .NET game as it quits
+## (godotengine/godot#122532). No set_property means no "set": the scope is then read-only to everyone,
+## the registry's rule. Anything else is reported ("setup") and left unbound, so a standalone engine
+## self-backs the scope as if nothing had been given.
+func _resolvers_of(given: Dictionary) -> Dictionary:
+	var out := {}
+	for token in given.keys():
+		var b = given[token]
+		if b is Dictionary:
+			out[token] = b
+		elif b is Object and is_instance_valid(b) and b.has_method("get_property"):
+			var resolver := {"get": Callable(b, "get_property")}
+			if b.has_method("set_property"):
+				resolver["set"] = Callable(b, "set_property")
+			out[token] = resolver
+		else:
+			_setup.append([str(token), '"host_scopes" binds "%s" to something that isn\'t a { "get", "set" } Dictionary or an object with a get_property method, so it\'s left unbound' % token])
+	return out
 
 
 static func _spec_for(specs: Array, token: String) -> Dictionary:

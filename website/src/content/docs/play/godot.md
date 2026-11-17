@@ -95,15 +95,40 @@ to hear it, or leave it unset to play silently.
 
 ## Your game's state
 
-Hand the engine your `@world` values through the **`host_scopes`** option, a `get` / `set` pair of
-Callables per token, keyed by property name, that the story reads before every condition and writes
-through on an effect. Bind the same store to anything else that shares those values:
+The story reads your game's state as `@world` properties, and you give it that state by binding a
+**World** through the **`host_scopes`** option. The simplest World is a **`PatterWorld`** node:
+
+1. Add a **PatterWorld** node to your scene, beside your game's own state, say.
+2. Hand it to the engine as `world`: `{"host_scopes": {"world": $PatterWorld}}`.
+3. Have your game write its state into it as it changes.
 
 ```gdscript
-var world := {"time_of_day": "night", "knows_road": false}
+@onready var world: PatterWorld = $PatterWorld
+
+func _ready() -> void:
+    world.set_value("time_of_day", "night")
+    world.set_value("knows_road", false)
+    world.set_read_only("time_of_day", true)      # yours alone: a story write is refused
+    world.changed.connect(_on_world_changed)      # (name, value, from_story)
+    var engine := PatterEngine.new(bundle, {"host_scopes": {"world": world}})
+```
+
+A condition on `@world.knows_road` now reads your value, and an effect that writes `@world` lands in
+the node. Names match case-insensitively, as the story's references do. `PatterBundle.declares_world(bundle)`
+says whether the story reads `@world` at all.
+
+`host_scopes` takes any object with a `get_property(name)` method (and a `set_property(name, value)`
+method if the story may write), so a node of your own can be the World, or you can extend `PatterWorld`
+and override those two to read your game's state where it already lives. Without `set_property`,
+the whole of `@world` is read-only to the story. It also takes a `get` / `set` pair of Callables,
+keyed by property name, that the story reads before every condition and writes through on an effect.
+Make those methods too, not GDScript lambdas: the engine keeps them, and a GDScript lambda kept until
+quit can crash a game on Godot .NET as it closes.
+
+```gdscript
 var engine := PatterEngine.new(bundle, {"host_scopes": {"world": {
-    "get": func(n): return world.get(n),          # null = unset
-    "set": func(n, v): world[n] = v,
+    "get": Callable(self, "_world_get"),          # returns null when unset
+    "set": Callable(self, "_world_set"),
 }}})
 ```
 

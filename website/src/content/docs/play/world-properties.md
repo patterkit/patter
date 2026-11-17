@@ -90,12 +90,37 @@ registry should store and save it, or foreign, with a resolver, when your game k
 
 ## The native ports
 
-Every runtime takes the same host scopes, in its own idiom, and self-backs `@world` when you bind
-none:
+On Unity, Unreal, and Godot you can bind `@world` in the editor, with no code to bind it: add a
+**Patter World** to your scene, point the component that builds your engine at it, and have your game
+write its state into it. It's the same binding as the code route below, under the token `world`, so
+the same rules apply.
 
-- **Unity** takes `EngineOptions.HostScopes`, an `IHostScope` per token, and the [Unity](/play/unity/#your-games-state) page has the detail.
-- **Unreal** takes a host-scopes map at `UPatterEngine::Create(Bundle, HostScopes)`, a `UPatterWorld` per token, covered on the [Unreal](/play/unreal/#your-games-state) page.
-- **Godot** uses the `host_scopes` option, a `get` / `set` pair per token, covered on the [Godot](/play/godot/#your-games-state) page.
+| Engine | In the editor | In code |
+|---|---|---|
+| Unity | a **Patter World** component (`PatterWorld`, or any component implementing `IHostScope`) in the **World** field of the Patter Runner Behaviour | `Bundle.CreateEngineWithWorld(world)`, or `EngineOptions.HostScopes` |
+| Unreal | a **Patter World** component (`UPatterWorldComponent`) on an actor that your engine's component points at | `UPatterEngine::CreateWithWorld(Bundle, World)`, or the host-scopes map at `UPatterEngine::Create` |
+| Godot | a **PatterWorld** node | `{"host_scopes": {"world": $PatterWorld}}`, or a `get` / `set` pair |
+
+Each engine page has the detail: [Unity](/play/unity/#your-games-state),
+[Unreal](/play/unreal/#your-games-state), and [Godot](/play/godot/#your-games-state).
+
+**Watch for an empty World.** Nothing bound is allowed, and the engine self-backs `@world` from the
+declared defaults (above), but in a game that's usually a mistake: "if the player has the key" reads
+the default and never sees your game. Unity's runner warns once when the story reads `@world` and its
+World field is empty, and each runtime's bundle says whether the story reads `@world` at all
+(`DeclaresWorld`, `declares_world`) for a component of your own to do the same.
+
+**Set every name before the story reads it.** A bound World, Patter World included, holds only what
+your game has put in it: a name you haven't set reads as unset, not as its declared default. A
+condition then reads it as false, and a sum on it (`@world.gold + 5`) fails and is reported. Fill the
+World as your game starts, before the first conversation.
+
+Every runtime takes the same host scopes in code, in its own idiom, and self-backs `@world` when you
+bind none:
+
+- **Unity** takes `EngineOptions.HostScopes`, an `IHostScope` per token.
+- **Unreal** takes a host-scopes map at `UPatterEngine::Create(Bundle, HostScopes)`, a `UPatterWorld` per token.
+- **Godot** uses the `host_scopes` option, a `PatterWorld` (or any object with `get_property` / `set_property` methods) or a `get` / `set` pair per token.
 
 The rules are the same everywhere: a bound `@world` is never in a save, a self-backed one is; a `writable: false`
 declaration refuses the STORY's write with the same sentence (`'@world.x' is read-only`), bound or

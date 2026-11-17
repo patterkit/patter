@@ -7,6 +7,12 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **No changes in this runtime.** This lockstep release lets Unity, Unreal, and Godot games bind `@world` in the
+  editor, with a Patter World their game fills, and ships the Godot runtime's second fix for C# games that crashed
+  as they quit.
+
 ## [1.0.3] - 2026-11-15
 
 ### Changed

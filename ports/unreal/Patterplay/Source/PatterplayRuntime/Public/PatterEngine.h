@@ -213,6 +213,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (AutoCreateRefTerm = "HostScopes"))
 	static UPatterEngine* CreateWithOptions(UPatterBundle* Bundle, const FPatterEngineOptions& Options, const TMap<FString, UPatterWorld*>& HostScopes);
 
+	// Create with the game's World bound as "world": the same as Create with a HostScopes map of "world" to
+	// World, for a game whose World is a Patter World component (UPatterWorldComponent::GetPatterWorld or
+	// FindPatterWorld) or any UPatterWorld it holds. A null World binds nothing, as Create with an empty
+	// map does, so @world is self-backed from its declared defaults. UPatterBundle::DeclaresWorld says
+	// whether the story has an @world to bind.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	static UPatterEngine* CreateWithWorld(UPatterBundle* Bundle, UPatterWorld* World);
+
 	// Fired with the choice group's id whenever a choice runs dry (no option could be offered), whether
 	// or not the log is on: live feedback for a writer testing the content.
 	UPROPERTY(BlueprintAssignable, Category = "Patterplay")
