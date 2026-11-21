@@ -1,5 +1,11 @@
 # @patterkit/play-helpers
 
+## 1.0.6
+
+### Patch Changes
+
+- 008a4f4: Uses `@patterkit/runtime` 1.0.5, the Patterplay 1.0.5 release.
+
 ## 1.0.5
 
 ### Patch Changes
