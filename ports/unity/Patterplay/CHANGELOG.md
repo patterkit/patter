@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-11-21
+
 ### Fixed
 
 - **A Patter World's unset names read their defaults.** A name your World (or any host scope you bind) hasn't set

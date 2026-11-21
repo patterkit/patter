@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-11-21
+
 ### Added
 
 - **The Patter Runner can make its own engine.** Set its new `Bundle` in Details, and its `World` to the actor

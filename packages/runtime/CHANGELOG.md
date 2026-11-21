@@ -7,6 +7,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-11-21
+
 ### Fixed
 
 - **A bound World's unset names read their declared defaults.** A name your game hasn't set yet in a World you bind

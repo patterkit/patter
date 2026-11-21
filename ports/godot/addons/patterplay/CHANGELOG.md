@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-11-21
+
 ### Added
 
 - **Set up the runner in the Inspector, with your Patter World.** Give a `PatterRunner` a Bundle and a World,
