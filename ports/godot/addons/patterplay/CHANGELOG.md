@@ -6,6 +6,21 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Set up the runner in the Inspector, with your Patter World.** Give a `PatterRunner` a Bundle and a World,
+  and it makes its own engine when it's ready, with the World bound as `@world`; it warns you if the story reads
+  `@world` and no World is set, and `attach(engine)` still works.
+
+### Fixed
+
+- **Unset `@world` names read their declared defaults with a World bound.** Before, a name your Patter World (or
+  your own store) hadn't set read as empty, so a story's sum on it failed; now it reads the declared default, and
+  your store isn't written.
+- **A refused write to a read-only `@world` name reaches `on_error`.** The story's write is reported as a failed
+  effect and the story plays on, as on the other runtimes; `PatterWorld.set_property` now returns why it refused,
+  and your own store's `set_property` or Dictionary `"set"` can refuse the same way.
+
 ## [1.0.4] - 2026-11-17
 
 ### Added

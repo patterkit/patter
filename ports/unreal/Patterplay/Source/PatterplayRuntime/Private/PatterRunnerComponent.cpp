@@ -1,6 +1,10 @@
 #include "PatterRunnerComponent.h"
+#include "PatterBundle.h"
 #include "PatterEngine.h"
 #include "PatterLog.h"
+#include "PatterWorld.h"
+#include "PatterWorldComponent.h"
+#include "GameFramework/Actor.h"
 
 // The same rules as the std core's patter::Runner (Patter/Runner.h), played through the Blueprint wrappers so
 // the engine's own handling carries over: OpenFlow delivers the Setup reports held since the engine was
@@ -9,6 +13,31 @@
 UPatterRunnerComponent::UPatterRunnerComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+}
+
+void UPatterRunnerComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	if (!Bundle || Engine) return;
+	// The World named in Details, else a Patter World on the runner's own actor (which a Blueprint's
+	// defaults can't name).
+	UPatterWorld* PatterWorld = UPatterWorldComponent::FindPatterWorld(World);
+	if (!PatterWorld && !World) PatterWorld = UPatterWorldComponent::FindPatterWorld(GetOwner());
+	const AActor* Owner = GetOwner();
+	const FString Who = FString::Printf(TEXT("Patter Runner '%s'"), Owner ? *Owner->GetActorNameOrLabel() : *GetName());
+	if (World && !PatterWorld)
+	{
+		// An actor that can't be the World: said, whatever the story reads, as it's a set-up mistake.
+		UE_LOG(LogPatterplay, Warning, TEXT("%s: World is set to '%s', which has no Patter World, so @world plays from its declared defaults. Add a Patter World to it, or set World to the actor that has one."),
+			*Who, *World->GetActorNameOrLabel());
+	}
+	else if (!PatterWorld && Bundle->DeclaresWorld())
+	{
+		// An empty World is said out loud: the story's @world would otherwise play its declared defaults and
+		// never see the game, silently.
+		UE_LOG(LogPatterplay, Warning, TEXT("%s: the story reads @world, but no World is set, so @world plays from its declared defaults and won't see your game. Set World to your game's Patter World."), *Who);
+	}
+	SetEngine(UPatterEngine::CreateWithWorld(Bundle, PatterWorld), FlowId);
 }
 
 void UPatterRunnerComponent::SetEngine(UPatterEngine* InEngine, const FString& InFlowId)

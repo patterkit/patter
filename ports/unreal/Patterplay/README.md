@@ -98,7 +98,10 @@ the core's `Patter/Runner.h`) turns this pull API into push events. `Begin` deli
 line, text, or game event arrives on `OnLine`, `OnText`, or `OnGameEvent` and waits for `Next`, and a choice
 arrives on `OnChoice` and waits for `Choose`. `OnEnded` hands its handler the end's `EPatterFlowEndReason`
 (`patter::FlowEndReason` in C++): `RanDry` when a choice had nothing left and nothing came after it, otherwise
-`Ended`. The engine's save and load stay the one way to save.
+`Ended`. The engine's save and load stay the one way to save. Hand it an engine with `SetEngine`, or set its
+`Bundle` in Details and it makes its own at BeginPlay, with its `World` (the actor holding your game's Patter
+World, else a Patter World on its own actor) bound as `@world`; with no World found, a story that reads `@world`
+logs a warning and plays `@world` from its declared defaults.
 
 ## Demos
 
@@ -123,8 +126,9 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   `UPatterWorld` (`"world"` for World Properties). To set the world up in the editor instead, add a
   **Patter World** component (`UPatterWorldComponent`) to an actor, fill its `GetPatterWorld()` from your
   game, and make the engine with `UPatterEngine::CreateWithWorld(Bundle, World)`;
-  `UPatterWorldComponent::FindPatterWorld(Actor)` finds it on an actor. With nothing bound, `@world` plays
-  from its declared defaults; `UPatterBundle::DeclaresWorld()` says whether the story has an `@world`.
+  `UPatterWorldComponent::FindPatterWorld(Actor)` finds it on an actor. A declared name your world hasn't
+  set reads its declared default, and with nothing bound, all of `@world` plays from its declared defaults;
+  `UPatterBundle::DeclaresWorld()` says whether the story has an `@world`.
 - **Refusals and reports**: Blueprint can't catch what the engine throws, so a flow keeps the reason its
   last `Advance`, `AdvanceToStop`, `Choose`, `Goto`, or `Reset` was refused in `GetLastError` (cleared by
   the next one that succeeds). `OnError` hears every problem the engine carried on past: a content error,

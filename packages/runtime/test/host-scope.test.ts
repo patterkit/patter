@@ -92,6 +92,30 @@ describe("first-class host scopes", () => {
     expect(bag.get("gold")).toBe(105);
   });
 
+  it("a bound resolver's unset name reads its declared default, and the game's store isn't written", () => {
+    const bag = new Map<string, number>();   // the game set nothing: gold and phase are both unset
+    const flow = new Engine(bundle, {
+      hostScopes: { world: { get: (n) => bag.get(n), set: (n, v) => { bag.set(n, v as number); } } },
+    }).openFlow("f", { scene: "s" });
+    // gold read its default 0 and onEntry wrote 5 to the game's bag; phase reads its default a1, never written.
+    expect(firstLine(flow)).toBe("gold 5 phase a1");
+    expect([...bag.entries()]).toEqual([["gold", 5]]);
+  });
+
+  it("a declared name with no default reads its type's default through a bound resolver", () => {
+    const noDefaults = {
+      ...bundle,
+      scopeRegistry: { version: 1, scopes: [{ token: "world", declarations: [
+        { name: "gold", type: "number" },
+        { name: "phase", type: "enum", values: ["a1", "a2"] },
+      ] }] },
+    } as typeof bundle;
+    const bag = new Map<string, number>();
+    const flow = new Engine(noDefaults, { hostScopes: { world: { get: (n) => bag.get(n), set: (n, v) => { bag.set(n, v as number); } } } })
+      .openFlow("f", { scene: "s" });
+    expect(firstLine(flow)).toBe("gold 5 phase a1");
+  });
+
   it("reports the retired `world` option, which binds nothing: the scope self-backs", () => {
     const bag = new Map<string, number>([["gold", 100]]);
     const errors: PlayError[] = [];

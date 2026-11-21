@@ -137,8 +137,18 @@ In `demo/` (delete the folder freely):
   `host_scopes` option (a `PatterWorld` node, any object with `get_property` and `set_property`,
   or a `{"get", "set"}` Dictionary), or hand the engine your game's `PatterScopeRegistry` with the `registry`
   option so every engine in the game shares one set of properties and one save. Without a registry
-  the engine makes its own, and its save carries every property value. See
+  the engine makes its own, and its save carries every property value. A declared name your store hasn't
+  set reads as its declared default, and your store isn't written. A name you've made read-only with
+  `set_read_only` refuses the story's write: `set_property` returns why, the engine reports it to `on_error`
+  as a failed effect, and the story plays on. Your own store refuses a write the same way, by returning why
+  from its `set_property` or its Dictionary's `"set"`. See
   [One registry per game](https://patterkit.dev/play/godot/#one-registry-per-game).
+- **The thin runner**: `PatterRunner` turns a flow into signals (`line`, `text`, `game_event`, `choice`,
+  `ended`) for your UI, and plays the next beat when you call `next()`. Hand it an engine with
+  `attach(engine)`, or set it up in the Inspector: give it a Bundle (an imported `.patterc`) and a World (your
+  scene's `PatterWorld`), and it makes its own engine when it's ready, with the World bound as `@world`,
+  playing `flow_id`. If the story reads `@world` and no World is set, it warns you: `@world` would play from
+  its declared defaults and not see your game. `get_engine()` gives you the engine, for saves.
 - **Audio**: `PatterAudioResolver` reads the `patteraudio.json` manifest exported next to a Patter
   audio folder and resolves each line to its winning take - it resolves the path, you play
   it. See [the audio guide](https://patterkit.dev/play/audio/).

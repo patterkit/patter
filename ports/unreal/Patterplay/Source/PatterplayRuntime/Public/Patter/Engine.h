@@ -72,7 +72,8 @@ namespace patter
     // self-backed by a standalone engine, as a property the registry stores and saves.
     struct HostScope
     {
-        // Returns nullptr when this scope has no such name (which reads as a graceful false). The
+        // Returns nullptr when the game hasn't set the name: a declared name then reads its declared
+        // default (DeclaredDefaultsResolver), anything else a graceful false. The
         // pointer must stay valid until the next call on this scope: the registry copies immediately,
         // and a binding that computes values should hold its own slot.
         std::function<const PatterValue*(const std::string&)> get;
@@ -96,6 +97,42 @@ namespace patter
     private:
         HostScope scope_;
     };
+
+    // A bound host scope's resolver, reading a declared name the game hasn't set as its declared default:
+    // the value the story would read with nothing bound (the declaration's `default`, else its type's,
+    // the kernel's defaultFor), so binding a World never turns a default into unset. Writes, and every
+    // name the game has set, go straight through; the game's own store is never written. Names reach the
+    // resolver lower-cased and match declarations case-insensitively. The same rule on every runtime.
+    class DeclaredDefaultsResolver : public IScopeResolver
+    {
+    public:
+        DeclaredDefaultsResolver(std::shared_ptr<IScopeResolver> inner, const std::vector<ScopeDeclaration>& decls)
+            : inner_(std::move(inner))
+        {
+            for (const auto& d : decls) defaults_.emplace(toLower(d.name), d.defaultOrTypeDefault());
+        }
+        std::optional<PatterValue> get(const std::string& name) const override
+        {
+            std::optional<PatterValue> v = inner_->get(name);
+            if (v) return v;
+            auto it = defaults_.find(toLower(name));
+            return it != defaults_.end() ? std::optional<PatterValue>(it->second) : v;
+        }
+        bool canSet() const override { return inner_->canSet(); }
+        void set(const std::string& name, const PatterValue& value) override { inner_->set(name, value); }
+    private:
+        std::shared_ptr<IScopeResolver> inner_;
+        std::map<std::string, PatterValue> defaults_;
+    };
+
+    // The resolver a bound host scope registers: the game's, with its declarations' defaults behind it
+    // (DeclaredDefaultsResolver). No declarations: the resolver as given.
+    inline std::shared_ptr<IScopeResolver> withDeclaredDefaults(
+        std::shared_ptr<IScopeResolver> resolver, const std::vector<ScopeDeclaration>& decls)
+    {
+        if (decls.empty()) return resolver;
+        return std::make_shared<DeclaredDefaultsResolver>(std::move(resolver), decls);
+    }
 
     // A bundle's host-scope declaration in the registry's vocabulary.
     inline ScopeDeclaration toForeignDecl(const HostScopeDecl& d)
@@ -795,7 +832,9 @@ namespace patter
         std::function<void(const std::vector<LoadMisfit>&)> onRefit;
         // Live game state per host-scope token ("world" -> your resolver): values the GAME keeps. Each
         // binding is registered in the registry as an external scope (read and written through, never
-        // stored or saved there). Declared tokens you do not bind are self-backed by a standalone
+        // stored or saved there). A declared name your resolver hasn't set reads its declared default
+        // (the declaration's own, else its type's); the fallback never writes your store. Declared
+        // tokens you do not bind are self-backed by a standalone
         // engine, as properties the registry stores and saves; given the game's registry, the engine
         // self-backs nothing, since those tokens are the game's to register (or another engine's).
         // Tokens are case-sensitive: a token the bundle doesn't declare is reported (`setup`), naming the
@@ -3755,7 +3794,7 @@ namespace patter
                     ForeignScopeOptions fo;
                     fo.writable = spec && spec->hasWritable ? spec->writable : true;
                     fo.owner = owner;
-                    reg.defineForeign(kv.first, std::make_shared<HostScopeResolver>(kv.second), &decls, fo);
+                    reg.defineForeign(kv.first, withDeclaredDefaults(std::make_shared<HostScopeResolver>(kv.second), decls), &decls, fo);
                     registered.push_back(kv.first);
                     host_.boundScopes.push_back(kv.first);
                     bound.insert(kv.first);

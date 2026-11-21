@@ -116,6 +116,33 @@ namespace Patterkit.Patterplay.TestHost
                 }
             }
 
+            // A world with nothing set: the engine reads each declared name as its declared default (its own, else
+            // its type's), the same as with no world bound, and never writes those defaults into the game's store.
+            // The story's write lands there; the world's own Get still says unset for the rest.
+            {
+                var bundle = WorldBundle();
+                var decls = bundle.ScopeRegistry.Scopes[0].Declarations;
+                decls[0].Default = ExprValue.True;
+                decls[1].Default = ExprValue.Num(5);
+                decls.Add(new HostScopeDecl { Name = "mood", Type = "enum", Values = new List<string> { "calm", "tense" } });
+                var w = new WorldValues();
+                var errors = new List<PlayError>();
+                var engine = new Engine(bundle, WorldBinding.WithWorld(new EngineOptions { OnError = errors.Add }, w));
+                Ok("an unset declared name reads its own default through the engine", engine.GetProperty("@world.doorsopen")?.AsNumber == 5,
+                    $"{engine.GetProperty("@world.doorsopen")}");
+                Ok("an unset name with no default reads its type's", engine.GetProperty("@world.mood")?.AsString == "calm",
+                    $"{engine.GetProperty("@world.mood")}");
+                Ok("reading defaults wrote nothing to the game's store", w.Names().Count == 0, string.Join(",", w.Names()));
+                var step = engine.OpenFlow("main", "s", "b").Advance();
+                Ok("a condition on an unset name sees its declared default", step.Type == StepType.Text && step.Text == "unlocked", step.Text);
+                Ok("the story's write from the default lands in the game's store", w.Get("doorsopen")?.AsNumber == 6, $"{w.Get("doorsopen")}");
+                Ok("only the story's write is in the store", string.Join(",", w.Names()) == "doorsopen", string.Join(",", w.Names()));
+                Ok("the world's own Get still says unset", w.Get("haskey") == null && w.Get("mood") == null);
+                w.HostSet("hasKey", ExprValue.False);
+                Ok("the game's value wins over the default", engine.GetProperty("@world.haskey")?.AsBool == false);
+                Ok("nothing was reported (defaults)", errors.Count == 0, string.Join(" | ", errors));
+            }
+
             // No world binds nothing: the caller's options come back as they were, and the engine self-backs
             // @world from the declared defaults (so the condition fails and the snippet is skipped).
             {

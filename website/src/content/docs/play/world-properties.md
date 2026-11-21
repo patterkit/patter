@@ -98,22 +98,22 @@ the same rules apply.
 | Engine | In the editor | In code |
 |---|---|---|
 | Unity | a **Patter World** component (`PatterWorld`, or any component implementing `IHostScope`) in the **World** field of the Patter Runner Behaviour | `Bundle.CreateEngineWithWorld(world)`, or `EngineOptions.HostScopes` |
-| Unreal | a **Patter World** component (`UPatterWorldComponent`) on an actor that your engine's component points at | `UPatterEngine::CreateWithWorld(Bundle, World)`, or the host-scopes map at `UPatterEngine::Create` |
-| Godot | a **PatterWorld** node | `{"host_scopes": {"world": $PatterWorld}}`, or a `get` / `set` pair |
+| Unreal | a **Patter World** component (`UPatterWorldComponent`) on the actor in the **World** field of the Patter Runner (or that your engine's component points at) | `UPatterEngine::CreateWithWorld(Bundle, World)`, or the host-scopes map at `UPatterEngine::Create` |
+| Godot | a **PatterWorld** node in the **World** field of the `PatterRunner` | `{"host_scopes": {"world": $PatterWorld}}`, or a `get` / `set` pair |
 
 Each engine page has the detail: [Unity](/play/unity/#your-games-state),
 [Unreal](/play/unreal/#your-games-state), and [Godot](/play/godot/#your-games-state).
 
 **Watch for an empty World.** Nothing bound is allowed, and the engine self-backs `@world` from the
 declared defaults (above), but in a game that's usually a mistake: "if the player has the key" reads
-the default and never sees your game. Unity's runner warns once when the story reads `@world` and its
+the default and never sees your game. Each engine's runner warns once when the story reads `@world` and its
 World field is empty, and each runtime's bundle says whether the story reads `@world` at all
 (`DeclaresWorld`, `declares_world`) for a component of your own to do the same.
 
-**Set every name before the story reads it.** A bound World, Patter World included, holds only what
-your game has put in it: a name you haven't set reads as unset, not as its declared default. A
-condition then reads it as false, and a sum on it (`@world.gold + 5`) fails and is reported. Fill the
-World as your game starts, before the first conversation.
+**A name you haven't set reads its declared default.** A bound World, Patter World included, holds only
+what your game has put in it, so until your game sets a name the story reads the default the project
+declares for it (its own default, else its type's: false, 0, an empty string, no flags, an enum's first
+value, a quality's first stage). Reading a default writes nothing: the World holds only what your game or the story has set.
 
 Every runtime takes the same host scopes in code, in its own idiom, and self-backs `@world` when you
 bind none:

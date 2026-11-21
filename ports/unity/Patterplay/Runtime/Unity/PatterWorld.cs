@@ -1,7 +1,7 @@
 // A Patter World: the game's `@world`, as a component you add in the editor. Put one on a GameObject, set its
 // values from your game (SetBool, SetNumber, SetString, SetFlags), and set it as a Patter Runner's World (or pass
 // it to PatterBundleAsset.CreateEngineWithWorld(world)). The story then reads and writes your game's values, not the
-// declared defaults.
+// declared defaults (a name you haven't set still reads its declared default; the engine never writes it here).
 //
 // It's bound through the same host-scopes path as EngineOptions.HostScopes, under the token "world": an
 // external scope the game keeps, never saved by Patterplay (save it with your game). Same shape as Unreal's
@@ -65,8 +65,9 @@ namespace Patterkit.Patterplay
 
         // --- what the engine calls (IHostScope) -----------------------------------------
 
-        /// <summary>The engine's read: the current value, or null when unset (the story reads it as false). The
-        /// engine hands names folded to lower case. Override to read your game's own state.</summary>
+        /// <summary>The engine's read: the current value, or null when unset (the story then reads the name's
+        /// declared default, as it would with no World set; nothing is written here). The engine hands names
+        /// folded to lower case. Override to read your game's own state.</summary>
         public virtual ExprValue Get(string name) => Store.Get(name);
 
         /// <summary>The engine's write (the story's effects, and Engine.SetProperty on `@world`): refused, by

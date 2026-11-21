@@ -12,6 +12,10 @@
 #   runner.ended.connect(func(reason): close())   # "ended", or "ran-dry": a choice had nothing left
 #   runner.begin()          # the project's start scene; next() on each click
 #
+# Or set it up in the editor: give it a Bundle (an imported .patterc) and it makes its own engine when it's
+# ready, with its World (the scene's Patter World) bound as @world, playing flow_id. attach() by code still
+# works, and an engine attached before the runner is ready is the one it plays.
+#
 # A fuller dialogue manager for more complex games, Patterstage, is coming.
 #
 # GDScript can't throw, so a refusal is push_error'd and kept for last_error(), as PatterFlow's advance()
@@ -32,6 +36,12 @@ signal choice(step: Dictionary)
 ## nothing left to offer and nothing came after it, otherwise "ended".
 signal ended(reason: String)
 
+## Optional: a compiled .patterc, imported. Set, the runner makes its own engine when it's ready; empty,
+## hand it one with attach(engine).
+@export var bundle: PatterBundleResource
+## Your game's Patter World, bound as @world when the runner makes its engine: a PatterWorld, or your own
+## subclass of one. Empty, @world plays from its declared defaults.
+@export var world: PatterWorld
 ## The flow the runner plays.
 @export var flow_id := "main"
 
@@ -41,6 +51,29 @@ var _queued := 0
 var _delivering := false
 ## Why the last begin(), next() or choose() was refused, or "" when it wasn't: see last_error().
 var _last_error := ""
+
+
+## Given a Bundle and no engine yet, make the engine, with the World bound as @world. A story that reads
+## @world with no World set is said out loud: it would otherwise play the declared defaults and never see
+## the game, silently.
+func _ready() -> void:
+	if bundle == null or _engine != null:
+		return
+	var who := "Patter Runner '%s'" % name
+	if not bundle.is_valid():
+		push_error("%s: the Bundle isn't a usable .patterc: %s" % [who, "; ".join(bundle.get_errors())])
+		return
+	var data := bundle.get_bundle()
+	var bound := world != null and is_instance_valid(world)
+	if not bound and PatterBundle.declares_world(data):
+		push_warning("%s: the story reads @world, but no World is set, so @world plays from its declared defaults and won't see your game. Set World to your game's Patter World." % who)
+	attach(PatterEngine.new(data, {"host_scopes": {"world": world}} if bound else {}), flow_id)
+
+
+## The engine the runner plays on, for saves and everything else the runner leaves alone; null until
+## attached (or made from the Bundle).
+func get_engine() -> PatterEngine:
+	return _engine
 
 
 ## Give the runner its engine, and the flow it plays. Plays nothing until begin().

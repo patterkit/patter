@@ -17,6 +17,8 @@ var _errors: Array = []
 const WORLD_DECLS := [
 	{"name": "hasKey", "type": "boolean", "default": false},
 	{"name": "gold", "type": "number", "default": 0},
+	{"name": "alarms", "type": "number", "default": 2},
+	{"name": "seen", "type": "flags"},
 ]
 
 
@@ -48,6 +50,17 @@ class ReadOnlyState extends RefCounted:
 		return gold if name == "gold" else null
 
 
+## A game's own store whose set_property answers nothing (void): every write lands.
+class VoidState extends RefCounted:
+	var values := {}
+
+	func get_property(name: String) -> Variant:
+		return values.get(name)
+
+	func set_property(name: String, value: Variant) -> void:
+		values[name] = value
+
+
 ## A game's own World, reading its own state instead of the store.
 class GameWorld extends PatterWorld:
 	var key_in_pocket := true
@@ -63,6 +76,8 @@ func _initialize() -> void:
 	_bound()
 	_unbound()
 	_read_only_through_the_engine()
+	_declared_defaults()
+	_dictionary_refusal()
 	_other_objects()
 	_declares_world()
 	print("test_world: ALL PASS" if _fails == 0 else "test_world: %d FAILED" % _fails)
@@ -107,10 +122,12 @@ func _the_store() -> void:
 	world.set_read_only("Gold", true)
 	_check("store: is_read_only, any spelling", world.is_read_only("gold"), "")
 	_heard = []
-	world.set_property("gold", 9)   # refused: push_error'd, nothing lands
+	var why = world.set_property("gold", 9)   # refused: answered, nothing lands
 	_check("store: read-only refuses a story write", _eq(world.get_value("gold"), 4) and _heard.is_empty(), str(world.get_value("gold")) + " " + str(_heard))
-	world.set_property("gold", 4.0)   # a rollback's write of the value it holds
-	_check("store: a write of the value it holds passes quietly", _heard.is_empty(), str(_heard))
+	_check("store: and answers why", why == "@world.gold is the game's alone: a story tried to set it", str(why))
+	why = world.set_property("gold", 4.0)   # a rollback's write of the value it holds
+	_check("store: a write of the value it holds passes quietly", _heard.is_empty() and why == "", str(_heard) + " " + str(why))
+	_check("store: a write that lands answers \"\"", world.set_property("hasKey", false) == "", "")
 	world.set_value("gold", 6)
 	_check("store: read-only never binds the host", _eq(world.get_value("gold"), 6), str(world.get_value("gold")))
 	world.set_read_only("gold", false)
@@ -153,11 +170,71 @@ func _read_only_through_the_engine() -> void:
 	world.set_value("hasKey", true)
 	world.set_value("gold", 2)
 	world.set_read_only("gold", true)
-	var engine := PatterEngine.new(_bundle(), {"seed": 1, "host_scopes": {"world": world}})
-	_check("read-only: the story still reads it", _first_text(engine) == "has key", "")
+	_errors = []
+	var engine := PatterEngine.new(_bundle(), {"seed": 1, "host_scopes": {"world": world}, "on_error": _on_error})
+	var flow = engine.open_flow("f", "s")
+	_check("read-only: the story still reads it", str(flow.advance().get("text", "")) == "has key", "")
+	_check("read-only: and plays on past the refused write", flow.advance().get("type", "") == "end", "")
 	_check("read-only: the story's write never lands", _eq(world.get_value("gold"), 2), str(world.get_value("gold")))
+	var got: Array = _errors.map(func(e): return [e.get("kind"), e.get("node"), e.get("flow"), e.get("message")])
+	_check("read-only: the refusal reaches on_error as a failed effect",
+		got == [["effect", "yes", "f", "@world.gold is the game's alone: a story tried to set it"]], str(_errors))
+	_check("read-only: the game's own write through the engine is refused too",
+		engine.set_property("@world.gold", 1) == "@world.gold is the game's alone: a story tried to set it"
+		and _eq(world.get_value("gold"), 2), str(world.get_value("gold")))
 	engine = null
 	world.free()
+
+
+# -- a declared name the game hasn't set reads its declared default --------------------
+
+func _declared_defaults() -> void:
+	var world := PatterWorld.new()
+	world.set_value("hasKey", true)   # gold, alarms and seen unset
+	var engine := PatterEngine.new(_bundle(), {"seed": 1, "host_scopes": {"world": world}})
+	_check("defaults: an unset number reads its declaration's default", _eq(engine.get_property("@world.alarms"), 2), str(engine.get_property("@world.alarms")))
+	_check("defaults: an unset name with no default reads its type's", _eq(engine.get_property("@world.seen"), []), str(engine.get_property("@world.seen")))
+	(engine.get_property("@world.seen") as Array).append("x")
+	_check("defaults: a flags default is never shared", _eq(engine.get_property("@world.seen"), []), str(engine.get_property("@world.seen")))
+	_check("defaults: the fallback never writes the game's store", not world.has_value("alarms") and not world.has_value("seen"), str(world.names()))
+	_check("defaults: a story sums on an unset name from its default", _first_text(engine) == "has key" and _eq(world.get_value("gold"), 5), str(world.get_value("gold")))
+	world.set_value("alarms", 7)
+	_check("defaults: a value the game sets reads through", _eq(engine.get_property("@world.alarms"), 7), str(engine.get_property("@world.alarms")))
+	_check("defaults: a name nobody declared still reads null", engine.get_property("@world.nothing") == null, str(engine.get_property("@world.nothing")))
+	engine = null
+	world.free()
+
+	# A Dictionary resolver gets the same fallback.
+	var store := {}
+	engine = PatterEngine.new(_bundle(), {"seed": 1, "host_scopes": {"world": {"get": func(n): return store.get(n), "set": func(n, v): store[n] = v}}})
+	_check("defaults: a Dictionary resolver reads the declared default too", _eq(engine.get_property("@world.alarms"), 2) and store.is_empty(), str(store))
+
+
+# -- a Dictionary resolver's own refusal -------------------------------------------------
+
+func _dictionary_refusal() -> void:
+	var store := {"haskey": true}
+	var refusing := {
+		"get": func(n): return store.get(n),
+		"set": func(n, v): return "the game keeps %s" % n if n == "gold" else _store_put(store, n, v),
+	}
+	_errors = []
+	var engine := PatterEngine.new(_bundle(), {"seed": 1, "host_scopes": {"world": refusing}, "on_error": _on_error})
+	var flow = engine.open_flow("f", "s")
+	_check("dictionary: the story reads through it", str(flow.advance().get("text", "")) == "has key", "")
+	_check("dictionary: and plays on past the refused write", flow.advance().get("type", "") == "end", "")
+	_check("dictionary: the refused write never lands", not store.has("gold"), str(store))
+	var got: Array = _errors.map(func(e): return [e.get("kind"), e.get("node"), e.get("message")])
+	_check("dictionary: a \"set\" that answers why reaches on_error as a failed effect",
+		got == [["effect", "yes", "the game keeps gold"]], str(_errors))
+	_check("dictionary: a \"set\" that answers nothing lands", engine.set_property("@world.alarms", 4) == ""
+		and _eq(store.get("alarms"), 4), str(store))
+
+
+## A write that lands, answering nothing (null).
+static func _store_put(store: Dictionary, n: String, v):
+	store[n] = v
+	return null
 
 
 # -- other objects in place of a PatterWorld -----------------------------------------
@@ -170,11 +247,16 @@ func _other_objects() -> void:
 	var refused: String = engine.set_property("@world.gold", 1)
 	_check("own object: no set_property, so even the host's write is refused", refused != "" and state.gold == 40, refused)
 
-	# A subclass reads the game's own state.
-	# An unset name reads null (the engine's rule for a game's own store), so the game sets what the
-	# story does sums on.
+	# An object whose set_property answers nothing: every write lands, and nothing is reported.
+	var plain := VoidState.new()
+	plain.values["haskey"] = true
+	_errors = []
+	engine = PatterEngine.new(_bundle(), {"seed": 1, "host_scopes": {"world": plain}, "on_error": _on_error})
+	_check("own object: a void set_property is a write that lands", _first_text(engine) == "has key"
+		and _eq(plain.values.get("gold"), 5) and _errors.is_empty(), str(plain.values) + " " + str(_errors))
+
+	# A subclass reads the game's own state. Gold is unset, so the story sums on its declared default.
 	var mine := GameWorld.new()
-	mine.set_value("gold", 0)
 	engine = PatterEngine.new(_bundle(), {"seed": 1, "host_scopes": {"world": mine}})
 	_check("subclass: an overridden get_property is what the story reads", _first_text(engine) == "has key", "")
 	_check("subclass: the store still takes the write back", _eq(mine.get_value("gold"), 5), str(mine.get_value("gold")))

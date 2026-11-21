@@ -5,7 +5,11 @@
 // the recording however it likes (UPatterAudioResolver resolves it, if you want it). The same runner as
 // the std core's patter::Runner (Patter/Runner.h) and every other Patterplay runtime's.
 //
-//   Runner->SetEngine(Engine, TEXT("main"));
+// Give it a Bundle in its Details and it makes its own engine at BeginPlay, with its World (the actor holding
+// your game's Patter World) bound as @world; or hand it one in code with SetEngine. Begin starts the
+// conversation.
+//
+//   Runner->SetEngine(Engine, TEXT("main"));                     // or set Bundle (and World) in Details
 //   Runner->OnLine.AddDynamic(this, &AMyActor::ShowLine);        // then Runner->Next() on each click
 //   Runner->OnChoice.AddDynamic(this, &AMyActor::OfferChoice);   // then Runner->Choose(OptionId)
 //   Runner->OnEnded.AddDynamic(this, &AMyActor::CloseDialogue);   // takes the EPatterFlowEndReason
@@ -19,6 +23,8 @@
 #include "PatterTypes.h"
 #include "PatterRunnerComponent.generated.h"
 
+class AActor;
+class UPatterBundle;
 class UPatterEngine;
 class UPatterFlow;
 
@@ -44,6 +50,17 @@ class PATTERPLAYRUNTIME_API UPatterRunnerComponent : public UActorComponent
 public:
 	UPatterRunnerComponent();
 
+	// Optional: a compiled .patterc. Set, the runner makes its own engine at BeginPlay (unless it was handed
+	// one with SetEngine first); empty, hand it one with SetEngine.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Patterplay")
+	TObjectPtr<UPatterBundle> Bundle = nullptr;
+
+	// The actor holding your game's Patter World (a Patter World component), bound as @world when the runner
+	// makes its engine from Bundle. Empty, the runner looks for a Patter World on its own actor; with none
+	// there either, @world plays from its declared defaults, and a story that reads @world logs a warning.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Patterplay")
+	TObjectPtr<AActor> World = nullptr;
+
 	// The id of the flow the runner plays, opened on the first Begin.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Patterplay")
 	FString FlowId = TEXT("main");
@@ -68,6 +85,10 @@ public:
 	// nothing came after it, otherwise Ended. Begin begins again.
 	UPROPERTY(BlueprintAssignable, Category = "Patterplay")
 	FPatterRunnerEndedEvent OnEnded;
+
+	// Makes the engine from Bundle, with World's Patter World bound as @world, when Bundle is set and no
+	// engine was handed over first.
+	virtual void BeginPlay() override;
 
 	// The engine to play on and the flow's id. Changes nothing in the engine: the flow opens on Start.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")

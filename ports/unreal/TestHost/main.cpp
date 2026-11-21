@@ -1904,7 +1904,7 @@ static void runHostScopeWritableSmoke()
     {
         const bool bound = pass == 1;
         const std::string label = bound ? "bound" : "self-backed";
-        // A bound scope has no defaults: the GAME owns its values and seeds them itself.
+        // The GAME owns a bound scope's values; it seeds them here, so no read falls back to a declared default.
         auto store = std::make_shared<std::map<std::string, PatterValue>>();
         (*store)["clock"] = PatterValue::Str("day"); (*store)["known"] = PatterValue::Bool(false);
         EngineOptions opts;

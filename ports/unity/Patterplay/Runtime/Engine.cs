@@ -26,7 +26,9 @@ namespace Patterkit.Patterplay
     /// registry stores and saves), so a standalone build plays the same story a bound one does.</summary>
     public interface IHostScope
     {
-        /// <summary>The current value, or null when this scope has no such property (reads graceful-false).</summary>
+        /// <summary>The current value, or null when this scope has no such property. The engine reads a null
+        /// for a declared name as that declaration's default (its own, else its type's), the value the story
+        /// reads with nothing bound; an undeclared name reads graceful-false.</summary>
         ExprValue Get(string name);
         void Set(string name, ExprValue value);
     }
@@ -40,6 +42,40 @@ namespace Patterkit.Patterplay
         public bool CanSet => true;
         public ExprValue Get(string name) => _scope.Get(name);
         public void Set(string name, ExprValue value) => _scope.Set(name, value);
+    }
+
+    /// <summary>A bound host scope's resolver, reading a declared name the game hasn't set (null) as its
+    /// declared default: the value the story would read with nothing bound (the declaration's `Default`, else
+    /// its type's), so binding a World never turns a default into unset. Writes, and every name the game has
+    /// set, go straight through; the game's own store is never written. No declarations: the resolver as given
+    /// (see <see cref="For"/>). Names match case-insensitively. ExprValue is immutable, so a default is never
+    /// shared mutably (the TypeScript engine clones for the same reason). The same rule on every runtime.</summary>
+    internal sealed class DeclaredDefaultsResolver : IScopeResolver
+    {
+        private readonly IScopeResolver _inner;
+        private readonly Dictionary<string, ScopeDeclaration> _byName;
+
+        private DeclaredDefaultsResolver(IScopeResolver inner, Dictionary<string, ScopeDeclaration> byName)
+        {
+            _inner = inner; _byName = byName;
+        }
+
+        public static IScopeResolver For(IScopeResolver inner, IReadOnlyCollection<ScopeDeclaration> decls)
+        {
+            if (decls == null || decls.Count == 0) return inner;
+            var byName = new Dictionary<string, ScopeDeclaration>(StringComparer.OrdinalIgnoreCase);
+            foreach (var d in decls) if (d?.Name != null && !byName.ContainsKey(d.Name)) byName[d.Name] = d;
+            return new DeclaredDefaultsResolver(inner, byName);
+        }
+
+        public bool CanSet => _inner.CanSet;
+        public ExprValue Get(string name)
+        {
+            var v = _inner.Get(name);
+            if (v != null || name == null) return v;
+            return _byName.TryGetValue(name, out var d) ? d.DefaultOrTypeDefault() : null;
+        }
+        public void Set(string name, ExprValue value) => _inner.Set(name, value);
     }
 
     /// <summary>The registry keys this engine stores its instance bags under. An id is escaped (`%` and
@@ -722,7 +758,7 @@ namespace Patterkit.Patterplay
                         }
                         var decls = (spec?.Declarations ?? new List<HostScopeDecl>())
                             .Where(d => d != null && d.Name != null).Select(ToForeignDecl).ToList();
-                        registry.DefineForeign(kv.Key, new HostScopeResolver(kv.Value), decls,
+                        registry.DefineForeign(kv.Key, DeclaredDefaultsResolver.For(new HostScopeResolver(kv.Value), decls), decls,
                             new ForeignScopeOptions { Writable = spec?.Writable ?? true, Owner = PatterKeys.Owner });
                         registered.Add(kv.Key);
                         bound.Add(kv.Key);

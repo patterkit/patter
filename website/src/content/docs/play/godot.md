@@ -115,12 +115,15 @@ func _ready() -> void:
 
 A condition on `@world.knows_road` now reads your value, and an effect that writes `@world` lands in
 the node. Names match case-insensitively, as the story's references do. `PatterBundle.declares_world(bundle)`
-says whether the story reads `@world` at all.
+says whether the story reads `@world` at all. A name you haven't set reads its declared default, and a story
+write to a name you've made read-only is refused and reported to `on_error` as a failed effect, and the story
+plays on.
 
 `host_scopes` takes any object with a `get_property(name)` method (and a `set_property(name, value)`
 method if the story may write), so a node of your own can be the World, or you can extend `PatterWorld`
 and override those two to read your game's state where it already lives. Without `set_property`,
-the whole of `@world` is read-only to the story. It also takes a `get` / `set` pair of Callables,
+the whole of `@world` is read-only to the story. A `set_property` that returns a reason (a non-empty
+String) refuses that write, reported as above; one that returns nothing lets it land. It also takes a `get` / `set` pair of Callables,
 keyed by property name, that the story reads before every condition and writes through on an effect.
 Make those methods too, not GDScript lambdas: the engine keeps them, and a GDScript lambda kept until
 quit can crash a game on Godot .NET as it closes.

@@ -97,7 +97,11 @@ component of yours that implements `IHostScope`) into the **World** field; left 
 
 ## Godot
 
-`PatterRunner` is a node with signals. Add it to your scene, attach the engine, and connect the signals.
+`PatterRunner` is a node with signals. Add it to your scene, give it its engine, and connect the signals. In the
+Inspector, set its **Bundle** to your imported bundle and, if the story reads `@world`, its **World** to your
+game's **PatterWorld** node: it makes its own engine when it's ready, playing **Flow Id**. Left without a World, it
+warns once and `@world` plays from its declared defaults ([Your game's state](/play/godot/#your-games-state)). Or
+build the engine in code and `attach` it, as here:
 
 ```gdscript
 @onready var runner: PatterRunner = $PatterRunner
@@ -118,8 +122,12 @@ pending) prints the error and keeps it for `runner.last_error()`, as the flow's 
 
 ## Unreal
 
-Add a **Patter Runner** component (`UPatterRunnerComponent`) to an actor, give it your engine with
-`SetEngine`, and bind its events: **On Line**, **On Text**, **On Game Event**, **On Choice**, and **On Ended**
+Add a **Patter Runner** component (`UPatterRunnerComponent`) to an actor and give it its engine. In Details, set
+its **Bundle** and, if the story reads `@world`, its **World** to the actor holding your game's **Patter World**
+component (left empty, it looks on its own actor): it makes its own engine at BeginPlay, playing **Flow Id**, and
+warns once if the story reads `@world` and it finds no Patter World
+([Your game's state](/play/unreal/#your-games-state)). Or build the engine in code and hand it over with
+`SetEngine`. Then bind its events: **On Line**, **On Text**, **On Game Event**, **On Choice**, and **On Ended**
 (its **Reason** pin is `Ended`, or `RanDry` when a choice had nothing left).
 Your Continue button calls **Next**, a choice button calls **Choose** with its option id, and **Begin** starts the
 conversation (leave **Scene** empty for the project's start scene).

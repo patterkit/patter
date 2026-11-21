@@ -7,6 +7,24 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **The Patter Runner can make its own engine.** Set its new `Bundle` in Details, and its `World` to the actor
+  holding your game's Patter World, and it makes the engine at BeginPlay with that world bound as `@world`, playing
+  the flow named in `FlowId`.
+  - Leave `World` empty and it uses a Patter World on the runner's own actor, if there is one. With none, a story
+    that reads `@world` logs a warning saying so, and `@world` plays from its declared defaults.
+  - A `World` actor with no Patter World on it is warned about too.
+  - Code that hands the runner an engine with `SetEngine` works as before, and an engine handed over before
+    BeginPlay is kept.
+
+### Fixed
+
+- **A bound World no longer turns a declared default into false.** When your World hasn't set a name the story
+  declares, the story now reads that declaration's default (its own, else its type's), just as it does with no
+  World bound. Values you set, and every write, go straight through, and your World is never written by the
+  fallback.
+
 ## [1.0.4] - 2026-11-17
 
 ### Added

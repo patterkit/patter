@@ -12,7 +12,9 @@
 # A bound world is an EXTERNAL scope in the engine's property registry: the registry reads and writes
 # it through this node and never stores or saves it, so the values are the game's, saved by the game.
 # Without one, a standalone engine self-backs @world from the declared defaults, which is fine for a run
-# that never leaves the engine, but won't see the game. PatterBundle.declares_world(bundle) says whether
+# that never leaves the engine, but won't see the game. A declared name this world hasn't set reads as its
+# declared default either way: the engine falls back to it when get_property gives null, and never writes it
+# here. PatterBundle.declares_world(bundle) says whether
 # a story reads @world at all, so a game (or a director built on Patterplay) can say so out loud.
 #
 # Names match case-insensitively: the compiler folds every property reference, so the story asks for
@@ -27,9 +29,9 @@
 # Two read-only ideas meet here and stay distinct, as on every runtime. A `writable: false` DECLARATION
 # is the story's promise, checked by the compiler and refused by the engine whether or not a world is
 # bound. set_read_only here is the GAME's policy: a name the story may read but this game won't let it
-# write. GDScript can't throw and the registry doesn't read a resolver's answer, so a refused write is
-# push_error'd and never lands; the engine doesn't see it as a failed effect. The host's own set_value
-# is bound by neither.
+# write. GDScript can't throw, so set_property answers with the refusal instead: the engine takes a
+# non-empty answer as a refused write, so a story's write is a failed effect, reported through the
+# engine's on_error, and the story plays on. The host's own set_value is bound by neither.
 #
 # Same shape as Unreal's UPatterWorld and Unity's PatterWorld, in Godot's idiom.
 class_name PatterWorld
@@ -84,23 +86,26 @@ func is_read_only(name: String) -> bool:
 
 # --- the story's side (what the engine calls; override to read the game's own state) -------------
 
-## A read; null when unset, as the engine takes an unset property. The registry hands names lower-cased.
+## A read; null when unset, and the engine then reads the name's declared default. The registry hands
+## names lower-cased.
 func get_property(name: String) -> Variant:
 	return get_value(name)
 
 
-## A write through the engine. Refused (push_error, nothing lands, nothing fires) when the game made
-## the name read-only and the write would change it; a write of the value it already holds, which a
-## checkpoint's rollback makes, passes quietly.
-func set_property(name: String, value: Variant) -> void:
+## A write through the engine. Returns "" when it landed, else why it was refused (nothing lands, nothing
+## fires): the game made the name read-only and the write would change it. The engine reports a refusal
+## to its on_error as a failed effect. A write of the value it already holds, which a checkpoint's rollback
+## makes, passes quietly. An override may return nothing (void), which the engine takes as landed: the
+## return is left untyped so an override declared `-> void` still matches.
+func set_property(name: String, value: Variant):
 	var key := name.to_lower()
 	if _read_only.has(key):
 		if _values.has(key) and _same(_values[key], value):
-			return
-		push_error("@world.%s is the game's alone: a story tried to set it" % name)
-		return
+			return ""
+		return "@world.%s is the game's alone: a story tried to set it" % name
 	_put(name, value)
 	changed.emit(name, value, true)
+	return ""
 
 
 func _put(name: String, value: Variant) -> void:

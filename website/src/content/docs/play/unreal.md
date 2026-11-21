@@ -129,8 +129,9 @@ to set one up is in the editor:
 
 1. Add a **Patter World** component (`UPatterWorldComponent`) to an actor, your game state or a
    manager actor say.
-2. In Details, point the component that builds your engine at that actor (a dialogue manager built on
-   Patterplay has a **World** field for it).
+2. In Details, point the component that builds your engine at that actor: the **World** field of a **Patter
+   Runner** with its **Bundle** set, or of a dialogue manager built on Patterplay. A runner with World left
+   empty uses a Patter World on its own actor.
 3. Have your game write its state into the world as it changes: in Blueprint, **Get Patter World** on the
    component, then **Set Bool**, **Set Number**, **Set String**, or **Set Flags**.
 

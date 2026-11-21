@@ -152,8 +152,8 @@ void UPatterWorld::StorySet(const std::string& Name, const patter::PatterValue& 
 
 patter::HostScope UPatterWorld::MakeHostScope()
 {
-	// Weak: a game that drops its world while an engine still holds the scope must read unset, not
-	// crash. The core's `get` contract is a pointer valid until the next call on this scope, which the
+	// Weak: a game that drops its world while an engine still holds the scope must read unset (the
+	// engine then reads the declared defaults), not crash. The core's `get` contract is a pointer valid until the next call on this scope, which the
 	// slot inside the world satisfies without the core knowing where the value came from.
 	TWeakObjectPtr<UPatterWorld> Weak(this);
 	patter::HostScope S;

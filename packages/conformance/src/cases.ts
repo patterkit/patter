@@ -4174,6 +4174,30 @@ const scriptedHostScopeWrongCase = {
   ],
 } satisfies ScriptedFixture;
 
+// A bound host scope's unset name reads its declared default (its own `default`, else its type's), as it would
+// with nothing bound; the case's store starts empty. A story write lands in the store and is read back.
+const scriptedHostScopeDefaults = {
+  name: "a bound host scope's unset name reads its declared default, and a story write lands in the game's store",
+  project: project({ scopeRegistry: { version: 1, scopes: [{ token: "world", declarations: [
+    { name: "alarms", type: "number", default: 2 },
+    { name: "mode", type: "enum", values: ["day", "night"], default: "night" },
+    { name: "count", type: "number" },
+  ] }] } }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "n1", type: "snippet", beats: [{ id: "T1", kind: "text" }] },
+    { id: "n2", type: "snippet", onEnter: [{ kind: "set", target: "@world.alarms", value: "@world.alarms + 1" }],
+      beats: [{ id: "T2", kind: "text" }], jump: { to: "END" } },
+  ] }] }],
+  locales: [loc("s", { T1: "alarms {@world.alarms} mode {@world.mode} count {@world.count}", T2: "alarms {@world.alarms}" })],
+  hostScopes: ["world"],
+  script: [
+    { op: "expectErrors", expectResult: [] },
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "alarms 2 mode night count 0" }] },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "alarms 3" }] },
+  ],
+} satisfies ScriptedFixture;
+
 // A host write that doesn't fit its declaration is refused, changing nothing (ruling B), as the Storylet Engine
 // refuses one: the kernel's `valueFits`, an enum whose own default is "" taking "" back. A name the content
 // doesn't declare is refused too, in @patter and in a host scope the bundle declares.
@@ -4799,7 +4823,7 @@ export const cases: Fixtures = {
     scriptedWorldQuality, scriptedStoryQuality, scriptedQualityDeletedStage, scriptedEnumDeletedValue,
     scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited,
     scriptedExtensions, scriptedExtensionsCompile, scriptedNoExtensions,
-    scriptedLocaleRule, scriptedLocaleNoRegion, scriptedLocaleIds, scriptedSpokenText, scriptedSpokenVoiced, scriptedSpokenIds, scriptedHostScopeWrongCase, scriptedHostWrites, scriptedGameDataCopied,
+    scriptedLocaleRule, scriptedLocaleNoRegion, scriptedLocaleIds, scriptedSpokenText, scriptedSpokenVoiced, scriptedSpokenIds, scriptedHostScopeWrongCase, scriptedHostScopeDefaults, scriptedHostWrites, scriptedGameDataCopied,
     scriptedChoiceFollowsLocale, scriptedSaveBeatInserted, scriptedSaveBeatDeleted, scriptedSaveOptionDeleted, scriptedSaveChoiceRewritten,
     scriptedDryChoiceEnds, scriptedDryChoiceCarriesOn],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults, gameDataQuality, gameDataQualityDefaults, gameDataOption, gameDataOptionDefaults],

@@ -7,6 +7,12 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Fixed
+
+- **A bound World's unset names read their declared defaults.** A name your game hasn't set yet in a World you bind
+  through `hostScopes` now reads the default the project declares for it, as it would with nothing bound, where it
+  used to read as unset (false in a condition, a failed sum). Reading a default writes nothing to your World.
+
 ## [1.0.4] - 2026-11-17
 
 ### Changed

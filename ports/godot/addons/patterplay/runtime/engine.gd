@@ -27,6 +27,8 @@ const _OWNS_REGISTRY := "_owns_registry"
 const _SETUP_REPORTED := "_setup_reported"
 
 const FlowHost := preload("res://addons/patterplay/runtime/flow_host.gd")
+const _Bag := preload("res://addons/patterplay/runtime/expr/property_bag.gd")
+const _Values := preload("res://addons/patterplay/runtime/expr/values.gd")
 
 ## The state this engine's flows share with it; see flow_host.gd.
 var _host: FlowHost
@@ -264,7 +266,8 @@ func _register(bundle: Dictionary, options: Dictionary) -> void:
 	# A scope the game binds through "host_scopes" is EXTERNAL: the game keeps the values, and the
 	# registry reads and writes them through the game's { "get", "set" } resolver (or a PatterWorld's,
 	# or any object's, get_property and set_property: see _resolvers_of) but never stores or
-	# saves them. Its declarations (types, read-only) come from the bundle. "writable": false binds the
+	# saves them. Its declarations (types, read-only, defaults) come from the bundle: a declared name the
+	# game gives null for reads its declared default (_with_declared_defaults). "writable": false binds the
 	# story and never the game (the registry's rule, ruled across the family 2026-09-05).
 	var bound := _resolvers_of(options.get("host_scopes", {}))
 	for token in bound.keys():
@@ -285,7 +288,7 @@ func _register(bundle: Dictionary, options: Dictionary) -> void:
 		var decls: Array = []
 		for d in spec.get("declarations", []):
 			decls.append(_host_decl(d, null))
-		refused = registry.define_foreign(str(token), bound[token], decls,
+		refused = registry.define_foreign(str(token), _with_declared_defaults(bound[token], decls), decls,
 			{"writable": spec.get("writable", true) != false, "owner": PatterFlow.OWNER})
 		if refused == "":
 			registered.append(str(token))
@@ -320,25 +323,71 @@ func _register(bundle: Dictionary, options: Dictionary) -> void:
 
 ## The "host_scopes" option as the registry takes it: token -> { "get", "set"? }. A token may be bound
 ## to that Dictionary, or to an object with get_property (and optionally set_property) methods, a
-## PatterWorld above all, which becomes { "get": its get_property, "set": its set_property }. Callables
-## to the object's own methods, never lambdas: a kept lambda can crash a .NET game as it quits
-## (godotengine/godot#122532). No set_property means no "set": the scope is then read-only to everyone,
-## the registry's rule. Anything else is reported ("setup") and left unbound, so a standalone engine
-## self-backs the scope as if nothing had been given.
+## PatterWorld above all, which becomes { "get": its get_property, "set": its set_property }. Every "set"
+## goes through _refusing_set: one that answers a non-empty String has refused the write (a PatterWorld's
+## read-only name, or a Dictionary's own "set" saying why), and the answer reaches the write that made it
+## as a refusal, so a story's write is a failed effect, reported through on_error, as a throwing setter is
+## on the other runtimes. One that answers nothing (void, null) always lands. Callables to the
+## object's own methods and static functions with the data bound, never lambdas: a kept lambda can crash a
+## .NET game as it quits (godotengine/godot#122532). No set_property means no "set": the scope is then
+## read-only to everyone, the registry's rule. Anything else is reported ("setup") and left unbound, so a
+## standalone engine self-backs the scope as if nothing had been given.
 func _resolvers_of(given: Dictionary) -> Dictionary:
 	var out := {}
 	for token in given.keys():
 		var b = given[token]
 		if b is Dictionary:
-			out[token] = b
+			var given_resolver := (b as Dictionary).duplicate()
+			if given_resolver.get("set") is Callable:
+				given_resolver["set"] = PatterEngine._refusing_set.bind(given_resolver["set"], _host.foreign_refusal)
+			out[token] = given_resolver
 		elif b is Object and is_instance_valid(b) and b.has_method("get_property"):
 			var resolver := {"get": Callable(b, "get_property")}
 			if b.has_method("set_property"):
-				resolver["set"] = Callable(b, "set_property")
+				resolver["set"] = PatterEngine._refusing_set.bind(Callable(b, "set_property"), _host.foreign_refusal)
 			out[token] = resolver
 		else:
 			_setup.append([str(token), '"host_scopes" binds "%s" to something that isn\'t a { "get", "set" } Dictionary or an object with a get_property method, so it\'s left unbound' % token])
 	return out
+
+
+## A bound scope's write: the game's setter (an object's set_property, or a Dictionary's "set"), whose answer, when it's a non-empty String, is parked in
+## `mailbox` (the host's foreign_refusal) for the write that made it. Static, with the setter and the
+## mailbox bound, so the registry keeps no lambda and no reference to this engine.
+static func _refusing_set(name: String, value, setter: Callable, mailbox: Dictionary) -> void:
+	var answer = setter.call(name, value)
+	if answer is String and answer != "":
+		mailbox["refusal"] = answer
+
+
+## A bound host scope's resolver, reading a declared name the game hasn't set (its resolver gives null) as
+## that declaration's default: its own "default", else its type's, the value a self-backed scope seeds
+## with. So binding a World never turns a default into unset. Writes, and every name the game has set, go
+## straight through, and the game's store is never written. No declarations: the resolver as given. The
+## same rule on every runtime (JS's withDeclaredDefaults).
+static func _with_declared_defaults(resolver: Dictionary, decls: Array) -> Dictionary:
+	if decls.is_empty() or not (resolver.get("get") is Callable):
+		return resolver
+	var by_name := {}
+	for d in decls:
+		by_name[str(d.get("name", "")).to_lower()] = d
+	var out := {"get": PatterEngine._read_or_default.bind(resolver["get"], by_name)}
+	if resolver.has("set"):
+		out["set"] = resolver["set"]
+	return out
+
+
+## The game's value for `name`, or its declared default when the game gives null. Names reach a resolver
+## lower-cased; matched case-insensitively all the same. A flags default is a fresh copy each read, so no
+## default is ever shared.
+static func _read_or_default(name: String, getter: Callable, by_name: Dictionary) -> Variant:
+	var v = getter.call(name)
+	if v != null:
+		return v
+	var d = by_name.get(name.to_lower())
+	if d == null:
+		return v
+	return _Bag._copy_value(_Values.to_value(_Bag.default_for(d)))
 
 
 static func _spec_for(specs: Array, token: String) -> Dictionary:
@@ -1004,7 +1053,13 @@ func set_property(ref: String, value) -> String:
 	# A refusal from the registry (an unknown scope, or a resolver with no setter) it push_errors itself.
 	var journal = _host.journal
 	var prev = _host.registry.get_value(sp[0], sp[1]) if journal != null else null
+	_host.clear_foreign_refusal()
 	var refused: String = _host.registry.set_value(sp[0], sp[1], value, {"host": true})
+	# A bound scope's own refusal (a PatterWorld's read-only name, a Dictionary "set" saying why), which the registry never reads.
+	var declined := _host.take_foreign_refusal()
+	if refused == "" and declined != "":
+		refused = declined
+		push_error(declined)
 	if journal != null and refused == "" and prev != null:
 		journal["undo"].append(Callable(_host.registry, "set_value").bind(sp[0], sp[1], prev, {"host": true}))
 	return refused

@@ -807,7 +807,7 @@ export class Engine {
             : `hostScopes binds "${token}", which this bundle doesn't declare` });
         }
         const decls = (spec?.declarations ?? []).map(toForeignDecl);
-        registry.defineForeign(token, resolver, decls, { writable: spec?.writable ?? true, owner: OWNER });
+        registry.defineForeign(token, withDeclaredDefaults(resolver, decls), decls, { writable: spec?.writable ?? true, owner: OWNER });
         registered.push(token);
         hostBound.add(token);
       }
@@ -3400,6 +3400,22 @@ function toForeignDecl(decl: HostScopeDecl): ScopeDeclaration {
   return { name: decl.name, type: decl.type, values: decl.values, stages: decl.stages, default: decl.default, writable: decl.writable };
 }
 
+
+/** A bound host scope's resolver, reading a declared name the game hasn't set as its declared default: the
+ *  value the story would read with nothing bound (the declaration's `default`, else its type's), so binding a
+ *  World never turns a default into unset. Writes, and every name the game has set, go straight through; the
+ *  game's own store is never written. No declarations: the resolver as given. The same rule on every runtime. */
+function withDeclaredDefaults(resolver: ScopeResolver, decls: ScopeDeclaration[]): ScopeResolver {
+  if (decls.length === 0) return resolver;
+  const byName = new Map(decls.map((d) => [d.name.toLowerCase(), d]));
+  const get = (name: string) => {
+    const v = resolver.get(name);
+    if (v !== undefined && v !== null) return v;
+    const d = byName.get(name.toLowerCase());
+    return d ? structuredClone(d.default ?? defaultFor(d)) : v;
+  };
+  return resolver.set ? { get, set: (name, value) => resolver.set!(name, value) } : { get };
+}
 
 /** A self-backed host scope's declaration (the standalone `@world`): the scope's own `writable` default
  *  folded in, since an owned bag reads writability per declaration. Names fold to lower case in the bag,

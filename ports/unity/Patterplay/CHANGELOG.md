@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A Patter World's unset names read their defaults.** A name your World (or any host scope you bind) hasn't set
+  now reads the default the story declares for it, as it would with no World set, instead of false. Your own
+  values and the story's writes go through as before, and the defaults are never written into your World.
+
 ## [1.0.4] - 2026-11-17
 
 ### Added

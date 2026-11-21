@@ -81,6 +81,12 @@ var patter_bag: PatterPropertyBag = null
 ## Host scopes this engine self-backed and registered (the game bound none, nobody else had). JS's
 ## name, which is why it is not the scopes the "host_scopes" option binds: the engine keeps those.
 var host_scopes: Array = []
+## Where a bound scope's setter leaves its refusal (a PatterWorld's read-only name, a Dictionary "set" saying why): {"refusal": why}
+## after a write it turned down, {} otherwise. The registry calls a resolver's "set" and never reads an
+## answer, so the engine's wrapper (PatterEngine._refusing_set) parks it here and the write that made it
+## takes it (take_foreign_refusal), making it a refused write like any the registry turns down. A plain
+## Dictionary, shared with the wrapper by binding: no reference back to this host.
+var foreign_refusal: Dictionary = {}
 ## Godot only: other engines' game-wide scopes the content names (the bundle's externalScopes),
 ## filtered once. Every one must be registered for a flow to open or a load to run, and each is a
 ## scope to PatterFlow.split_host_ref whether or not anybody registers it now. JS reads
@@ -154,6 +160,18 @@ func report(err: Dictionary) -> void:
 		push_warning("Patterplay: flow '%s': %s" % [err["flow"], err["message"]])
 	else:
 		push_warning("Patterplay: %s on %s in flow '%s' failed, played through: %s" % [kind, err["node"], err["flow"], err["message"]])
+
+
+## The refusal a bound scope's setter gave the write just made, or "" when it took it; the
+## mailbox is emptied either way. Call clear_foreign_refusal() before the write.
+func take_foreign_refusal() -> String:
+	var why := str(foreign_refusal.get("refusal", ""))
+	foreign_refusal.clear()
+	return why
+
+
+func clear_foreign_refusal() -> void:
+	foreign_refusal.clear()
 
 
 ## An entry in the engine's log that belongs to no flow's (a set-up report, whose flow is ""): to

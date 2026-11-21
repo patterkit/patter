@@ -645,7 +645,15 @@ func _write_property(ref: String, value, host: bool) -> String:
 		# Host scopes and other engines' scopes. "writable": false is the STORY's promise, so the
 		# registry refuses a story write (push_error, no write) and lets the game's own through.
 		var prev = _host.registry.get_value(sp[0], sp[1]) if journal != null else null
+		_host.clear_foreign_refusal()
 		var refused: String = _host.registry.set_value(sp[0], sp[1], value, {"host": true} if host else {})
+		# The game's own refusal (a PatterWorld's read-only name, or a setter's answer), which the registry never reads: a story's
+		# write it turned down is a failed effect, as any refused write is; a host write is push_error'd.
+		var declined := _host.take_foreign_refusal()
+		if refused == "" and declined != "":
+			refused = declined
+			if host:
+				push_error(declined)
 		# Recorded after the write: one a read-only host scope refused never happened, so has nothing to undo.
 		if journal != null and refused == "" and prev != null:
 			journal["undo"].append(Callable(_host.registry, "set_value").bind(sp[0], sp[1], prev, {"host": true}))

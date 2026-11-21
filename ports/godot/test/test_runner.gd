@@ -76,6 +76,11 @@ func _initialize() -> void:
 	_check_load_and_rebind()
 	_check_ran_dry()
 	_check_disconnect()
+	# A runner made ready by the tree: the tree is up from the first frame, not during _initialize.
+	await process_frame
+	_check_bundle_and_world()
+	_check_bundle_without_world()
+	_check_attached_before_ready()
 	for r in _runners:
 		r.free()
 	print("test_runner: ALL PASS" if _fails == 0 else "test_runner: %d FAILED" % _fails)
@@ -264,6 +269,81 @@ func _check_disconnect() -> void:
 	runner.line.disconnect(handler)
 	runner.begin("talk")
 	_expect(seen.is_empty(), "stops listening when asked: " + str(seen))
+
+
+# -- set up in the editor: a Bundle and a World ---------------------------------------
+
+## A story that reads @world: a line naming the World's gold.
+static func _world_bundle() -> Dictionary:
+	return {
+		"schema": "patter/bundle@0",
+		"locales": {"default": "en", "included": ["en"]},
+		"cast": [{"name": "NPC"}],
+		"strings": {"en": {"G": "gold {@world.gold}"}},
+		"scopeRegistry": {"version": 1, "scopes": [{"token": "world", "declarations": [
+			{"name": "gold", "type": "number", "default": 1}]}]},
+		"scenes": {"s": {"id": "s", "gameId": "s", "blocks": [{"id": "b", "gameId": "b", "children": [
+			{"id": "sn", "type": "snippet", "beats": [{"id": "G", "kind": "text"}], "jump": {"to": "END"}}]}]}},
+	}
+
+
+## What push_warning said while it ran.
+class _Warned extends Logger:
+	var warnings: Array = []
+	func _log_error(_function: String, _file: String, _line: int, code: String, _rationale: String,
+			_editor_notify: bool, error_type: int, _script_backtrace: Array[ScriptBacktrace]) -> void:
+		if error_type == ERROR_TYPE_WARNING:
+			warnings.append(code)
+
+
+## A runner set up as the Inspector sets one: a Bundle, a World (or none) and a flow id, then added to the
+## tree, which makes it ready. Returns {runner, seen, warnings}.
+func _ready_runner(node_name: String, world: PatterWorld, flow := "main") -> Dictionary:
+	var runner := PatterRunner.new()
+	runner.name = node_name
+	runner.bundle = PatterBundleResource.from_json_text(JSON.stringify(_world_bundle()))
+	runner.world = world
+	runner.flow_id = flow
+	var warned := _Warned.new()
+	OS.add_logger(warned)
+	root.add_child(runner)
+	OS.remove_logger(warned)
+	_runners.append(runner)
+	var seen: Array = []
+	runner.text.connect(func(s): seen.append(s["text"]))
+	return {"runner": runner, "seen": seen, "warnings": warned.warnings}
+
+
+func _check_bundle_and_world() -> void:
+	var world := PatterWorld.new()
+	world.set_value("gold", 30)
+	var r := _ready_runner("Talker", world, "talk")
+	var runner: PatterRunner = r["runner"]
+	_expect(runner.get_engine() != null, "given a Bundle, the runner makes its own engine when it's ready")
+	_expect((r["warnings"] as Array).is_empty(), "with a World set, it warns of nothing: " + str(r["warnings"]))
+	runner.begin()
+	_expect(r["seen"] == ["gold 30"], "and plays a value set on the World: " + str(r["seen"]))
+	_expect(runner.get_flow() != null and runner.get_engine().get_flow("talk") != null, "on the flow flow_id names")
+	world.free()
+
+
+func _check_bundle_without_world() -> void:
+	var r := _ready_runner("Quiet", null)
+	var runner: PatterRunner = r["runner"]
+	var expected := "Patter Runner 'Quiet': the story reads @world, but no World is set, so @world plays from its declared defaults and won't see your game. Set World to your game's Patter World."
+	_expect(r["warnings"] == [expected], "a story that reads @world with no World set warns: " + str(r["warnings"]))
+	runner.begin()
+	_expect(r["seen"] == ["gold 1"], "and plays @world from its declared defaults: " + str(r["seen"]))
+
+
+func _check_attached_before_ready() -> void:
+	var engine := PatterEngine.new(_bundle())
+	var runner := PatterRunner.new()
+	runner.bundle = PatterBundleResource.from_json_text(JSON.stringify(_world_bundle()))
+	runner.attach(engine)
+	root.add_child(runner)
+	_runners.append(runner)
+	_expect(runner.get_engine() == engine, "an engine attached before the runner is ready is the one it plays")
 
 
 func _expect(ok: bool, what: String) -> void:
