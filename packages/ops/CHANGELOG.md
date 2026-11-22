@@ -1,5 +1,11 @@
 # @patterkit/ops
 
+## 1.2.6
+
+### Patch Changes
+
+- ac434c9: Uses `@patterkit/runtime` 1.1.0, the Patterplay 1.1.0 release.
+
 ## 1.2.5
 
 ### Patch Changes
