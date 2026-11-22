@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/runtime",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "description": "Patter reference runtime: load a bundle and play dialogue - flows, selectors, choices, jumps, effects, properties. Built on @wildwinter/expr + scoperegistry.",
   "keywords": ["patter", "patterkit", "dialogue", "interactive-fiction", "branching-dialogue", "game-dev", "narrative", "runtime", "engine", "choices"],
   "type": "module",

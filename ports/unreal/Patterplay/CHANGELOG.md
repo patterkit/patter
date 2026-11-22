@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-22
+
 ### Added
 
 - **Show a letter, a book page, or a sign in one call.** `RunText(Scene, Block)` (BlueprintCallable) plays a block and gives you its text as one string,

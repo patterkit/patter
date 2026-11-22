@@ -7,6 +7,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-22
+
 ### Added
 
 - **Show a letter, a book page, or a sign in one call.** `engine.runText(scene, block)` plays a block and gives you its text as one string,

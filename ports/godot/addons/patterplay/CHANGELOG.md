@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-22
+
 ### Added
 
 - **Show a letter, a book page, or a sign in one call.** `engine.run_text(scene, block)` plays a block and gives you its text as one string,
