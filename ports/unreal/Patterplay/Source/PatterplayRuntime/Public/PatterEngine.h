@@ -374,6 +374,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	TArray<FPatterStep> RunFlow(const FString& FlowName, const FString& Scene, const FString& Block);
 
+	// "Give me just the text at this address": the one-call form for a letter, a book page, a sign, or any
+	// other block of prose with no dialogue in it. Plays the address and returns the text of every text beat
+	// it delivers, interpolated and in the shown language, joined with Separator (a newline by default). Game
+	// events on the way are skipped. An empty string means the address had nothing to give.
+	//
+	// With no FlowName it plays on a throwaway flow that is never registered, never saved, and closed before
+	// the call returns, so reading the same address twice gives the same text unless the state behind it has
+	// changed. Name a flow to play on that flow instead, reused exactly as RunFlow reuses it, so variations
+	// move on from call to call. An address that doesn't resolve, or content that reaches a line of dialogue
+	// or a choice, is an authoring mistake: it's logged as an error and the call returns an empty string.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	FString RunText(const FString& Scene, const FString& Block = TEXT(""), const FString& FlowName = TEXT(""), const FString& Separator = TEXT("\n"));
+
 	// double, like UPatterWorld and FPatterValue: a float stored 0.1 as 0.10000000149, which then showed in
 	// every {@ref} that read it.
 	UFUNCTION(BlueprintPure, Category = "Patterplay")

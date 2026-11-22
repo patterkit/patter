@@ -54,6 +54,52 @@ when you genuinely mean "begin again", but don't mix the two on one name by acci
 will keep repeating its first line.
 :::
 
+## Show a block of text
+
+A letter, a book page, a sign, or a computer terminal is usually just prose: no one speaks and there's
+nothing to choose. `runText` plays an address and hands you its text as **one string**, ready to put
+on screen:
+
+```js
+const letter = engine.runText("correspondence", "from-mother");
+letterView.setText(letter);
+```
+
+Every text beat is there, with its values filled in and in the player's language, one per line. Pass
+a separator if you want something else between them, such as a blank line between paragraphs:
+
+```js
+const page = engine.runText("library", "old-diary", { separator: "\n\n" });
+```
+
+Game events in the block are skipped.
+
+`runText` is a convenience wrapper around `runFlow`: it plays the same way and keeps only the text.
+If you want more from the block, such as its game events, or the tags and game data on each beat (a
+signature styled differently, a paragraph marked as a postscript), go back to `runFlow` and interpret
+the beats yourself.
+
+### It reads the same each time
+
+You don't name a flow. `runText` plays the block on a flow of its own that it throws away
+afterwards, so it never shows up in your flows or your save. Reading the same letter twice gives the
+same text, unless the state behind it has changed. Anything the block writes to a shared property
+still happens, so a block can count how often it's been read.
+
+If you *want* the text to move on each time, so that a shelf reads "Dusty." and then "Still dusty.",
+name a flow and it's reused exactly as `runFlow` reuses one:
+
+```js
+engine.runText("study", "shelf", { flow: "shelf" });   // "Dusty."
+engine.runText("study", "shelf", { flow: "shelf" });   // "Still dusty."
+```
+
+### Dialogue and choices are mistakes here
+
+A text block holds no dialogue and no choices, so `runText` treats either as an authoring mistake.
+It stops at the line or the choice, so nothing after it runs, and throws an error naming the beat.
+An address that doesn't exist throws too. An empty string means the address had nothing to give.
+
 ## Moving a flow you are already holding
 
 If you are driving a flow yourself, `goto` moves its cursor and leaves everything else alone:
@@ -94,6 +140,7 @@ run out of content resumes at the new address.
 ```js
 // JavaScript
 const lines = engine.runFlow("guard-42", "npc-barks", "greet");
+const letter = engine.runText("correspondence", "from-mother");
 const moved = flow.goto("throne-room", "audience");   // false = address not found
 const { played, stop } = flow.advanceToStop();        // play to the next choice / end
 ```
@@ -101,6 +148,7 @@ const { played, stop } = flow.advanceToStop();        // play to the next choice
 ```csharp
 // Unity
 List<StepResult> lines = engine.RunFlow("guard-42", "npc-barks", "greet");
+string letter = engine.RunText("correspondence", "from-mother");
 bool moved = flow.Goto("throne-room", "audience");
 AdvanceToStopResult res = flow.AdvanceToStop();
 ```
@@ -108,6 +156,7 @@ AdvanceToStopResult res = flow.AdvanceToStop();
 ```gdscript
 # Godot
 var lines: Array = engine.run_flow("guard-42", "npc-barks", "greet")
+var letter = engine.run_text("correspondence", "from-mother")   # null if refused
 var moved: bool = flow.goto("throne-room", "audience")
 var res: Dictionary = flow.advance_to_stop()   # { "played": [...], "stop": {...} }
 ```
@@ -115,6 +164,7 @@ var res: Dictionary = flow.advance_to_stop()   # { "played": [...], "stop": {...
 ```cpp
 // Unreal (Blueprint or C++). Every one of these is BlueprintCallable.
 TArray<FPatterStep> Lines = Engine->RunFlow(TEXT("guard-42"), TEXT("npc-barks"), TEXT("greet"));
+FString Letter = Engine->RunText(TEXT("correspondence"), TEXT("from-mother"));
 bool bMoved = Flow->Goto(TEXT("throne-room"), TEXT("audience"));
 FPatterStep Stop;
 TArray<FPatterStep> Played = Flow->AdvanceToStop(Stop);

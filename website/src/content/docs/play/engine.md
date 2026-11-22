@@ -86,6 +86,20 @@ replacing it, so variation state (shuffles, once-each lists, visit counts) keeps
 across calls. An empty array means the address had nothing left to give; an address that
 does not resolve throws. See [Host navigation](/play/navigation/).
 
+### Text in one call
+
+```ts
+engine.runText(scene, block?, { flow?, separator? })   // -> one string
+```
+
+Plays the address and returns its text beats as one string, joined with `separator` (a newline
+by default), for a letter, a book page, or a sign. It's a convenience wrapper around `runFlow` that
+keeps only the text: game events are skipped, and for game data or tags, use `runFlow` and read the
+beats yourself. With no `flow`, it
+plays on a throwaway flow that's never registered or saved, so the same address reads the same
+each time; name a `flow` to reuse it as `runFlow` does. A line of dialogue, a choice, or an
+address that doesn't resolve throws. See [Host navigation](/play/navigation/#show-a-block-of-text).
+
 ## Walking a flow
 
 - **`flow.advance()`**: the next step (line, text, game event, choice, or end).

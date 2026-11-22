@@ -30,7 +30,7 @@ export { resolveSceneRef, sceneAddressIndex } from "@patterkit/model";
 // host typing a row should not have to depend on the kernel to name it.
 export type { LoadMisfit, PropertyRow } from "@wildwinter/scoperegistry";
 export type {
-  StepResult, SpokenFields, FlowEndReason, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, HostScope,
+  StepResult, SpokenFields, FlowEndReason, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, RunTextOptions, HostScope,
   EngineSave, SaveGame, SaveGameV3, FlowSnapshot, FlowState, FlowValues, FlowCursor, SelectorSnapshot, SavedChoice, SavedChoiceOption, SavedChoicePrompt, StackFrame, SaveEnvelope,
   BeatInfo, OutlineNode, OutlineBlock, OutlineScene, FlatBeat,
   TraceEvent, EngineTraceHandler, LogEntry, EngineLogEntry, PlayError, Steerer, GatePoint, PickPoint,

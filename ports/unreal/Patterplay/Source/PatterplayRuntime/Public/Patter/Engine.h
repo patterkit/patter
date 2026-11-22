@@ -414,6 +414,9 @@ namespace patter
      *  beat by id; a frame inside an option carries its choice's id. Versions 3 and 4 are read. */
     inline constexpr int SAVE_VERSION = 4;
 
+    /** The id of Engine::runText's throwaway flow, as the trace names it. Never registered as a flow. */
+    inline constexpr const char* RUN_TEXT_FLOW = "(runText)";
+
     // One flow taken out of an engine (Engine::captureFlow) to be put back later (Engine::restoreFlow),
     // under the same id or another: its snapshot as a save writes it, plus its own property values
     // without its id (`scopes`, its NOT-shared @patter globals, and `sceneBags`, its per-scene NOT-shared
@@ -3208,6 +3211,86 @@ namespace patter
             else f = openFlow(flow, scene, block);
 
             return f->advanceToStop().played;
+        }
+
+        // "Give me just the text at this address": the one-call form for a letter, a book page, a sign, or any
+        // other block of prose with no dialogue in it. Plays the address and returns the text of every text
+        // beat it delivers, interpolated and in the shown language, joined with `separator` (a newline by
+        // default). Game events on the way are skipped. Empty string = the address had nothing to give.
+        //
+        // With no `flow` it plays on a throwaway flow ("(runText)") that is never registered, never saved,
+        // and closed before the call returns, so reading the same address twice gives the same text unless
+        // the state behind it has changed (a shuffle draws from the engine's seed afresh, and a "once each"
+        // list starts again). Its writes to shared properties and shared selectors stay, as any play's do.
+        // Name a `flow` to play on that flow instead, reused exactly as runFlow reuses it, so variations move
+        // on from call to call.
+        //
+        // Throws when the address does not resolve, and when the content reaches a line of dialogue or a
+        // choice: a text block holds neither, so either is an authoring mistake. It stops there, so nothing
+        // after the offending beat runs. A named flow is left where it stopped; a throwaway one is closed.
+        std::string runText(const std::string& scene, const std::string& block = "", const std::string& flow = "", const std::string& separator = "\n")
+        {
+            const std::string where = scene + (block.empty() ? "" : " / " + block);
+            Flow* f = nullptr;
+            std::shared_ptr<Flow> throwaway;
+            std::string sceneId, blockId;
+            if (!flow.empty())
+            {
+                f = getFlow(flow);
+                if (!f) f = openFlow(flow, scene, block); // openFlow throws on a bad address
+                else if (!f->gotoAddress(scene, block))
+                    throw std::runtime_error("runText: address not found: " + where);
+            }
+            else
+            {
+                assertExternalScopes();
+                resolveOpenAddress(scene, block, sceneId, blockId); // throws on a bad address
+                throwaway = std::make_shared<Flow>(RUN_TEXT_FLOW, &host_, static_cast<int64_t>(defaultSeed_));
+                f = throwaway.get();
+                // Inside a checkpoint it counts as opened there, so it may begin; it adds no undo entry.
+                if (host_.journal) { host_.journal->flows.insert(f); host_.journal->opened.insert(f); }
+            }
+            // Closing the throwaway also takes it out of the journal: once this call returns its address may be
+            // reused, and a later flow must not inherit its entries.
+            auto closeThrowaway = [this, &throwaway]
+            {
+                if (!throwaway) return;
+                throwaway->close();
+                if (Journal* j = host_.journal.get())
+                {
+                    j->flows.erase(throwaway.get());
+                    j->opened.erase(throwaway.get());
+                    j->flowSelectors.erase(throwaway.get());
+                }
+            };
+            std::string out;
+            bool first = true;
+            try
+            {
+                if (throwaway) throwaway->begin(sceneId, blockId);
+                for (;;)
+                {
+                    StepResult r = f->advance();
+                    if (r.type == StepType::End) break;
+                    if (r.type == StepType::Text)
+                    {
+                        if (!first) out += separator;
+                        out += r.text;
+                        first = false;
+                    }
+                    else if (r.type == StepType::Line)
+                        throw std::runtime_error("runText: " + where + " has a line of dialogue (" + r.id + "): runText plays text only, so use runFlow for dialogue");
+                    else if (r.type == StepType::Choice)
+                        throw std::runtime_error("runText: " + where + " reaches a choice (" + r.groupId + "): runText plays text only, so use runFlow for choices");
+                }
+            }
+            catch (...)
+            {
+                closeThrowaway();
+                throw;
+            }
+            closeThrowaway();
+            return out;
         }
 
         // Author tags (#215): a beat's accumulated tags (own + every ancestor's), the same value its step

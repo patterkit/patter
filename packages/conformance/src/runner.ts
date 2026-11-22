@@ -175,6 +175,15 @@ export function runScript(
         }
         break;
       }
+      case "runText": {
+        const call = () => engine.runText(op.scene, op.block, { flow: op.flow, separator: op.separator });
+        if (op.expectRefused) { refused(`runText ${op.scene}${op.block === undefined ? "" : `/${op.block}`}`, call); break; }
+        const got = call();
+        if (op.expectResult !== undefined && got !== op.expectResult) {
+          throw new Error(`runText ${op.scene}${op.block === undefined ? "" : `/${op.block}`}: expected ${JSON.stringify(op.expectResult)}, got ${JSON.stringify(got)}`);
+        }
+        break;
+      }
       case "captureFlow":
         captured.set(op.into, JSON.parse(JSON.stringify(engine.captureFlow(op.flow))) as FlowState);
         break;

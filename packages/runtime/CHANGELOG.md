@@ -7,6 +7,14 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Show a letter, a book page, or a sign in one call.** `engine.runText(scene, block)` plays a block and gives you its text as one string,
+  a line per text beat, with values filled in and in the player's language (a `separator` option changes what goes between them).
+  It plays on a flow of its own that's thrown away afterwards, so the same block reads the same each time and
+  nothing lands in your save. Pass a `flow` name to reuse that flow instead, so variations move on. A text block shouldn't
+  hold dialogue or choices, so if it reaches either it stops there and throws.
+
 ## [1.0.5] - 2026-11-21
 
 ### Fixed

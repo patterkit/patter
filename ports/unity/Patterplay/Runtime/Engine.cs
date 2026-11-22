@@ -1129,6 +1129,68 @@ namespace Patterkit.Patterplay
             return f.AdvanceToStop().Played;
         }
 
+        /// <summary>The id of RunText's throwaway flow, as OnError and the trace name it. Never registered as a flow.</summary>
+        private const string RunTextFlow = "(runText)";
+
+        /// <summary>"Give me just the text at this address": the one-call form for a letter, a book page, a sign,
+        /// or any other block of prose with no dialogue in it. Plays the address and returns the text of every
+        /// text beat it delivers, interpolated and in the shown language, joined with <paramref name="separator"/>
+        /// (a newline by default). Game events on the way are skipped. "" means the address had nothing to give.
+        ///
+        /// With no <paramref name="flow"/>, it plays on a throwaway flow that is never registered, never saved,
+        /// and closed before the call returns, so reading the same address twice gives the same text unless the
+        /// state behind it has changed (a shuffle draws from the engine's seed afresh, and an "once each" list
+        /// starts again). Its writes to shared properties and shared selectors stay, as any play's do. Name a
+        /// flow to play on that flow instead, reused exactly as RunFlow reuses it, so variations move on from
+        /// call to call.
+        ///
+        /// Throws when the address does not resolve, and when the content reaches a line of dialogue or a choice:
+        /// a text block holds neither, so either is an authoring mistake. It stops there, so nothing after the
+        /// offending beat runs. A named flow is left where it stopped; a throwaway one is closed.</summary>
+        public string RunText(string scene, string block = null, string flow = null, string separator = "\n")
+        {
+            string where = $"{scene}{(block == null ? "" : " / " + block)}";
+            Flow f;
+            bool throwaway = false;
+            if (flow != null)
+            {
+                if (!_flows.TryGetValue(flow, out var existing)) f = OpenFlow(flow, scene, block); // OpenFlow throws on a bad address
+                else if (!existing.Goto(scene, block)) throw new Exception($"runText: address not found: {where}");
+                else f = existing;
+            }
+            else
+            {
+                AssertExternalScopes();
+                var (sceneId, blockId) = ResolveOpenAddress(scene, block); // throws on a bad address
+                f = new Flow(RunTextFlow, _host, _defaultSeed);
+                var journal = _host.Journal;
+                if (journal != null) { journal.Flows.Add(f); journal.Opened.Add(f); } // its bags go when it closes, below
+                throwaway = true;
+                try { f.Begin(sceneId, blockId); }
+                catch { f.Close(); throw; }
+            }
+            separator ??= "\n";
+            var texts = new List<string>();
+            try
+            {
+                for (;;)
+                {
+                    var r = f.Advance();
+                    if (r.Type == StepType.End) break;
+                    if (r.Type == StepType.Text) texts.Add(r.Text);
+                    else if (r.Type == StepType.Line)
+                        throw new Exception($"runText: {where} has a line of dialogue ({r.Id}): runText plays text only, so use runFlow for dialogue");
+                    else if (r.Type == StepType.Choice)
+                        throw new Exception($"runText: {where} reaches a choice ({r.GroupId}): runText plays text only, so use runFlow for choices");
+                }
+            }
+            finally
+            {
+                if (throwaway) f.Close();
+            }
+            return string.Join(separator, texts);
+        }
+
         /// <summary>The host-facing address (Game ID) of a scene by internal id, or null if unknown. The
         /// inverse of the address resolution OpenFlow / Goto do - for a host that wants to display, log, or
         /// pass back the address of where it currently is.</summary>

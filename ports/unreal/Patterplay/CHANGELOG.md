@@ -7,6 +7,14 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Show a letter, a book page, or a sign in one call.** `RunText(Scene, Block)` (BlueprintCallable) plays a block and gives you its text as one string,
+  a line per text beat, with values filled in and in the player's language (a `Separator` argument changes what goes between them).
+  It plays on a flow of its own that's thrown away afterwards, so the same block reads the same each time and
+  nothing lands in your save. Pass a `FlowName` to reuse that flow instead, so variations move on. A text block shouldn't
+  hold dialogue or choices, so if it reaches either it stops there and logs an error and returns an empty string.
+
 ## [1.0.5] - 2026-11-21
 
 ### Added

@@ -34,6 +34,8 @@ const _Values := preload("res://addons/patterplay/runtime/expr/values.gd")
 var _host: FlowHost
 ## Why construction was refused ("" when it was not): see init_error().
 var _init_error := ""
+## The id of run_text()'s throwaway flow, as errors and the trace name it. Never registered as a flow.
+const RUN_TEXT_FLOW := "(runText)"
 var _default_seed: int = 0x9e3779b9
 var _flows: Dictionary = {}
 var _scene_game_id_to_id: Dictionary = {}
@@ -728,6 +730,79 @@ func run_flow(flow_name: String, scene: String, block: String = "") -> Array:
 		if f == null:
 			return []   # open_flow has reported the bad address
 	return f.advance_to_stop()["played"]
+
+
+# "Give me just the text at this address": the one-call form for a letter, a book page, a sign, or any
+# other block of prose with no dialogue in it. Plays the address and returns the text of every text beat
+# it delivers, interpolated and in the shown language, joined with `separator` (a newline by default).
+# Game events on the way are skipped. "" means the address had nothing to give.
+#
+# With no `flow_name`, it plays on a throwaway flow that is never registered, never saved, and closed
+# before the call returns, so reading the same address twice gives the same text unless the state behind
+# it has changed (a shuffle draws from the engine's seed afresh, and a "once each" list starts again). Its
+# writes to shared properties and shared selectors stay, as any play's do. Name a flow to play on that
+# flow instead, reused exactly as run_flow() reuses it, so variations move on from call to call.
+#
+# Pushes an error and returns null when the address does not resolve, and when the content reaches a
+# line of dialogue or a choice: a text block holds neither, so either is an authoring mistake. It stops
+# there, so nothing after the offending beat runs. A named flow is left where it stopped; a throwaway
+# one is closed.
+func run_text(scene: String, block: String = "", flow_name: String = "", separator: String = "\n") -> Variant:
+	var where := "%s%s" % [scene, "" if block == "" else " / " + block]
+	var f: PatterFlow
+	var throwaway := false
+	if flow_name != "":
+		if _flows.has(flow_name):
+			f = _flows[flow_name]
+			if not f.goto(scene, block):
+				push_error("run_text: address not found: " + where)
+				return null
+		else:
+			f = open_flow(flow_name, scene, block)
+			if f == null:
+				return null   # open_flow has reported the bad address
+	else:
+		if _init_error != "":
+			push_error("run_text: this engine was refused its registration (%s)" % _init_error)
+			return null
+		var unregistered := _external_scope_refusal()
+		if unregistered != "":
+			push_error("run_text: " + unregistered)
+			return null
+		var address := _resolve_open_address(scene, block)
+		if address.has("error"):
+			push_error("run_text: " + address["error"])
+			return null
+		f = PatterFlow.new(_host, float(_default_seed))
+		f.id = RUN_TEXT_FLOW
+		var journal = _host.journal
+		if journal != null:
+			# So it may begin inside the checkpoint. No undo entry: it is closed below, and its bags with it.
+			journal["flows"][f] = true
+			journal["opened"][f] = true
+		throwaway = true
+		f._begin(address["scene"], address["block"])
+	var texts: PackedStringArray = []
+	var refusal := ""
+	while true:
+		var r: Dictionary = f.advance()
+		var t: String = r.get("type", "end")
+		if t == "end":
+			break
+		if t == "text":
+			texts.append(str(r.get("text", "")))
+		elif t == "line":
+			refusal = "run_text: %s has a line of dialogue (%s): run_text plays text only, so use run_flow for dialogue" % [where, str(r.get("id", ""))]
+			break
+		elif t == "choice":
+			refusal = "run_text: %s reaches a choice (%s): run_text plays text only, so use run_flow for choices" % [where, str(r.get("groupId", ""))]
+			break
+	if throwaway:
+		f.close()
+	if refusal != "":
+		push_error(refusal)
+		return null
+	return separator.join(texts)
 
 
 func reset() -> void:

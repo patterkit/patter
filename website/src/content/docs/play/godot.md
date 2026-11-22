@@ -226,6 +226,16 @@ var moved: bool = flow.goto("throne-room", "audience")   # false = did not resol
 Give each independent speaker its own flow name. Full rules, and why `open_flow` behaves
 differently: [Host navigation](/play/navigation/).
 
+For a letter, a book page, or a sign, `run_text` gives you the block's text as one string. It refuses
+dialogue and choices: it reports an error and returns `null` if it meets either, or if the address
+doesn't resolve ([Show a block of text](/play/navigation/#show-a-block-of-text)):
+
+```gdscript
+var letter = engine.run_text("correspondence", "from-mother")
+if letter != null:
+    letter_label.text = letter
+```
+
 ## Live property inspector
 
 A Godot game runs in its own process, so the live state inspector ships as an **in-game

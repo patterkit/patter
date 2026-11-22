@@ -1115,6 +1115,69 @@ const scriptedResetFlow = {
   ],
 } satisfies ScriptedFixture;
 
+// runText on all four runtimes: "give me just the text at this address", for a letter or a book page. Text
+// beats joined (a newline by default, or the separator given), interpolated, game events skipped. With no flow
+// it plays a throwaway one, so the same address reads the same each time, while its shared writes stay (@reads
+// counts the reads). A named flow is reused as runFlow reuses it, so a "once each" list moves on and then has
+// nothing left. A line of dialogue or a choice is refused, stopping there: the onEnter after the line never runs.
+const scriptedRunText = {
+  name: "runText: a block's text beats joined into one string; dialogue and choices refused",
+  project: project({ properties: [{ name: "reads", type: "number", default: 0, shared: true }] }),
+  scenes: [
+    { id: "scn_rt", type: "scene", name: "Letters", blocks: [
+      { id: "b_rt_m", type: "block", name: "Mother", children: [
+        { id: "sn_rt_m1", type: "snippet", onEnter: [{ kind: "set", target: "@reads", value: "@reads + 1" }],
+          beats: [{ id: "M1", kind: "text" }, { id: "M_EV", kind: "gameEvent", gameData: { cue: "flower" } }, { id: "M2", kind: "text" }] },
+        { id: "sn_rt_m3", type: "snippet", beats: [{ id: "M3", kind: "text" }] },
+      ] },
+      { id: "b_rt_n", type: "block", name: "Notes", children: [
+        { id: "g_rt_n", type: "group", selector: "sequence", options: { order: "sequential", exhaust: "once" }, children: [
+          { id: "sn_rt_n1", type: "snippet", beats: [{ id: "N1", kind: "text" }] },
+          { id: "sn_rt_n2", type: "snippet", beats: [{ id: "N2", kind: "text" }] },
+        ] },
+      ] },
+      { id: "b_rt_s", type: "block", name: "Spoken", children: [
+        { id: "sn_rt_s1", type: "snippet", beats: [{ id: "S1", kind: "text" }, { id: "S2", kind: "line", character: "ADA" }] },
+        { id: "sn_rt_s3", type: "snippet", onEnter: [{ kind: "set", target: "@reads", value: "@reads + 100" }], beats: [{ id: "S3", kind: "text" }] },
+      ] },
+      { id: "b_rt_a", type: "block", name: "Ask", children: [
+        { id: "sn_rt_a1", type: "snippet", beats: [{ id: "A1", kind: "text" }] },
+        { id: "g_rt_a", type: "group", selector: "choice", children: [
+          { id: "o_rt_yes", type: "group", prompt: { id: "P_YES", kind: "text" }, children: [
+            { id: "sn_rt_yes", type: "snippet", beats: [{ id: "YES", kind: "text" }] },
+          ] },
+        ] },
+      ] },
+    ] },
+  ],
+  locales: [loc("scn_rt", {
+    M1: "Dear reader ({@reads}),", M2: "The garden is well.", M3: "Love, Mother",
+    N1: "first note", N2: "second note", S1: "A plain line.", S2: "Hello!", S3: "after",
+    A1: "Choose:", P_YES: "Yes", YES: "yes",
+  })],
+  script: <ScriptOp[]>[
+    { op: "runText", scene: "letters", block: "mother", expectResult: "Dear reader (1),\nThe garden is well.\nLove, Mother" },
+    { op: "runText", scene: "letters", block: "mother", separator: " | ", expectResult: "Dear reader (2), | The garden is well. | Love, Mother" },
+    { op: "runText", scene: "letters", block: "notes", expectResult: "first note" },
+    { op: "runText", scene: "letters", block: "notes", expectResult: "first note" },
+    { op: "runText", scene: "letters", block: "notes", flow: "desk", expectResult: "first note" },
+    { op: "runText", scene: "letters", block: "notes", flow: "desk", expectResult: "second note" },
+    { op: "runText", scene: "letters", block: "notes", flow: "desk", expectResult: "" },
+    { op: "runText", scene: "letters", block: "spoken", expectRefused: true },
+    { op: "runText", scene: "letters", block: "ask", expectRefused: true },
+    { op: "runText", scene: "letters", block: "nope", expectRefused: true },
+    { op: "runText", scene: "nowhere", expectRefused: true },
+    { op: "runText", scene: "letters", block: "nope", flow: "desk", expectRefused: true },
+    { op: "runText", scene: "letters", block: "mother", expectResult: "Dear reader (3),\nThe garden is well.\nLove, Mother" },
+    // Inside a checkpoint the throwaway flow may begin, and a rollback undoes its shared write.
+    { op: "checkpoint" },
+    { op: "runText", scene: "letters", block: "mother", expectResult: "Dear reader (4),\nThe garden is well.\nLove, Mother" },
+    { op: "runText", scene: "letters", block: "spoken", expectRefused: true },
+    { op: "rollback" },
+    { op: "runText", scene: "letters", block: "mother", expectResult: "Dear reader (4),\nThe garden is well.\nLove, Mother" },
+  ],
+} satisfies ScriptedFixture;
+
 // getVisitCounts hands game code its own copy: a read kept across a reset or more play still says
 // what it said when it was taken. Unity and Unreal handed back their live maps (2026-11-15), which a flow's reset
 // cleared under the game and play grew while it was being read.
@@ -4818,7 +4881,7 @@ export const cases: Fixtures = {
     scriptedApplyLiveBundleText, scriptedApplyLiveBundleStructure,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
-    scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow,
+    scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow, scriptedRunText,
     scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties, scriptedStages,
     scriptedWorldQuality, scriptedStoryQuality, scriptedQualityDeletedStage, scriptedEnumDeletedValue,
     scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited,

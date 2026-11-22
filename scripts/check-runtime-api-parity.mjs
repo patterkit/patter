@@ -85,6 +85,7 @@ const API = [
   { on: "Flow", js: "interpolate", unity: "Interpolate", godot: "interpolate", unreal: "interpolate", bp: "Interpolate" },
   { on: "Flow", js: "stripCaptions", unity: "StripCaptions", godot: "strip_captions", unreal: "stripCaptions", bp: "StripCaptions" },
   { on: "Engine", js: "runFlow", unity: "RunFlow", godot: "run_flow", unreal: "runFlow", bp: "RunFlow" },
+  { on: "Engine", js: "runText", unity: "RunText", godot: "run_text", unreal: "runText", bp: "RunText" },
 
   // --- flow lifecycle -------------------------------------------------------
   { on: "Engine", js: "openFlow", unity: "OpenFlow", godot: "open_flow", unreal: "openFlow", bp: "OpenFlow" },

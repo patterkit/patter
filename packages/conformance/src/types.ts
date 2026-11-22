@@ -186,6 +186,14 @@ export type ScriptOp =
   // pins the BOOLEAN it returns - false = address did not resolve, cursor untouched - which a runner
   // asserts directly rather than through the transcript. Every port must agree on all of it.
   | { op: "goto"; scene: string; block?: string; expectResult?: boolean }
+  // "Give me just the text at this address" (engine.runText): play the address and join its text beats with
+  // `separator` (a newline when omitted), skipping game events. No `flow`: a throwaway flow, never registered
+  // or saved, so the same address reads the same each time. A `flow`: that named flow, reused as runFlow
+  // reuses it. Doesn't move the current flow. `expectResult` pins the string; `expectRefused` says the call
+  // must be refused (an address that doesn't resolve, or content that reaches a line of dialogue or a
+  // choice, stopping there so nothing after it runs). A runtime that throws refuses by throwing; Godot
+  // reports and returns null. No transcript of its own.
+  | { op: "runText"; scene: string; block?: string; flow?: string; separator?: string; expectResult?: string; expectRefused?: boolean }
   | { op: "saveLoad" }
   // A flow taken out as data and put back (engine.captureFlow / restoreFlow). `captureFlow` keeps the state
   // under `into`, sent through JSON to prove it is plain data; `restoreFlow` opens flow `flow` from the state

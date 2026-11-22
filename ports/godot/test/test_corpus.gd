@@ -950,6 +950,25 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 				captured[op["into"]] = JSON.parse_string(JSON.stringify(state))
 			"closeFlow":
 				holder["engine"].close_flow(op["flow"])
+			"runText":
+				# Plays text at an address and checks what it gives back. Doesn't move the current flow; no
+				# transcript of its own. A refused one must return null and leave the checkpoint as it was.
+				var rt_scene: String = op["scene"]
+				var rt_block: String = op.get("block", "")
+				var rt_flow: String = op.get("flow", "")
+				var rt_separator: String = op.get("separator", "\n")
+				var rt_where := "runText %s%s" % [rt_scene, "" if rt_block == "" else "/" + rt_block]
+				if op.get("expectRefused", false):
+					if not _refused(holder, name, rt_where, func(e): return e.run_text(rt_scene, rt_block, rt_flow, rt_separator) == null, false):
+						return false
+				else:
+					var rt_got = holder["engine"].run_text(rt_scene, rt_block, rt_flow, rt_separator)
+					if rt_got == null:
+						_fail("scripted", name, "%s: refused" % rt_where)
+						return false
+					if op.has("expectResult") and rt_got != str(op["expectResult"]):
+						_fail("scripted", name, "%s: expected %s, got %s" % [rt_where, JSON.stringify(op["expectResult"]), JSON.stringify(rt_got)])
+						return false
 			"restoreFlow":
 				if not captured.has(op["from"]):
 					_fail("scripted", name, "restoreFlow: nothing captured under '%s'" % op["from"])

@@ -1030,6 +1030,21 @@ namespace Patterkit.Patterplay.TestHost
                                     throw new Exception($"goto {op.GetProperty("scene").GetString()}: expected {ger.GetBoolean()}, got {moved}");
                                 break;
                             }
+                            case "runText":
+                            {
+                                // The text at an address as one string. Doesn't move the current flow and has no
+                                // transcript of its own; expectResult pins the returned string.
+                                string rtScene = op.GetProperty("scene").GetString();
+                                string rtBlock = op.TryGetProperty("block", out var rtb) ? rtb.GetString() : null;
+                                string rtFlow = op.TryGetProperty("flow", out var rtf) ? rtf.GetString() : null;
+                                string rtSep = op.TryGetProperty("separator", out var rts) ? rts.GetString() : "\n";
+                                string rtWhat = $"runText {rtScene}{(rtBlock == null ? "" : "/" + rtBlock)}";
+                                if (Refused(op)) { ExpectRefused(engine, rtWhat, () => engine.RunText(rtScene, rtBlock, rtFlow, rtSep)); break; }
+                                string got = engine.RunText(rtScene, rtBlock, rtFlow, rtSep);
+                                if (op.TryGetProperty("expectResult", out var rter) && got != rter.GetString())
+                                    throw new Exception($"{rtWhat}: expected {JsonSerializer.Serialize(rter.GetString())}, got {JsonSerializer.Serialize(got)}");
+                                break;
+                            }
                             case "saveLoad":
                             {
                                 if (_jsonSaveLoad)

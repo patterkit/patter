@@ -270,6 +270,15 @@ Give each independent speaker its own flow name. Full rules, and why `OpenFlow` 
 differently: [Host navigation](/play/navigation/). (In the underlying std C++ core the method
 is `gotoAddress`, because `goto` is a reserved word; the Blueprint-facing name is `Goto`.)
 
+For a letter, a book page, or a sign, `RunText` (also BlueprintCallable) gives you the block's text as
+one string. It refuses dialogue and choices: it logs an error and returns an empty string if it meets
+either, or if the address doesn't resolve
+([Show a block of text](/play/navigation/#show-a-block-of-text)):
+
+```cpp
+FString Letter = Engine->RunText(TEXT("correspondence"), TEXT("from-mother"));
+```
+
 ## Inspect live state
 
 The plugin's editor module adds a **Window ▸ Tools ▸ Patterplay Runtime State** panel. Register a

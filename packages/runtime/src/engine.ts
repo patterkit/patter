@@ -259,6 +259,17 @@ export interface FlatBeat {
   beat: BeatInfo;
 }
 
+/** {@link Engine.runText}'s options. */
+export interface RunTextOptions {
+  /** Play on this named flow, reused as `runFlow` reuses it. Omitted: a throwaway flow, never registered or saved. */
+  flow?: string;
+  /** Put between one text beat and the next. Default `"\n"`. */
+  separator?: string;
+}
+
+/** The id of {@link Engine.runText}'s throwaway flow, as `onError` and the trace name it. Never registered as a flow. */
+const RUN_TEXT_FLOW = "(runText)";
+
 /** What {@link Flow.advanceToStop} returns: the beats walked, and the choice / end that stopped it. */
 export interface AdvanceToStopResult {
   /** The line / text / game-event beats played on the way to the stop (never a choice / end). */
@@ -1104,6 +1115,56 @@ export class Engine {
       throw new Error(`runFlow: address not found: ${scene}${block === undefined ? "" : ` / ${block}`}`);
     }
     return existing.advanceToStop().played;
+  }
+
+  /**
+   * "Give me just the text at this address": the one-call form for a letter, a book page, a sign, or any
+   * other block of prose with no dialogue in it. Plays the address and returns the text of every text beat
+   * it delivers, interpolated and in the shown language, joined with `separator` (a newline by default).
+   * Game events on the way are skipped. `""` means the address had nothing to give.
+   *
+   * With no `flow`, it plays on a throwaway flow that is never registered, never saved, and closed before
+   * the call returns, so reading the same address twice gives the same text unless the state behind it
+   * has changed (a shuffle draws from the engine's seed afresh, and a "once each" list starts again). Its
+   * writes to shared properties and shared selectors stay, as any play's do. Name a `flow` to play on that
+   * flow instead, reused exactly as {@link runFlow} reuses it, so variations move on from call to call.
+   *
+   * THROWS when the address does not resolve, and when the content reaches a line of dialogue or a
+   * choice: a text block holds neither, so either is an authoring mistake. It stops there, so nothing after
+   * the offending beat runs. A named flow is left where it stopped; a throwaway one is closed.
+   */
+  runText(scene: string, block?: string, options: RunTextOptions = {}): string {
+    const where = `${scene}${block === undefined ? "" : ` / ${block}`}`;
+    let flow: Flow;
+    let throwaway = false;
+    if (options.flow !== undefined) {
+      const existing = this.flowsById.get(options.flow);
+      if (!existing) flow = this.openFlow(options.flow, { scene, block }); // openFlow throws on a bad address
+      else if (!existing.goto(scene, block)) throw new Error(`runText: address not found: ${where}`);
+      else flow = existing;
+    } else {
+      this.assertExternalScopes();
+      const { sceneId, blockId } = this.resolveOpenAddress(scene, block); // throws on a bad address
+      flow = new Flow(RUN_TEXT_FLOW, this.host, this.defaultSeed);
+      const journal = this.host.journal;
+      if (journal) { journal.flows.add(flow); journal.opened.add(flow); } // its bags go when it closes, below
+      throwaway = true;
+      try { flow.begin(sceneId, blockId); } catch (e) { flow.close(); throw e; }
+    }
+    const separator = options.separator ?? "\n";
+    const texts: string[] = [];
+    try {
+      for (;;) {
+        const r = flow.advance();
+        if (r.type === "end") break;
+        if (r.type === "text") texts.push(r.text);
+        else if (r.type === "line") throw new Error(`runText: ${where} has a line of dialogue (${r.id}): runText plays text only, so use runFlow for dialogue`);
+        else if (r.type === "choice") throw new Error(`runText: ${where} reaches a choice (${r.groupId}): runText plays text only, so use runFlow for choices`);
+      }
+    } finally {
+      if (throwaway) flow.close();
+    }
+    return texts.join(separator);
   }
 
   /** Content that names another engine's scope (`@story.act`) runs only where that engine is on this

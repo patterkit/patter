@@ -255,6 +255,14 @@ if (!flow.Goto("throne-room", "audience")) { /* did not resolve; the cursor has 
 Give each independent speaker its own flow name. Full rules, and why `OpenFlow` behaves
 differently: [Host navigation](/play/navigation/).
 
+For a letter, a book page, or a sign, `RunText` gives you the block's text as one string. It refuses
+dialogue and choices, and throws if it meets either
+([Show a block of text](/play/navigation/#show-a-block-of-text)):
+
+```csharp
+string letter = engine.RunText("correspondence", "from-mother");
+```
+
 ## Inspect live state
 
 The package adds **Window ▸ Patterplay ▸ Runtime State**: register a running engine with

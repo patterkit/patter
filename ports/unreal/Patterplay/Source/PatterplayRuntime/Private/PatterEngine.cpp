@@ -688,6 +688,17 @@ TArray<FPatterStep> UPatterEngine::RunFlow(const FString& FlowName, const FStrin
 	return Played;
 }
 
+FString UPatterEngine::RunText(const FString& Scene, const FString& Block, const FString& FlowName, const FString& Separator)
+{
+	if (!Engine) return FString();
+	try
+	{
+		return Ue(Engine->runText(Std(Scene), Std(Block), Std(FlowName), Std(Separator)));
+	}
+	catch (const std::exception& Ex) { UE_LOG(LogPatterplay, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	return FString();
+}
+
 TArray<FString> UPatterEngine::TagsForBeat(const FString& BeatId) const
 {
 	TArray<FString> Out;

@@ -1175,6 +1175,23 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                     if (op.has("expectResult") && moved != op.at("expectResult").b)
                         throw std::runtime_error("goto " + op.at("scene").str + ": unexpected result");
                 }
+                // "Give me just the text at this address" (engine.runText): a throwaway flow, or the named
+                // one reused as runFlow reuses it. Doesn't move the current flow; no transcript of its own.
+                else if (kind == "runText")
+                {
+                    const std::string sc = op.at("scene").str;
+                    const std::string bl = op.has("block") ? op.at("block").str : std::string();
+                    const std::string fl = op.has("flow") ? op.at("flow").str : std::string();
+                    const std::string sep = op.has("separator") ? op.at("separator").str : std::string("\n");
+                    const std::string what = "runText " + sc + (bl.empty() ? "" : "/" + bl);
+                    if (refusing(op)) refused(what, [&] { engine->runText(sc, bl, fl, sep); });
+                    else
+                    {
+                        const std::string got = engine->runText(sc, bl, fl, sep);
+                        if (op.has("expectResult") && got != op.at("expectResult").str)
+                            throw std::runtime_error(what + ": expected \"" + op.at("expectResult").str + "\", got \"" + got + "\"");
+                    }
+                }
                 // A flow taken out as data and put back: the state goes through JSON (Patter/Save.h) to
                 // prove it is plain data, and a restored flow becomes the current one.
                 else if (kind == "captureFlow")

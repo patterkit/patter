@@ -18769,6 +18769,365 @@
       ]
     },
     {
+      "name": "runText: a block's text beats joined into one string; dialogue and choices refused",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0e52n7j",
+          "structureHash": "1thglxb"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "reads",
+            "type": "number",
+            "default": 0,
+            "shared": true
+          }
+        ],
+        "scenes": {
+          "scn_rt": {
+            "id": "scn_rt",
+            "type": "scene",
+            "name": "Letters",
+            "blocks": [
+              {
+                "id": "b_rt_m",
+                "type": "block",
+                "name": "Mother",
+                "children": [
+                  {
+                    "id": "sn_rt_m1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "M1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "M_EV",
+                        "kind": "gameEvent",
+                        "gameData": {
+                          "cue": "flower"
+                        }
+                      },
+                      {
+                        "id": "M2",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@reads",
+                        "value": {
+                          "src": "@reads + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "reads"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_rt_m3",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "M3",
+                        "kind": "text"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_rt_n",
+                "type": "block",
+                "name": "Notes",
+                "children": [
+                  {
+                    "id": "g_rt_n",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "sequential",
+                      "exhaust": "once"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_rt_n1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "N1",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_rt_n2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "N2",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_rt_s",
+                "type": "block",
+                "name": "Spoken",
+                "children": [
+                  {
+                    "id": "sn_rt_s1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "S1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "S2",
+                        "kind": "line",
+                        "character": "ADA"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_rt_s3",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "S3",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@reads",
+                        "value": {
+                          "src": "@reads + 100",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "reads"
+                            ],
+                            [
+                              "n",
+                              100
+                            ]
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_rt_a",
+                "type": "block",
+                "name": "Ask",
+                "children": [
+                  {
+                    "id": "sn_rt_a1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "A1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_rt_a",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_rt_yes",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_rt_yes",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "YES",
+                                "kind": "text"
+                              }
+                            ]
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_YES",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "M1": "Dear reader ({@reads}),",
+            "M2": "The garden is well.",
+            "M3": "Love, Mother",
+            "N1": "first note",
+            "N2": "second note",
+            "S1": "A plain line.",
+            "S2": "Hello!",
+            "S3": "after",
+            "A1": "Choose:",
+            "P_YES": "Yes",
+            "YES": "yes"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "mother",
+          "expectResult": "Dear reader (1),\nThe garden is well.\nLove, Mother"
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "mother",
+          "separator": " | ",
+          "expectResult": "Dear reader (2), | The garden is well. | Love, Mother"
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "notes",
+          "expectResult": "first note"
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "notes",
+          "expectResult": "first note"
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "notes",
+          "flow": "desk",
+          "expectResult": "first note"
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "notes",
+          "flow": "desk",
+          "expectResult": "second note"
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "notes",
+          "flow": "desk",
+          "expectResult": ""
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "spoken",
+          "expectRefused": true
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "ask",
+          "expectRefused": true
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "nope",
+          "expectRefused": true
+        },
+        {
+          "op": "runText",
+          "scene": "nowhere",
+          "expectRefused": true
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "nope",
+          "flow": "desk",
+          "expectRefused": true
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "mother",
+          "expectResult": "Dear reader (3),\nThe garden is well.\nLove, Mother"
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "mother",
+          "expectResult": "Dear reader (4),\nThe garden is well.\nLove, Mother"
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "spoken",
+          "expectRefused": true
+        },
+        {
+          "op": "rollback"
+        },
+        {
+          "op": "runText",
+          "scene": "letters",
+          "block": "mother",
+          "expectResult": "Dear reader (4),\nThe garden is well.\nLove, Mother"
+        }
+      ]
+    },
+    {
       "name": "checkpoint: a second checkpoint, a hot swap, and an engine reset are refused while one is open",
       "bundle": {
         "schema": "patter/bundle@0",
