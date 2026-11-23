@@ -4,11 +4,11 @@
   "files": {
     "site.mjs": "07dc113d9f01f877a26f1ae95d25dd48e23461245ca52bc94485e811b9ce8b70",
     "palette.css": "6c1989ae2f43090fb6a8a7cabdf53f9e8988c23d9d35171c35656458ec0bc52f",
-    "chrome.css": "f75f35c4ee06a6df892e33d9a5f2a803ffc94e6093680e14f1bdf581f54caa5c",
+    "chrome.css": "19602d9c669761f55a462e8d3f2eb7c6fde7173fa72d3e02cc140cc4d935e2d6",
     "fonts.css": "15881be7b3d33daac654e91b75f52667af03950164b8dfe7ede8b27eb227aa3f",
     "Footer.astro": "61c22c60e163fd5122c50375fb5e4cf169e468ce24771dbe86fe93649c7fb369",
     "Newsletter.astro": "39c27da67857b73c67d96f0f42ece2f0dcf4727265745ad611799a4f9fce813a",
-    "Downloads.astro": "226df1dfc8c6505133cb4e0e5766f4b044a147f4640dd03a418d95e65757d7d8",
+    "Downloads.astro": "8e172f63c3af93c4c476c86b8db06549f1eba3f47d1ddfb5c6abb8480b1057b5",
     "LandingHeader.astro": "60675c087c5be259b5c5e0e4ba9b4e416bad8b85097d2cb5fd7a51d5f6d9737c",
     "LandingFooter.astro": "269aed7afdb5962c1313045ed83db61cd76b8233abdc376356fe727256ab1245",
     "extensions.mjs": "19dc9aaf02a0cfeb53b8b64e767d516c04ba9210c730305f66568614a2fe718a",

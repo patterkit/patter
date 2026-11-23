@@ -25,13 +25,24 @@ if (section?.downloads?.sections?.[kind]) {
   const mounts = Array.from(document.querySelectorAll<HTMLElement>("[data-chrome-dl]"));
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 
-  type Asset = { name: string; browser_download_url: string };
+  type Asset = { name: string; browser_download_url: string; size: number };
   type Release = { tag_name: string; html_url: string; published_at: string | null; draft: boolean; assets: Asset[] };
 
-  const row = (icon: string, name: string, sub: string, action: string): string =>
+  const sizeOf = (bytes: number): string => {
+    const units = ["KB", "MB", "GB"];
+    let n = bytes / 1000;
+    let u = 0;
+    while (n >= 1000 && u < units.length - 1) {
+      n /= 1000;
+      u++;
+    }
+    return `${n < 10 ? n.toFixed(1) : Math.round(n)} ${units[u]}`;
+  };
+  const row = (icon: string, name: string, sub: string, action: string, asset?: Asset): string =>
     `<li class="chrome-dl-row">
       <span class="chrome-dl-name">${icon}<span>${esc(name)}</span></span>
       <span class="chrome-dl-sub">${sub}</span>
+      ${asset && asset.size > 0 ? `<span class="chrome-dl-size">${sizeOf(asset.size)}</span>` : ""}
       ${action}
     </li>`;
   const list = (rows: string[]): string => `<ul class="chrome-dl-list">${rows.join("")}</ul>`;
@@ -98,7 +109,7 @@ if (section?.downloads?.sections?.[kind]) {
       const asset = assetFor(release, r.asset);
 
       if (!asset && r.drop) continue;
-      rows.push(row(icon(r.icon), r.name, r.sub, download(asset, r.label)));
+      rows.push(row(icon(r.icon), r.name, r.sub, download(asset, r.label), asset));
     }
     root.innerHTML = list(rows) + (spec.meta === false ? "" : meta(release, version));
   }
@@ -113,7 +124,7 @@ if (section?.downloads?.sections?.[kind]) {
         loose = release.assets.find((a) => a.name === spec.loose.asset);
       }
       const zip = assetFor(release, spec.asset);
-      return row(icon(e.icon), `${e.name} ${version}`, e.sub, download(zip, spec.label));
+      return row(icon(e.icon), `${e.name} ${version}`, e.sub, download(zip, spec.label), zip);
     });
     const line =
       loose && spec.loose
