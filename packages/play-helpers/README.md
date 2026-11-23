@@ -1,23 +1,16 @@
 # @patterkit/play-helpers
 
-Thin game-integration helpers around [@patterkit/runtime](../runtime)'s `Engine` -
-the **Patterplay JS** companion. None are required to play a bundle; they smooth
-the host wiring most games end up writing anyway.
+Thin game-integration helpers around [@patterkit/runtime](../runtime)'s `Engine` - the **Patterplay JS** companion. None are required to play a bundle; they smooth the host wiring most games end up writing anyway.
 
 ```sh
 npm install @patterkit/play-helpers
 ```
 
-`@wildwinter/scoperegistry` is a peer dependency, as it is of `@patterkit/runtime`: one copy for your
-whole game. npm installs it for you; with a package manager that doesn't install peers, add it
-yourself.
+`@wildwinter/scoperegistry` is a peer dependency, as it is of `@patterkit/runtime`: one copy for your whole game. npm installs it for you; with a package manager that doesn't install peers, add it yourself.
 
 ## Drop-in (`<script>`)
 
-This package also builds **`patterplay.min.js`**, the zero-build browser drop-in: one classic
-script, everything inlined, defining `window.Patterplay` with the runtime **and** these helpers
-on it. It ships loose on every `play-js-v*` GitHub Release, inside `patterplay-js-<version>.zip`,
-and from a CDN:
+This package also builds **`patterplay.min.js`**, the zero-build browser drop-in: one classic script, everything inlined, defining `window.Patterplay` with the runtime **and** these helpers on it. It ships loose on every `play-js-v*` GitHub Release, inside `patterplay-js-<version>.zip`, and from a CDN:
 
 ```html
 <script src="https://unpkg.com/@patterkit/play-helpers/dist/patterplay.min.js"></script>
@@ -28,13 +21,11 @@ and from a CDN:
 </script>
 ```
 
-Two script tags (this and the Storylet Engine's `storyletengine.min.js`) is the whole
-integration for a page running both families with no bundler.
+Two script tags (this and the Storylet Engine's `storyletengine.min.js`) is the whole integration for a page running both families with no bundler.
 
 ## Runner
 
-`Runner` plays a flow a beat at a time as events, for straightforward games: `begin()`, then `next()` for each
-beat and `choose(id)` at a choice. It dictates no UI and no audio. See [The runner](https://patterkit.dev/play/runner/).
+`Runner` plays a flow a beat at a time as events, for straightforward games: `begin()`, then `next()` for each beat and `choose(id)` at a choice. It dictates no UI and no audio. See [The runner](https://patterkit.dev/play/runner/).
 
 ```ts
 import { Runner } from "@patterkit/play-helpers";
@@ -48,8 +39,7 @@ runner.begin();
 
 ## Save / load
 
-Wrap the engine's whole-game snapshot in a tagged, versioned envelope - drop it into
-localStorage or a file, and a foreign blob throws instead of corrupting a run.
+Wrap the engine's whole-game snapshot in a tagged, versioned envelope - drop it into localStorage or a file, and a foreign blob throws instead of corrupting a run.
 
 ```ts
 import { serializeState, deserializeState } from "@patterkit/play-helpers";
@@ -62,9 +52,7 @@ deserializeState(engine, localStorage.getItem("slot1")!);   // throws on a non-p
 
 ## Runtime properties
 
-Read / write `@patter` globals, `@scene` props, or a wired foreign scope at runtime -
-e.g. the game pushing inventory into the dialogue. Pass the engine for game-wide properties, or a
-flow for those plus `@scene`, since each flow has its own scene properties.
+Read / write `@patter` globals, `@scene` props, or a wired foreign scope at runtime - e.g. the game pushing inventory into the dialogue. Pass the engine for game-wide properties, or a flow for those plus `@scene`, since each flow has its own scene properties.
 
 ```ts
 import { setProperty, setProperties, getProperty } from "@patterkit/play-helpers";
@@ -74,16 +62,11 @@ setProperties(flow, { "@scene.locked": false });
 getProperty(engine, "@hp");   // 10
 ```
 
-(Localisation needs no helper: an **Embedded** bundle carries its strings - construct with
-`{ locale }` or switch live via `engine.setLocale()`; an **IDs-only** bundle emits beat IDs
-your game localises itself, re-interpolated with `flow.interpolate()`. See the
-[Localisation guide](https://patterkit.dev/play/localisation/).)
+(Localisation needs no helper: an **Embedded** bundle carries its strings - construct with `{ locale }` or switch live via `engine.setLocale()`; an **IDs-only** bundle emits beat IDs your game localises itself, re-interpolated with `flow.interpolate()`. See the [Localisation guide](https://patterkit.dev/play/localisation/).)
 
 ## State logger
 
-A debug companion that watches the mutable runtime state (`@patter` / `@scene` /
-visit counts, shared + per-flow) and reports what changed between captures. `logStep`
-traces each played step, including its `gameData` (the host-event channel).
+A debug companion that watches the mutable runtime state (`@patter` / `@scene` / visit counts, shared + per-flow) and reports what changed between captures. `logStep` traces each played step, including its `gameData` (the host-event channel).
 
 ```ts
 import { createStateLogger } from "@patterkit/play-helpers";
@@ -98,9 +81,7 @@ log.capture();       // [main] @patter.bell_tolls: 0 -> 1
 
 ## Live Link (Patterpad debug + hot reload)
 
-`createDebugLink` streams the running story's cursor to Patterpad over a localhost
-WebSocket, so the editor follows the game like a debugger - and receives **live bundle
-pushes** back when the author edits, for hot reload without restarting:
+`createDebugLink` streams the running story's cursor to Patterpad over a localhost WebSocket, so the editor follows the game like a debugger - and receives **live bundle pushes** back when the author edits, for hot reload without restarting:
 
 ```ts
 import { createDebugLink, applyLiveBundle } from "@patterkit/play-helpers";
@@ -121,29 +102,17 @@ link.flowOpened("main");
 // after each step: link.observe(flowId, sceneId, beatId, step.type)
 ```
 
-`applyLiveBundle` picks the cheapest tier itself: same `structureHash` -> in-place
-`replaceStrings` (`kind: "text"`, nothing lost); structural change -> `hotSwap` to a fresh
-engine restored from the old one (`kind: "structure"`). Wire it behind a dev flag - it is
-a development tool, not a shipping feature.
+`applyLiveBundle` picks the cheapest tier itself: same `structureHash` -> in-place `replaceStrings` (`kind: "text"`, nothing lost); structural change -> `hotSwap` to a fresh engine restored from the old one (`kind: "structure"`). Wire it behind a dev flag - it is a development tool, not a shipping feature.
 
-**Play in game**: Patterpad can ask the running game to start a block now. Pass `onPlay`; it
-gets `{ id, sceneId, blockId, takeOver, build? }` and answers with
-`link.replyPlay(id, { started, reason?, detail? })`, then or a frame or more later. With no
-`onPlay`, the link answers `{ started: false, reason: "unhandled" }` itself. Details and the
-reason codes Patterpad words: [Play in game](https://patterkit.dev/play/live-debug/#play-in-game).
+**Play in game**: Patterpad can ask the running game to start a block now. Pass `onPlay`; it gets `{ id, sceneId, blockId, takeOver, build? }` and answers with `link.replyPlay(id, { started, reason?, detail? })`, then or a frame or more later. With no `onPlay`, the link answers `{ started: false, reason: "unhandled" }` itself. Details and the reason codes Patterpad words: [Play in game](https://patterkit.dev/play/live-debug/#play-in-game).
 
 ## Property inspector
 
-`createPropertyInspector(engine)` builds a small DOM panel of the engine's `@patter`
-properties with type-aware editors (toggle / number / text / enum / flags) and
-reset-to-default - the JS equivalent of the Unity / Unreal / Godot runtime-state panels.
-`refresh()` re-reads values; `destroy()` unhooks; `pollMs` auto-refreshes.
+`createPropertyInspector(engine)` builds a small DOM panel of the engine's `@patter` properties with type-aware editors (toggle / number / text / enum / flags) and reset-to-default - the JS equivalent of the Unity / Unreal / Godot runtime-state panels. `refresh()` re-reads values; `destroy()` unhooks; `pollMs` auto-refreshes.
 
 ## Audio resolution
 
-`createAudioResolver(manifestJson, basePath)` reads a `patteraudio.json` manifest (the
-sidecar Patterpad's Build writes next to the audio root) and resolves a beat to its
-**winning take**:
+`createAudioResolver(manifestJson, basePath)` reads a `patteraudio.json` manifest (the sidecar Patterpad's Build writes next to the audio root) and resolves a beat to its **winning take**:
 
 ```ts
 import { createAudioResolver } from "@patterkit/play-helpers";
