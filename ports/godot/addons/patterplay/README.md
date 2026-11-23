@@ -1,19 +1,12 @@
 # Patterplay for Godot
 
-Play [Patter](https://patterkit.dev/) branching dialogue natively in Godot.
-Patterplay loads a compiled `.patterc` bundle (the file Patterpad's *Publish Bundle* or the
-`patter` CLI writes) and plays it in pure GDScript: no web view, no native extension to
-compile. Every Patterplay runtime plays the same bundle with the same behaviour, so a story
-authored once runs identically here, on the web, in Unity, and in Unreal.
+Play [Patter](https://patterkit.dev/) branching dialogue natively in Godot. Patterplay loads a compiled `.patterc` bundle (the file Patterpad's *Publish Bundle* or the `patter` CLI writes) and plays it in pure GDScript: no web view, no native extension to compile. Every Patterplay runtime plays the same bundle with the same behaviour, so a story authored once runs identically here, on the web, in Unity, and in Unreal.
 
 Full documentation: **[the Godot guide](https://patterkit.dev/play/godot/)**.
 
 ## Install
 
-Drop this `patterplay/` folder into your project's `addons/` directory and enable the plugin
-in *Project ▸ Project Settings ▸ Plugins*. The runtime works with or without the editor plugin
-enabled; enabling it just registers the helper classes. Requires **Godot 4.4 or newer**, and is
-verified on 4.7, which every release is gated on.
+Drop this `patterplay/` folder into your project's `addons/` directory and enable the plugin in *Project ▸ Project Settings ▸ Plugins*. The runtime works with or without the editor plugin enabled; enabling it just registers the helper classes. Requires **Godot 4.4 or newer**, and is verified on 4.7, which every release is gated on.
 
 ## Play a flow
 
@@ -33,169 +26,49 @@ while true:
         "end":       break
 ```
 
-Render each step into your own dialogue UI; on a `"choice"`, present `step["options"]` (each
-has a `prompt` whose `"text"` is the label, and an `eligible` flag) and call `flow.choose(id)`
-with the player's pick.
+Render each step into your own dialogue UI; on a `"choice"`, present `step["options"]` (each has a `prompt` whose `"text"` is the label, and an `eligible` flag) and call `flow.choose(id)` with the player's pick.
 
-A `"line"` step names its speaker with `character` (the character ID) and `characterName` (the shown
-name), and carries `direction` when set. A line with a speaker qualifier (`TAM (O.S.)`) also carries
-`qualifier`, the qualifier's `gameId` (`"os"`) for your game to switch on, and `qualifierName`, its
-shown name (`"O.S."`) in the active language. A line prompt on a choice option carries the same fields.
+A `"line"` step names its speaker with `character` (the character ID) and `characterName` (the shown name), and carries `direction` when set. A line with a speaker qualifier (`TAM (O.S.)`) also carries `qualifier`, the qualifier's `gameId` (`"os"`) for your game to switch on, and `qualifierName`, its shown name (`"O.S."`) in the active language. A line prompt on a choice option carries the same fields.
 
-To show who's speaking, use `speakerLabel`, the speaker's label in the active language, rather than putting
-the name and the qualifier together yourself: word order and punctuation differ by language, and a writer
-can give a pair its own label. With a qualifier it's that character's own label for the pair when the
-project gives one (`"Your thoughts"`), else the project's speaker pattern filled in (`"You (V.O.)"` by
-default); with none, it's the shown name (the character ID when the cast gives no character name). It's absent
-when the line has no speaker, when closed captions silence it, and in an IDs-only build. A replayed prompt
-and a saved choice keep it, and `get_outline()` and `get_beat_sequence()` give it in the source language.
+To show who's speaking, use `speakerLabel`, the speaker's label in the active language, rather than putting the name and the qualifier together yourself: word order and punctuation differ by language, and a writer can give a pair its own label. With a qualifier it's that character's own label for the pair when the project gives one (`"Your thoughts"`), else the project's speaker pattern filled in (`"You (V.O.)"` by default); with none, it's the shown name (the character ID when the cast gives no character name). It's absent when the line has no speaker, when closed captions silence it, and in an IDs-only build. A replayed prompt and a saved choice keep it, and `get_outline()` and `get_beat_sequence()` give it in the source language.
 
-Every `"line"` and `"text"` step also carries `padAfter`, the pause after it in seconds, before the next
-line: positive waits, zero follows at once, and negative starts the next line that long before this one
-ends (a cut-in). It is already resolved: the beat's own value, else the nearest default above it
-(snippet, group, block, scene, then the project's), else 0.6. Only a snippet's last line is never
-negative; a negative pause before a game event stands. A replayed prompt carries its option's pause, and
-so does each choice option's `prompt`, as `padAfter`, for a game that voices the prompts itself. A line
-silenced by closed captions keeps its pause.
-When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects. `get_outline()` and `get_beat_sequence()`
-give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the beat sets its own. For a
-line with a recording, the line lasts as long as the recording. For one without,
-`PatterBundle.estimate_line_duration(step.get("spokenText", ""), step.get("spokenLocale", ""), step["estimateSpeed"])`
-gives how long it lasts, in seconds: its characters at 14 a second times the project's speed (1 unless the project
-sets `estimateSpeed`, higher is faster), clamped to 0.5 to 18 seconds. Most characters weigh 1, a Han character 3,
-kana 2, a Hangul syllable 2.5, and a soft hyphen 0 (`PatterBundle.LINE_CHAR_WEIGHTS`). It's Patter's one rule, the
-same in every runtime and in Patterpad's Play window. That's how long the line takes to say, not how long its text
-needs to be read: if you show it as a subtitle, keep the text up at least `PatterBundle.SUBTITLE_READING_MIN` (1.5
-seconds) after a shorter line ends, overlapping the next line if you must.
+Every `"line"` and `"text"` step also carries `padAfter`, the pause after it in seconds, before the next line: positive waits, zero follows at once, and negative starts the next line that long before this one ends (a cut-in). It is already resolved: the beat's own value, else the nearest default above it (snippet, group, block, scene, then the project's), else 0.6. Only a snippet's last line is never negative; a negative pause before a game event stands. A replayed prompt carries its option's pause, and so does each choice option's `prompt`, as `padAfter`, for a game that voices the prompts itself. A line silenced by closed captions keeps its pause. When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects. `get_outline()` and `get_beat_sequence()` give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the beat sets its own. For a line with a recording, the line lasts as long as the recording. For one without, `PatterBundle.estimate_line_duration(step.get("spokenText", ""), step.get("spokenLocale", ""), step["estimateSpeed"])` gives how long it lasts, in seconds: its characters at 14 a second times the project's speed (1 unless the project sets `estimateSpeed`, higher is faster), clamped to 0.5 to 18 seconds. Most characters weigh 1, a Han character 3, kana 2, a Hangul syllable 2.5, and a soft hyphen 0 (`PatterBundle.LINE_CHAR_WEIGHTS`). It's Patter's one rule, the same in every runtime and in Patterpad's Play window. That's how long the line takes to say, not how long its text needs to be read: if you show it as a subtitle, keep the text up at least `PatterBundle.SUBTITLE_READING_MIN` (1.5 seconds) after a shorter line ends, overlapping the next line if you must.
 
-So you can time a line by the same measure, every `"line"` and `"text"` step (a replayed prompt too) carries how
-it's spoken:
+So you can time a line by the same measure, every `"line"` and `"text"` step (a replayed prompt too) carries how it's spoken:
 
-- `spokenText`: the line in the project's main language, whatever language is being shown, interpolated as the
-  shown text is (a voiced project's lines aren't), with caption cues always left out, and empty for the caption
-  character's lines.
+- `spokenText`: the line in the project's main language, whatever language is being shown, interpolated as the shown text is (a voiced project's lines aren't), with caption cues always left out, and empty for the caption character's lines.
 - `spokenLocale`: that language. Both are absent from an IDs-only build, which has no text, so pass your own.
 - `estimateSpeed`: the project's speed for an estimate, always there.
 
 To move a mouth to a line, use Patterstage, which breaks a line into the syllables and pauses it's spoken in.
 
-A `"text"` step with `action: true` is action: a direction for whoever stages the scene, never shown to the
-player. It's a dialogue scene's text when the project doesn't localise it, and its text is the source in
-every locale. The key is absent on shown text, and a replayed prompt is never action.
+A `"text"` step with `action: true` is action: a direction for whoever stages the scene, never shown to the player. It's a dialogue scene's text when the project doesn't localise it, and its text is the source in every locale. The key is absent on shown text, and a replayed prompt is never action.
 
-To show a line again that your game kept by id (after a load, or a language switch), call
-`flow.step_for(beat_id)`. It gives the step `advance()` would give for that beat right now, built the same
-way: the text in the active locale, interpolated against the flow's values, closed captions applied, and the
-names, label, pause, Game Data, extension values, and tags. It doesn't move the flow, count a visit, or run an effect, and it
-returns `null` for an id that isn't a beat or an option's prompt.
+To show a line again that your game kept by id (after a load, or a language switch), call `flow.step_for(beat_id)`. It gives the step `advance()` would give for that beat right now, built the same way: the text in the active locale, interpolated against the flow's values, closed captions applied, and the names, label, pause, Game Data, extension values, and tags. It doesn't move the flow, count a visit, or run an effect, and it returns `null` for an id that isn't a beat or an option's prompt.
 
 ## Demos
 
 In `demo/` (delete the folder freely):
 
-- **`demo.gd`** - the smallest possible integration: plays a tiny shared flow headless and
-  prints each step. Read this first.
-  Run it: `godot --headless --path <project> --script res://addons/patterplay/demo/demo.gd`
-- **`tour.tscn`** - the full interactive Patter tour with clickable choice buttons, plus
-  per-line audio resolution via `PatterAudioResolver`. Audio files are not bundled (playback is your
-  platform call): point its audio base at a Patter audio folder to hear it, or leave it unset
-  to play silently.
+- **`demo.gd`** - the smallest possible integration: plays a tiny shared flow headless and prints each step. Read this first. Run it: `godot --headless --path <project> --script res://addons/patterplay/demo/demo.gd`
+- **`tour.tscn`** - the full interactive Patter tour with clickable choice buttons, plus per-line audio resolution via `PatterAudioResolver`. Audio files are not bundled (playback is your platform call): point its audio base at a Patter audio folder to hear it, or leave it unset to play silently.
 
 ## Beyond the basics
 
-- **Save / load**: `PatterSave.serialize_state(engine)` / `deserialize_state(engine, json)` (or
-  `engine.save_game()` / `engine.load_game(blob)` for the bare dictionary) snapshot and restore the
-  whole run. Saves are the shared `patter/save@0` format, version 4; a version 3 save still loads. A
-  pending choice saves which options were offered, not their text, so a load shows it in the language in
-  use. A load whose place has gone from an edited build resumes at the nearest safe point and reports it
-  through `on_error` (kind `"save"`).
-- **One flow as data**: `engine.capture_flow(id)` returns a flow's state as a plain Dictionary (its
-  cursor, PRNG, visits, and selectors, as a save writes them, plus its own `@patter` and `@scene`
-  values), without its id, for your game to keep and save like anything else. `engine.restore_flow(id,
-  state)` opens a flow from it, under that id or another, and carries on where it was; shared state
-  isn't in it, so nothing else is rewound. Capture before `close_flow`, which drops the flow's values.
-  Capturing is allowed inside a checkpoint; restoring isn't, nor over an id that is open (it returns
-  null, with `push_error`).
-- **Game Data**: a step, an option, and each scene and block carry the writer's `gameData` overrides
-  raw (`engine.game_data_for_scene(ref)` and `engine.game_data_for_block(scene, block)` for a scene's and a
-  block's own). `PatterBundle.effective_game_data(PatterBundle.game_data_fields(bundle, kind), node)` fills
-  in the declared defaults.
-- **Patter extension values**: when the project uses Patter extensions, a `"line"`, `"text"` or
-  `"gameEvent"` step, a choice option, and each scene, block and beat of `get_outline()` carry
-  `extensions`, by extension id, raw as the bundle wrote them (any JSON), and only when the node has any.
-  `engine.extensions_for_scene(ref)`, `engine.extensions_for_block(scene, block)` and
-  `engine.extensions_for_snippet(snippet_id)` read a scene's, a block's and a snippet's own. Fill in an extension's defaults with the same helper, given its declarations:
-  `PatterBundle.effective_game_data(PatterBundle.extension_decls(bundle, id, kind), step["extensions"].get(id))`.
-  `PatterBundle.extensions_of(bundle, kind, address)` reads any node's values off the bundle: `"project"`
-  (no address), `"scene"`, `"block"` (`"scene/block"`), or a `"snippet"`, `"option"`, `"line"`, `"text"` or
-  `"gameEvent"` by id.
-- **Which Patterplay this is**: `PatterplayVersion.CURRENT` is this runtime's version, as in its
-  `plugin.cfg`. An extension that ships apart from Patterplay checks it at start-up with
-  `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "1.0.0", "2.0.0")`: at least the first version and
-  below the second, by semantic-version order. Every runtime has the same pair.
-- **Your game's state and one registry per game**: bind `@world` to your own store with the
-  `host_scopes` option (a `PatterWorld` node, any object with `get_property` and `set_property`,
-  or a `{"get", "set"}` Dictionary), or hand the engine your game's `PatterScopeRegistry` with the `registry`
-  option so every engine in the game shares one set of properties and one save. Without a registry
-  the engine makes its own, and its save carries every property value. A declared name your store hasn't
-  set reads as its declared default, and your store isn't written. A name you've made read-only with
-  `set_read_only` refuses the story's write: `set_property` returns why, the engine reports it to `on_error`
-  as a failed effect, and the story plays on. Your own store refuses a write the same way, by returning why
-  from its `set_property` or its Dictionary's `"set"`. See
-  [One registry per game](https://patterkit.dev/play/godot/#one-registry-per-game).
-- **The thin runner**: `PatterRunner` turns a flow into signals (`line`, `text`, `game_event`, `choice`,
-  `ended`) for your UI, and plays the next beat when you call `next()`. Hand it an engine with
-  `attach(engine)`, or set it up in the Inspector: give it a Bundle (an imported `.patterc`) and a World (your
-  scene's `PatterWorld`), and it makes its own engine when it's ready, with the World bound as `@world`,
-  playing `flow_id`. If the story reads `@world` and no World is set, it warns you: `@world` would play from
-  its declared defaults and not see your game. `get_engine()` gives you the engine, for saves.
-- **Audio**: `PatterAudioResolver` reads the `patteraudio.json` manifest exported next to a Patter
-  audio folder and resolves each line to its winning take - it resolves the path, you play
-  it. See [the audio guide](https://patterkit.dev/play/audio/).
-- **Live state**: add a `PatterStatePanel` (an in-game overlay) and register your engine with
-  `PatterDebug.register(engine)` to watch and edit its `@patter` properties while playing.
-- **Live Link**: `PatterDebugLink` connects a running game to Patterpad, streaming the story
-  cursor to the editor and hot-reloading edited bundles back in.
-  See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
-- **Localisation**: play any locale of an Embedded bundle (the `locale` option or `engine.set_locale`), or
-  ship an IDs-only bundle and localise in your own system. A locale resolves by one rule: case and `_` /
-  `-` don't matter, then the language alone (`fr` for `fr-FR`), then the default, and anything but an
-  exact match is reported. `engine.locale()` is the locale in use; `engine.locales()` gives the bundle's
-  `{"default", "included"}`.
-- **Problems and refusals**: the engine reports what it carried on past to your `on_error` Callable (or
-  `push_warning`): a content error, how it was set up (`"setup"`: an option key it doesn't take, a locale
-  the bundle doesn't have, a host scope it doesn't declare, reported as the engine is built), a load
-  whose place has gone (`"save"`), and a choice that ran dry and so ended the flow (`"dry-choice"`, whose
-  `node` is the choice group: a hub whose options were all used, say). That flow's `"end"` step says
-  `"reason": "ran-dry"`; any other end says `"ended"`, and `PatterRunner`'s `ended(reason)` signal passes it
-  on. The reason survives a save and load, and the host's `goto("END")` is a plain end. A dry choice that play carries on past isn't reported: it's the gather
-  idiom. A call it refuses can't throw in GDScript: `set_property` returns the
-  refusal (`""` when written; a value that doesn't fit its declaration, or a name the content doesn't
-  declare, is refused), and `advance()` and `choose()` keep theirs for `flow.last_error()`, cleared by the
-  next success. Each is also `push_error`'d.
-- **Tooling hooks, never for a shipped game**: `on_dry_choice`, a Callable, hears the group id of each choice
-  that runs dry. `steer` is for a tool, such as a bake or a test, that has to reach content whatever the game's
-  data says. It's an Object with a `gate(point) -> bool` method and a `pick(point) -> String` method, and it
-  decides every choice the flow makes on game data, hearing each one as it's passed. `gate` is asked for each
-  condition a run, a choice option, or a fallback reaches (the point's `"node"`, `"where"` it is, its
-  `"source"`, and its `"default"`), and an option it answers true is offered as eligible, a hidden one included.
-  `pick` is asked once each time a branch or sequence picks, with every child's real verdict in `"children"`
-  and the `"default"` pick, and returns a child's id or `""` for none. A steerer that only listens returns
-  `point["default"]`, and a method it doesn't have answers the default. Steering changes no values, and with
-  `log` on, an answer that overrules the engine adds a `steered` entry. A `steer` that isn't an Object (or whose
-  `gate` or `pick` isn't a method) is reported as a `"setup"` problem and ignored. On an engine that's already
-  made (one a game's director built, say), `engine.set_steer(steerer)` sets it and `engine.set_steer(null)` clears
-  it, from the next decision a flow makes; one that isn't a steerer is reported the same way and leaves the engine
-  unsteered. An answer of the wrong type,
-  or a pick naming a child the group doesn't have, is refused as `choose()` refuses an unknown option: that
-  `advance()` returns `{"type": "end", "reason": "ended"}`, and `flow.last_error()` says why.
-- **Copies and read-only values**: the Game Data and tags a step, an option, an outline, or a lookup hands
-  you are your own copies, so editing them changes nothing the engine says next. Extension values are the
-  bundle's own: read them, never edit them.
-- **Exporting**: nothing to configure. From 0.4.5 the plugin puts your bundle into the export
-  itself, so a build has its story on every platform. (If you use Audio Folders, `patteraudio.json`
-  is still yours to add to the export filters.) Details:
-  [Exporting your game](https://patterkit.dev/play/godot/#exporting-your-game).
-  See [the localisation guide](https://patterkit.dev/play/localisation/).
+- **Save / load**: `PatterSave.serialize_state(engine)` / `deserialize_state(engine, json)` (or `engine.save_game()` / `engine.load_game(blob)` for the bare dictionary) snapshot and restore the whole run. Saves are the shared `patter/save@0` format, version 4; a version 3 save still loads. A pending choice saves which options were offered, not their text, so a load shows it in the language in use. A load whose place has gone from an edited build resumes at the nearest safe point and reports it through `on_error` (kind `"save"`).
+- **One flow as data**: `engine.capture_flow(id)` returns a flow's state as a plain Dictionary (its cursor, PRNG, visits, and selectors, as a save writes them, plus its own `@patter` and `@scene` values), without its id, for your game to keep and save like anything else. `engine.restore_flow(id, state)` opens a flow from it, under that id or another, and carries on where it was; shared state isn't in it, so nothing else is rewound. Capture before `close_flow`, which drops the flow's values. Capturing is allowed inside a checkpoint; restoring isn't, nor over an id that is open (it returns null, with `push_error`).
+- **Game Data**: a step, an option, and each scene and block carry the writer's `gameData` overrides raw (`engine.game_data_for_scene(ref)` and `engine.game_data_for_block(scene, block)` for a scene's and a block's own). `PatterBundle.effective_game_data(PatterBundle.game_data_fields(bundle, kind), node)` fills in the declared defaults.
+- **Patter extension values**: when the project uses Patter extensions, a `"line"`, `"text"` or `"gameEvent"` step, a choice option, and each scene, block and beat of `get_outline()` carry `extensions`, by extension id, raw as the bundle wrote them (any JSON), and only when the node has any. `engine.extensions_for_scene(ref)`, `engine.extensions_for_block(scene, block)` and `engine.extensions_for_snippet(snippet_id)` read a scene's, a block's and a snippet's own. Fill in an extension's defaults with the same helper, given its declarations: `PatterBundle.effective_game_data(PatterBundle.extension_decls(bundle, id, kind), step["extensions"].get(id))`. `PatterBundle.extensions_of(bundle, kind, address)` reads any node's values off the bundle: `"project"` (no address), `"scene"`, `"block"` (`"scene/block"`), or a `"snippet"`, `"option"`, `"line"`, `"text"` or `"gameEvent"` by id.
+- **Which Patterplay this is**: `PatterplayVersion.CURRENT` is this runtime's version, as in its `plugin.cfg`. An extension that ships apart from Patterplay checks it at start-up with `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "1.0.0", "2.0.0")`: at least the first version and below the second, by semantic-version order. Every runtime has the same pair.
+- **Your game's state and one registry per game**: bind `@world` to your own store with the `host_scopes` option (a `PatterWorld` node, any object with `get_property` and `set_property`, or a `{"get", "set"}` Dictionary), or hand the engine your game's `PatterScopeRegistry` with the `registry` option so every engine in the game shares one set of properties and one save. Without a registry the engine makes its own, and its save carries every property value. A declared name your store hasn't set reads as its declared default, and your store isn't written. A name you've made read-only with `set_read_only` refuses the story's write: `set_property` returns why, the engine reports it to `on_error` as a failed effect, and the story plays on. Your own store refuses a write the same way, by returning why from its `set_property` or its Dictionary's `"set"`. See [One registry per game](https://patterkit.dev/play/godot/#one-registry-per-game).
+- **The thin runner**: `PatterRunner` turns a flow into signals (`line`, `text`, `game_event`, `choice`, `ended`) for your UI, and plays the next beat when you call `next()`. Hand it an engine with `attach(engine)`, or set it up in the Inspector: give it a Bundle (an imported `.patterc`) and a World (your scene's `PatterWorld`), and it makes its own engine when it's ready, with the World bound as `@world`, playing `flow_id`. If the story reads `@world` and no World is set, it warns you: `@world` would play from its declared defaults and not see your game. `get_engine()` gives you the engine, for saves.
+- **Audio**: `PatterAudioResolver` reads the `patteraudio.json` manifest exported next to a Patter audio folder and resolves each line to its winning take - it resolves the path, you play it. See [the audio guide](https://patterkit.dev/play/audio/).
+- **Live state**: add a `PatterStatePanel` (an in-game overlay) and register your engine with `PatterDebug.register(engine)` to watch and edit its `@patter` properties while playing.
+- **Live Link**: `PatterDebugLink` connects a running game to Patterpad, streaming the story cursor to the editor and hot-reloading edited bundles back in. See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
+- **Localisation**: play any locale of an Embedded bundle (the `locale` option or `engine.set_locale`), or ship an IDs-only bundle and localise in your own system. A locale resolves by one rule: case and `_` / `-` don't matter, then the language alone (`fr` for `fr-FR`), then the default, and anything but an exact match is reported. `engine.locale()` is the locale in use; `engine.locales()` gives the bundle's `{"default", "included"}`.
+- **Problems and refusals**: the engine reports what it carried on past to your `on_error` Callable (or `push_warning`): a content error, how it was set up (`"setup"`: an option key it doesn't take, a locale the bundle doesn't have, a host scope it doesn't declare, reported as the engine is built), a load whose place has gone (`"save"`), and a choice that ran dry and so ended the flow (`"dry-choice"`, whose `node` is the choice group: a hub whose options were all used, say). That flow's `"end"` step says `"reason": "ran-dry"`; any other end says `"ended"`, and `PatterRunner`'s `ended(reason)` signal passes it on. The reason survives a save and load, and the host's `goto("END")` is a plain end. A dry choice that play carries on past isn't reported: it's the gather idiom. A call it refuses can't throw in GDScript: `set_property` returns the refusal (`""` when written; a value that doesn't fit its declaration, or a name the content doesn't declare, is refused), and `advance()` and `choose()` keep theirs for `flow.last_error()`, cleared by the next success. Each is also `push_error`'d.
+- **Tooling hooks, never for a shipped game**: `on_dry_choice`, a Callable, hears the group id of each choice that runs dry. `steer` is for a tool, such as a bake or a test, that has to reach content whatever the game's data says. It's an Object with a `gate(point) -> bool` method and a `pick(point) -> String` method, and it decides every choice the flow makes on game data, hearing each one as it's passed. `gate` is asked for each condition a run, a choice option, or a fallback reaches (the point's `"node"`, `"where"` it is, its `"source"`, and its `"default"`), and an option it answers true is offered as eligible, a hidden one included. `pick` is asked once each time a branch or sequence picks, with every child's real verdict in `"children"` and the `"default"` pick, and returns a child's id or `""` for none. A steerer that only listens returns `point["default"]`, and a method it doesn't have answers the default. Steering changes no values, and with `log` on, an answer that overrules the engine adds a `steered` entry. A `steer` that isn't an Object (or whose `gate` or `pick` isn't a method) is reported as a `"setup"` problem and ignored. On an engine that's already made (one a game's director built, say), `engine.set_steer(steerer)` sets it and `engine.set_steer(null)` clears it, from the next decision a flow makes; one that isn't a steerer is reported the same way and leaves the engine unsteered. An answer of the wrong type, or a pick naming a child the group doesn't have, is refused as `choose()` refuses an unknown option: that `advance()` returns `{"type": "end", "reason": "ended"}`, and `flow.last_error()` says why.
+- **Copies and read-only values**: the Game Data and tags a step, an option, an outline, or a lookup hands you are your own copies, so editing them changes nothing the engine says next. Extension values are the bundle's own: read them, never edit them.
+- **Exporting**: nothing to configure. From 0.4.5 the plugin puts your bundle into the export itself, so a build has its story on every platform. (If you use Audio Folders, `patteraudio.json` is still yours to add to the export filters.) Details: [Exporting your game](https://patterkit.dev/play/godot/#exporting-your-game). See [the localisation guide](https://patterkit.dev/play/localisation/).
 
 Changes per release: [CHANGELOG.md](CHANGELOG.md).

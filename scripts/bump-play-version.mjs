@@ -35,6 +35,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VERSION_CONSTANTS, writeVersionConstant } from "./lib/patterplay-version-constants.mjs";
 import { changelogProblems } from "@wildwinter/app-shell/changelog";
+import { SHIPPED_MARKDOWN, unwrapMarkdown } from "./unwrap-markdown.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const version = process.argv[2];
@@ -203,6 +204,12 @@ for (const rel of [
     }
     return s.replace(/^## \[Unreleased\]/m, `## [Unreleased]\n\n## [${version}] - ${today}`);
   });
+}
+
+// The zips carry these files, which are read as plain text as often as rendered: each paragraph on one line.
+const wrapped = SHIPPED_MARKDOWN.filter((rel) => unwrapMarkdown(readFileSync(resolve(root, rel), "utf8")).joined.length);
+if (wrapped.length) {
+  throw new Error(`hard-wrapped Markdown in the release zips:\n${wrapped.map((r) => `  - ${r}`).join("\n")}\n  Fix: node scripts/unwrap-markdown.mjs`);
 }
 
 // --- 3. write + report (all-or-nothing: nothing was written before this point) ---

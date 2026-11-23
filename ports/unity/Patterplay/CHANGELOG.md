@@ -1,8 +1,6 @@
 # Changelog
 
-All notable changes to Patterplay for Unity are documented here. The Patterplay runtimes - JS,
-Unity, Unreal, and Godot - are versioned in lockstep: the same version number always means the
-same runtime behaviour.
+All notable changes to Patterplay for Unity are documented here. The Patterplay runtimes - JS, Unity, Unreal, and Godot - are versioned in lockstep: the same version number always means the same runtime behaviour.
 
 ## [Unreleased]
 
@@ -10,64 +8,42 @@ same runtime behaviour.
 
 ### Added
 
-- **Show a letter, a book page, or a sign in one call.** `engine.RunText(scene, block)` plays a block and gives you its text as one string,
-  a line per text beat, with values filled in and in the player's language (a `separator` argument changes what goes between them).
-  It plays on a flow of its own that's thrown away afterwards, so the same block reads the same each time and
-  nothing lands in your save. Pass a `flow` name to reuse that flow instead, so variations move on. A text block shouldn't
-  hold dialogue or choices, so if it reaches either it stops there and throws.
+- **Show a letter, a book page, or a sign in one call.** `engine.RunText(scene, block)` plays a block and gives you its text as one string, a line per text beat, with values filled in and in the player's language (a `separator` argument changes what goes between them). It plays on a flow of its own that's thrown away afterwards, so the same block reads the same each time and nothing lands in your save. Pass a `flow` name to reuse that flow instead, so variations move on. A text block shouldn't hold dialogue or choices, so if it reaches either it stops there and throws.
 
 ## [1.0.5] - 2026-11-21
 
 ### Fixed
 
-- **A Patter World's unset names read their defaults.** A name your World (or any host scope you bind) hasn't set
-  now reads the default the story declares for it, as it would with no World set, instead of false. Your own
-  values and the story's writes go through as before, and the defaults are never written into your World.
+- **A Patter World's unset names read their defaults.** A name your World (or any host scope you bind) hasn't set now reads the default the story declares for it, as it would with no World set, instead of false. Your own values and the story's writes go through as before, and the defaults are never written into your World.
 
 ## [1.0.4] - 2026-11-17
 
 ### Added
 
-- **Set your game's `@world` in the Inspector, with no code.** Add a **Patter World** component (Add Component ▸
-  Patterplay ▸ Patter World), fill it from your game with `SetBool`, `SetNumber`, `SetString`, and `SetFlags`, and
-  drag it into the Patter Runner's new **World** field. The story's conditions then see your game, and its effects
-  write back into it.
-  - `PatterWorld` reads with `Has`, `GetBool`, `GetNumber`, `GetString`, `GetFlags`, and `Names`, matching names
-    whatever their case, and tells you about every change through `Changed` (and the `OnChanged` UnityEvent), with
-    whether the story made it. `SetReadOnly` keeps a name the game's alone: the story's write to it is refused and
-    reported through `OnError`, and the story plays on. Your own writes always land.
-  - Subclass it and override `Get` and `Set` to read and write state your game already keeps, or put any component
-    of yours that implements `IHostScope` in the World field instead.
-  - `PatterBundleAsset.CreateEngineWithWorld(world, options)` binds a world for an engine you make yourself. It's the same
-    binding `EngineOptions.HostScopes` makes under `"world"`, which still works as before; give a world in one
-    place, not both, or it throws. `PatterBundleAsset.DeclaresWorld` says whether the story declares `@world`.
-  - `[HostScopeField]` gives a World field of your own component the same Inspector behaviour: drop a GameObject
-    and it takes the component that can be bound.
-- **A Patter Runner with no World says so.** When the story declares `@world` and nothing is bound, it plays from
-  the declared defaults and can't see your game, so the runner now logs a warning as it wakes, rather than staying
-  quiet.
+- **Set your game's `@world` in the Inspector, with no code.** Add a **Patter World** component (Add Component ▸ Patterplay ▸ Patter World), fill it from your game with `SetBool`, `SetNumber`, `SetString`, and `SetFlags`, and drag it into the Patter Runner's new **World** field. The story's conditions then see your game, and its effects write back into it.
+  - `PatterWorld` reads with `Has`, `GetBool`, `GetNumber`, `GetString`, `GetFlags`, and `Names`, matching names whatever their case, and tells you about every change through `Changed` (and the `OnChanged` UnityEvent), with whether the story made it. `SetReadOnly` keeps a name the game's alone: the story's write to it is refused and reported through `OnError`, and the story plays on. Your own writes always land.
+  - Subclass it and override `Get` and `Set` to read and write state your game already keeps, or put any component of yours that implements `IHostScope` in the World field instead.
+  - `PatterBundleAsset.CreateEngineWithWorld(world, options)` binds a world for an engine you make yourself. It's the same binding `EngineOptions.HostScopes` makes under `"world"`, which still works as before; give a world in one place, not both, or it throws. `PatterBundleAsset.DeclaresWorld` says whether the story declares `@world`.
+  - `[HostScopeField]` gives a World field of your own component the same Inspector behaviour: drop a GameObject and it takes the component that can be bound.
+- **A Patter Runner with no World says so.** When the story declares `@world` and nothing is bound, it plays from the declared defaults and can't see your game, so the runner now logs a warning as it wakes, rather than staying quiet.
 
 ## [1.0.3] - 2026-11-15
 
 ### Changed
 
-- **No changes in this runtime.** This lockstep release ships the Godot runtime's fix for C# games that crashed as
-  they quit.
+- **No changes in this runtime.** This lockstep release ships the Godot runtime's fix for C# games that crashed as they quit.
 
 ## [1.0.2] - 2026-11-15
 
 ### Fixed
 
-- **`GetVisitCounts()` now hands you a copy you can keep**, on `Engine` and `Flow`, as the other runtimes already
-  did. Before, it was the engine's own live dictionary: a flow's reset cleared what you were holding, and reading
-  it while the story played could throw.
+- **`GetVisitCounts()` now hands you a copy you can keep**, on `Engine` and `Flow`, as the other runtimes already did. Before, it was the engine's own live dictionary: a flow's reset cleared what you were holding, and reading it while the story played could throw.
 
 ## [1.0.1] - 2026-11-10
 
 ### Changed
 
-- **`+` on two strings is now an error at play**, as it already was at compile. Text built from pieces can't be
-  translated, so put the value into the line's own text instead. It comes from expr 1.0.1, on every runtime.
+- **`+` on two strings is now an error at play**, as it already was at compile. Text built from pieces can't be translated, so put the value into the line's own text instead. It comes from expr 1.0.1, on every runtime.
 
 ## [1.0.0] - 2026-11-08
 
@@ -79,933 +55,462 @@ same runtime behaviour.
 
 ### Changed
 
-- The audio resolver needs no change for Ogg Vorbis takes, which Audio Folders now accept: it returns a `.ogg`
-  path as it does any other. The Tour demo now plays `.ogg` and `.mp3` takes as well as `.wav`.
+- The audio resolver needs no change for Ogg Vorbis takes, which Audio Folders now accept: it returns a `.ogg` path as it does any other. The Tour demo now plays `.ogg` and `.mp3` takes as well as `.wav`.
 
 ## [0.46.1] - 2026-11-06
 
 ### Changed
 
-- No changes in this runtime. This lockstep release ships Patterplay for Unreal's bundle import: other plugins
-  hear a `.patterc` import, and Reimport works.
+- No changes in this runtime. This lockstep release ships Patterplay for Unreal's bundle import: other plugins hear a `.patterc` import, and Reimport works.
 
 ## [0.46.0] - 2026-11-06
 
 ### Changed
 
-- **The debug link reconnects.** `PatterDebugLink` tries again 1 s after a close or a failed attempt, doubling to 10
-  s, and back to 1 s once a hello goes; each new socket says hello again with the build and the open flows. One line
-  is logged when an open link is lost and one when it's back, and a link that never opened logs nothing. Frames queue
-  only while the first attempt connects. A link the editor closes with code 4000 (another game connected) stops until
-  the game switches it off and on. Restart Patterpad, or turn its Live Link on after the game has started, and Follow,
-  live edits, and Play in game come back by themselves. `Close()` stops the retries at once.
+- **The debug link reconnects.** `PatterDebugLink` tries again 1 s after a close or a failed attempt, doubling to 10 s, and back to 1 s once a hello goes; each new socket says hello again with the build and the open flows. One line is logged when an open link is lost and one when it's back, and a link that never opened logs nothing. Frames queue only while the first attempt connects. A link the editor closes with code 4000 (another game connected) stops until the game switches it off and on. Restart Patterpad, or turn its Live Link on after the game has started, and Follow, live edits, and Play in game come back by themselves. `Close()` stops the retries at once.
 
 ## [0.45.0] - 2026-11-05
 
 ### Breaking
 
-- **Speech units have moved to Patterstage.** `Bundle.SpeechUnits`, `Bundle.CountSyllables`, `SpeechUnit`,
-  `SpeechUnitKind`, the speech weights' constants (`Bundle.SpeechDigitWeight`, `SpeechKanjiWeight`,
-  `SpeechPauseShortWeight`, and `SpeechPauseLongWeight`), and the generated speech table are gone from Patterplay.
-  They only served a mouth, and Patterstage now carries its own copy for that. Nothing else in Patter needs them.
-- **A line with no recording is timed by its weighted characters at a speed.** `Bundle.EstimateLineDuration(text,
-  locale, speed)` weighs each character (a code point) as 1, a Han character 3, kana 2, a Hangul syllable 2.5, and a
-  soft hyphen 0 (`Bundle.LineCharWeights`), at `Bundle.LineCharsPerSecond` (14) times `speed`, clamped to 0.5 to 18
-  seconds as before. `locale` is reserved and unused. A speed that isn't a finite positive number is 1. A silent
-  line's length changes with the new rule; a line with a recording still lasts as long as the recording.
-- **The project's timing is a speed.** `Bundle.DefaultEstimateSyllablesPerSecond` is now `Bundle.DefaultEstimateSpeed`
-  (1), with `EstimateSpeedMin` (0.5) and `EstimateSpeedMax` (2.5) in place of the syllable range; the bundle's
-  `estimateSyllablesPerSecond` is now `estimateSpeed`, read into `Bundle.EstimateSpeed` (null unless the project sets
-  one, higher is faster); and a line or text step's `EstimateRate` is now `EstimateSpeed`. `SpokenText` and
-  `SpokenLocale` are unchanged.
-- The conformance corpus is version 17: its speech section is gone, and its duration cases are re-pinned for the
-  new rule.
+- **Speech units have moved to Patterstage.** `Bundle.SpeechUnits`, `Bundle.CountSyllables`, `SpeechUnit`, `SpeechUnitKind`, the speech weights' constants (`Bundle.SpeechDigitWeight`, `SpeechKanjiWeight`, `SpeechPauseShortWeight`, and `SpeechPauseLongWeight`), and the generated speech table are gone from Patterplay. They only served a mouth, and Patterstage now carries its own copy for that. Nothing else in Patter needs them.
+- **A line with no recording is timed by its weighted characters at a speed.** `Bundle.EstimateLineDuration(text, locale, speed)` weighs each character (a code point) as 1, a Han character 3, kana 2, a Hangul syllable 2.5, and a soft hyphen 0 (`Bundle.LineCharWeights`), at `Bundle.LineCharsPerSecond` (14) times `speed`, clamped to 0.5 to 18 seconds as before. `locale` is reserved and unused. A speed that isn't a finite positive number is 1. A silent line's length changes with the new rule; a line with a recording still lasts as long as the recording.
+- **The project's timing is a speed.** `Bundle.DefaultEstimateSyllablesPerSecond` is now `Bundle.DefaultEstimateSpeed` (1), with `EstimateSpeedMin` (0.5) and `EstimateSpeedMax` (2.5) in place of the syllable range; the bundle's `estimateSyllablesPerSecond` is now `estimateSpeed`, read into `Bundle.EstimateSpeed` (null unless the project sets one, higher is faster); and a line or text step's `EstimateRate` is now `EstimateSpeed`. `SpokenText` and `SpokenLocale` are unchanged.
+- The conformance corpus is version 17: its speech section is gone, and its duration cases are re-pinned for the new rule.
 
 ## [0.44.0] - 2026-11-04
 
 ### Added
 
-- **A syllable's vowel, for a mouth shape.** Each `Syllable` unit from `Bundle.SpeechUnits` now carries its `Vowel`:
-  "a", "e", "i", "o", "u", or "ə" (a vowel the script shows that isn't one of the five), or null where the script
-  doesn't say (Han, digits, unvowelled Arabic, and any script outside the set). It's null on a pause and a shut beat
-  too. Latin, Cyrillic, kana, Hangul, written Arabic vowels, and Thai all say it. Nothing else about the units has
-  changed: their kinds, weights, offsets, and timing are as before. Corpus 16.
+- **A syllable's vowel, for a mouth shape.** Each `Syllable` unit from `Bundle.SpeechUnits` now carries its `Vowel`: "a", "e", "i", "o", "u", or "ə" (a vowel the script shows that isn't one of the five), or null where the script doesn't say (Han, digits, unvowelled Arabic, and any script outside the set). It's null on a pause and a shut beat too. Latin, Cyrillic, kana, Hangul, written Arabic vowels, and Thai all say it. Nothing else about the units has changed: their kinds, weights, offsets, and timing are as before. Corpus 16.
 
 ## [0.43.0] - 2026-11-04
 
 ### Added
 
-- **Play in game.** Patterpad can ask the running game to start a block now: a `play` message on the debug link,
-  `{ t: "play", id, sceneId, blockId, takeOver, build? }`, that arrives through `PatterDebugLink.TryReceive` like a
-  pushed bundle. Read it with `PatterPlayInGame.TryParsePlay(raw, out PatterPlayRequest req)`, start the block however
-  your game plays conversations, and answer with `PatterDebugLink.ReplyPlay(req.Id, new PatterPlayResult { Started,
-  Reason, Detail })` from the main thread, at once or later. `Reason` is a short code (`busy`, `unknownBlock`,
-  `staleBuild`, or your own) and Patterpad words it. A game that drains the link but doesn't handle it should answer
-  `PatterPlayInGame.Unhandled`.
+- **Play in game.** Patterpad can ask the running game to start a block now: a `play` message on the debug link, `{ t: "play", id, sceneId, blockId, takeOver, build? }`, that arrives through `PatterDebugLink.TryReceive` like a pushed bundle. Read it with `PatterPlayInGame.TryParsePlay(raw, out PatterPlayRequest req)`, start the block however your game plays conversations, and answer with `PatterDebugLink.ReplyPlay(req.Id, new PatterPlayResult { Started, Reason, Detail })` from the main thread, at once or later. `Reason` is a short code (`busy`, `unknownBlock`, `staleBuild`, or your own) and Patterpad words it. A game that drains the link but doesn't handle it should answer `PatterPlayInGame.Unhandled`.
 
 ### Changed
 
-- **A line with no recording can be quick.** `Bundle.EstimateLineDuration` now clamps to 0.5 to 18 seconds, not 1.5 to 18: the
-  shortest a line lasts is a speaking time, the least a spoken word plausibly takes, not a reading time, so an
-  unvoiced "No." answered by "Yes." no longer takes three seconds. The new `Bundle.SubtitleReadingMin` (1.5 seconds) is the least time a
-  line's text should stay on screen to be read: if you show lines as subtitles or overhead text, keep each one up at
-  least that long after a shorter line ends, overlapping the next if you must. The line itself still ends when it's
-  said. The conformance corpus re-pins its duration cases at the floor.
-- The conformance corpus is version 15: its new `applyLiveBundle` op holds that `PatterLiveBundle.ApplyLiveBundle` picks the same tier
-  (`"text"` or `"structure"`) as the other runtimes for the same pair of bundles.
+- **A line with no recording can be quick.** `Bundle.EstimateLineDuration` now clamps to 0.5 to 18 seconds, not 1.5 to 18: the shortest a line lasts is a speaking time, the least a spoken word plausibly takes, not a reading time, so an unvoiced "No." answered by "Yes." no longer takes three seconds. The new `Bundle.SubtitleReadingMin` (1.5 seconds) is the least time a line's text should stay on screen to be read: if you show lines as subtitles or overhead text, keep each one up at least that long after a shorter line ends, overlapping the next if you must. The line itself still ends when it's said. The conformance corpus re-pins its duration cases at the floor.
+- The conformance corpus is version 15: its new `applyLiveBundle` op holds that `PatterLiveBundle.ApplyLiveBundle` picks the same tier (`"text"` or `"structure"`) as the other runtimes for the same pair of bundles.
 
 ## [0.42.0] - 2026-11-03
 
 ### Added
 
-- **The Patterplay version, in code.** `PatterplayVersion.Current` is this runtime's version, as in its package
-  manifest, and `PatterplayVersion.InRange(version, min, maxExclusive)` is true when `version` is at least `min` and
-  below `maxExclusive` by semantic-version precedence (a prerelease comes before its release, and build metadata is
-  ignored), false when any of the three isn't a version. An extension (Patterstage, Pattershot) checks the Patterplay
-  it finds at start-up with `PatterplayVersion.InRange(PatterplayVersion.Current, "0.41.0", "0.42.0")`, the same
-  check on every engine, since Unreal's and Godot's plugin files can't declare a version range. The conformance
-  corpus is version 14.
+- **The Patterplay version, in code.** `PatterplayVersion.Current` is this runtime's version, as in its package manifest, and `PatterplayVersion.InRange(version, min, maxExclusive)` is true when `version` is at least `min` and below `maxExclusive` by semantic-version precedence (a prerelease comes before its release, and build metadata is ignored), false when any of the three isn't a version. An extension (Patterstage, Pattershot) checks the Patterplay it finds at start-up with `PatterplayVersion.InRange(PatterplayVersion.Current, "0.41.0", "0.42.0")`, the same check on every engine, since Unreal's and Godot's plugin files can't declare a version range. The conformance corpus is version 14.
 
 ## [0.41.0] - 2026-11-02
 
 ### Added
 
-- **Steering an engine that's already made.** `Engine.SetSteer(ISteerer)` sets the steerer on a live engine, as
-  `EngineOptions.Steer` does when it's made, and `SetSteer(null)` clears it. It takes effect from the next decision a
-  flow makes, and a `HotSwap` keeps whichever is set. For tools whose engine a game's director has already built,
-  in place of reaching into the engine's internals. The conformance corpus is version 13.
+- **Steering an engine that's already made.** `Engine.SetSteer(ISteerer)` sets the steerer on a live engine, as `EngineOptions.Steer` does when it's made, and `SetSteer(null)` clears it. It takes effect from the next decision a flow makes, and a `HotSwap` keeps whichever is set. For tools whose engine a game's director has already built, in place of reaching into the engine's internals. The conformance corpus is version 13.
 
 ## [0.40.0] - 2026-11-01
 
 ### Added
 
-- **Steering, for tools.** `EngineOptions.Steer` takes an `ISteerer`, a hook for a bake or a test that has to
-  reach content whatever the game's data says (never for a shipped game). `Gate(GatePoint)` answers each
-  condition a run's child, a choice's option, or a choice's fallback reaches, and is asked only for a node that
-  has a condition; an option answered true is offered as eligible (a hidden one included) and `Choose` takes it.
-  `Pick(PickPoint)` answers each branch or sequence pick with a child's id or `""` for none, once per pick and
-  after the selector has run, so a sequence's cursor and a shuffle's bag move as they would have; its children's
-  conditions aren't also asked as gates. Each point carries its `Default`, and both methods default to answering
-  it, so a steerer can implement just one. A pick naming a child the group doesn't have, or answering null,
-  throws, as `Choose` with an unknown id does. Steering changes no values, and a `HotSwap` keeps the steerer. With
-  `Log` on, an answer that differs from its default adds a `steered` entry (`Node`, `Kind` "gate" or "pick",
-  `Default`, and `Answer`) before the entry it changed. The conformance corpus is version 12.
+- **Steering, for tools.** `EngineOptions.Steer` takes an `ISteerer`, a hook for a bake or a test that has to reach content whatever the game's data says (never for a shipped game). `Gate(GatePoint)` answers each condition a run's child, a choice's option, or a choice's fallback reaches, and is asked only for a node that has a condition; an option answered true is offered as eligible (a hidden one included) and `Choose` takes it. `Pick(PickPoint)` answers each branch or sequence pick with a child's id or `""` for none, once per pick and after the selector has run, so a sequence's cursor and a shuffle's bag move as they would have; its children's conditions aren't also asked as gates. Each point carries its `Default`, and both methods default to answering it, so a steerer can implement just one. A pick naming a child the group doesn't have, or answering null, throws, as `Choose` with an unknown id does. Steering changes no values, and a `HotSwap` keeps the steerer. With `Log` on, an answer that differs from its default adds a `steered` entry (`Node`, `Kind` "gate" or "pick", `Default`, and `Answer`) before the entry it changed. The conformance corpus is version 12.
 
 ## [0.39.0] - 2026-10-31
 
 ### Added
 
-- **Speech units, for a lip flap.** `Bundle.SpeechUnits(text, locale)` breaks a line into the units it's spoken
-  in, in order: each `SpeechUnit` is a `SpeechUnitKind.Syllable`, a `Closed` beat with the mouth shut (っ), or a
-  `Pause` at its punctuation, with a `Weight` and `Start` and `End` offsets in code points (a surrogate pair
-  counts once). Lay them over a line's length to move a mouth. `Bundle.CountSyllables(text, locale)` gives the
-  syllable count, pauses aside. They're counted from the text alone, script by script (Latin, Cyrillic, Han, kana,
-  Hangul, Arabic, Thai, and a rule for any other), the same in all four runtimes. The weights are
-  `Bundle.SpeechDigitWeight`, `SpeechKanjiWeight`, `SpeechPauseShortWeight`, and `SpeechPauseLongWeight`.
-- **How a line is spoken, on its step.** A line or text step now carries `SpokenText`, the beat's string in the
-  project's main language whatever language is being shown (interpolated, closed-caption cues always left out,
-  and empty for the caption character's lines), `SpokenLocale`, that language, and `EstimateRate`, the project's
-  syllables a second for an estimate. `SpokenText` and `SpokenLocale` are null in an IDs-only bundle. A replayed
-  prompt carries them too, and so do `PatterRunner`'s events.
-- **The project's own rate.** A bundle's `estimateSyllablesPerSecond` is read into
-  `Bundle.EstimateSyllablesPerSecond` (null means `Bundle.DefaultEstimateSyllablesPerSecond`, 4). A project
-  keeps it between `EstimateSyllablesPerSecondMin` (2) and `EstimateSyllablesPerSecondMax` (10).
+- **Speech units, for a lip flap.** `Bundle.SpeechUnits(text, locale)` breaks a line into the units it's spoken in, in order: each `SpeechUnit` is a `SpeechUnitKind.Syllable`, a `Closed` beat with the mouth shut (っ), or a `Pause` at its punctuation, with a `Weight` and `Start` and `End` offsets in code points (a surrogate pair counts once). Lay them over a line's length to move a mouth. `Bundle.CountSyllables(text, locale)` gives the syllable count, pauses aside. They're counted from the text alone, script by script (Latin, Cyrillic, Han, kana, Hangul, Arabic, Thai, and a rule for any other), the same in all four runtimes. The weights are `Bundle.SpeechDigitWeight`, `SpeechKanjiWeight`, `SpeechPauseShortWeight`, and `SpeechPauseLongWeight`.
+- **How a line is spoken, on its step.** A line or text step now carries `SpokenText`, the beat's string in the project's main language whatever language is being shown (interpolated, closed-caption cues always left out, and empty for the caption character's lines), `SpokenLocale`, that language, and `EstimateRate`, the project's syllables a second for an estimate. `SpokenText` and `SpokenLocale` are null in an IDs-only bundle. A replayed prompt carries them too, and so do `PatterRunner`'s events.
+- **The project's own rate.** A bundle's `estimateSyllablesPerSecond` is read into `Bundle.EstimateSyllablesPerSecond` (null means `Bundle.DefaultEstimateSyllablesPerSecond`, 4). A project keeps it between `EstimateSyllablesPerSecondMin` (2) and `EstimateSyllablesPerSecondMax` (10).
 
 ### Changed
 
-- **The estimate counts syllables, not characters.** `Bundle.EstimateLineDuration(text, locale,
-  syllablesPerSecond)` now times a line by the total weight of its speech units, pauses included, at
-  `syllablesPerSecond` (default 4; a rate that isn't a finite positive number is the default), still clamped to
-  1.5 to 18 seconds. Pass a step's `SpokenText`, `SpokenLocale`, and `EstimateRate`. A line with a recording
-  lasts as long as the recording. `Bundle.LineCharsPerSecond` is gone. The conformance corpus is version 11.
+- **The estimate counts syllables, not characters.** `Bundle.EstimateLineDuration(text, locale, syllablesPerSecond)` now times a line by the total weight of its speech units, pauses included, at `syllablesPerSecond` (default 4; a rate that isn't a finite positive number is the default), still clamped to 1.5 to 18 seconds. Pass a step's `SpokenText`, `SpokenLocale`, and `EstimateRate`. A line with a recording lasts as long as the recording. `Bundle.LineCharsPerSecond` is gone. The conformance corpus is version 11.
 
 ## [0.38.0] - 2026-10-30
 
 ### Changed
 
-- **`EndReason` is now `FlowEndReason`.** In C# the old name clashed (CS0104, "ambiguous reference") with a game's
-  own `EndReason` in any file using both namespaces. `StepResult.Reason`, `PatterRunner.Ended` (an
-  `Action<FlowEndReason>`), and `PatterRunnerBehaviour.OnEnded` now carry `FlowEndReason`; its values, `Ended` and
-  `RanDry`, are unchanged. Rename the type where your code names it; an alias for the old name is no longer needed.
+- **`EndReason` is now `FlowEndReason`.** In C# the old name clashed (CS0104, "ambiguous reference") with a game's own `EndReason` in any file using both namespaces. `StepResult.Reason`, `PatterRunner.Ended` (an `Action<FlowEndReason>`), and `PatterRunnerBehaviour.OnEnded` now carry `FlowEndReason`; its values, `Ended` and `RanDry`, are unchanged. Rename the type where your code names it; an alias for the old name is no longer needed.
 
 ## [0.37.0] - 2026-10-30
 
 ### Added
 
-- **A choice that runs dry and ends the flow says so.** A choice with no option left to take and no
-  fallback still gathers and never throws. When the flow then ends with nothing played since, the `End` step's
-  new `Reason` is `EndReason.RanDry` (otherwise `EndReason.Ended`), and the engine reports it once through
-  `EngineOptions.OnError` as a `PlayError` of kind `"dry-choice"`, naming the choice group. An `END` reached
-  straight after the dry choice still counts; a dry choice that play carries on past stays silent. Asking
-  `Advance` again gives the same end without a second report. The reason survives a save and load (the save's
-  cursor carries `ranDry`, written only when set) and a checkpoint's rollback; a load doesn't report it again.
-  The host's `Goto("END")` ends it plainly, and `Goto` to a scene or `Reset` clears it. `OnDryChoice` is
-  unchanged. The conformance corpus is version 10.
+- **A choice that runs dry and ends the flow says so.** A choice with no option left to take and no fallback still gathers and never throws. When the flow then ends with nothing played since, the `End` step's new `Reason` is `EndReason.RanDry` (otherwise `EndReason.Ended`), and the engine reports it once through `EngineOptions.OnError` as a `PlayError` of kind `"dry-choice"`, naming the choice group. An `END` reached straight after the dry choice still counts; a dry choice that play carries on past stays silent. Asking `Advance` again gives the same end without a second report. The reason survives a save and load (the save's cursor carries `ranDry`, written only when set) and a checkpoint's rollback; a load doesn't report it again. The host's `Goto("END")` ends it plainly, and `Goto` to a scene or `Reset` clears it. `OnDryChoice` is unchanged. The conformance corpus is version 10.
 
 ### Changed
 
-- **The thin runner's end says why.** `PatterRunner.Ended` is now an `event Action<EndReason>`, handed the
-  `End` step's `Reason`: `EndReason.RanDry` when a choice had nothing left and nothing came after it,
-  otherwise `EndReason.Ended`. `PatterRunnerBehaviour.OnEnded` is now a `PatterEndedEvent`
-  (`UnityEvent<EndReason>`) that carries it too. This changes the event's signature: a handler written as
-  `() => ...` becomes `reason => ...` (or `_ => ...` to ignore it). Listeners wired in the Inspector keep
-  working. The same in all four runtimes.
+- **The thin runner's end says why.** `PatterRunner.Ended` is now an `event Action<EndReason>`, handed the `End` step's `Reason`: `EndReason.RanDry` when a choice had nothing left and nothing came after it, otherwise `EndReason.Ended`. `PatterRunnerBehaviour.OnEnded` is now a `PatterEndedEvent` (`UnityEvent<EndReason>`) that carries it too. This changes the event's signature: a handler written as `() => ...` becomes `reason => ...` (or `_ => ...` to ignore it). Listeners wired in the Inspector keep working. The same in all four runtimes.
 
 ## [0.36.0] - 2026-10-29
 
 ### Added
 
-- **How long a line with no recording lasts.** `Bundle.EstimateLineDuration(text, locale)` gives it in seconds:
-  the line's characters at 14 a second, clamped to 1.5 to 18 seconds, a character outside the Basic Multilingual
-  Plane counted once and soft hyphens (U+00AD) not counted. It's Patter's one rule, the same in all four
-  runtimes, in Patterpad's Play window, and in the playable HTML page. The locale is reserved for per-language
-  reading rates and changes nothing yet. Its numbers are `Bundle.LineCharsPerSecond`, `LineDurationMin`, and
-  `LineDurationMax`. The conformance corpus is version 9, whose `durations` section holds every runtime to it.
+- **How long a line with no recording lasts.** `Bundle.EstimateLineDuration(text, locale)` gives it in seconds: the line's characters at 14 a second, clamped to 1.5 to 18 seconds, a character outside the Basic Multilingual Plane counted once and soft hyphens (U+00AD) not counted. It's Patter's one rule, the same in all four runtimes, in Patterpad's Play window, and in the playable HTML page. The locale is reserved for per-language reading rates and changes nothing yet. Its numbers are `Bundle.LineCharsPerSecond`, `LineDurationMin`, and `LineDurationMax`. The conformance corpus is version 9, whose `durations` section holds every runtime to it.
 
 ## [0.35.0] - 2026-10-29
 
-The runtime foundations before 1.0, from the hands-on review of October 2026. Changes marked **Breaking
-(1.0)** change what an existing game sees. The conformance corpus is version 8.
+The runtime foundations before 1.0, from the hands-on review of October 2026. Changes marked **Breaking (1.0)** change what an existing game sees. The conformance corpus is version 8.
 
 ### Added
 
-- **The thin runner, `PatterRunner`**: the flow API turned from pull to push, for straightforward games.
-  `Begin(scene, block)` opens the flow (or moves it, or with no scene starts the story again) and delivers the
-  first beat; the `Line`, `Text`, and `GameEvent` events each wait for `Next()`, `Choice` waits for
-  `Choose(id)`, and `Ended` is raised at the end. Handlers may call `Next()` themselves without deepening the
-  stack; `Stop()` drops what they asked for and leaves the flow open and saveable; `Rebind(engine)` plays on
-  after a hot swap. It keeps no save state and dictates no UI and no audio: a line carries its beat id, and
-  the game plays it however it likes. `PatterRunnerBehaviour` wraps it as a component whose UnityEvents a
-  designer wires in the Inspector, with the same `Begin`. The tour demo now plays
-  on it. A fuller dialogue manager for more complex games, Patterstage, is coming.
-- **The project's start scene.** A flow opened, or reset, without a scene starts at the bundle's `start`
-  (`Bundle.Start`, a `BundleStart` with `Scene` and `Block`), at its block when it names one, so a game opens
-  where the writer chose. A bundle without one starts at the first scene, as before.
-- **Set-up problems and moved saves are reported.** `PlayError.Kind` gains `"setup"` (how the engine was set
-  up: a locale the bundle doesn't have, or a host scope it doesn't declare; `Flow` is `""` and `Node` is the
-  locale or token) and `"save"` (a load whose place has gone from the build; `Node` is the saved snippet, or the
-  pending choice's group). Both reach `EngineOptions.OnError` and the decision log as a `diagnostic` entry, as a
-  content error does. A report found while the engine is built is made as the constructor ends, so the handler
-  hears it. With no `OnError`, each still goes to `Engine.DefaultOnError`.
+- **The thin runner, `PatterRunner`**: the flow API turned from pull to push, for straightforward games. `Begin(scene, block)` opens the flow (or moves it, or with no scene starts the story again) and delivers the first beat; the `Line`, `Text`, and `GameEvent` events each wait for `Next()`, `Choice` waits for `Choose(id)`, and `Ended` is raised at the end. Handlers may call `Next()` themselves without deepening the stack; `Stop()` drops what they asked for and leaves the flow open and saveable; `Rebind(engine)` plays on after a hot swap. It keeps no save state and dictates no UI and no audio: a line carries its beat id, and the game plays it however it likes. `PatterRunnerBehaviour` wraps it as a component whose UnityEvents a designer wires in the Inspector, with the same `Begin`. The tour demo now plays on it. A fuller dialogue manager for more complex games, Patterstage, is coming.
+- **The project's start scene.** A flow opened, or reset, without a scene starts at the bundle's `start` (`Bundle.Start`, a `BundleStart` with `Scene` and `Block`), at its block when it names one, so a game opens where the writer chose. A bundle without one starts at the first scene, as before.
+- **Set-up problems and moved saves are reported.** `PlayError.Kind` gains `"setup"` (how the engine was set up: a locale the bundle doesn't have, or a host scope it doesn't declare; `Flow` is `""` and `Node` is the locale or token) and `"save"` (a load whose place has gone from the build; `Node` is the saved snippet, or the pending choice's group). Both reach `EngineOptions.OnError` and the decision log as a `diagnostic` entry, as a content error does. A report found while the engine is built is made as the constructor ends, so the handler hears it. With no `OnError`, each still goes to `Engine.DefaultOnError`.
 - **`engine.Locales`**: the bundle's `Default` and `Included` locales, a fresh copy each call.
-- **One rule for a locale**, used by `EngineOptions.Locale`, `SetLocale`, `ReplaceStrings`, and `HotSwap`: case
-  and `_` / `-` don't matter, so the locale itself wins, then its language (`fr` for `fr-FR`), then the
-  bundle's default, whose text keeps the `<Untranslated: id>` marker. Anything but an exact match (a case-only
-  one included) is reported as `setup`. `fr` never looks for `fr-FR`. A hot swap resolves the locale asked for
-  against the new bundle and reports again; `ReplaceStrings` reports only a fallback that changed. An IDs-only
-  bundle takes the locale as given, unreported.
-- **A host scope bound under a token the bundle doesn't declare is reported** (`setup`), naming the declared
-  spelling when only the case differs. Tokens stay case-sensitive: nothing is folded.
-- **A save loaded into an edited build resumes at the nearest safe point**, reported as `save` only when its
-  place has really gone: a gone snippet is skipped; a gone next beat ends its snippet there (its onExit and
-  jump run), so nothing plays twice; a gone option offers its choice again; a pending choice none of whose
-  options survive is offered again with what its group has now, or play carries on after it.
+- **One rule for a locale**, used by `EngineOptions.Locale`, `SetLocale`, `ReplaceStrings`, and `HotSwap`: case and `_` / `-` don't matter, so the locale itself wins, then its language (`fr` for `fr-FR`), then the bundle's default, whose text keeps the `<Untranslated: id>` marker. Anything but an exact match (a case-only one included) is reported as `setup`. `fr` never looks for `fr-FR`. A hot swap resolves the locale asked for against the new bundle and reports again; `ReplaceStrings` reports only a fallback that changed. An IDs-only bundle takes the locale as given, unreported.
+- **A host scope bound under a token the bundle doesn't declare is reported** (`setup`), naming the declared spelling when only the case differs. Tokens stay case-sensitive: nothing is folded.
+- **A save loaded into an edited build resumes at the nearest safe point**, reported as `save` only when its place has really gone: a gone snippet is skipped; a gone next beat ends its snippet there (its onExit and jump run), so nothing plays twice; a gone option offers its choice again; a pending choice none of whose options survive is offered again with what its group has now, or play carries on after it.
 
 ### Changed
 
-- **Breaking (1.0): `SetProperty` refuses a value that doesn't fit its declaration**, on the engine and on a
-  flow, by throwing and changing nothing, as the Storylet Engine does: the kernel's `ValueFit`, so a value a
-  game may set is exactly one a save may carry, and an enum whose own default is `""` takes `""` back. A name
-  the content doesn't declare (in `@patter`, `@scene`, or a host scope the bundle declares) is refused too. An
-  opaque host scope, one that declares no names, takes anything. The message says what the property takes:
-  `"@patter.gold" takes a number; "lots" doesn't fit`. Another engine's scope is that engine's to check. The
-  editor's Runtime State window shows a refusal as a warning.
-- **Breaking (1.0): a pending choice follows the language and the values.** Its options' prompts are built
-  each time the choice is delivered (`Advance`, `GetChoices`), so `SetLocale` reaches a choice already on
-  screen, a property the game sets shows in its prompts, and a save loads in the language of the engine that
-  loads it. The replayed prompt (`ReplayPromptOnChoose`) is the documented exception: it's spoken exactly as
-  the choice showed it.
-- **Breaking (1.0): `engine.Locale` is the locale in use**, the one the rule resolved to (`fr` after asking for
-  `fr-FR`; the default after asking for a locale the bundle doesn't have), rather than the string asked for.
-- **Breaking (1.0): what the engine hands out is the game's own copy.** The gameData on every step, option,
-  `GetOutline` and `GetBeatSequence` entry, and from `GameDataForScene` and `GameDataForBlock`, with its flags
-  lists; and the tags on a step and from `TagsForBeat`, `TagsForScene`, and `TagsForBlock`, which handed out the
-  engine's own index lists. A game that edits one changes nothing the engine, or another engine on the same
-  bundle, hands out next. Extension values are not copied: they're the bundle's own, documented as read-only.
-- **Breaking (1.0): saves are version 4** (`Engine.SaveVersion`). A pending choice keeps its options' ids,
-  eligibility, and gameData, not their prompts (`FlowSnapshot.PendingOptions` is a list of the new
-  `SavedChoiceOption`); the cursor names the next beat by id (`FlowSnapshot.BeatId`, absent when none is left)
-  instead of its index (`BeatIndex` is now `int?`, read from a version 3 save and never written); and a frame
-  inside a choice's option carries the choice's id (`StackFrame.ChoiceId`). The runtime reads versions 3 and 4
-  and writes 4; a version 3 save's prompt text is discarded as it loads. `CaptureFlow` writes version 4, and
-  `RestoreFlow` reads 3 and 4. A flow's own values (`Scopes`, `SceneBags`) are on `FlowState` alone now.
-- `PatterSave` reads keys exactly as the family writes them (camelCase), now that no older shape needs a
-  case-insensitive read.
+- **Breaking (1.0): `SetProperty` refuses a value that doesn't fit its declaration**, on the engine and on a flow, by throwing and changing nothing, as the Storylet Engine does: the kernel's `ValueFit`, so a value a game may set is exactly one a save may carry, and an enum whose own default is `""` takes `""` back. A name the content doesn't declare (in `@patter`, `@scene`, or a host scope the bundle declares) is refused too. An opaque host scope, one that declares no names, takes anything. The message says what the property takes: `"@patter.gold" takes a number; "lots" doesn't fit`. Another engine's scope is that engine's to check. The editor's Runtime State window shows a refusal as a warning.
+- **Breaking (1.0): a pending choice follows the language and the values.** Its options' prompts are built each time the choice is delivered (`Advance`, `GetChoices`), so `SetLocale` reaches a choice already on screen, a property the game sets shows in its prompts, and a save loads in the language of the engine that loads it. The replayed prompt (`ReplayPromptOnChoose`) is the documented exception: it's spoken exactly as the choice showed it.
+- **Breaking (1.0): `engine.Locale` is the locale in use**, the one the rule resolved to (`fr` after asking for `fr-FR`; the default after asking for a locale the bundle doesn't have), rather than the string asked for.
+- **Breaking (1.0): what the engine hands out is the game's own copy.** The gameData on every step, option, `GetOutline` and `GetBeatSequence` entry, and from `GameDataForScene` and `GameDataForBlock`, with its flags lists; and the tags on a step and from `TagsForBeat`, `TagsForScene`, and `TagsForBlock`, which handed out the engine's own index lists. A game that edits one changes nothing the engine, or another engine on the same bundle, hands out next. Extension values are not copied: they're the bundle's own, documented as read-only.
+- **Breaking (1.0): saves are version 4** (`Engine.SaveVersion`). A pending choice keeps its options' ids, eligibility, and gameData, not their prompts (`FlowSnapshot.PendingOptions` is a list of the new `SavedChoiceOption`); the cursor names the next beat by id (`FlowSnapshot.BeatId`, absent when none is left) instead of its index (`BeatIndex` is now `int?`, read from a version 3 save and never written); and a frame inside a choice's option carries the choice's id (`StackFrame.ChoiceId`). The runtime reads versions 3 and 4 and writes 4; a version 3 save's prompt text is discarded as it loads. `CaptureFlow` writes version 4, and `RestoreFlow` reads 3 and 4. A flow's own values (`Scopes`, `SceneBags`) are on `FlowState` alone now.
+- `PatterSave` reads keys exactly as the family writes them (camelCase), now that no older shape needs a case-insensitive read.
 
 ### Removed
 
-- **Breaking (1.0): version 2 saves no longer load**, nor this port's pre-0.11.0 PascalCase saves, and
-  `SaveGame.Shared` and `SaveGame.StageBags` are gone. Load an older save with a 0.x runtime and save it again
-  to bring it forward.
-- **Breaking (1.0): the deprecated API.** `Flow.Start` (use `Flow.Reset`), `BundleInfo.Describe` (use
-  `DescribeBundle`), `PatterLiveBundle.Apply` (use `ApplyLiveBundle`), `GameDataHelpers.FieldsFor` and
-  `Effective` (use `GameDataFields` and `EffectiveGameData`), `PatterValueConverter` and `Uint32Converter`
-  (`PatterSave` reads and writes saves itself), `PatterSave.Envelope` (use `SaveState`), and the log entry's
-  `Subject`, `Considered`, and `Detail` (use `Group`, `To`, `Target`, `Node`, `Children`, `Options`, `Mode`, or
-  `Message`).
+- **Breaking (1.0): version 2 saves no longer load**, nor this port's pre-0.11.0 PascalCase saves, and `SaveGame.Shared` and `SaveGame.StageBags` are gone. Load an older save with a 0.x runtime and save it again to bring it forward.
+- **Breaking (1.0): the deprecated API.** `Flow.Start` (use `Flow.Reset`), `BundleInfo.Describe` (use `DescribeBundle`), `PatterLiveBundle.Apply` (use `ApplyLiveBundle`), `GameDataHelpers.FieldsFor` and `Effective` (use `GameDataFields` and `EffectiveGameData`), `PatterValueConverter` and `Uint32Converter` (`PatterSave` reads and writes saves itself), `PatterSave.Envelope` (use `SaveState`), and the log entry's `Subject`, `Considered`, and `Detail` (use `Group`, `To`, `Target`, `Node`, `Children`, `Options`, `Mode`, or `Message`).
 
 ### Fixed
 
-- **A saved "" loads as saved on an enum whose default is "".** A host scope's enum declared with default ""
-  (none chosen) had a saved "" reported as drifted when it loaded. It now loads as saved; any other enum still
-  puts a saved "" back to its default. (The shared expression kernel, fixed in every runtime.)
-- **A refused hot swap reports set-up once, and a start the bundle doesn't have is passed over.** When `HotSwap`'s
-  load is refused, the engine it falls back on no longer repeats the replacement's set-up reports. A hand-edited
-  bundle whose `start` names a scene, or block, it doesn't have now starts at the first scene, or that scene's
-  first block, rather than throwing.
+- **A saved "" loads as saved on an enum whose default is "".** A host scope's enum declared with default "" (none chosen) had a saved "" reported as drifted when it loaded. It now loads as saved; any other enum still puts a saved "" back to its default. (The shared expression kernel, fixed in every runtime.)
+- **A refused hot swap reports set-up once, and a start the bundle doesn't have is passed over.** When `HotSwap`'s load is refused, the engine it falls back on no longer repeats the replacement's set-up reports. A hand-edited bundle whose `start` names a scene, or block, it doesn't have now starts at the first scene, or that scene's first block, rather than throwing.
 
 ## [0.34.0] - 2026-10-21
 
 ### Removed
 
-- `GameDataHelpers.ExtensionSettings(bundle, extension)` and `BundleExtension.Settings`: extension settings named
-  the gameData field a claim presented, and claims and settings are gone from the extensions spec. A bundle an
-  older compiler wrote still loads, its settings ignored. Pinned by the corpus (version 7).
+- `GameDataHelpers.ExtensionSettings(bundle, extension)` and `BundleExtension.Settings`: extension settings named the gameData field a claim presented, and claims and settings are gone from the extensions spec. A bundle an older compiler wrote still loads, its settings ignored. Pinned by the corpus (version 7).
 
 ## [0.33.0] - 2026-10-19
 
 ### Added
 
-- `engine.ExtensionsForSnippet(snippetId)` reads a snippet's own Patter extension values, beside the scene and block
-  accessors: raw and sparse, a fresh copy, empty when the snippet has none, the id is unknown, or it names a
-  node that isn't a snippet. A snippet is named by its id, as a beat sequence or a step names it.
+- `engine.ExtensionsForSnippet(snippetId)` reads a snippet's own Patter extension values, beside the scene and block accessors: raw and sparse, a fresh copy, empty when the snippet has none, the id is unknown, or it names a node that isn't a snippet. A snippet is named by its id, as a beat sequence or a step names it.
 
 ## [0.32.0] - 2026-10-19
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the JS runtime's: it exports `resolveSceneRef`, the one rule for a scene reference (the address first,
-  then the internal id), which this runtime already resolves by. Nothing in this runtime changed.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the JS runtime's: it exports `resolveSceneRef`, the one rule for a scene reference (the address first, then the internal id), which this runtime already resolves by. Nothing in this runtime changed.
 
 ## [0.31.0] - 2026-10-19
 
 ### Added
 
-- **Action text**: a text step has `Action`, true when the beat is action, a direction for whoever stages the
-  scene that the player never sees. The compiler marks a dialogue scene's text beats as action when the
-  project doesn't localise that text (`action: true` in the bundle, read into `Beat.Action`), and their text is
-  the source in every locale. It's false on shown text and on a prompt spoken back. Pinned by the corpus
-  (version 5).
+- **Action text**: a text step has `Action`, true when the beat is action, a direction for whoever stages the scene that the player never sees. The compiler marks a dialogue scene's text beats as action when the project doesn't localise that text (`action: true` in the bundle, read into `Beat.Action`), and their text is the source in every locale. It's false on shown text and on a prompt spoken back. Pinned by the corpus (version 5).
 
 ## [0.30.0] - 2026-10-18
 
 ### Added
 
-- **An extension's settings**: a bundle now carries each Patter extension's settings, every one its manifest
-  declares, with the project's value or else the setting's default (`BundleExtension.Settings`).
-  `GameDataHelpers.ExtensionSettings(bundle, extension)` reads them as a fresh `Dictionary<string, string>`
-  by setting name, so a game can tell which gameData field holds what the extension claims. It's empty for an
-  extension the bundle doesn't have or one that declares no settings. Pinned by the corpus (version 4).
+- **An extension's settings**: a bundle now carries each Patter extension's settings, every one its manifest declares, with the project's value or else the setting's default (`BundleExtension.Settings`). `GameDataHelpers.ExtensionSettings(bundle, extension)` reads them as a fresh `Dictionary<string, string>` by setting name, so a game can tell which gameData field holds what the extension claims. It's empty for an extension the bundle doesn't have or one that declares no settings. Pinned by the corpus (version 4).
 
 ## [0.29.0] - 2026-10-18
 
 ### Added
 
-- **A choice's options have game-data fields of their own**: `option` is a node kind, so a project declares
-  fields for options as for any other node, and `GameDataHelpers.EffectiveGameData(GameDataHelpers.GameDataFields(bundle, "option"), ...)` resolves the gameData an option
-  arrives with. Pinned by the corpus.
-- **Patter extension values**: a bundle can carry the values a Patter extension gives each node, and the
-  runtime hands them over where it hands over gameData: `Extensions` on a line, text and game event step, a
-  prompt spoken back, a choice's option, and each beat, block and scene of the outline, by extension id, raw
-  as the bundle wrote them (any JSON, as a neutral tree of `OrderedMap`, `List`, `double`, `string`, `bool`
-  and null: records, maps and lists as well as the seven field types), null when a node has none.
-  `engine.ExtensionsForScene(sceneRef)` and `engine.ExtensionsForBlock(sceneRef, blockRef)` read a scene's
-  and a block's own. `GameDataHelpers.ExtensionDecls(bundle, extension, kind)` gives an extension's
-  declarations for a node kind, every default resolved, so
-  `GameDataHelpers.EffectiveGameData(GameDataHelpers.ExtensionDecls(...), step.Extensions?.GetOrDefault(id))`
-  fills in what a node leaves out, and `GameDataHelpers.ExtensionsOf(bundle, kind, address)` reads any node's
-  values: the project, a scene, a block, a snippet, an option or a beat. A saved pending choice doesn't carry
-  them: they're read off the bundle as it loads. Bundles without extensions are unchanged. Pinned by the
-  corpus (version 3).
+- **A choice's options have game-data fields of their own**: `option` is a node kind, so a project declares fields for options as for any other node, and `GameDataHelpers.EffectiveGameData(GameDataHelpers.GameDataFields(bundle, "option"), ...)` resolves the gameData an option arrives with. Pinned by the corpus.
+- **Patter extension values**: a bundle can carry the values a Patter extension gives each node, and the runtime hands them over where it hands over gameData: `Extensions` on a line, text and game event step, a prompt spoken back, a choice's option, and each beat, block and scene of the outline, by extension id, raw as the bundle wrote them (any JSON, as a neutral tree of `OrderedMap`, `List`, `double`, `string`, `bool` and null: records, maps and lists as well as the seven field types), null when a node has none. `engine.ExtensionsForScene(sceneRef)` and `engine.ExtensionsForBlock(sceneRef, blockRef)` read a scene's and a block's own. `GameDataHelpers.ExtensionDecls(bundle, extension, kind)` gives an extension's declarations for a node kind, every default resolved, so `GameDataHelpers.EffectiveGameData(GameDataHelpers.ExtensionDecls(...), step.Extensions?.GetOrDefault(id))` fills in what a node leaves out, and `GameDataHelpers.ExtensionsOf(bundle, kind, address)` reads any node's values: the project, a scene, a block, a snippet, an option or a beat. A saved pending choice doesn't carry them: they're read off the bundle as it loads. Bundles without extensions are unchanged. Pinned by the corpus (version 3).
 
 
 ## [0.28.0] - 2026-10-18
 
 ### Added
 
-- **Drifted saves are put back, and said.** A saved value its declaration no longer takes (a stage, an
-  enum value or a flag deleted since the save, or a value of another type) goes back to its default as
-  the save loads, instead of reaching the first gate that orders it. Each is reported: `EngineOptions.OnRefit` hears the list of `LoadMisfit`s (scope, name, what the save held); unset, each goes to `Engine.DefaultOnRefit`, a `Debug.LogWarning` in Unity. A hot
-  swap onto a game's shared registry refits this engine's values too, as does a hot swap that falls
-  back on a fresh engine. An engine reports only its own scopes' values; the rest of a shared
-  registry's stay for their owners. Every load refits, through the
-  kernel's refitting registry load.
-- **Game data takes flags and quality**, the family's field types: a game-data field's declaration
-  carries `stages` for a quality, and `GameDataField` is now a kernel `ScopeDeclaration`, so `Stages.Compare(field, a, b)` and its two siblings take one.
+- **Drifted saves are put back, and said.** A saved value its declaration no longer takes (a stage, an enum value or a flag deleted since the save, or a value of another type) goes back to its default as the save loads, instead of reaching the first gate that orders it. Each is reported: `EngineOptions.OnRefit` hears the list of `LoadMisfit`s (scope, name, what the save held); unset, each goes to `Engine.DefaultOnRefit`, a `Debug.LogWarning` in Unity. A hot swap onto a game's shared registry refits this engine's values too, as does a hot swap that falls back on a fresh engine. An engine reports only its own scopes' values; the rest of a shared registry's stay for their owners. Every load refits, through the kernel's refitting registry load.
+- **Game data takes flags and quality**, the family's field types: a game-data field's declaration carries `stages` for a quality, and `GameDataField` is now a kernel `ScopeDeclaration`, so `Stages.Compare(field, a, b)` and its two siblings take one.
 
-- Kernel `k1a333a0e`, vendored from `@wildwinter/expr`: the value check, the type defaults (`text` and
-  `multiline` seed `""`) and the refitting load, in every port. The kernel id changes, so the Storylet
-  Engine must ship the same kernel in the same release round.
+- Kernel `k1a333a0e`, vendored from `@wildwinter/expr`: the value check, the type defaults (`text` and `multiline` seed `""`) and the refitting load, in every port. The kernel id changes, so the Storylet Engine must ship the same kernel in the same release round.
 
 ## [0.27.0] - 2026-10-17
 
 ### Added
 
-- **A quality's stages from game code.** A game holding a quality's value can put it in the story's order
-  without keeping a copy of the ladder: `engine.StageIndex(ref, value)`, `engine.CompareStages(ref, a, b)` and
-  `engine.NextStage(ref, value)`, and the same on a `Flow`, which also reaches `@scene`; a refusal throws
-  `EvalError`. They give a stage's position (-1 when the value isn't a stage), how two stages compare (-1, 0
-  or 1, as a condition compares them), and the stage after one, staying on the top rung as `advance()` does.
+- **A quality's stages from game code.** A game holding a quality's value can put it in the story's order without keeping a copy of the ladder: `engine.StageIndex(ref, value)`, `engine.CompareStages(ref, a, b)` and `engine.NextStage(ref, value)`, and the same on a `Flow`, which also reaches `@scene`; a refusal throws `EvalError`. They give a stage's position (-1 when the value isn't a stage), how two stages compare (-1, 0 or 1, as a condition compares them), and the stage after one, staying on the top rung as `advance()` does.
 
 ### Changed
 
-- **The shared expression kernel is `k88b76cef`** (from `@wildwinter/expr` 0.5.2), the one the Storylet Engine
-  uses from its next release.
+- **The shared expression kernel is `k88b76cef`** (from `@wildwinter/expr` 0.5.2), the one the Storylet Engine uses from its next release.
 
 ## [0.26.1] - 2026-10-17
 
 ### Changed
 
-- Nothing changes in this plugin. It's released with the other Patterplay runtimes, whose 0.26.1 raises the JS
-  runtime's dependency floors and fixes the Unreal save reader's handling of an escaped emoji.
+- Nothing changes in this plugin. It's released with the other Patterplay runtimes, whose 0.26.1 raises the JS runtime's dependency floors and fixes the Unreal save reader's handling of an escaped emoji.
 
 ## [0.26.0] - 2026-10-14
 
 ### Added
 
-- **`Flow.StepFor(beatId)`**: the step a flow would deliver for a beat right now, without delivering it, for a
-  game that keeps lines by id and shows them again after a load or a language switch. It's built by the same
-  function as a delivered step, so it carries what `Advance` would: the text in the active locale, interpolated
-  (unless the project is voiced), closed captions applied, the character's and qualifier's names, the speaker
-  label, the pause, Game Data, and tags. It follows `SetLocale` and the closed-captions toggle. It doesn't move
-  the flow, count a visit, or run an effect, and it's null for an id that's neither a beat nor an option's
-  prompt. Held across all four runtimes by the conformance corpus.
+- **`Flow.StepFor(beatId)`**: the step a flow would deliver for a beat right now, without delivering it, for a game that keeps lines by id and shows them again after a load or a language switch. It's built by the same function as a delivered step, so it carries what `Advance` would: the text in the active locale, interpolated (unless the project is voiced), closed captions applied, the character's and qualifier's names, the speaker label, the pause, Game Data, and tags. It follows `SetLocale` and the closed-captions toggle. It doesn't move the flow, count a visit, or run an effect, and it's null for an id that's neither a beat nor an option's prompt. Held across all four runtimes by the conformance corpus.
 
 ## [0.25.0] - 2026-10-14
 
 ### Added
 
-- **Speaker labels**: a line step, a choice option's line `Prompt`, and a replayed prompt carry `SpeakerLabel`,
-  the name to show for the speaker in the current locale, so a game never puts the character's and the
-  qualifier's names together itself. With no qualifier it's the character's shown name; with one, the
-  character's own label for that pair when the project overrides it (the bundle's `cast[].qualifierLabels`,
-  translated as `speaker:<NAME>:<gameId>`), else the speaker pattern (`speaker:pattern`, else the bundle's
-  `speakerPattern`, else `{name} ({qualifier})`) filled with the two shown names. It's null with no speaker, on
-  a line closed captions have silenced, and in IDs-only mode. `BeatInfo.SpeakerLabel` gives it at the source
-  locale for `GetOutline` and `GetBeatSequence`. Saved choice prompts carry it, and a save written before it
-  existed works it out again on load. `Bundle.SpeakerPattern` and `Cast.QualifierLabels` read the new bundle
-  fields. The samples show the label. Held across all four runtimes by the conformance corpus.
+- **Speaker labels**: a line step, a choice option's line `Prompt`, and a replayed prompt carry `SpeakerLabel`, the name to show for the speaker in the current locale, so a game never puts the character's and the qualifier's names together itself. With no qualifier it's the character's shown name; with one, the character's own label for that pair when the project overrides it (the bundle's `cast[].qualifierLabels`, translated as `speaker:<NAME>:<gameId>`), else the speaker pattern (`speaker:pattern`, else the bundle's `speakerPattern`, else `{name} ({qualifier})`) filled with the two shown names. It's null with no speaker, on a line closed captions have silenced, and in IDs-only mode. `BeatInfo.SpeakerLabel` gives it at the source locale for `GetOutline` and `GetBeatSequence`. Saved choice prompts carry it, and a save written before it existed works it out again on load. `Bundle.SpeakerPattern` and `Cast.QualifierLabels` read the new bundle fields. The samples show the label. Held across all four runtimes by the conformance corpus.
 
 ## [0.24.0] - 2026-10-11
 
 ### Added
 
-- **Flow capture and restore**: `engine.CaptureFlow(id)` takes one flow out as a `FlowState`, plain data in the
-  save's own spelling: a `FlowSnapshot` as `SaveGame` writes it (cursor, PRNG, visits, and selectors), a
-  `Version`, and its own property values as a version 2 save's per-flow `Scopes` and `SceneBags`, without its
-  id. Values still waiting for a scene the flow hasn't re-entered come too. `engine.RestoreFlow(id, state)`
-  opens it again under any id, as `LoadGame` restores each flow, re-finding its place by id against an edited
-  bundle. Shared state isn't in it, so a restore rewinds nothing else, and anything a load left waiting under
-  the id is dropped first, as when a flow starts. Refused over an open id, inside a checkpoint, for a version a
-  save couldn't have, and for a state with no cursor (`PatterSave.ReadFlowState` refuses one as it reads, with
-  "malformed flow state: no cursor", since a flow state never had the flat shape older saves did); a state
-  that won't restore leaves nothing behind. Capturing only reads, so it
-  is allowed inside a checkpoint. Capture before `CloseFlow`, which drops the flow's values.
-  `PatterSave.SaveFlowState` and `ReadFlowState` write and read the state as JSON, in the same shape the other
-  runtimes write. Held across all four runtimes by the conformance corpus.
+- **Flow capture and restore**: `engine.CaptureFlow(id)` takes one flow out as a `FlowState`, plain data in the save's own spelling: a `FlowSnapshot` as `SaveGame` writes it (cursor, PRNG, visits, and selectors), a `Version`, and its own property values as a version 2 save's per-flow `Scopes` and `SceneBags`, without its id. Values still waiting for a scene the flow hasn't re-entered come too. `engine.RestoreFlow(id, state)` opens it again under any id, as `LoadGame` restores each flow, re-finding its place by id against an edited bundle. Shared state isn't in it, so a restore rewinds nothing else, and anything a load left waiting under the id is dropped first, as when a flow starts. Refused over an open id, inside a checkpoint, for a version a save couldn't have, and for a state with no cursor (`PatterSave.ReadFlowState` refuses one as it reads, with "malformed flow state: no cursor", since a flow state never had the flat shape older saves did); a state that won't restore leaves nothing behind. Capturing only reads, so it is allowed inside a checkpoint. Capture before `CloseFlow`, which drops the flow's values. `PatterSave.SaveFlowState` and `ReadFlowState` write and read the state as JSON, in the same shape the other runtimes write. Held across all four runtimes by the conformance corpus.
 
 ### Changed
 
-- `FlowSnapshot.Scopes` and `SceneBags` are no longer obsolete: a `FlowState` carries them. A version 3 save
-  still doesn't write them, its values being the registry's. `FlowSnapshot` is no longer sealed (`FlowState`
-  extends it).
+- `FlowSnapshot.Scopes` and `SceneBags` are no longer obsolete: a `FlowState` carries them. A version 3 save still doesn't write them, its values being the registry's. `FlowSnapshot` is no longer sealed (`FlowState` extends it).
 
 ## [0.23.0] - 2026-10-10
 
 ### Added
 
-- **Line padding**: the writer's pause after a line, so a game can time a conversation the way it was written.
-  A line or text step gains `PadAfter`, in seconds: the beat's own `padAfter`, else the nearest
-  `padAfterDefault` above it (its snippet, each group it sits in, innermost first, its block, its scene), else
-  the project's, else the built-in `Bundle.DefaultPadAfter` (0.6). A negative value is a cut-in, the next
-  line (or game event) starting that long before this one ends; it is clamped to zero only on a snippet's last
-  line or text beat, where nothing certain follows. A spoken prompt (`ReplayPromptOnChoose`) resolves through
-  its option and is never clamped, and a line closed captions silence keeps its pause. A choice option's
-  `ChoicePrompt` carries the same `PadAfter`, for a game that voices the prompts itself, and a save keeps it
-  (a save written before this works it out again on load). Game event steps carry none. `GetOutline` and
-  `GetBeatSequence` report `PadAfter` on a line or text beat's `BeatInfo`, and `OwnPadAfter` when the beat
-  sets its own. Older bundles load unchanged and pause 0.6 after every line.
+- **Line padding**: the writer's pause after a line, so a game can time a conversation the way it was written. A line or text step gains `PadAfter`, in seconds: the beat's own `padAfter`, else the nearest `padAfterDefault` above it (its snippet, each group it sits in, innermost first, its block, its scene), else the project's, else the built-in `Bundle.DefaultPadAfter` (0.6). A negative value is a cut-in, the next line (or game event) starting that long before this one ends; it is clamped to zero only on a snippet's last line or text beat, where nothing certain follows. A spoken prompt (`ReplayPromptOnChoose`) resolves through its option and is never clamped, and a line closed captions silence keeps its pause. A choice option's `ChoicePrompt` carries the same `PadAfter`, for a game that voices the prompts itself, and a save keeps it (a save written before this works it out again on load). Game event steps carry none. `GetOutline` and `GetBeatSequence` report `PadAfter` on a line or text beat's `BeatInfo`, and `OwnPadAfter` when the beat sets its own. Older bundles load unchanged and pause 0.6 after every line.
 
 ## [0.22.0] - 2026-10-10
 
 ### Added
 
-- **Speaker qualifiers**: a line can say how it is delivered, a screenplay's `TAM (O.S.)`, without becoming a
-  second character. A line step gains `Qualifier` (the qualifier's `gameId`, such as `vo`) and `QualifierName`
-  (its shown name, such as `V.O.`, resolved as `CharacterName` is: the active locale, then the default locale,
-  then the authored name, and absent in an IDs-only build). A line-kind choice prompt carries them too, a save
-  keeps them on a pending prompt, and `GetOutline` and `GetBeatSequence` report them on a line's `BeatInfo`.
-  Both are absent on a line with no qualifier, and on a line closed captions silence. Older bundles and saves
-  load unchanged. The samples show the qualifier after the speaker's name.
+- **Speaker qualifiers**: a line can say how it is delivered, a screenplay's `TAM (O.S.)`, without becoming a second character. A line step gains `Qualifier` (the qualifier's `gameId`, such as `vo`) and `QualifierName` (its shown name, such as `V.O.`, resolved as `CharacterName` is: the active locale, then the default locale, then the authored name, and absent in an IDs-only build). A line-kind choice prompt carries them too, a save keeps them on a pending prompt, and `GetOutline` and `GetBeatSequence` report them on a line's `BeatInfo`. Both are absent on a line with no qualifier, and on a line closed captions silence. Older bundles and saves load unchanged. The samples show the qualifier after the speaker's name.
 
 ## [0.21.0] - 2026-10-07
 
 ### Changed
 
-- **The core runtime assembly (`Patterplay.Runtime`) declares that it uses no engine code**, so nothing
-  Unity-specific can creep into the part every runtime shares. The Unity glue stays in
-  `Patterplay.Runtime.Unity`.
-- **The conformance corpus covers more, and every runtime is held to it**: the outline and beat sequence, the
-  audio resolver's joins, `listProperties`, what a checkpoint refuses while it is open, a save taken inside one,
-  and a block named under another scene. Unity already matched it.
+- **The core runtime assembly (`Patterplay.Runtime`) declares that it uses no engine code**, so nothing Unity-specific can creep into the part every runtime shares. The Unity glue stays in `Patterplay.Runtime.Unity`.
+- **The conformance corpus covers more, and every runtime is held to it**: the outline and beat sequence, the audio resolver's joins, `listProperties`, what a checkpoint refuses while it is open, a save taken inside one, and a block named under another scene. Unity already matched it.
 
 ### Deprecated
 
-- **`PatterValueConverter` and `Uint32Converter`.** Nothing in Patterplay uses them: `PatterSave` reads and
-  writes saves itself. They go in a later release.
+- **`PatterValueConverter` and `Uint32Converter`.** Nothing in Patterplay uses them: `PatterSave` reads and writes saves itself. They go in a later release.
 
 ### Removed
 
-- **`Ast.cs`, a file that held only a comment.** The expression tree lives in the shared expression code beside
-  it.
+- **`Ast.cs`, a file that held only a comment.** The expression tree lives in the shared expression code beside it.
 
 ### Fixed
 
-- **The Runtime State window starts each Play Mode session empty.** With Enter Play Mode Options turned on (no
-  domain reload), it went on listing the last session's engines and debug links.
+- **The Runtime State window starts each Play Mode session empty.** With Enter Play Mode Options turned on (no domain reload), it went on listing the last session's engines and debug links.
 
 ## [0.20.0] - 2026-10-06
 
 ### Added
 
-- **`PatterSave.LoadState` and `GameDataHelpers.GameDataValue`**, as the other runtimes have: restore a save
-  envelope you already hold as a `JObject`, and read one gameData field with its default applied.
-- **`Engine.OnTrace(handler)`**, as the JS runtime has: each decision as it happens, with the flow it happened
-  in, whether the log is on or off. It returns its own unsubscribe. An earlier entry here described `OnTrace`
-  before it existed.
-- **A gameData field's `Purpose`**, read from the bundle and carried in its description, as on every other
-  runtime.
+- **`PatterSave.LoadState` and `GameDataHelpers.GameDataValue`**, as the other runtimes have: restore a save envelope you already hold as a `JObject`, and read one gameData field with its default applied.
+- **`Engine.OnTrace(handler)`**, as the JS runtime has: each decision as it happens, with the flow it happened in, whether the log is on or off. It returns its own unsubscribe. An earlier entry here described `OnTrace` before it existed.
+- **A gameData field's `Purpose`**, read from the bundle and carried in its description, as on every other runtime.
 - **`GetVisitCounts()` on `Engine` and `Flow`**, as on every runtime: visit counts read without a save.
 
 ### Changed
 
-- **A log entry has the JS runtime's fields.** `Group`, `Children`, `Options`, `Option`, `To`, `Mode`, `Target`,
-  `Node`, and `Message`, each where that type of entry has it, in place of the shared `Subject`, `Considered`,
-  and `Detail`; and a sequence's select names its `Order` and `Exhaust`, which it did not before. The old three
-  still read as they did, and go in a later release, with one difference: a `chose` entry's option is in
-  `Option`, no longer in `Picked`. The corpus now holds every runtime's log to the same entries.
+- **A log entry has the JS runtime's fields.** `Group`, `Children`, `Options`, `Option`, `To`, `Mode`, `Target`, `Node`, and `Message`, each where that type of entry has it, in place of the shared `Subject`, `Considered`, and `Detail`; and a sequence's select names its `Order` and `Exhaust`, which it did not before. The old three still read as they did, and go in a later release, with one difference: a `chose` entry's option is in `Option`, no longer in `Picked`. The corpus now holds every runtime's log to the same entries.
 - **`Engine.BuildId` is empty, not null, for a bundle compiled without a hash**, as on every other runtime.
 - **The corpus now holds the bundle description to the same fields on every runtime.** Unity's already matched it.
-- **Less work per step, and in the editor.** A decision's log entry is built only while the log is on or
-  something is tracing; a quality's stage ladder is looked up once rather than scanned for on every comparison;
-  one random-number generator serves a flow rather than a new one per draw; and the state logger and the Runtime
-  State window read visit counts directly rather than saving the whole game, which the window did on every
-  repaint.
+- **Less work per step, and in the editor.** A decision's log entry is built only while the log is on or something is tracing; a quality's stage ladder is looked up once rather than scanned for on every comparison; one random-number generator serves a flow rather than a new one per draw; and the state logger and the Runtime State window read visit counts directly rather than saving the whole game, which the window did on every repaint.
 
 ### Deprecated
 
-- **`Flow.Start` is deprecated: use `Flow.Reset`.** They were the same call under two names. `Flow.Reset` is the
-  one public name for beginning a flow again on every runtime (opening a flow begins a new one); `Flow.Start`
-  goes in a later release.
-- **Names that differed from every other runtime's now match them; the old names still work, and go in a later
-  release.** `BundleInfo.DescribeBundle` (was `Describe`), `GameDataHelpers.GameDataFields` and
-  `EffectiveGameData` (were `FieldsFor` and `Effective`), `PatterSave.SaveState(engine)` (was
-  `Envelope(engine.SaveGame())`), and `PatterLiveBundle.ApplyLiveBundle` (was `Apply`).
+- **`Flow.Start` is deprecated: use `Flow.Reset`.** They were the same call under two names. `Flow.Reset` is the one public name for beginning a flow again on every runtime (opening a flow begins a new one); `Flow.Start` goes in a later release.
+- **Names that differed from every other runtime's now match them; the old names still work, and go in a later release.** `BundleInfo.DescribeBundle` (was `Describe`), `GameDataHelpers.GameDataFields` and `EffectiveGameData` (were `FieldsFor` and `Effective`), `PatterSave.SaveState(engine)` (was `Envelope(engine.SaveGame())`), and `PatterLiveBundle.ApplyLiveBundle` (was `Apply`).
 
 ### Fixed
 
-- **`Reset` no longer replays a prompt from the run it abandoned.** With prompt replay on, `Choose` leaves the
-  chosen option's prompt waiting for the next `Advance`. `Reset` in between cleared only the choice, so the old
-  prompt played as the restarted run's first beat. Every move that leaves the flow's place (`Reset`, `Goto`,
-  `Close`) now drops both, through one helper.
-- **The audio resolver keeps a base path that is a root.** It trimmed every trailing slash before adding its
-  own, so a base of `"/"` lost its root and a take resolved to a relative path. A base that ends in a slash is
-  now joined as it stands.
+- **`Reset` no longer replays a prompt from the run it abandoned.** With prompt replay on, `Choose` leaves the chosen option's prompt waiting for the next `Advance`. `Reset` in between cleared only the choice, so the old prompt played as the restarted run's first beat. Every move that leaves the flow's place (`Reset`, `Goto`, `Close`) now drops both, through one helper.
+- **The audio resolver keeps a base path that is a root.** It trimmed every trailing slash before adding its own, so a base of `"/"` lost its root and a take resolved to a relative path. A base that ends in a slash is now joined as it stands.
 
 ## [0.19.0] - 2026-10-06
 
 ### Changed
 
-- **Content that fails at run time no longer stops the story.** A condition that fails to evaluate (a division
-  by zero, a host value of the wrong type) now counts as false, and an effect that fails, including a story
-  write to a read-only `@world` value, is skipped while the rest of its list still runs. Each used to throw an
-  `EvalError` out of `Advance()`, `OpenFlow()`, `Goto()`, or `Choose()`, ending the conversation. Each is now
-  reported instead (see Added). Misusing the API is still refused as before: choosing an option that is not
-  offered, opening an unknown scene, or a call a checkpoint does not allow.
-- **A selector evaluates each child's condition once.** The verdicts and the eligible list used to come from two
-  passes, so a condition calling `random()` drew twice and its verdict and the pick could disagree.
-- **A shuffle draws only from the members of its bag that are still eligible.** A child whose condition has gone
-  false since the bag was filled is never drawn. When none of the bag is eligible the pass is over, exactly as
-  when the bag is empty. While every member is still eligible the draw is the same as before, so seeded results
-  do not move.
-- **One address rule everywhere.** A scene address resolves by its gameId first, then by its internal id, in
-  `OpenFlow`, `Goto`, and every lookup by address (`TagsForScene`, `GameDataForBlock`, `CastForScene`, and the
-  rest). `OpenFlow` used to try the internal id first, so it and `Goto` could land in different scenes. A block
-  address is read within its scene: that scene's block gameId first, then the internal id of a block in it.
-- **An option's prompt beat carries tags.** It gets its own tags plus the option's, like any beat, so a replayed
-  prompt and the outline's prompt are no longer untagged.
-- **A choice whose every option is greyed out runs dry.** It is handled as a choice with no options: its
-  fallback follows if it has an eligible one, otherwise `OnDryChoice` fires and the flow moves on. It used to be
-  offered with nothing the player could take.
-- **`LoadGame` checks a save before it changes anything.** A save with no `Flows` is refused with
-  `malformed save: no flows` and leaves the engine as it was; it used to close every flow and load the registry
-  first, then fail. `PatterSave` also refuses a `version` that is not a whole number, where a cast read 3.9 as 4
-  and the string "3" as 3.
+- **Content that fails at run time no longer stops the story.** A condition that fails to evaluate (a division by zero, a host value of the wrong type) now counts as false, and an effect that fails, including a story write to a read-only `@world` value, is skipped while the rest of its list still runs. Each used to throw an `EvalError` out of `Advance()`, `OpenFlow()`, `Goto()`, or `Choose()`, ending the conversation. Each is now reported instead (see Added). Misusing the API is still refused as before: choosing an option that is not offered, opening an unknown scene, or a call a checkpoint does not allow.
+- **A selector evaluates each child's condition once.** The verdicts and the eligible list used to come from two passes, so a condition calling `random()` drew twice and its verdict and the pick could disagree.
+- **A shuffle draws only from the members of its bag that are still eligible.** A child whose condition has gone false since the bag was filled is never drawn. When none of the bag is eligible the pass is over, exactly as when the bag is empty. While every member is still eligible the draw is the same as before, so seeded results do not move.
+- **One address rule everywhere.** A scene address resolves by its gameId first, then by its internal id, in `OpenFlow`, `Goto`, and every lookup by address (`TagsForScene`, `GameDataForBlock`, `CastForScene`, and the rest). `OpenFlow` used to try the internal id first, so it and `Goto` could land in different scenes. A block address is read within its scene: that scene's block gameId first, then the internal id of a block in it.
+- **An option's prompt beat carries tags.** It gets its own tags plus the option's, like any beat, so a replayed prompt and the outline's prompt are no longer untagged.
+- **A choice whose every option is greyed out runs dry.** It is handled as a choice with no options: its fallback follows if it has an eligible one, otherwise `OnDryChoice` fires and the flow moves on. It used to be offered with nothing the player could take.
+- **`LoadGame` checks a save before it changes anything.** A save with no `Flows` is refused with `malformed save: no flows` and leaves the engine as it was; it used to close every flow and load the registry first, then fail. `PatterSave` also refuses a `version` that is not a whole number, where a cast read 3.9 as 4 and the string "3" as 3.
 
 ### Added
 
-- **`EngineOptions.OnError` hears each content error the engine played through.** It is called with a
-  `PlayError` carrying the `Flow`, the `Kind` (`condition`, `effect`, or `best-match`), the `Node` whose
-  condition failed or that owns the effect (a scene, for its onEntry), the expression's `Source` text, and the
-  `Message`. Left unset, each goes to `Engine.DefaultOnError`, which the Unity layer points at
-  `Debug.LogWarning` (`PatterUnityLog.LogWarning`), so a content bug shows in the Console. With `Log = true`
-  each is also a `diagnostic` entry in the decision log (`Subject` is the node, `Detail` the message, plus the
-  new `LogEntry.Kind` and `LogEntry.Source`), and the Runtime State window shows them. `Expression.Src` holds
-  the source text when the bundle carries it.
+- **`EngineOptions.OnError` hears each content error the engine played through.** It is called with a `PlayError` carrying the `Flow`, the `Kind` (`condition`, `effect`, or `best-match`), the `Node` whose condition failed or that owns the effect (a scene, for its onEntry), the expression's `Source` text, and the `Message`. Left unset, each goes to `Engine.DefaultOnError`, which the Unity layer points at `Debug.LogWarning` (`PatterUnityLog.LogWarning`), so a content bug shows in the Console. With `Log = true` each is also a `diagnostic` entry in the decision log (`Subject` is the node, `Detail` the message, plus the new `LogEntry.Kind` and `LogEntry.Source`), and the Runtime State window shows them. `Expression.Src` holds the source text when the bundle carries it.
 
 ### Removed
 
-- **`PatterSave.DeserializeState` no longer reads a bare snapshot.** A save must be inside its `patter/save@0`
-  envelope, as the JS runtime already required. A version 2 save inside the envelope still loads.
+- **`PatterSave.DeserializeState` no longer reads a bare snapshot.** A save must be inside its `patter/save@0` envelope, as the JS runtime already required. A version 2 save inside the envelope still loads.
 
 ### Fixed
 
-- **Expression kernel `k492cf234`:** a listener's own error is no longer reported as a read-only refusal, every
-  listener registered when a write starts hears it exactly once, and the hot path allocates less, with no leaks.
-- **A bare snippet option's `fallback`, `sticky`, and `secretUntilEligible` are read.** The bundle loader read
-  them on Option groups only, so a snippet fallback was offered as an ordinary option, a sticky snippet option
-  was once-only, and a secret one was shown greyed.
-- **A shuffle no longer throws when a child in its bag has since become ineligible.** A shuffle fills its bag
-  from the children eligible on the first visit; if one of them later stopped being eligible and was drawn,
-  Unity threw out of `Advance()`. Such a child is now never drawn (see Changed).
-- **A rollback after a load keeps a scene's saved `@scene` values.** After a load, a scene the flow is not
-  standing in keeps its saved values waiting until the flow enters it. Entering it inside a checkpoint and then
-  rolling back used to drop those values, so the next real entry found the defaults and the next save left them
-  out. A new corpus case pins this on all four runtimes.
-- **The decision log's `seq` keeps counting after a clear.** The engine's log numbered entries by its length, so
-  after `ClearLog()` the numbers started again at 0 and entries read either side of the clear could not be put
-  in order.
+- **Expression kernel `k492cf234`:** a listener's own error is no longer reported as a read-only refusal, every listener registered when a write starts hears it exactly once, and the hot path allocates less, with no leaks.
+- **A bare snippet option's `fallback`, `sticky`, and `secretUntilEligible` are read.** The bundle loader read them on Option groups only, so a snippet fallback was offered as an ordinary option, a sticky snippet option was once-only, and a secret one was shown greyed.
+- **A shuffle no longer throws when a child in its bag has since become ineligible.** A shuffle fills its bag from the children eligible on the first visit; if one of them later stopped being eligible and was drawn, Unity threw out of `Advance()`. Such a child is now never drawn (see Changed).
+- **A rollback after a load keeps a scene's saved `@scene` values.** After a load, a scene the flow is not standing in keeps its saved values waiting until the flow enters it. Entering it inside a checkpoint and then rolling back used to drop those values, so the next real entry found the defaults and the next save left them out. A new corpus case pins this on all four runtimes.
+- **The decision log's `seq` keeps counting after a clear.** The engine's log numbered entries by its length, so after `ClearLog()` the numbers started again at 0 and entries read either side of the clear could not be put in order.
 
 ## [0.18.0] - 2026-10-05
 
 ### Changed
 
-- **`EngineOptions.ReplayPromptOnChoose` speaks back only an authored prompt, and exactly what the choice showed.** A game that
-  turns the option on will see the difference, which is why this is a minor release rather than a patch:
-  - An option whose prompt the choice borrowed from its own first content line (a bare-snippet option,
-    or an Option group with no prompt of its own) is no longer spoken back. That line used to play twice
-    in a row, once as the replay and once as content. It now plays once.
-  - The replayed prompt carries the text, `character`, `characterName`, and `direction` the choice
-    displayed, instead of resolving the prompt again when it is delivered. So if choosing runs effects
-    first (an Option group that picks a snippet runs its onEnter at once), or the language changes
-    between `Choose()` and the next `Advance()`, the replay still says what the player saw. In a voiced
-    project a replayed line prompt is now interpolated, as the choice showed it.
-  - A save taken between `Choose()` and the next `Advance()` carries that prompt as shown, in a new
-    optional `pendingPrompt` on the flow's cursor, so the replay after a load is the same. Every
-    Patterplay runtime writes and reads it. A save from an earlier version, without it, still loads and
-    resolves the prompt when it is delivered, as before. `FlowSnapshot.PendingPrompt` holds it in memory.
+- **`EngineOptions.ReplayPromptOnChoose` speaks back only an authored prompt, and exactly what the choice showed.** A game that turns the option on will see the difference, which is why this is a minor release rather than a patch:
+  - An option whose prompt the choice borrowed from its own first content line (a bare-snippet option, or an Option group with no prompt of its own) is no longer spoken back. That line used to play twice in a row, once as the replay and once as content. It now plays once.
+  - The replayed prompt carries the text, `character`, `characterName`, and `direction` the choice displayed, instead of resolving the prompt again when it is delivered. So if choosing runs effects first (an Option group that picks a snippet runs its onEnter at once), or the language changes between `Choose()` and the next `Advance()`, the replay still says what the player saw. In a voiced project a replayed line prompt is now interpolated, as the choice showed it.
+  - A save taken between `Choose()` and the next `Advance()` carries that prompt as shown, in a new optional `pendingPrompt` on the flow's cursor, so the replay after a load is the same. Every Patterplay runtime writes and reads it. A save from an earlier version, without it, still loads and resolves the prompt when it is delivered, as before. `FlowSnapshot.PendingPrompt` holds it in memory.
 
 ## [0.17.0] - 2026-10-05
 
 ### Fixed
 
-- **`OpenFlow` at an address that does not resolve changes nothing.** It threw, but only after closing
-  any flow already open under that name and putting a broken one in its place. It now throws before
-  anything changes. The block must be in the scene you named, as `Goto` has always required: a block
-  from another scene used to open there, and now throws. Held across all four runtimes by the
-  conformance corpus, which now also pins a choice step whole (its `GroupId` and each option's
-  `Prompt`), as this runtime already gave it.
+- **`OpenFlow` at an address that does not resolve changes nothing.** It threw, but only after closing any flow already open under that name and putting a broken one in its place. It now throws before anything changes. The block must be in the scene you named, as `Goto` has always required: a block from another scene used to open there, and now throws. Held across all four runtimes by the conformance corpus, which now also pins a choice step whole (its `GroupId` and each option's `Prompt`), as this runtime already gave it.
 
 ## [0.16.0] - 2026-10-04
 
 ### Added
 
-- **Checkpoints: try something, then undo it.** `engine.Checkpoint()` opens a checkpoint; `engine.Rollback(checkpoint)` puts the game back exactly
-  as it was then, and `engine.Commit(checkpoint)` keeps everything. A rollback undoes every change the story made in between:
-  property values in every scope (a game's own `@world` store is written back through the game), visit
-  counts, shuffle and sequence positions, `@scene` bags made since, and every flow's position and random
-  state; a flow opened since is closed, and its name is free again. `engine.InCheckpoint` says whether one is open.
-  The use is asking "would this say anything?" without consequences: move a flow to an address, step
-  it, and roll back if it had nothing to give, so the scene's on-entry effects, the visits, and the
-  shuffle draws never happened. Each change records how to undo itself as it happens, so a checkpoint
-  costs what the steps inside it do, not what the game has built up, and the record is let go when it
-  closes. One is open at a time; while it is, the calls a rollback couldn't undo are refused
-  (`Reset`, `LoadGame`, `HotSwap`, `CloseFlow`, `OpenFlow` over an open flow, and a flow's own `Start`, `Reset`, and `Restore`). Held across all four runtimes by the conformance corpus.
+- **Checkpoints: try something, then undo it.** `engine.Checkpoint()` opens a checkpoint; `engine.Rollback(checkpoint)` puts the game back exactly as it was then, and `engine.Commit(checkpoint)` keeps everything. A rollback undoes every change the story made in between: property values in every scope (a game's own `@world` store is written back through the game), visit counts, shuffle and sequence positions, `@scene` bags made since, and every flow's position and random state; a flow opened since is closed, and its name is free again. `engine.InCheckpoint` says whether one is open. The use is asking "would this say anything?" without consequences: move a flow to an address, step it, and roll back if it had nothing to give, so the scene's on-entry effects, the visits, and the shuffle draws never happened. Each change records how to undo itself as it happens, so a checkpoint costs what the steps inside it do, not what the game has built up, and the record is let go when it closes. One is open at a time; while it is, the calls a rollback couldn't undo are refused (`Reset`, `LoadGame`, `HotSwap`, `CloseFlow`, `OpenFlow` over an open flow, and a flow's own `Start`, `Reset`, and `Restore`). Held across all four runtimes by the conformance corpus.
 
 ### Fixed
 
-- **`Flow.Restore()` on a running flow keeps that flow's own property values.** It used to drop them back to
-  their defaults, since a snapshot holds a flow's position and memory, not its property values. Loading
-  a save is unchanged.
+- **`Flow.Restore()` on a running flow keeps that flow's own property values.** It used to drop them back to their defaults, since a snapshot holds a flow's position and memory, not its property values. Loading a save is unchanged.
 
 ## [0.15.0] - 2026-10-03
 
 ### Added
 
-- **Scene and block gameData you can read at runtime.** `engine.GameDataForScene(sceneRef)` and
-  `engine.GameDataForBlock(sceneRef, blockRef)` return the author's own gameData on a scene or a block,
-  by internal id or gameId address, like the tag and cast reads. The answer is the RAW sparse override,
-  the same rule a beat's step follows: it is not merged with the project's declared field defaults (use
-  `GameDataHelpers.Effective(GameDataHelpers.FieldsFor(bundle, "scene"), ...)` for that), and a block
-  does not inherit its scene's. Each call returns a fresh copy, empty when the node sets none or the ref
-  does not resolve. Both bundle loaders now read scene and block `gameData`, and `GetOutline()`'s
-  `OutlineScene` and `OutlineBlock` carry it as `GameData` (null when empty, like `BeatInfo.GameData`).
-  Held across all four runtimes by the conformance corpus.
+- **Scene and block gameData you can read at runtime.** `engine.GameDataForScene(sceneRef)` and `engine.GameDataForBlock(sceneRef, blockRef)` return the author's own gameData on a scene or a block, by internal id or gameId address, like the tag and cast reads. The answer is the RAW sparse override, the same rule a beat's step follows: it is not merged with the project's declared field defaults (use `GameDataHelpers.Effective(GameDataHelpers.FieldsFor(bundle, "scene"), ...)` for that), and a block does not inherit its scene's. Each call returns a fresh copy, empty when the node sets none or the ref does not resolve. Both bundle loaders now read scene and block `gameData`, and `GetOutline()`'s `OutlineScene` and `OutlineBlock` carry it as `GameData` (null when empty, like `BeatInfo.GameData`). Held across all four runtimes by the conformance corpus.
 
 ### Changed
 
-- **`Flow.Snapshot()` and `Flow.Restore()` are public**, as `snapshot` and `restore` already are on the
-  JS, Godot, and Unreal runtimes. A host can copy one flow's position and memory and put it back
-  without saving the whole engine; Patterstage uses this to leave a running conversation's flow
-  untouched when a request turns out to have nothing to say.
+- **`Flow.Snapshot()` and `Flow.Restore()` are public**, as `snapshot` and `restore` already are on the JS, Godot, and Unreal runtimes. A host can copy one flow's position and memory and put it back without saving the whole engine; Patterstage uses this to leave a running conversation's flow untouched when a request turns out to have nothing to say.
 
 ## [0.14.3] - 2026-09-27
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the JS runtime's zip, whose module builds now work without npm. Nothing in this runtime changed.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the JS runtime's zip, whose module builds now work without npm. Nothing in this runtime changed.
 
 ## [0.14.2] - 2026-09-27
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the JS runtime's: `@wildwinter/scoperegistry` is now a peer dependency, so a game's install holds
-  exactly one copy of the registry. Nothing in this runtime changed.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the JS runtime's: `@wildwinter/scoperegistry` is now a peer dependency, so a game's install holds exactly one copy of the registry. Nothing in this runtime changed.
 
 ## [0.14.1] - 2026-09-27
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the JS runtime's: it accepts any `@wildwinter/scoperegistry` from 0.7.0 up to 1.0, so an install no
-  longer ends up with two copies of the registry. Nothing in this runtime changed.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the JS runtime's: it accepts any `@wildwinter/scoperegistry` from 0.7.0 up to 1.0, so an install no longer ends up with two copies of the registry. Nothing in this runtime changed.
 
 ## [0.14.0] - 2026-09-24
 
 ### Changed
 
-- **Breaking: one expression kernel, shared with the Storylet Engine.** `PatterValue` and `PatterKind`
-  are now `ExprValue` and `ExprKind`, in the `Wildwinter.Expr` namespace with the rest of the shared
-  kernel (`ScopeRegistry`, `PropertyBag`, `OrderedMap`, `Mulberry32`, and the evaluator), which now
-  has its own assembly definition, `Patterplay.Expr`. The Storylet Engine carries the same kernel, and
-  a game with both installed compiles it once, here, so one `ScopeRegistry` is the same type to both
-  engines. Patterplay's API still throws `EvalError`, with the same messages; a call straight to the
-  registry or a property bag throws the kernel's `RegistryError`, and `Expr.Evaluate` its `ExprError`.
-  **To migrate:** rename `PatterValue` to `ExprValue` and `PatterKind` to `ExprKind`, and add
-  `using Wildwinter.Expr;`. A game assembly definition that references `Patterplay.Runtime` must also
-  reference `Patterplay.Expr` and `StoryletEngine.Expr` (Unity ignores whichever is not installed);
-  scripts with no assembly definition need nothing more.
-- **One registry per game.** Every property bag the engine holds now lives in a `ScopeRegistry`
-  (the shared registry, vendored from `expr`): `@patter` under `patter`, and each flow's and scene's
-  bag under a key starting `patter/`. A new `EngineOptions.Registry` takes the game's own registry,
-  shared with any other engine in the game; without one the engine makes its own and acts as its own
-  game, so a single-engine game needs no change.
-- **The save is version 3.** `SaveGame()` holds what is not a property (cursors, PRNGs, visit counts,
-  selector cursors). An engine built without a registry also carries that registry's values under
-  `SaveGame.Registry` (`registry` in the JSON), so one `PatterSave.SerializeState` is still the whole
-  game; an engine given the game's registry leaves them to the game, which saves the registry once.
-  Version 2 saves still load, their values moving into the registry. `SaveGame.Shared`,
-  `SaveGame.StageBags`, `FlowSnapshot.Scopes`, and `FlowSnapshot.SceneBags` are now read from a
-  version 2 save only, and are marked obsolete.
-- **`IHostScope` is registered in the registry.** Each `EngineOptions.HostScopes` binding becomes a
-  foreign scope: your game keeps the values, and no Patterplay save holds them. The interface and the
-  option are unchanged. A `writable: false` declaration is still refused to the story and never to
-  your game's own `SetProperty`.
-- **A self-backed `@world` is saved.** When the game binds no `IHostScope`, `@world` is a property the
-  engine's registry stores, so it rides in the save. Given the game's registry, the engine self-backs
-  nothing: `@world` is the game's to register there.
-- **Every expression reads every registered scope**, so a condition can test another engine's
-  `@story.act` in a combined game, even one the other engine registers again after the flow opened
-  (a live edit). A token two engines both want fails as the second is built, naming the first, and
-  leaves the game's registry as it was.
-- `HotSwap` hands every bag to the replacement engine on the same registry. The engine it replaces is
-  released and its flows are closed. If the restore fails, the fallback engine keeps the shared
-  properties and restarts each flow, where it used to throw.
-- `Reset()` and a fresh `OpenFlow` drop values a load left waiting for this engine's keys, and no
-  other engine's.
-- `PatterStateLogger.SnapshotState` reads the engine's bags rather than its save. A scene no flow has
-  re-entered since a load appears once it is.
+- **Breaking: one expression kernel, shared with the Storylet Engine.** `PatterValue` and `PatterKind` are now `ExprValue` and `ExprKind`, in the `Wildwinter.Expr` namespace with the rest of the shared kernel (`ScopeRegistry`, `PropertyBag`, `OrderedMap`, `Mulberry32`, and the evaluator), which now has its own assembly definition, `Patterplay.Expr`. The Storylet Engine carries the same kernel, and a game with both installed compiles it once, here, so one `ScopeRegistry` is the same type to both engines. Patterplay's API still throws `EvalError`, with the same messages; a call straight to the registry or a property bag throws the kernel's `RegistryError`, and `Expr.Evaluate` its `ExprError`. **To migrate:** rename `PatterValue` to `ExprValue` and `PatterKind` to `ExprKind`, and add `using Wildwinter.Expr;`. A game assembly definition that references `Patterplay.Runtime` must also reference `Patterplay.Expr` and `StoryletEngine.Expr` (Unity ignores whichever is not installed); scripts with no assembly definition need nothing more.
+- **One registry per game.** Every property bag the engine holds now lives in a `ScopeRegistry` (the shared registry, vendored from `expr`): `@patter` under `patter`, and each flow's and scene's bag under a key starting `patter/`. A new `EngineOptions.Registry` takes the game's own registry, shared with any other engine in the game; without one the engine makes its own and acts as its own game, so a single-engine game needs no change.
+- **The save is version 3.** `SaveGame()` holds what is not a property (cursors, PRNGs, visit counts, selector cursors). An engine built without a registry also carries that registry's values under `SaveGame.Registry` (`registry` in the JSON), so one `PatterSave.SerializeState` is still the whole game; an engine given the game's registry leaves them to the game, which saves the registry once. Version 2 saves still load, their values moving into the registry. `SaveGame.Shared`, `SaveGame.StageBags`, `FlowSnapshot.Scopes`, and `FlowSnapshot.SceneBags` are now read from a version 2 save only, and are marked obsolete.
+- **`IHostScope` is registered in the registry.** Each `EngineOptions.HostScopes` binding becomes a foreign scope: your game keeps the values, and no Patterplay save holds them. The interface and the option are unchanged. A `writable: false` declaration is still refused to the story and never to your game's own `SetProperty`.
+- **A self-backed `@world` is saved.** When the game binds no `IHostScope`, `@world` is a property the engine's registry stores, so it rides in the save. Given the game's registry, the engine self-backs nothing: `@world` is the game's to register there.
+- **Every expression reads every registered scope**, so a condition can test another engine's `@story.act` in a combined game, even one the other engine registers again after the flow opened (a live edit). A token two engines both want fails as the second is built, naming the first, and leaves the game's registry as it was.
+- `HotSwap` hands every bag to the replacement engine on the same registry. The engine it replaces is released and its flows are closed. If the restore fails, the fallback engine keeps the shared properties and restarts each flow, where it used to throw.
+- `Reset()` and a fresh `OpenFlow` drop values a load left waiting for this engine's keys, and no other engine's.
+- `PatterStateLogger.SnapshotState` reads the engine's bags rather than its save. A scene no flow has re-entered since a load appears once it is.
 
 ### Added
 
-- `PatterSave.SaveRegistry(registry)` and `PatterSave.LoadRegistry(registry, json)`: a game's
-  registry as JSON, for a game that saves its registry once beside each engine's part.
-- **Other engines' scopes, with no setting.** A bundle now lists the other engines' game-wide scopes
-  its content names (`externalScopes`, such as `story` for a line that reads `@story.act`), and both
-  loaders read it. `OpenFlow` and `LoadGame` refuse content that names one no engine on the registry
-  has registered, before anything changes, with `this content names @story, which no engine on this
-  registry registered: give every engine the game's one registry`. Such a scope is still a scope if
-  the other engine takes it away mid-game, so a write to `@story.act` then fails naming `@story`
-  instead of landing in `@patter` as a property called `story.act`.
+- `PatterSave.SaveRegistry(registry)` and `PatterSave.LoadRegistry(registry, json)`: a game's registry as JSON, for a game that saves its registry once beside each engine's part.
+- **Other engines' scopes, with no setting.** A bundle now lists the other engines' game-wide scopes its content names (`externalScopes`, such as `story` for a line that reads `@story.act`), and both loaders read it. `OpenFlow` and `LoadGame` refuse content that names one no engine on the registry has registered, before anything changes, with `this content names @story, which no engine on this registry registered: give every engine the game's one registry`. Such a scope is still a scope if the other engine takes it away mid-game, so a write to `@story.act` then fails naming `@story` instead of landing in `@patter` as a property called `story.act`.
 
 ## [0.13.0] - 2026-09-05
 
 ### Changed
 
-- **A `writable: false` host declaration is the STORY's promise, and only the story's: the game
-  writes it.** The engine's own `SetProperty` now writes a read-only `@world` property, self-backed or bound;
-  an effect that writes one is refused exactly as before, with the same sentence. Until now every
-  caller was refused alike, so a game could not advance its own clock through the engine. Matches the
-  JS reference and the Storylet Engine (from-storylets/host-writes-to-read-only-world).
+- **A `writable: false` host declaration is the STORY's promise, and only the story's: the game writes it.** The engine's own `SetProperty` now writes a read-only `@world` property, self-backed or bound; an effect that writes one is refused exactly as before, with the same sentence. Until now every caller was refused alike, so a game could not advance its own clock through the engine. Matches the JS reference and the Storylet Engine (from-storylets/host-writes-to-read-only-world).
 
 ## [0.12.1] - 2026-09-04
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the Godot addon's: it now states the Godot version it needs (4.4 or newer, verified on 4.7), which
-  had never been stated and never been tested. Nothing in this runtime changed.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the Godot addon's: it now states the Godot version it needs (4.4 or newer, verified on 4.7), which had never been stated and never been tested. Nothing in this runtime changed.
 
 ## [0.12.0] - 2026-09-04
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the JS runtime's: `patterplay.min.js`, the browser drop-in, is now built by `@patterkit/play-helpers`
-  and carries the play helpers (save / load, state logger, inspectors, Live Link) as well as the
-  runtime on the one `Patterplay` global, so a plain web page can write the family's save text with
-  no bundler. This plugin is unchanged; a save it writes still loads there and back.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the JS runtime's: `patterplay.min.js`, the browser drop-in, is now built by `@patterkit/play-helpers` and carries the play helpers (save / load, state logger, inspectors, Live Link) as well as the runtime on the one `Patterplay` global, so a plain web page can write the family's save text with no bundler. This plugin is unchanged; a save it writes still loads there and back.
 
 ## [0.11.0] - 2026-09-03
 
 ### Fixed
 
-- **A `writable: false` host declaration is refused by the engine, bound or self-backed.** The package let a
-  bound `IHostScope`'s `Set` straight through, so the story's own promise held only for the self-backed
-  bag; now `'@world.x' is read-only` is thrown from either, as the JS runtime always has. Pinned in the
-  TestHost (from-storylets/unreal-wrapper-host-scopes).
-- **`Engine.GetProperty` / `SetProperty` resolve host-scope refs.** They knew only `@patter` and `@scene`, so
-  `engine.SetProperty("@world.x", …)` silently landed in the shared `@patter` bag as a stray and
-  `GetProperty` read back nothing. They now route through the bound or self-backed scope, as a Flow does
-  and as every other runtime's engine-level accessor does.
+- **A `writable: false` host declaration is refused by the engine, bound or self-backed.** The package let a bound `IHostScope`'s `Set` straight through, so the story's own promise held only for the self-backed bag; now `'@world.x' is read-only` is thrown from either, as the JS runtime always has. Pinned in the TestHost (from-storylets/unreal-wrapper-host-scopes).
+- **`Engine.GetProperty` / `SetProperty` resolve host-scope refs.** They knew only `@patter` and `@scene`, so `engine.SetProperty("@world.x", …)` silently landed in the shared `@patter` bag as a stray and `GetProperty` read back nothing. They now route through the bound or self-backed scope, as a Flow does and as every other runtime's engine-level accessor does.
 
 ### Changed
 
-- **Saves cross engines.** `PatterSave` now writes and reads the family's `patter/save@0` shape - the JS
-  reference's, documented in `@patterkit/model` - so a save written by a web build or by Patterpad loads
-  here, and a save written here loads in Godot or Unreal. Until now this package wrote PascalCase keys
-  (`StageBags`, `Flows`) and a one-level `Shared` off reflection, which loaded nowhere else, and a JS
-  save loaded here threw on its first nested object. The envelope is now built and read by literal key.
-  **A save written by this package before 0.11.0 still loads** and is written back in the shared shape.
-  The conformance corpus now carries a save the JS reference wrote, which this package must load, write
-  back with the same key paths, and continue (from-storylets/save-shape-across-engines).
+- **Saves cross engines.** `PatterSave` now writes and reads the family's `patter/save@0` shape - the JS reference's, documented in `@patterkit/model` - so a save written by a web build or by Patterpad loads here, and a save written here loads in Godot or Unreal. Until now this package wrote PascalCase keys (`StageBags`, `Flows`) and a one-level `Shared` off reflection, which loaded nowhere else, and a JS save loaded here threw on its first nested object. The envelope is now built and read by literal key. **A save written by this package before 0.11.0 still loads** and is written back in the shared shape. The conformance corpus now carries a save the JS reference wrote, which this package must load, write back with the same key paths, and continue (from-storylets/save-shape-across-engines).
 
 ## [0.10.0] - 2026-09-02
 
 ### Added
 
-- **`Engine.ListBags()`, `Flow.ListBags()` and `Engine.Flows()`.** What a state logger mounts;
-  parity with the JS runtime and the other ports.
+- **`Engine.ListBags()`, `Flow.ListBags()` and `Engine.Flows()`.** What a state logger mounts; parity with the JS runtime and the other ports.
 
 ### Changed
 
-- **The state logger watches the property bags instead of diffing save snapshots.** A
-  property write is logged when it LANDS, on the bag's audit hook, rather than at the next
-  capture. The visit counts live in no bag, so those are still diffed - which is all this
-  logger used to do for everything. What it buys: a diff can only report the NET change
-  between two captures, so a value that changed and changed back was invisible, and every
-  write was reported late. The core is shared with the Storylet Engine, which has always
-  worked this way.
-- **The `@patter` globals, and a flow's not-shared half, live in a property bag.** They were
-  plain maps here while the JS runtime held them in a bag; a bag is what carries the audit
-  hook the logger pushes from. **The save format is unchanged** - the same flat map, and a
-  load seeds from the declarations before laying saved values over.
-- **BREAKING: `PatterStateLogger.CreateStateLogger` returns `PatterStateLog`, not
-  `StateLogger`.** The shared kernel's class is vendored into this namespace and owns that
-  name now. The members are unchanged, and hosts almost always hold it with `var`.
+- **The state logger watches the property bags instead of diffing save snapshots.** A property write is logged when it LANDS, on the bag's audit hook, rather than at the next capture. The visit counts live in no bag, so those are still diffed - which is all this logger used to do for everything. What it buys: a diff can only report the NET change between two captures, so a value that changed and changed back was invisible, and every write was reported late. The core is shared with the Storylet Engine, which has always worked this way.
+- **The `@patter` globals, and a flow's not-shared half, live in a property bag.** They were plain maps here while the JS runtime held them in a bag; a bag is what carries the audit hook the logger pushes from. **The save format is unchanged** - the same flat map, and a load seeds from the declarations before laying saved values over.
+- **BREAKING: `PatterStateLogger.CreateStateLogger` returns `PatterStateLog`, not `StateLogger`.** The shared kernel's class is vendored into this namespace and owns that name now. The members are unchanged, and hosts almost always hold it with `var`.
 
 ### Fixed
 
-- **A declaration with an explicit `null` default seeds the type's default.** Two halves of
-  one rule disagreed: the seeding read the key directly, where `default_for` treats null and
-  absent alike, so a `number` could hold nil. Unreachable from an exported bundle; a
-  hand-written or third-party one could do it.
+- **A declaration with an explicit `null` default seeds the type's default.** Two halves of one rule disagreed: the seeding read the key directly, where `default_for` treats null and absent alike, so a `number` could hold nil. Unreachable from an exported bundle; a hand-written or third-party one could do it.
 
 ## [0.9.0] - 2026-09-02
 
 ### Changed
 
-- **BREAKING: `PropertyRow.Ref` is now `PropertyRow.Path`, and the row carries `Writable`.** The
-  shape is `@wildwinter/scoperegistry`'s property row, shared with the Storylet Engine. `Path` holds
-  exactly what `Ref` held: the reference `GetProperty` and `SetProperty` take. `Name` was already
-  there. Anything reading `row.Ref` reads `row.Path`.
-- **BREAKING: a row's address is the qualified one, `@patter.gold`, not `@gold`.** Both forms
-  have always resolved on input and still do - an unqualified name defaults to the `patter`
-  scope - so `GetProperty("@gold")` is unaffected. What changed is the address a row REPORTS,
-  which is what a state panel displays and what an inspector writes back through. It matches
-  what `@scene` and the other family's scopes have always looked like.
+- **BREAKING: `PropertyRow.Ref` is now `PropertyRow.Path`, and the row carries `Writable`.** The shape is `@wildwinter/scoperegistry`'s property row, shared with the Storylet Engine. `Path` holds exactly what `Ref` held: the reference `GetProperty` and `SetProperty` take. `Name` was already there. Anything reading `row.Ref` reads `row.Path`.
+- **BREAKING: a row's address is the qualified one, `@patter.gold`, not `@gold`.** Both forms have always resolved on input and still do - an unqualified name defaults to the `patter` scope - so `GetProperty("@gold")` is unaffected. What changed is the address a row REPORTS, which is what a state panel displays and what an inspector writes back through. It matches what `@scene` and the other family's scopes have always looked like.
 
-- **Scene and stage state is held in the shared property bag.** `@scene` properties lived in
-  hand-rolled maps that duplicated the bag's own seeding, so they missed its guards: two flows
-  entering one scene now never share a mutable flags list, and a `temporary` property's reset on
-  re-entry goes through the bag, which means a state logger sees it. **The save format is
-  unchanged** - a flat name/value map per scene, and a load that seeds from the bundle's
-  declarations before laying saved values over, so a property a save predates keeps its default.
-- **BREAKING: `PropertyView` is gone; `ListProperties()` returns `List<PropertyRow>`.** It was
-  `PropertyRow` plus a `Path`, and `Path` is on the shared row now. C# has no type alias to keep
-  the old name alive with, and an empty subclass would be a type a bag's own row could never
-  satisfy.
+- **Scene and stage state is held in the shared property bag.** `@scene` properties lived in hand-rolled maps that duplicated the bag's own seeding, so they missed its guards: two flows entering one scene now never share a mutable flags list, and a `temporary` property's reset on re-entry goes through the bag, which means a state logger sees it. **The save format is unchanged** - a flat name/value map per scene, and a load that seeds from the bundle's declarations before laying saved values over, so a property a save predates keeps its default.
+- **BREAKING: `PropertyView` is gone; `ListProperties()` returns `List<PropertyRow>`.** It was `PropertyRow` plus a `Path`, and `Path` is on the shared row now. C# has no type alias to keep the old name alive with, and an empty subclass would be a type a bag's own row could never satisfy.
 
 ### Added
 
-- **A decision log, and `OnDryChoice`.** Opening a run with `EngineOptions.Log` records what the engine
-  decided and why - each choice with the options it offered, the ones it greyed out and the
-  reason, each jump, each property write with the value it replaced. `Engine.Log()` is the whole
-  run in order, a `Flow`'s own log is flow-local, and `OnTrace` streams entries live rather than
-  retaining them. `OnDryChoice` fires when a choice runs dry - no takeable option, no eligible
-  fallback - so the silent fall-through is observable; it survives alongside the log because it is
-  live feedback, not a record.
+- **A decision log, and `OnDryChoice`.** Opening a run with `EngineOptions.Log` records what the engine decided and why - each choice with the options it offered, the ones it greyed out and the reason, each jump, each property write with the value it replaced. `Engine.Log()` is the whole run in order, a `Flow`'s own log is flow-local, and `OnTrace` streams entries live rather than retaining them. `OnDryChoice` fires when a choice runs dry - no takeable option, no eligible fallback - so the silent fall-through is observable; it survives alongside the log because it is live feedback, not a record.
 
 ### Fixed
 
-- **A quality row carries its ladder.** `stages` was on the row so an examiner could offer the
-  stages instead of a free-text box, and the code that builds rows never filled it in - on this
-  runtime and two others. Every quality row came out without one.
+- **A quality row carries its ladder.** `stages` was on the row so an examiner could offer the stages instead of a free-text box, and the code that builds rows never filled it in - on this runtime and two others. Every quality row came out without one.
 
 ## [0.8.0] - 2026-09-01
 
 ### Changed
 
-- **Flags compare as a SET.** `==` and `!=` on a flags value now ignore order, so
-  `check_flags` results and stored flag lists that hold the same members are equal
-  however they were built. They are compared as multisets, so a duplicated flag
-  still counts.
+- **Flags compare as a SET.** `==` and `!=` on a flags value now ignore order, so `check_flags` results and stored flag lists that hold the same members are equal however they were built. They are compared as multisets, so a duplicated flag still counts.
 
-  This is a behaviour change to existing content, and it is a fix rather than a
-  preference: a flags value IS a set, and its stored order was an artefact of the
-  order somebody happened to add things in. `set_flags(@f, +red)` then `+blue`
-  compared UNEQUAL to the same two flags added the other way round, a difference
-  no author can see and none intends. An expression that relied on two
-  equal-membered flag values comparing unequal will change answer.
+  This is a behaviour change to existing content, and it is a fix rather than a preference: a flags value IS a set, and its stored order was an artefact of the order somebody happened to add things in. `set_flags(@f, +red)` then `+blue` compared UNEQUAL to the same two flags added the other way round, a difference no author can see and none intends. An expression that relied on two equal-membered flag values comparing unequal will change answer.
 
 ### Fixed
 
-- **The PRNG seed is coerced the way JavaScript coerces it** (ECMA-262 ToUint32),
-  so every runtime lands on the same first draw for every seed. Seeds outside the
-  range of a 64-bit integer (`1e19`, `Infinity`) previously gave a different
-  answer here from the JS runtime.
-- **A save written before this release now loads.** The JS runtime accumulated
-  `rngState` with `| 0`, so more than half of all saves carry a NEGATIVE number
-  where the schema says uint32. Newtonsoft refused those with an
-  `OverflowException`, which meant a player could not load their own game. Saves
-  are read through the same ToUint32 as everything else now, and land on the
-  identical PRNG position. Pinned by a regression check in the corpus TestHost.
-- **Numbers render the way JavaScript's `String(n)` renders them** for values
-  above 2^63. `JsNumber` cast to `long`, so `1e20` printed as
-  `9223372036854775807`.
-- **`==` between a whole number and a float.** `3` and `3.0` compared unequal;
-  the reference has one number type, so they are the same value.
-- The PRNG seed is a `double` rather than a `long`, matching the JS API, so the
-  coercion happens once and in one place instead of at every call site.
+- **The PRNG seed is coerced the way JavaScript coerces it** (ECMA-262 ToUint32), so every runtime lands on the same first draw for every seed. Seeds outside the range of a 64-bit integer (`1e19`, `Infinity`) previously gave a different answer here from the JS runtime.
+- **A save written before this release now loads.** The JS runtime accumulated `rngState` with `| 0`, so more than half of all saves carry a NEGATIVE number where the schema says uint32. Newtonsoft refused those with an `OverflowException`, which meant a player could not load their own game. Saves are read through the same ToUint32 as everything else now, and land on the identical PRNG position. Pinned by a regression check in the corpus TestHost.
+- **Numbers render the way JavaScript's `String(n)` renders them** for values above 2^63. `JsNumber` cast to `long`, so `1e20` printed as `9223372036854775807`.
+- **`==` between a whole number and a float.** `3` and `3.0` compared unequal; the reference has one number type, so they are the same value.
+- The PRNG seed is a `double` rather than a `long`, matching the JS API, so the coercion happens once and in one place instead of at every call site.
 
 ### Changed
 
-- `PatterValue`, `PatterKind` and `Mulberry32` moved to `Runtime/Expr/`, where
-  they are generated from a single shared source also used by the Storylet
-  Engine. The types, namespace and members are unchanged; only the files moved.
+- `PatterValue`, `PatterKind` and `Mulberry32` moved to `Runtime/Expr/`, where they are generated from a single shared source also used by the Storylet Engine. The types, namespace and members are unchanged; only the files moved.
 
 
 ## [0.7.1] - 2026-08-30
 
 ### Added
 
-- **The Runtime State window says whether Patterpad is listening.** A Live Link registered with
-  `PatterDebug.RegisterLink(link)` shows its state (connecting / connected / closed), the address it
-  dials and the build it handshook. From inside a running game, "the editor is not listening" and
-  "I never attached" look identical, and only the game knows which.
+- **The Runtime State window says whether Patterpad is listening.** A Live Link registered with `PatterDebug.RegisterLink(link)` shows its state (connecting / connected / closed), the address it dials and the build it handshook. From inside a running game, "the editor is not listening" and "I never attached" look identical, and only the game knows which.
 
 ### Fixed
 
@@ -1013,183 +518,102 @@ The runtime foundations before 1.0, from the hands-on review of October 2026. Ch
 
 ### Fixed
 
-- **A flow you forgot to announce still shows up in Patterpad's debug link.** `flowOpened` was the
-  host's job and nothing could check it, so a game that opened a flow and did not announce it left
-  the editor's follow list short - and the omission outlived a reconnect, because the link's hello
-  carries that list. A flow now announces itself the first time it is observed; `flowOpened` remains
-  worth calling for a flow that exists before it says anything. Reported from the Storylet Studio
-  side, 2026-08-29. (Same fix in all four runtimes.)
+- **A flow you forgot to announce still shows up in Patterpad's debug link.** `flowOpened` was the host's job and nothing could check it, so a game that opened a flow and did not announce it left the editor's follow list short - and the omission outlived a reconnect, because the link's hello carries that list. A flow now announces itself the first time it is observed; `flowOpened` remains worth calling for a flow that exists before it says anything. Reported from the Storylet Studio side, 2026-08-29. (Same fix in all four runtimes.)
 
 ## [0.7.0] - 2026-08-29
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is
-  Unreal's: a `UPatterFlow` held across a save load pointed at freed memory, because the core rebuilt
-  its flows underneath the wrapper. The C# runtime is reference counted and never had that fault.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is Unreal's: a `UPatterFlow` held across a save load pointed at freed memory, because the core rebuilt its flows underneath the wrapper. The C# runtime is reference counted and never had that fault.
 
 ## [0.6.0] - 2026-08-25
 
 ### Added
 
-- **The `quality` property type: a story stage as an ordered ladder of named stages.** The value is a
-  stage name; ordering operators compare by ladder POSITION, `advance(@q)` steps to the next stage
-  saturating at the last, and a save carries the stage by name - so a stage inserted mid-production
-  shifts nothing. Declared with `stages` on the property; seeds at the first stage. Corpus-locked
-  across all four runtimes (gating, stepping, and the insertion story through a live hot swap).
-  The runtime state inspector edits a quality as a dropdown of its stage ladder, like an enum's
-  values.
+- **The `quality` property type: a story stage as an ordered ladder of named stages.** The value is a stage name; ordering operators compare by ladder POSITION, `advance(@q)` steps to the next stage saturating at the last, and a save carries the stage by name - so a stage inserted mid-production shifts nothing. Declared with `stages` on the property; seeds at the first stage. Corpus-locked across all four runtimes (gating, stepping, and the insertion story through a live hot swap). The runtime state inspector edits a quality as a dropdown of its stage ladder, like an enum's values.
 
 ### Fixed
 
-- **The live debug link no longer corrupts a pushed bundle at a chunk boundary.** `PatterDebugLink`
-  reads the socket in 64 KB chunks, and decoded each chunk on its own, so a multi-byte character
-  straddling a boundary became two replacement characters and could leave the pushed JSON unparseable.
-  A pushed bundle is exactly the message large enough to span chunks, so any non-ASCII text in the
-  story (a curly quote, an accented name) could hit it. The bytes are now accumulated and decoded once
-  at the end of the message. Unreal and Godot were checked and never had this: both receive a whole
-  message at a time. Reported from the Storylet Studio side.
+- **The live debug link no longer corrupts a pushed bundle at a chunk boundary.** `PatterDebugLink` reads the socket in 64 KB chunks, and decoded each chunk on its own, so a multi-byte character straddling a boundary became two replacement characters and could leave the pushed JSON unparseable. A pushed bundle is exactly the message large enough to span chunks, so any non-ASCII text in the story (a curly quote, an accented name) could hit it. The bytes are now accumulated and decoded once at the end of the message. Unreal and Godot were checked and never had this: both receive a whole message at a time. Reported from the Storylet Studio side.
 
 ## [0.5.0] - 2026-08-21
 
 ### Added
 
-- **Cast lists you can query at runtime.** Three static reads answer "who is in this?": the cast the
-  project declares, the speakers of a scene, and the speakers of one block. Scene and block refs take
-  an internal id or a gameId address. The result is the character token a line beat carries, deduped
-  and ordered by first appearance, and it is derived from the AUTHORED structure, so a speaker behind a
-  condition, inside a group, or voicing a choice prompt is included: it answers who *can* speak, not
-  who a given playthrough heard. Held across all four runtimes by the conformance corpus.
-  `engine.GetCast()`, `engine.CastForScene(sceneRef)`, `engine.CastForBlock(sceneRef, blockRef)`.
+- **Cast lists you can query at runtime.** Three static reads answer "who is in this?": the cast the project declares, the speakers of a scene, and the speakers of one block. Scene and block refs take an internal id or a gameId address. The result is the character token a line beat carries, deduped and ordered by first appearance, and it is derived from the AUTHORED structure, so a speaker behind a condition, inside a group, or voicing a choice prompt is included: it answers who *can* speak, not who a given playthrough heard. Held across all four runtimes by the conformance corpus. `engine.GetCast()`, `engine.CastForScene(sceneRef)`, `engine.CastForBlock(sceneRef, blockRef)`.
 
 ## [0.4.5] - 2026-08-20
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  Godot-only (#45); this runtime is unchanged.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is Godot-only (#45); this runtime is unchanged.
 
 ## [0.4.4] - 2026-08-20
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is
-  Godot-only (#45); this runtime is unchanged.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is Godot-only (#45); this runtime is unchanged.
 
 ## [0.4.3] - 2026-08-19
 
 ### Added
 
-- **The bundle inspector.** Select an imported `.patterc` and see what your game code may call, read
-  from the asset alone with nothing running: the project's identity and hashes, every scene and block
-  ADDRESS `runFlow` / `goto` accept, the `@world` properties the GAME must supply (with the ones
-  carrying no default marked, because those are the values a story silently reads as a type default
-  if the host forgets them), the story's own declarations, the gameData fields, and counts for "is
-  this the right build?". A source-debug build says NOT SHIPPABLE rather than leaving it to be
-  inferred from `strings: ids`.
+- **The bundle inspector.** Select an imported `.patterc` and see what your game code may call, read from the asset alone with nothing running: the project's identity and hashes, every scene and block ADDRESS `runFlow` / `goto` accept, the `@world` properties the GAME must supply (with the ones carrying no default marked, because those are the values a story silently reads as a type default if the host forgets them), the story's own declarations, the gameData fields, and counts for "is this the right build?". A source-debug build says NOT SHIPPABLE rather than leaving it to be inferred from `strings: ids`.
 
-  The summary itself is available to code as well (`BundleInfo.Describe`), so a build step or an
-  editor tool can read the   same description the panel draws.
+  The summary itself is available to code as well (`BundleInfo.Describe`), so a build step or an editor tool can read the   same description the panel draws.
 
-  The Inspector for a `PatterBundleAsset` draws it in foldouts, with the raw JSON demoted to the last
-  one and a button to copy it. Foldout state survives a domain reload.
+  The Inspector for a `PatterBundleAsset` draws it in foldouts, with the raw JSON demoted to the last one and a button to copy it. Foldout state survives a domain reload.
 
 ## [0.4.2] - 2026-08-19
 
 ### Added
 
-- **Declared host scopes (`@world`) are parsed and self-backed.** A project can DECLARE host properties
-  in its bundle (`scopeRegistry`); this port ignored them entirely, so `@world.isNight` resolved to
-  nothing, read as a graceful false, and any branch gated on it was skipped. The same bundle therefore
-  played a different story here than on the JavaScript runtime, with no error anywhere. The registry is
-  now parsed into the bundle model, a scope the embedder binds is theirs, and every other declared scope
-  gets a live bag seeded from its declaration defaults. The shared conformance corpus gates this.
+- **Declared host scopes (`@world`) are parsed and self-backed.** A project can DECLARE host properties in its bundle (`scopeRegistry`); this port ignored them entirely, so `@world.isNight` resolved to nothing, read as a graceful false, and any branch gated on it was skipped. The same bundle therefore played a different story here than on the JavaScript runtime, with no error anywhere. The registry is now parsed into the bundle model, a scope the embedder binds is theirs, and every other declared scope gets a live bag seeded from its declaration defaults. The shared conformance corpus gates this.
 
 ### Fixed
-- **Window ▸ Patterplay ▸ Runtime State now opens docked** (beside the Inspector) instead of
-  floating. A floating editor window slides behind the main Unity window the moment you click the
-  Game view - exactly when you want to be watching properties change - so a play session meant
-  constant alt-tabbing. It is still an ordinary dockable window: drag it wherever you like and Unity
-  remembers. (If you have one open from a previous version, close it before reopening; Unity restores
-  the old floating position otherwise.)
+- **Window ▸ Patterplay ▸ Runtime State now opens docked** (beside the Inspector) instead of floating. A floating editor window slides behind the main Unity window the moment you click the Game view - exactly when you want to be watching properties change - so a play session meant constant alt-tabbing. It is still an ordinary dockable window: drag it wherever you like and Unity remembers. (If you have one open from a previous version, close it before reopening; Unity restores the old floating position otherwise.)
 
 ## [0.4.0] - 2026-07-30
 
 ### Added
-- **State logger** (parity: previously JS-only). Watches the mutable runtime state - `@patter`
-  globals, per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed
-  between captures, plus a per-step trace including `gameData`. Built on the engine's save-game, so
-  what the logger sees is exactly what a save persists. Identical flattened-path and line format on
-  every runtime.
+- **State logger** (parity: previously JS-only). Watches the mutable runtime state - `@patter` globals, per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed between captures, plus a per-step trace including `gameData`. Built on the engine's save-game, so what the logger sees is exactly what a save persists. Identical flattened-path and line format on every runtime.
 
 ### Fixed
-- The download now includes the **MIT `LICENSE` file**; previously the zip shipped with no licence
-  text at all.
+- The download now includes the **MIT `LICENSE` file**; previously the zip shipped with no licence text at all.
 
 ## [0.3.1] - 2026-07-22
 
 ### Changed
-- Version bump only, to keep the four Patterplay runtimes in lockstep. This release fixes
-  Unreal-only build issues (see the Unreal changelog and #25); the Unity plugin is unchanged.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. This release fixes Unreal-only build issues (see the Unreal changelog and #25); the Unity plugin is unchanged.
 
 ## [0.3.0] - 2026-07-21
 
 ### Added
-- **Host navigation.** `Flow.Goto(scene, block)` sends a running flow to a Game ID address, behaving exactly like a jump
-  the writer could have written: the destination scene's on-entry effects run, arriving counts as a
-  visit, and the call stack is replaced. Being a game action rather than a written one it lands
-  immediately (any remaining lines of the snippet being delivered are abandoned, and a pending choice is
-  dropped), and it MOVES the cursor without resetting the flow - variation, visit counts and properties
-  all carry on. Returns false, cursor untouched, on an address that does not resolve.
-- **`Engine.RunFlow(name, scene, block)`** plays an address in one call: it opens the named flow if it does not exist, moves it if it
-  does, runs to the next stop and returns what played. Reusing the name is the point - a flow owns its
-  selector cursors, so a shuffle keeps its bag and a "once each" list keeps its place from call to call.
-  Use one name per speaker. An empty result means that address has nothing left to give.
-- **`Flow.AdvanceToStop()`** (parity): advance repeatedly, collecting every beat played, until a choice or the end.
-  Previously only the JS runtime had this.
+- **Host navigation.** `Flow.Goto(scene, block)` sends a running flow to a Game ID address, behaving exactly like a jump the writer could have written: the destination scene's on-entry effects run, arriving counts as a visit, and the call stack is replaced. Being a game action rather than a written one it lands immediately (any remaining lines of the snippet being delivered are abandoned, and a pending choice is dropped), and it MOVES the cursor without resetting the flow - variation, visit counts and properties all carry on. Returns false, cursor untouched, on an address that does not resolve.
+- **`Engine.RunFlow(name, scene, block)`** plays an address in one call: it opens the named flow if it does not exist, moves it if it does, runs to the next stop and returns what played. Reusing the name is the point - a flow owns its selector cursors, so a shuffle keeps its bag and a "once each" list keeps its place from call to call. Use one name per speaker. An empty result means that address has nothing left to give.
+- **`Flow.AdvanceToStop()`** (parity): advance repeatedly, collecting every beat played, until a choice or the end. Previously only the JS runtime had this.
 
 ### Changed
-- Dropping a flow now FINISHES it. Closing a flow, resetting the engine, or re-opening a name all leave
-  the old flow object inert, so a reference a game still holds cannot keep advancing it and quietly move
-  shared state. Re-opening a name still replaces (and so resets) that flow - use `RunFlow` when you
-  want a speaker's variation state to carry on instead.
+- Dropping a flow now FINISHES it. Closing a flow, resetting the engine, or re-opening a name all leave the old flow object inert, so a reference a game still holds cannot keep advancing it and quietly move shared state. Re-opening a name still replaces (and so resets) that flow - use `RunFlow` when you want a speaker's variation state to carry on instead.
 
 ## [0.2.2] - 2026-07-13
 
 ### Changed
-- Internal: the Best match (`specificity`) selection metric now uses the shared
-  `@wildwinter/expr-specificity` package instead of a per-engine inline copy. Behaviour is
-  unchanged and conformance-verified across all four engines.
+- Internal: the Best match (`specificity`) selection metric now uses the shared `@wildwinter/expr-specificity` package instead of a per-engine inline copy. Behaviour is unchanged and conformance-verified across all four engines.
 
 ## [0.2.0] - 2026-07-07
 
 ### Added
-- **Best match** selection (a new `sequence` order, `specificity`): among the eligible children,
-  play the one whose condition most specifically fits the current state; equally-specific ties break
-  by the seeded shuffle, and a condition-less child is the filler that wins only when nothing more
-  specific applies. Composes with the exhaust axis (re-pickable, or graceful degradation to the
-  filler). Locked by the conformance corpus, so all four runtimes agree.
+- **Best match** selection (a new `sequence` order, `specificity`): among the eligible children, play the one whose condition most specifically fits the current state; equally-specific ties break by the seeded shuffle, and a condition-less child is the filler that wins only when nothing more specific applies. Composes with the exhaust axis (re-pickable, or graceful degradation to the filler). Locked by the conformance corpus, so all four runtimes agree.
 
 ## [0.1.0] - 2026-07-04
 
 ### Added
-- The native C# Patter runtime: `Engine` + `Flow` over a compiled `.patterc` bundle - scenes,
-  blocks, run/choice/branch/sequence selectors, sticky/fallback options, call-return jumps,
-  conditions + effects, visit counts, `{@ref}` interpolation, game events, tags, gameData
-  merge-at-read, and whole-game save/load (`PatterSave`).
-- A `.patterc` ScriptedImporter: drop the file in and it becomes a `PatterBundleAsset` (with
-  a custom Inspector); `Bundle.CreateEngine()` from there.
-- Localisation: play any locale of an Embedded bundle, switch live with `SetLocale`, or ship
-  an IDs-only bundle and localise in your own system. Closed-caption cue stripping via
-  `SetClosedCaptions`.
-- Audio resolution: `PatterAudioResolver` resolves each line to its winning take from a
-  `patteraudio.json` manifest (it resolves the path; playback stays yours).
-- Live state: **Window ▸ Patterplay ▸ Runtime State** watches and edits a running engine's
-  `@patter` properties (type-aware editors + reset-to-default) and saves / loads the run.
-- Live Link: `PatterDebugLink` streams the story cursor to Patterpad and hot-reloads edited
-  bundles into the running game (`ApplyLiveBundle`: strings-only or full swap, state kept).
-- Structure introspection: `GetOutline()` / `GetBeatSequence()` expose the authored tree
-  (per-beat text, character, gameData, tags) for tooling.
-- Samples (import via Package Manager), each with a **ready-made scene** - import, open the
-  scene, press Play: **Play-through demo** (the minimal integration) and the **Tour demo**
-  (the interactive Patter tour, with optional audio resolution).
+- The native C# Patter runtime: `Engine` + `Flow` over a compiled `.patterc` bundle - scenes, blocks, run/choice/branch/sequence selectors, sticky/fallback options, call-return jumps, conditions + effects, visit counts, `{@ref}` interpolation, game events, tags, gameData merge-at-read, and whole-game save/load (`PatterSave`).
+- A `.patterc` ScriptedImporter: drop the file in and it becomes a `PatterBundleAsset` (with a custom Inspector); `Bundle.CreateEngine()` from there.
+- Localisation: play any locale of an Embedded bundle, switch live with `SetLocale`, or ship an IDs-only bundle and localise in your own system. Closed-caption cue stripping via `SetClosedCaptions`.
+- Audio resolution: `PatterAudioResolver` resolves each line to its winning take from a `patteraudio.json` manifest (it resolves the path; playback stays yours).
+- Live state: **Window ▸ Patterplay ▸ Runtime State** watches and edits a running engine's `@patter` properties (type-aware editors + reset-to-default) and saves / loads the run.
+- Live Link: `PatterDebugLink` streams the story cursor to Patterpad and hot-reloads edited bundles into the running game (`ApplyLiveBundle`: strings-only or full swap, state kept).
+- Structure introspection: `GetOutline()` / `GetBeatSequence()` expose the authored tree (per-beat text, character, gameData, tags) for tooling.
+- Samples (import via Package Manager), each with a **ready-made scene** - import, open the scene, press Play: **Play-through demo** (the minimal integration) and the **Tour demo** (the interactive Patter tour, with optional audio resolution).

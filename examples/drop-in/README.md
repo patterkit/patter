@@ -1,14 +1,10 @@
 # Patterplay drop-in (`<script>`)
 
-The smallest possible host: a compiled Patter bundle played on a plain HTML page
-by the self-contained **`patterplay.min.js`** - no bundler, no module loader, no
-dev server. This is the "Patterplay JS" drop-in distribution.
+The smallest possible host: a compiled Patter bundle played on a plain HTML page by the self-contained **`patterplay.min.js`** - no bundler, no module loader, no dev server. This is the "Patterplay JS" drop-in distribution.
 
 ## Run it
 
-**From the release zip** (this folder ships as `demos/drop-in/` inside
-`patterplay-js-<version>.zip`): just open `index.html` in a browser. Everything it needs
-sits beside it.
+**From the release zip** (this folder ships as `demos/drop-in/` inside `patterplay-js-<version>.zip`): just open `index.html` in a browser. Everything it needs sits beside it.
 
 **From the Patterkit repo**:
 
@@ -17,9 +13,7 @@ npm run build -w @patterkit/runtime   # produces packages/runtime/dist/patterpla
 node examples/drop-in/gen.mjs         # (re)generates bundle.js from the demo story
 ```
 
-Then open [`index.html`](./index.html) directly in a browser. (`gen.mjs` resolves the
-workspace packages from source via esbuild aliases, so it runs without an install step;
-from inside this folder, `npm run gen` does the same thing.)
+Then open [`index.html`](./index.html) directly in a browser. (`gen.mjs` resolves the workspace packages from source via esbuild aliases, so it runs without an install step; from inside this folder, `npm run gen` does the same thing.)
 
 ## How it works
 
@@ -34,15 +28,9 @@ from inside this folder, `npm run gen` does the same thing.)
 </script>
 ```
 
-`bundle.js` is the compiled bundle (the same artifact Patterpad's **Publish Bundle**
-writes as `<name>.patterc`) wrapped as `window.PATTER_BUNDLE`. In a real game you
-would ship the `.patterc` and `fetch()` it instead.
+`bundle.js` is the compiled bundle (the same artifact Patterpad's **Publish Bundle** writes as `<name>.patterc`) wrapped as `window.PATTER_BUNDLE`. In a real game you would ship the `.patterc` and `fetch()` it instead.
 
-Save / load use `serializeState` / `deserializeState` straight off `window.Patterplay`:
-the drop-in carries [`@patterkit/play-helpers`](../../packages/play-helpers) as well as
-the runtime (plus its property setters, state logger, Patterpad Live Link client, and
-audio resolution), so a plain page writes the family's save text with no bundler. The
-same names come from the npm package for module hosts:
+Save / load use `serializeState` / `deserializeState` straight off `window.Patterplay`: the drop-in carries [`@patterkit/play-helpers`](../../packages/play-helpers) as well as the runtime (plus its property setters, state logger, Patterpad Live Link client, and audio resolution), so a plain page writes the family's save text with no bundler. The same names come from the npm package for module hosts:
 
 ```js
 import { serializeState, deserializeState } from "@patterkit/play-helpers";

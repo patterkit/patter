@@ -1,31 +1,14 @@
 # @patterkit/runtime
 
-**Patterplay JS** - play [Patter](https://patterkit.dev/) branching
-dialogue in JavaScript or TypeScript. Load a compiled bundle (a `.patterc`, the
-artifact Patterpad's *Publish Bundle* writes) and play the dialogue: flows, selectors,
-choices, jumps, effects, properties, save/load. One of the four Patterplay runtimes
-(JS, Unity, Unreal, Godot): every runtime plays the same bundle with the same
-behaviour, and the whole set is **versioned in lockstep** (see
-[CHANGELOG.md](CHANGELOG.md)).
+**Patterplay JS** - play [Patter](https://patterkit.dev/) branching dialogue in JavaScript or TypeScript. Load a compiled bundle (a `.patterc`, the artifact Patterpad's *Publish Bundle* writes) and play the dialogue: flows, selectors, choices, jumps, effects, properties, save/load. One of the four Patterplay runtimes (JS, Unity, Unreal, Godot): every runtime plays the same bundle with the same behaviour, and the whole set is **versioned in lockstep** (see [CHANGELOG.md](CHANGELOG.md)).
 
 ## Get it
 
 Three equivalent channels - pick whichever fits how you work; **no npm is required**:
 
-- **Release zip**: `patterplay-js-<version>.zip` on every
-  [`play-js-v*` GitHub Release](https://github.com/patterkit/patter/releases) - this
-  runtime as a plain download, symmetric with the Unity / Unreal / Godot plugin zips.
-  It carries `patterplay.min.js` (the `<script>` drop-in: this runtime plus
-  `@patterkit/play-helpers` under one global), the module builds of both packages under
-  `@patterkit/runtime/dist/` and `@patterkit/play-helpers/dist/` (ESM + CJS + types, with their
-  dependencies inside them, so they need nothing installed), this README, the CHANGELOG, and two
-  `demos/` (the zero-build drop-in page and the interactive tour). The zip's builds carry their own
-  registry; to share one registry between engines, install from npm.
-- **npm**: `npm install @patterkit/runtime` (same version as the zip). `@wildwinter/scoperegistry`
-  is a peer dependency, so a game holds one registry that every engine shares; npm installs it for
-  you, and a package manager that doesn't install peers needs `npm install @wildwinter/scoperegistry`.
-- **CDN**: `patterplay.min.js` via unpkg/jsDelivr from `@patterkit/play-helpers` (the package
-  that builds it), or loose on the same Release.
+- **Release zip**: `patterplay-js-<version>.zip` on every [`play-js-v*` GitHub Release](https://github.com/patterkit/patter/releases) - this runtime as a plain download, symmetric with the Unity / Unreal / Godot plugin zips. It carries `patterplay.min.js` (the `<script>` drop-in: this runtime plus `@patterkit/play-helpers` under one global), the module builds of both packages under `@patterkit/runtime/dist/` and `@patterkit/play-helpers/dist/` (ESM + CJS + types, with their dependencies inside them, so they need nothing installed), this README, the CHANGELOG, and two `demos/` (the zero-build drop-in page and the interactive tour). The zip's builds carry their own registry; to share one registry between engines, install from npm.
+- **npm**: `npm install @patterkit/runtime` (same version as the zip). `@wildwinter/scoperegistry` is a peer dependency, so a game holds one registry that every engine shares; npm installs it for you, and a package manager that doesn't install peers needs `npm install @wildwinter/scoperegistry`.
+- **CDN**: `patterplay.min.js` via unpkg/jsDelivr from `@patterkit/play-helpers` (the package that builds it), or loose on the same Release.
 
 ## Use it (npm / bundler)
 
@@ -44,66 +27,26 @@ for (;;) {
 }
 ```
 
-An `end` step carries `reason`: `"ended"`, or `"ran-dry"` when the flow ended because a choice ran dry with
-nothing after it (its options all used, no fallback), which `onError` also hears as a `dry-choice` problem.
+An `end` step carries `reason`: `"ended"`, or `"ran-dry"` when the flow ended because a choice ran dry with nothing after it (its options all used, no fallback), which `onError` also hears as a `dry-choice` problem.
 
-A `line` step carries `id`, `text`, `character`, `characterName`, `direction`, and, when the line has a
-speaker qualifier, `qualifier` (its `gameId`, `os`) and `qualifierName` (its shown name, `O.S.`). Line and
-text steps both carry `padAfter`, the writer's pause after the beat in seconds, already resolved; a negative
-one means the next line cuts in. Line, text, and game event steps can carry `gameData` and `tags`. The
-[step shapes](https://patterkit.dev/play/engine/#step-shapes) give the full list and the timing rules a game
-should follow. For a line with no recording, `estimateLineDuration(step.spokenText, step.spokenLocale,
-step.estimateSpeed)` gives how long it lasts, in seconds: Patter's one rule, the same in every runtime and in
-Patterpad's Play window. It weighs the line's characters (a Han character 3, kana 2, a Hangul syllable 2.5, a soft
-hyphen nothing, and anything else 1) at 14 a second times the project's speed, from half a second to 18. A line is
-timed in the project's main language, the one it's spoken in, whatever language is shown, and a line with a
-recording lasts as long as the recording. Moving a mouth to a line is Patterstage's, which has its own speech
-units for it.
+A `line` step carries `id`, `text`, `character`, `characterName`, `direction`, and, when the line has a speaker qualifier, `qualifier` (its `gameId`, `os`) and `qualifierName` (its shown name, `O.S.`). Line and text steps both carry `padAfter`, the writer's pause after the beat in seconds, already resolved; a negative one means the next line cuts in. Line, text, and game event steps can carry `gameData` and `tags`. The [step shapes](https://patterkit.dev/play/engine/#step-shapes) give the full list and the timing rules a game should follow. For a line with no recording, `estimateLineDuration(step.spokenText, step.spokenLocale, step.estimateSpeed)` gives how long it lasts, in seconds: Patter's one rule, the same in every runtime and in Patterpad's Play window. It weighs the line's characters (a Han character 3, kana 2, a Hangul syllable 2.5, a soft hyphen nothing, and anything else 1) at 14 a second times the project's speed, from half a second to 18. A line is timed in the project's main language, the one it's spoken in, whatever language is shown, and a line with a recording lasts as long as the recording. Moving a mouth to a line is Patterstage's, which has its own speech units for it.
 
-`new Engine(bundle, options)` takes `{ rng?, seed?, locale?, hostScopes?, registry?, replayPromptOnChoose?, closedCaptions?, onError?, onRefit?, onDryChoice?, steer?, log? }`
-(any other key is reported to `onError` as a `setup` problem):
-- `hostScopes` binds the scopes your game owns, by token, each `{ get(name), set?(name, value) }`: for World
-  Properties, `hostScopes: { world: { get, set } }`. Leave `world` unbound and the runtime self-backs `@world`
-  from the declared defaults, as a property it saves. A token the bundle doesn't declare is reported.
-- `registry` is the game's one `ScopeRegistry` (from `@wildwinter/scoperegistry`), holding every
-  engine's properties. Omit it and the engine makes its own. See *One registry per game* below.
-- `locale` plays a non-default language (embedded localisation; an IDs-only bundle ignores it). It resolves by
-  one rule: the locale (case and `_` / `-` aside), then its language (`fr` for `fr-FR`), then the default,
-  each fallback reported.
-- A string the active locale is missing falls back to the default-locale source,
-  flagged `<Untranslated: {id}> {source}` so a partial translation is impossible to miss.
-- `steer` is for tools, such as a bake or a test, never for a shipped game. It's a steerer,
-  `{ gate?(point): boolean, pick?(point): string }`, that decides every choice the flow makes on game data and hears
-  each one as it's passed. `gate` is asked for each condition a run, a choice option, or a fallback reaches (the
-  point names the node, `where` it is, its `source`, and its `default`), and an option it answers true is offered as
-  eligible, a hidden one included. `pick` is asked once each time a branch or sequence picks, with every child's real
-  verdict and the `default` pick, and returns a child's id or `""` for none. A steerer that only listens returns
-  `point.default`, and a method left out answers the default. Steering changes no values, and with `log` on, an
-  answer that overrules the engine adds a `steered` entry. On an engine that's already made (one a game's director
-  built, say), `engine.setSteer(steerer)` sets it and `engine.setSteer(null)` clears it, from the next decision a
-  flow makes; a hot swap keeps whichever is set.
+`new Engine(bundle, options)` takes `{ rng?, seed?, locale?, hostScopes?, registry?, replayPromptOnChoose?, closedCaptions?, onError?, onRefit?, onDryChoice?, steer?, log? }` (any other key is reported to `onError` as a `setup` problem):
+- `hostScopes` binds the scopes your game owns, by token, each `{ get(name), set?(name, value) }`: for World Properties, `hostScopes: { world: { get, set } }`. Leave `world` unbound and the runtime self-backs `@world` from the declared defaults, as a property it saves. A token the bundle doesn't declare is reported.
+- `registry` is the game's one `ScopeRegistry` (from `@wildwinter/scoperegistry`), holding every engine's properties. Omit it and the engine makes its own. See *One registry per game* below.
+- `locale` plays a non-default language (embedded localisation; an IDs-only bundle ignores it). It resolves by one rule: the locale (case and `_` / `-` aside), then its language (`fr` for `fr-FR`), then the default, each fallback reported.
+- A string the active locale is missing falls back to the default-locale source, flagged `<Untranslated: {id}> {source}` so a partial translation is impossible to miss.
+- `steer` is for tools, such as a bake or a test, never for a shipped game. It's a steerer, `{ gate?(point): boolean, pick?(point): string }`, that decides every choice the flow makes on game data and hears each one as it's passed. `gate` is asked for each condition a run, a choice option, or a fallback reaches (the point names the node, `where` it is, its `source`, and its `default`), and an option it answers true is offered as eligible, a hidden one included. `pick` is asked once each time a branch or sequence picks, with every child's real verdict and the `default` pick, and returns a child's id or `""` for none. A steerer that only listens returns `point.default`, and a method left out answers the default. Steering changes no values, and with `log` on, an answer that overrules the engine adds a `steered` entry. On an engine that's already made (one a game's director built, say), `engine.setSteer(steerer)` sets it and `engine.setSteer(null)` clears it, from the next decision a flow makes; a hot swap keeps whichever is set.
 
-Switch language mid-game with **`engine.setLocale("fr")`** (`engine.locale` is the locale in use, and
-`engine.locales` the bundle's `{ default, included }`): subsequent beats, a pending choice's options,
-character names, and `{@ref}` render in the new locale while the flow's position,
-state, visit counts, and PRNG are untouched - so a game's "language" setting can change live without
-rebuilding the engine or losing the player's place.
+Switch language mid-game with **`engine.setLocale("fr")`** (`engine.locale` is the locale in use, and `engine.locales` the bundle's `{ default, included }`): subsequent beats, a pending choice's options, character names, and `{@ref}` render in the new locale while the flow's position, state, visit counts, and PRNG are untouched - so a game's "language" setting can change live without rebuilding the engine or losing the player's place.
 
-The above is the **Embedded** build (strings ship inside the `.patterc`). An **IDs-only** build ships no
-strings: `step.text` is the beat **ID**, and `step.characterName` and `step.qualifierName` are omitted, so
-your game localises the IDs in its own system, then applies `{@ref}` replacement with **`flow.interpolate(yourString)`**. See the
-[Localisation guide](https://patterkit.dev/play/localisation/) for both modes across all four runtimes.
+The above is the **Embedded** build (strings ship inside the `.patterc`). An **IDs-only** build ships no strings: `step.text` is the beat **ID**, and `step.characterName` and `step.qualifierName` are omitted, so your game localises the IDs in its own system, then applies `{@ref}` replacement with **`flow.interpolate(yourString)`**. See the [Localisation guide](https://patterkit.dev/play/localisation/) for both modes across all four runtimes.
 
-`PATTERPLAY_VERSION` is this runtime's version, as in its `package.json`. An extension that ships apart from
-Patterplay checks it at start-up with `versionInRange(PATTERPLAY_VERSION, "1.0.0", "2.0.0")` (at least the first
-version, below the second).
+`PATTERPLAY_VERSION` is this runtime's version, as in its `package.json`. An extension that ships apart from Patterplay checks it at start-up with `versionInRange(PATTERPLAY_VERSION, "1.0.0", "2.0.0")` (at least the first version, below the second).
 
 ## Drop-in (`<script>`)
 
-`patterplay.min.js` is a single self-contained, minified IIFE - every dependency
-inlined - for plain HTML pages with no bundler. It carries this runtime AND
-[`@patterkit/play-helpers`](../play-helpers) on the one `Patterplay` global, so a plain
-page can also write and read the family's save text:
+`patterplay.min.js` is a single self-contained, minified IIFE - every dependency inlined - for plain HTML pages with no bundler. It carries this runtime AND [`@patterkit/play-helpers`](../play-helpers) on the one `Patterplay` global, so a plain page can also write and read the family's save text:
 
 ```html
 <script src="https://unpkg.com/@patterkit/play-helpers/dist/patterplay.min.js"></script>
@@ -115,37 +58,24 @@ page can also write and read the family's save text:
 </script>
 ```
 
-It is built by the play-helpers package, the one that depends on both: `npm run build -w
-@patterkit/play-helpers` (emits `packages/play-helpers/dist/patterplay.min.js`).
+It is built by the play-helpers package, the one that depends on both: `npm run build -w @patterkit/play-helpers` (emits `packages/play-helpers/dist/patterplay.min.js`).
 
 ## Demos
 
-The release zip's `demos/` folder holds two working references (in the repo:
-[examples/drop-in](../../examples/drop-in) and [examples/tour-web](../../examples/tour-web)):
+The release zip's `demos/` folder holds two working references (in the repo: [examples/drop-in](../../examples/drop-in) and [examples/tour-web](../../examples/tour-web)):
 
-- **drop-in** - the smallest possible host: a plain HTML page playing a compiled bundle
-  via `patterplay.min.js`. Open `index.html` straight from the unzipped folder.
-- **tour-web** - the full interactive Patter tour in a browser (`node serve.mjs`, open
-  the page). The JS counterpart of the demos the Unity, Godot, and Unreal plugins bundle
-  (audio-less: the resolver wiring is there, playback is your call).
+- **drop-in** - the smallest possible host: a plain HTML page playing a compiled bundle via `patterplay.min.js`. Open `index.html` straight from the unzipped folder.
+- **tour-web** - the full interactive Patter tour in a browser (`node serve.mjs`, open the page). The JS counterpart of the demos the Unity, Godot, and Unreal plugins bundle (audio-less: the resolver wiring is there, playback is your call).
 
 ## Save / load
 
-`engine.saveGame()` returns a JSON-serialisable snapshot of the whole game (visit counts,
-selector cursors, every live flow, and, for an engine built without a registry, every property
-value); `engine.loadGame(blob)` restores it. Saves are version 4; version 3 saves still load, and
-version 2 saves no longer do. A save whose place has gone from an edited build resumes at the nearest
-safe point and says so to `onError`. [@patterkit/play-helpers](../play-helpers) wraps these as
-`serializeState` / `deserializeState` with a tagged envelope.
+`engine.saveGame()` returns a JSON-serialisable snapshot of the whole game (visit counts, selector cursors, every live flow, and, for an engine built without a registry, every property value); `engine.loadGame(blob)` restores it. Saves are version 4; version 3 saves still load, and version 2 saves no longer do. A save whose place has gone from an edited build resumes at the nearest safe point and says so to `onError`. [@patterkit/play-helpers](../play-helpers) wraps these as `serializeState` / `deserializeState` with a tagged envelope.
 
-To set one flow aside instead, `engine.captureFlow(id)` returns its part of a save as plain data (its
-position, PRNG, visits, selectors, and its own property values, without its id); close it after capturing,
-and `engine.restoreFlow(newId, state)` opens it again later, under any id, without rewinding shared state.
+To set one flow aside instead, `engine.captureFlow(id)` returns its part of a save as plain data (its position, PRNG, visits, selectors, and its own property values, without its id); close it after capturing, and `engine.restoreFlow(newId, state)` opens it again later, under any id, without rewinding shared state.
 
 ## One registry per game
 
-A game has one `ScopeRegistry` holding every property from every engine, except values the game
-keeps itself and lends through a resolver, and saves it once. Pass it as `registry`:
+A game has one `ScopeRegistry` holding every property from every engine, except values the game keeps itself and lends through a resolver, and saves it once. Pass it as `registry`:
 
 ```ts
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
@@ -155,5 +85,4 @@ const engine = new Engine(bundle, { registry });
 const save = { registry: registry.save(), patter: engine.saveGame() };   // saveGame() holds no values now
 ```
 
-The engine registers `@patter` under `patter` and every per-flow and per-scene bag under a key
-starting `patter/`; `@world` is the game's to register. Loading works in either order.
+The engine registers `@patter` under `patter` and every per-flow and per-scene bag under a key starting `patter/`; `@world` is the game's to register. Loading works in either order.

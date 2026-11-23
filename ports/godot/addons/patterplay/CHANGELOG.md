@@ -1,8 +1,6 @@
 # Changelog
 
-All notable changes to Patterplay for Godot are documented here. The Patterplay runtimes - JS,
-Unity, Unreal, and Godot - are versioned in lockstep: the same version number always means the
-same runtime behaviour.
+All notable changes to Patterplay for Godot are documented here. The Patterplay runtimes - JS, Unity, Unreal, and Godot - are versioned in lockstep: the same version number always means the same runtime behaviour.
 
 ## [Unreleased]
 
@@ -10,76 +8,49 @@ same runtime behaviour.
 
 ### Added
 
-- **Show a letter, a book page, or a sign in one call.** `engine.run_text(scene, block)` plays a block and gives you its text as one string,
-  a line per text beat, with values filled in and in the player's language (a `separator` argument changes what goes between them).
-  It plays on a flow of its own that's thrown away afterwards, so the same block reads the same each time and
-  nothing lands in your save. Pass a `flow_name` to reuse that flow instead, so variations move on. A text block shouldn't
-  hold dialogue or choices, so if it reaches either it stops there and reports an error and returns `null`.
+- **Show a letter, a book page, or a sign in one call.** `engine.run_text(scene, block)` plays a block and gives you its text as one string, a line per text beat, with values filled in and in the player's language (a `separator` argument changes what goes between them). It plays on a flow of its own that's thrown away afterwards, so the same block reads the same each time and nothing lands in your save. Pass a `flow_name` to reuse that flow instead, so variations move on. A text block shouldn't hold dialogue or choices, so if it reaches either it stops there and reports an error and returns `null`.
 
 ## [1.0.5] - 2026-11-21
 
 ### Added
 
-- **Set up the runner in the Inspector, with your Patter World.** Give a `PatterRunner` a Bundle and a World,
-  and it makes its own engine when it's ready, with the World bound as `@world`; it warns you if the story reads
-  `@world` and no World is set, and `attach(engine)` still works.
+- **Set up the runner in the Inspector, with your Patter World.** Give a `PatterRunner` a Bundle and a World, and it makes its own engine when it's ready, with the World bound as `@world`; it warns you if the story reads `@world` and no World is set, and `attach(engine)` still works.
 
 ### Fixed
 
-- **Unset `@world` names read their declared defaults with a World bound.** Before, a name your Patter World (or
-  your own store) hadn't set read as empty, so a story's sum on it failed; now it reads the declared default, and
-  your store isn't written.
-- **A refused write to a read-only `@world` name reaches `on_error`.** The story's write is reported as a failed
-  effect and the story plays on, as on the other runtimes; `PatterWorld.set_property` now returns why it refused,
-  and your own store's `set_property` or Dictionary `"set"` can refuse the same way.
+- **Unset `@world` names read their declared defaults with a World bound.** Before, a name your Patter World (or your own store) hadn't set read as empty, so a story's sum on it failed; now it reads the declared default, and your store isn't written.
+- **A refused write to a read-only `@world` name reaches `on_error`.** The story's write is reported as a failed effect and the story plays on, as on the other runtimes; `PatterWorld.set_property` now returns why it refused, and your own store's `set_property` or Dictionary `"set"` can refuse the same way.
 
 ## [1.0.4] - 2026-11-17
 
 ### Added
 
-- **Bind your game's `@world` with a Patter World node.** Add a `PatterWorld` to your scene, set values on it, and
-  pass it to the engine as `"host_scopes": {"world": world}`: the story's conditions read what you set, its effects
-  write back, and its `changed` signal tells you when they do. Before, `@world` took a Dictionary of two functions.
-  - `set_value`, `get_value`, `has_value`, and `names` are the game's side; names match whatever their case.
-    `set_read_only` stops the story writing a name the game keeps for itself, while your own `set_value` still
-    lands. The refused write is reported as an error and never lands.
-  - `"host_scopes"` now takes any object with a `get_property` method (and `set_property`, if the story may write)
-    in place of the Dictionary, so you can subclass `PatterWorld`, or bind a node of your own, to read your
-    game's own state. With no `set_property`, the scope is read-only.
-  - `PatterBundle.declares_world(bundle)` says whether a story reads `@world`, so a tool that makes engines can warn
-    when nothing is bound to it and the story would play from its declared defaults.
+- **Bind your game's `@world` with a Patter World node.** Add a `PatterWorld` to your scene, set values on it, and pass it to the engine as `"host_scopes": {"world": world}`: the story's conditions read what you set, its effects write back, and its `changed` signal tells you when they do. Before, `@world` took a Dictionary of two functions.
+  - `set_value`, `get_value`, `has_value`, and `names` are the game's side; names match whatever their case. `set_read_only` stops the story writing a name the game keeps for itself, while your own `set_value` still lands. The refused write is reported as an error and never lands.
+  - `"host_scopes"` now takes any object with a `get_property` method (and `set_property`, if the story may write) in place of the Dictionary, so you can subclass `PatterWorld`, or bind a node of your own, to read your game's own state. With no `set_property`, the scope is read-only.
+  - `PatterBundle.declares_world(bundle)` says whether a story reads `@world`, so a tool that makes engines can warn when nothing is bound to it and the story would play from its declared defaults.
 
 ### Fixed
 
-- **C# games that keep an `on_trace` unsubscribe quit cleanly.** Before, they crashed as they quit. 1.0.3 fixed the shared kernel,
-  but Patterplay's own code still kept GDScript lambdas in three places: the function `on_trace` hands back, the
-  state logger, and the state panel's Autoscroll checkbox. In Godot's .NET build, a game whose C# scripts held the
-  `on_trace` unsubscribe until quit aborted every time (godotengine/godot#122532). None of them keeps a lambda now.
+- **C# games that keep an `on_trace` unsubscribe quit cleanly.** Before, they crashed as they quit. 1.0.3 fixed the shared kernel, but Patterplay's own code still kept GDScript lambdas in three places: the function `on_trace` hands back, the state logger, and the state panel's Autoscroll checkbox. In Godot's .NET build, a game whose C# scripts held the `on_trace` unsubscribe until quit aborted every time (godotengine/godot#122532). None of them keeps a lambda now.
 
 ## [1.0.3] - 2026-11-15
 
 ### Fixed
 
-- **A C# game no longer crashes as it quits.** In Godot's .NET build, a game whose C# scripts kept hold of
-  something from the runtime's state layer, such as the function `subscribe` hands back, played correctly but
-  aborted on quit. The shared expression kernel no longer keeps GDScript lambdas, which Godot 4.7 can't free safely
-  once their script has gone (godotengine/godot#122532, fixed for Godot 4.8). A state logger also no longer keeps
-  itself alive through the bags it watches.
+- **A C# game no longer crashes as it quits.** In Godot's .NET build, a game whose C# scripts kept hold of something from the runtime's state layer, such as the function `subscribe` hands back, played correctly but aborted on quit. The shared expression kernel no longer keeps GDScript lambdas, which Godot 4.7 can't free safely once their script has gone (godotengine/godot#122532, fixed for Godot 4.8). A state logger also no longer keeps itself alive through the bags it watches.
 
 ## [1.0.2] - 2026-11-15
 
 ### Fixed
 
-- **An engine dropped while a checkpoint is open is now freed.** Before, letting go of an engine part way through a
-  checkpoint, without `commit` or `rollback`, kept the engine and its flows in memory until the game quit. It now goes
-  as soon as nothing else holds it, taking the checkpoint with it.
+- **An engine dropped while a checkpoint is open is now freed.** Before, letting go of an engine part way through a checkpoint, without `commit` or `rollback`, kept the engine and its flows in memory until the game quit. It now goes as soon as nothing else holds it, taking the checkpoint with it.
 
 ## [1.0.1] - 2026-11-10
 
 ### Changed
 
-- **`+` on two strings is now an error at play**, as it already was at compile. Text built from pieces can't be
-  translated, so put the value into the line's own text instead. It comes from expr 1.0.1, on every runtime.
+- **`+` on two strings is now an error at play**, as it already was at compile. Text built from pieces can't be translated, so put the value into the line's own text instead. It comes from expr 1.0.1, on every runtime.
 
 ## [1.0.0] - 2026-11-08
 
@@ -91,950 +62,477 @@ same runtime behaviour.
 
 ### Changed
 
-- The audio resolver needs no change for Ogg Vorbis takes, which Audio Folders now accept: it returns a `.ogg`
-  path as it does any other. The Tour demo now plays `.ogg` and `.mp3` takes as well as `.wav`.
+- The audio resolver needs no change for Ogg Vorbis takes, which Audio Folders now accept: it returns a `.ogg` path as it does any other. The Tour demo now plays `.ogg` and `.mp3` takes as well as `.wav`.
 
 ## [0.46.1] - 2026-11-06
 
 ### Changed
 
-- No changes in this runtime. This lockstep release ships Patterplay for Unreal's bundle import: other plugins
-  hear a `.patterc` import, and Reimport works.
+- No changes in this runtime. This lockstep release ships Patterplay for Unreal's bundle import: other plugins hear a `.patterc` import, and Reimport works.
 
 ## [0.46.0] - 2026-11-06
 
 ### Changed
 
-- **The debug link reconnects.** The debug link tries again 1 s after a close or a failed attempt, doubling to 10 s,
-  and back to 1 s once a hello goes; each new socket says hello again with the build and the open flows. One line is
-  logged when an open link is lost and one when it's back, and a link that never opened logs nothing. Frames queue
-  only while the first attempt connects. A link the editor closes with code 4000 (another game connected) stops until
-  the game switches it off and on. Restart Patterpad, or turn its Live Link on after the game has started, and Follow,
-  live edits, and Play in game come back by themselves. `close()` stops the retries.
+- **The debug link reconnects.** The debug link tries again 1 s after a close or a failed attempt, doubling to 10 s, and back to 1 s once a hello goes; each new socket says hello again with the build and the open flows. One line is logged when an open link is lost and one when it's back, and a link that never opened logs nothing. Frames queue only while the first attempt connects. A link the editor closes with code 4000 (another game connected) stops until the game switches it off and on. Restart Patterpad, or turn its Live Link on after the game has started, and Follow, live edits, and Play in game come back by themselves. `close()` stops the retries.
 
 ## [0.45.0] - 2026-11-05
 
 ### Breaking
 
-- **Speech units have moved to Patterstage.** `PatterBundle.speech_units`, `PatterBundle.count_syllables`, the
-  speech weights (`SPEECH_DIGIT_WEIGHT`, `SPEECH_KANJI_WEIGHT`, `SPEECH_PAUSE_SHORT_WEIGHT`, and
-  `SPEECH_PAUSE_LONG_WEIGHT`), the counter `PatterSpeech` (`speech.gd`), and its generated table
-  `PatterSpeechTable` (`speech_table.gd`) are gone from Patterplay. They only served a mouth, and Patterstage now carries its own copy for
-  that. Nothing else in Patter needs them.
-- **A line with no recording is timed by its weighted characters at a speed.**
-  `PatterBundle.estimate_line_duration(text, locale, speed)` weighs each character (a code point) as 1, a Han
-  character 3, kana 2, a Hangul syllable 2.5, and a soft hyphen 0 (`LINE_CHAR_WEIGHTS`), at `LINE_CHARS_PER_SECOND`
-  (14, back with this meaning: characters a second at speed 1) times `speed`, clamped to 0.5 to 18 seconds as before. `locale` is reserved and unused. A speed that isn't a
-  finite positive number is 1. A silent line's length changes with the new rule; a line with a recording still lasts
-  as long as the recording.
-- **The project's timing is a speed.** `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND` and its range are now
-  `DEFAULT_ESTIMATE_SPEED` (1), `ESTIMATE_SPEED_MIN` (0.5), and `ESTIMATE_SPEED_MAX` (2.5), the bundle's
-  `estimateSyllablesPerSecond` is now `estimateSpeed` (present only when the project sets one, higher is faster),
-  and a line or text step's `"estimateRate"` is now `"estimateSpeed"`. `"spokenText"` and `"spokenLocale"` are
-  unchanged.
-- The conformance corpus is version 17: its speech section is gone, and its duration cases are re-pinned for the
-  new rule, with Chinese, Japanese, Korean, soft hyphen, speed, and floor and ceiling cases.
+- **Speech units have moved to Patterstage.** `PatterBundle.speech_units`, `PatterBundle.count_syllables`, the speech weights (`SPEECH_DIGIT_WEIGHT`, `SPEECH_KANJI_WEIGHT`, `SPEECH_PAUSE_SHORT_WEIGHT`, and `SPEECH_PAUSE_LONG_WEIGHT`), the counter `PatterSpeech` (`speech.gd`), and its generated table `PatterSpeechTable` (`speech_table.gd`) are gone from Patterplay. They only served a mouth, and Patterstage now carries its own copy for that. Nothing else in Patter needs them.
+- **A line with no recording is timed by its weighted characters at a speed.** `PatterBundle.estimate_line_duration(text, locale, speed)` weighs each character (a code point) as 1, a Han character 3, kana 2, a Hangul syllable 2.5, and a soft hyphen 0 (`LINE_CHAR_WEIGHTS`), at `LINE_CHARS_PER_SECOND` (14, back with this meaning: characters a second at speed 1) times `speed`, clamped to 0.5 to 18 seconds as before. `locale` is reserved and unused. A speed that isn't a finite positive number is 1. A silent line's length changes with the new rule; a line with a recording still lasts as long as the recording.
+- **The project's timing is a speed.** `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND` and its range are now `DEFAULT_ESTIMATE_SPEED` (1), `ESTIMATE_SPEED_MIN` (0.5), and `ESTIMATE_SPEED_MAX` (2.5), the bundle's `estimateSyllablesPerSecond` is now `estimateSpeed` (present only when the project sets one, higher is faster), and a line or text step's `"estimateRate"` is now `"estimateSpeed"`. `"spokenText"` and `"spokenLocale"` are unchanged.
+- The conformance corpus is version 17: its speech section is gone, and its duration cases are re-pinned for the new rule, with Chinese, Japanese, Korean, soft hyphen, speed, and floor and ceiling cases.
 
 ## [0.44.0] - 2026-11-04
 
 ### Added
 
-- **A syllable's vowel.** Each `"syllable"` unit from `PatterBundle.speech_units` now has a `"vowel"` where its
-  script says one: `"a"`, `"e"`, `"i"`, `"o"`, `"u"`, or `"ə"` (a vowel that isn't one of the five), for a mouth
-  shape at the syllable's peak. It's read from Latin, Cyrillic, kana, Hangul, written Arabic short vowels, and
-  Thai, and it's absent on pauses, shut beats, and syllables whose script doesn't say. Nothing else about the
-  units has changed: their kinds, weights, offsets, and timing are the same.
+- **A syllable's vowel.** Each `"syllable"` unit from `PatterBundle.speech_units` now has a `"vowel"` where its script says one: `"a"`, `"e"`, `"i"`, `"o"`, `"u"`, or `"ə"` (a vowel that isn't one of the five), for a mouth shape at the syllable's peak. It's read from Latin, Cyrillic, kana, Hangul, written Arabic short vowels, and Thai, and it's absent on pauses, shut beats, and syllables whose script doesn't say. Nothing else about the units has changed: their kinds, weights, offsets, and timing are the same.
 
 ## [0.43.0] - 2026-11-04
 
 ### Added
 
-- **Play in game.** Patterpad can ask the running game to start a block now: a `play` message on the debug link.
-  Connect `PatterDebugLink.play_requested(request)` (`id`, `sceneId`, `blockId`, `takeOver`, `build`), start the block
-  however your game plays conversations, and answer with `reply_play(request.id, { started, reason, detail })`, at once
-  or later. `reason` is a short code (`busy`, `unknownBlock`, `staleBuild`, or your own) and Patterpad words it. With
-  nothing connected to the signal the link answers `unhandled` itself.
+- **Play in game.** Patterpad can ask the running game to start a block now: a `play` message on the debug link. Connect `PatterDebugLink.play_requested(request)` (`id`, `sceneId`, `blockId`, `takeOver`, `build`), start the block however your game plays conversations, and answer with `reply_play(request.id, { started, reason, detail })`, at once or later. `reason` is a short code (`busy`, `unknownBlock`, `staleBuild`, or your own) and Patterpad words it. With nothing connected to the signal the link answers `unhandled` itself.
 
 ### Changed
 
-- **A line with no recording can be quick.** `PatterBundle.estimate_line_duration` now clamps to 0.5 to 18 seconds, not 1.5 to 18: the
-  shortest a line lasts is a speaking time, the least a spoken word plausibly takes, not a reading time, so an
-  unvoiced "No." answered by "Yes." no longer takes three seconds. The new `PatterBundle.SUBTITLE_READING_MIN` (1.5 seconds) is the least time a
-  line's text should stay on screen to be read: if you show lines as subtitles or overhead text, keep each one up at
-  least that long after a shorter line ends, overlapping the next if you must. The line itself still ends when it's
-  said. The conformance corpus re-pins its duration cases at the floor.
-- The conformance corpus is version 15: its new `applyLiveBundle` op holds that `apply_live_bundle` picks the same tier
-  (`"text"` or `"structure"`) as the other runtimes for the same pair of bundles.
+- **A line with no recording can be quick.** `PatterBundle.estimate_line_duration` now clamps to 0.5 to 18 seconds, not 1.5 to 18: the shortest a line lasts is a speaking time, the least a spoken word plausibly takes, not a reading time, so an unvoiced "No." answered by "Yes." no longer takes three seconds. The new `PatterBundle.SUBTITLE_READING_MIN` (1.5 seconds) is the least time a line's text should stay on screen to be read: if you show lines as subtitles or overhead text, keep each one up at least that long after a shorter line ends, overlapping the next if you must. The line itself still ends when it's said. The conformance corpus re-pins its duration cases at the floor.
+- The conformance corpus is version 15: its new `applyLiveBundle` op holds that `apply_live_bundle` picks the same tier (`"text"` or `"structure"`) as the other runtimes for the same pair of bundles.
 
 ## [0.42.0] - 2026-11-03
 
 ### Added
 
-- **Which Patterplay this is.** `PatterplayVersion.CURRENT` is the runtime's version, as in its `plugin.cfg`, and
-  `PatterplayVersion.in_range(version, min, max_exclusive)` says whether a version is at least `min` and below
-  `max_exclusive`, by semantic-version order (a prerelease before its release, build metadata ignored, and anything
-  that isn't a version out of range). An extension that ships apart from Patterplay, such as Patterstage or
-  Pattershot, checks the Patterplay it's running on at start-up:
-  `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "0.41.0", "0.42.0")`. JS, Unity, and Unreal have the same
-  pair. `npm run bump:play` writes the version. The conformance corpus is version 14, with the section `versions`.
+- **Which Patterplay this is.** `PatterplayVersion.CURRENT` is the runtime's version, as in its `plugin.cfg`, and `PatterplayVersion.in_range(version, min, max_exclusive)` says whether a version is at least `min` and below `max_exclusive`, by semantic-version order (a prerelease before its release, build metadata ignored, and anything that isn't a version out of range). An extension that ships apart from Patterplay, such as Patterstage or Pattershot, checks the Patterplay it's running on at start-up: `PatterplayVersion.in_range(PatterplayVersion.CURRENT, "0.41.0", "0.42.0")`. JS, Unity, and Unreal have the same pair. `npm run bump:play` writes the version. The conformance corpus is version 14, with the section `versions`.
 
 ## [0.41.0] - 2026-11-02
 
 ### Added
 
-- **Steering an engine that's already made.** `engine.set_steer(steerer)` sets the steerer on a live engine, as the
-  `steer` option does when it's made, and `set_steer(null)` clears it. It takes effect from the next decision a flow
-  makes, and `hot_swap` keeps whichever is set. Something that isn't a steerer is reported (`"setup"`) and leaves the
-  engine unsteered. For tools whose engine a game's director has already built, in place of reaching into the
-  engine's internals. The conformance corpus is version 13.
+- **Steering an engine that's already made.** `engine.set_steer(steerer)` sets the steerer on a live engine, as the `steer` option does when it's made, and `set_steer(null)` clears it. It takes effect from the next decision a flow makes, and `hot_swap` keeps whichever is set. Something that isn't a steerer is reported (`"setup"`) and leaves the engine unsteered. For tools whose engine a game's director has already built, in place of reaching into the engine's internals. The conformance corpus is version 13.
 
 ## [0.40.0] - 2026-11-01
 
 ### Added
 
-- **Steering, for tools.** The engine option `steer` takes an Object with `gate(point)` and `pick(point)` methods,
-  for a bake or a test that has to reach content whatever the game's data says. `gate` decides each condition a
-  run, a choice option, or a fallback reaches, and `pick` decides each branch and sequence pick, and each hears
-  every point as it's passed, with its default. A method the Object doesn't have answers the default. An option
-  steered true is offered as eligible, and a hidden one is offered. Steering changes no values, and the log's new
-  `steered` entry says when an answer overruled the engine. An answer that isn't one is refused as `choose()`
-  refuses an unknown option, through `flow.last_error()`. Never for a shipped game. The conformance corpus is
-  version 12, with the section `steers`.
+- **Steering, for tools.** The engine option `steer` takes an Object with `gate(point)` and `pick(point)` methods, for a bake or a test that has to reach content whatever the game's data says. `gate` decides each condition a run, a choice option, or a fallback reaches, and `pick` decides each branch and sequence pick, and each hears every point as it's passed, with its default. A method the Object doesn't have answers the default. An option steered true is offered as eligible, and a hidden one is offered. Steering changes no values, and the log's new `steered` entry says when an answer overruled the engine. An answer that isn't one is refused as `choose()` refuses an unknown option, through `flow.last_error()`. Never for a shipped game. The conformance corpus is version 12, with the section `steers`.
 
 ## [0.39.0] - 2026-10-31
 
 ### Added
 
-- **Speech units and syllable counting.** `PatterBundle.speech_units(text, locale)` breaks a line into the units
-  it would be spoken in: its syllables, its beats with the mouth shut (Japanese っ), and its pauses at
-  punctuation, each `{"kind", "weight", "start", "end"}` with code-point offsets, to lay over a line's length for
-  a lip flap. `PatterBundle.count_syllables(text, locale)` gives the syllables alone. They count Latin, Cyrillic,
-  Han, kana, Hangul, Arabic, Thai, and other scripts from one generated table (`PatterSpeechTable`) that every
-  runtime carries. The weights are `SPEECH_DIGIT_WEIGHT`, `SPEECH_KANJI_WEIGHT`, `SPEECH_PAUSE_SHORT_WEIGHT`, and
-  `SPEECH_PAUSE_LONG_WEIGHT`.
-- **How a line is spoken, on every line and text step.** `"spokenText"` is the line in the project's main
-  language whatever language is shown (interpolated, caption cues always left out, empty for the caption
-  character's lines), `"spokenLocale"` that language (both absent in an IDs-only build), and `"estimateRate"` the
-  project's syllables a second, from the bundle's `estimateSyllablesPerSecond` (4 when it sets none). A replayed
-  prompt carries them too, and so do the steps `PatterRunner`'s signals hand over.
+- **Speech units and syllable counting.** `PatterBundle.speech_units(text, locale)` breaks a line into the units it would be spoken in: its syllables, its beats with the mouth shut (Japanese っ), and its pauses at punctuation, each `{"kind", "weight", "start", "end"}` with code-point offsets, to lay over a line's length for a lip flap. `PatterBundle.count_syllables(text, locale)` gives the syllables alone. They count Latin, Cyrillic, Han, kana, Hangul, Arabic, Thai, and other scripts from one generated table (`PatterSpeechTable`) that every runtime carries. The weights are `SPEECH_DIGIT_WEIGHT`, `SPEECH_KANJI_WEIGHT`, `SPEECH_PAUSE_SHORT_WEIGHT`, and `SPEECH_PAUSE_LONG_WEIGHT`.
+- **How a line is spoken, on every line and text step.** `"spokenText"` is the line in the project's main language whatever language is shown (interpolated, caption cues always left out, empty for the caption character's lines), `"spokenLocale"` that language (both absent in an IDs-only build), and `"estimateRate"` the project's syllables a second, from the bundle's `estimateSyllablesPerSecond` (4 when it sets none). A replayed prompt carries them too, and so do the steps `PatterRunner`'s signals hand over.
 
 ### Changed
 
-- **`estimate_line_duration(text, locale, syllables_per_second)` times a line by its speech units.** It's the
-  total weight of the line's syllables and pauses at the rate (default `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND`, 4;
-  a rate that isn't a positive number is the default), clamped to 1.5 to 18 seconds, instead of its characters
-  at 14 a second. Pass a step's `spokenText`, `spokenLocale`, and `estimateRate`. `LINE_CHARS_PER_SECOND` is gone;
-  `ESTIMATE_SYLLABLES_PER_SECOND_MIN` and `_MAX` (2 and 10) are the range a project's rate is kept within. A
-  line with a recording still lasts as long as the recording. The conformance corpus is version 11.
+- **`estimate_line_duration(text, locale, syllables_per_second)` times a line by its speech units.** It's the total weight of the line's syllables and pauses at the rate (default `DEFAULT_ESTIMATE_SYLLABLES_PER_SECOND`, 4; a rate that isn't a positive number is the default), clamped to 1.5 to 18 seconds, instead of its characters at 14 a second. Pass a step's `spokenText`, `spokenLocale`, and `estimateRate`. `LINE_CHARS_PER_SECOND` is gone; `ESTIMATE_SYLLABLES_PER_SECOND_MIN` and `_MAX` (2 and 10) are the range a project's rate is kept within. A line with a recording still lasts as long as the recording. The conformance corpus is version 11.
 
 ## [0.38.0] - 2026-10-30
 
 ### Changed
 
-- Nothing to change here: Godot reports why a flow ended as a string (`"ended"` or `"ran-dry"`), so the other
-  runtimes' rename of their `EndReason` type to `FlowEndReason` leaves it as it is.
+- Nothing to change here: Godot reports why a flow ended as a string (`"ended"` or `"ran-dry"`), so the other runtimes' rename of their `EndReason` type to `FlowEndReason` leaves it as it is.
 
 ## [0.37.0] - 2026-10-30
 
 ### Added
 
-- **A choice that runs dry and ends the flow is reported.** A choice with no option left to take and no
-  eligible fallback still gathers and never stops the story. When the flow then ends with nothing delivered
-  since, `on_error` gets it once, with kind `"dry-choice"`, `node` the choice group, and `flow` the flow. An
-  `END` reached straight after it still counts. Asking `advance()` again gives the same end without a second
-  report. A dry choice that play carries on past stays silent. `on_dry_choice` is unchanged.
-- **Every `"end"` step has a `"reason"`.** It's `"ran-dry"` when the flow ended that way, else `"ended"`
-  (the end of a block, an `END`, the host's `goto("END")`, or a closed flow). A save's flow cursor carries
-  `ranDry` (the group) only when it's set, so a loaded flow ends the same way without reporting it again.
-  `goto` to a scene, `reset`, and a checkpoint's rollback put it back as they do the rest of the cursor. The
-  conformance corpus is version 10.
+- **A choice that runs dry and ends the flow is reported.** A choice with no option left to take and no eligible fallback still gathers and never stops the story. When the flow then ends with nothing delivered since, `on_error` gets it once, with kind `"dry-choice"`, `node` the choice group, and `flow` the flow. An `END` reached straight after it still counts. Asking `advance()` again gives the same end without a second report. A dry choice that play carries on past stays silent. `on_dry_choice` is unchanged.
+- **Every `"end"` step has a `"reason"`.** It's `"ran-dry"` when the flow ended that way, else `"ended"` (the end of a block, an `END`, the host's `goto("END")`, or a closed flow). A save's flow cursor carries `ranDry` (the group) only when it's set, so a loaded flow ends the same way without reporting it again. `goto` to a scene, `reset`, and a checkpoint's rollback put it back as they do the rest of the cursor. The conformance corpus is version 10.
 
 ### Changed
 
-- **`PatterRunner`'s `ended` signal carries the reason: `signal ended(reason: String)`.** It's the end
-  step's `"reason"`, `"ran-dry"` when a choice had nothing left to offer and nothing came after it, else
-  `"ended"`, as the runner does in all four runtimes. The signal now has one argument, so a handler
-  connected to it takes one too: `func _on_ended(reason: String)`, or `func(_reason): close()`. The Tour
-  demo's handler does.
+- **`PatterRunner`'s `ended` signal carries the reason: `signal ended(reason: String)`.** It's the end step's `"reason"`, `"ran-dry"` when a choice had nothing left to offer and nothing came after it, else `"ended"`, as the runner does in all four runtimes. The signal now has one argument, so a handler connected to it takes one too: `func _on_ended(reason: String)`, or `func(_reason): close()`. The Tour demo's handler does.
 
 ## [0.36.0] - 2026-10-29
 
 ### Added
 
-- **How long a line with no recording lasts.** `PatterBundle.estimate_line_duration(text, locale)` gives it in
-  seconds: the line's characters at 14 a second, clamped to 1.5 to 18 seconds, a character outside the Basic
-  Multilingual Plane counted once and soft hyphens (U+00AD) not counted. It's Patter's one rule, the same in all
-  four runtimes, in Patterpad's Play window, and in the playable HTML page. The locale is reserved for
-  per-language reading rates and changes nothing yet. Its numbers are `LINE_CHARS_PER_SECOND`,
-  `LINE_DURATION_MIN`, and `LINE_DURATION_MAX`. The conformance corpus is version 9, whose `durations` section
-  holds every runtime to it.
+- **How long a line with no recording lasts.** `PatterBundle.estimate_line_duration(text, locale)` gives it in seconds: the line's characters at 14 a second, clamped to 1.5 to 18 seconds, a character outside the Basic Multilingual Plane counted once and soft hyphens (U+00AD) not counted. It's Patter's one rule, the same in all four runtimes, in Patterpad's Play window, and in the playable HTML page. The locale is reserved for per-language reading rates and changes nothing yet. Its numbers are `LINE_CHARS_PER_SECOND`, `LINE_DURATION_MIN`, and `LINE_DURATION_MAX`. The conformance corpus is version 9, whose `durations` section holds every runtime to it.
 
 ## [0.35.0] - 2026-10-29
 
-The runtime foundations before 1.0, from the hands-on review of October 2026, as the JS reference has them.
-Changes marked **Breaking (1.0)** change what an existing game sees. Pinned by the conformance corpus
-(version 8).
+The runtime foundations before 1.0, from the hands-on review of October 2026, as the JS reference has them. Changes marked **Breaking (1.0)** change what an existing game sees. Pinned by the conformance corpus (version 8).
 
 ### Added
 
-- **The project's start scene.** `open_flow(id)` with no scene, and `flow.reset()` with none, start at the
-  bundle's `start`, at its block when it names one. A bundle without one starts at the first scene, as before.
-- **Set-up problems and moved saves are reported** to `on_error` and the decision log (a `diagnostic` entry),
-  as a content error is. The kind `"setup"` (with `flow` `""`) covers an option key the engine doesn't take
-  (the options are an untyped Dictionary, so a mistyped key used to be ignored in silence; the retired
-  `"world"` says how to bind the scope now), a locale the bundle doesn't have, and a `host_scopes` token the
-  bundle doesn't declare, naming the declared spelling when only the case differs. Those found while the
-  engine is built are reported as the constructor ends, in that order. The kind `"save"` covers a load
-  whose place has gone from the build. With no `on_error`, each is `push_warning`'d.
+- **The project's start scene.** `open_flow(id)` with no scene, and `flow.reset()` with none, start at the bundle's `start`, at its block when it names one. A bundle without one starts at the first scene, as before.
+- **Set-up problems and moved saves are reported** to `on_error` and the decision log (a `diagnostic` entry), as a content error is. The kind `"setup"` (with `flow` `""`) covers an option key the engine doesn't take (the options are an untyped Dictionary, so a mistyped key used to be ignored in silence; the retired `"world"` says how to bind the scope now), a locale the bundle doesn't have, and a `host_scopes` token the bundle doesn't declare, naming the declared spelling when only the case differs. Those found while the engine is built are reported as the constructor ends, in that order. The kind `"save"` covers a load whose place has gone from the build. With no `on_error`, each is `push_warning`'d.
 - **`engine.locales()`**: the bundle's `{"default", "included"}`, a fresh copy each call.
-- **One rule for a locale**, used by the `locale` option, `set_locale`, `replace_strings`, and `hot_swap`:
-  case and `_` / `-` don't matter, so the locale itself wins, then its language (`fr` for `fr-FR`), then the
-  default, whose text keeps the `<Untranslated: id>` marker. Anything but an exact match is reported. `fr`
-  never looks for `fr-FR`. An IDs-only bundle takes the locale as given, unreported.
-- **`flow.last_error()`**: why the last `advance()` or `choose()` was refused (also `push_error`'d), or `""`.
-  Set on a refusal (a flow that hasn't started, no choice pending, an unknown or greyed option, a jump to
-  nowhere, a jump cycle that never settles) and cleared by the next of those calls that succeeds. A refused
-  `advance()` returns `{"type": "end"}`, as before.
-- **A save loaded into an edited build resumes at the nearest safe point**, reported as `"save"` only when
-  its place has really gone: a gone snippet is skipped; a gone next beat ends its snippet there (its onExit
-  and jump run), so nothing plays twice; a gone option offers its choice again; a pending choice none of
-  whose options survive is offered again with what its group has now, or play carries on after it.
-- **`PatterRunner`, the thin runner**: the flow API turned from pull to push, for straightforward games. A
-  `Node` that plays one flow (`attach(engine, flow_id)`), emitting `line`, `text`, `game_event`, and
-  `choice` signals for each beat and `ended` at the end; the game calls `next()` when it's ready and
-  `choose(id)` for a choice. `begin(scene, block)` opens the flow, or moves it there once open; `stop()`
-  drops any `next()` a handler asked for; `rebind(engine)` plays on after a hot swap. Handlers may call
-  `next()` themselves without deepening the stack. It dictates no UI and no audio, and keeps no save state.
-  A refusal is `push_error`'d and kept for `runner.last_error()`, as `flow.choose()` keeps its. A fuller
-  dialogue manager for more complex games, Patterstage, is coming. The Tour demo now plays through it.
+- **One rule for a locale**, used by the `locale` option, `set_locale`, `replace_strings`, and `hot_swap`: case and `_` / `-` don't matter, so the locale itself wins, then its language (`fr` for `fr-FR`), then the default, whose text keeps the `<Untranslated: id>` marker. Anything but an exact match is reported. `fr` never looks for `fr-FR`. An IDs-only bundle takes the locale as given, unreported.
+- **`flow.last_error()`**: why the last `advance()` or `choose()` was refused (also `push_error`'d), or `""`. Set on a refusal (a flow that hasn't started, no choice pending, an unknown or greyed option, a jump to nowhere, a jump cycle that never settles) and cleared by the next of those calls that succeeds. A refused `advance()` returns `{"type": "end"}`, as before.
+- **A save loaded into an edited build resumes at the nearest safe point**, reported as `"save"` only when its place has really gone: a gone snippet is skipped; a gone next beat ends its snippet there (its onExit and jump run), so nothing plays twice; a gone option offers its choice again; a pending choice none of whose options survive is offered again with what its group has now, or play carries on after it.
+- **`PatterRunner`, the thin runner**: the flow API turned from pull to push, for straightforward games. A `Node` that plays one flow (`attach(engine, flow_id)`), emitting `line`, `text`, `game_event`, and `choice` signals for each beat and `ended` at the end; the game calls `next()` when it's ready and `choose(id)` for a choice. `begin(scene, block)` opens the flow, or moves it there once open; `stop()` drops any `next()` a handler asked for; `rebind(engine)` plays on after a hot swap. Handlers may call `next()` themselves without deepening the stack. It dictates no UI and no audio, and keeps no save state. A refusal is `push_error`'d and kept for `runner.last_error()`, as `flow.choose()` keeps its. A fuller dialogue manager for more complex games, Patterstage, is coming. The Tour demo now plays through it.
 
 ### Changed
 
-- **Breaking (1.0): `set_property` refuses a value that doesn't fit its declaration**, on the engine and on a
-  flow, and a name the content doesn't declare (in `@patter`, `@scene`, or a host scope the bundle
-  declares), changing nothing. It now **returns** the refusal, or `""` when the value was written, and
-  `push_error`s it, as the Storylet Engine's does: `"@patter.gold" takes a number; "lots" doesn't fit`. An
-  enum whose own default is `""` takes `""` back; a scope that declares no names takes anything.
-- **Breaking (1.0): a pending choice follows the language and the values.** Its options' prompts are built
-  each time the choice is delivered (`advance()`, `get_choices()`), so `set_locale` reaches a choice already
-  on screen and a save loads in the loading engine's language. The replayed prompt
-  (`replay_prompt_on_choose`) is the documented exception: it's spoken exactly as the choice showed it.
-- **Breaking (1.0): `engine.locale()` is the locale in use**, the one the rule resolved to, rather than the
-  string asked for.
-- **Breaking (1.0): what the engine hands out is the game's own copy.** Tag lists (on steps, from
-  `tags_for_beat`, `tags_for_scene`, `tags_for_block`, and in the outline) and the outline's beat gameData are
-  copies now, as step, option, scene, and block gameData already were. Extension values are not copied:
-  they're the bundle's own, read-only by contract.
-- **Breaking (1.0): saves are version 4.** A pending choice keeps its options' ids, eligibility, and gameData,
-  not their prompts; the cursor names the next beat by `beatId` instead of `beatIndex`; and a frame inside a
-  choice's option carries the choice's `choiceId`. Version 3 saves still load (their prompt text is
-  discarded). `capture_flow` writes version 4, and `restore_flow` reads 3 and 4.
+- **Breaking (1.0): `set_property` refuses a value that doesn't fit its declaration**, on the engine and on a flow, and a name the content doesn't declare (in `@patter`, `@scene`, or a host scope the bundle declares), changing nothing. It now **returns** the refusal, or `""` when the value was written, and `push_error`s it, as the Storylet Engine's does: `"@patter.gold" takes a number; "lots" doesn't fit`. An enum whose own default is `""` takes `""` back; a scope that declares no names takes anything.
+- **Breaking (1.0): a pending choice follows the language and the values.** Its options' prompts are built each time the choice is delivered (`advance()`, `get_choices()`), so `set_locale` reaches a choice already on screen and a save loads in the loading engine's language. The replayed prompt (`replay_prompt_on_choose`) is the documented exception: it's spoken exactly as the choice showed it.
+- **Breaking (1.0): `engine.locale()` is the locale in use**, the one the rule resolved to, rather than the string asked for.
+- **Breaking (1.0): what the engine hands out is the game's own copy.** Tag lists (on steps, from `tags_for_beat`, `tags_for_scene`, `tags_for_block`, and in the outline) and the outline's beat gameData are copies now, as step, option, scene, and block gameData already were. Extension values are not copied: they're the bundle's own, read-only by contract.
+- **Breaking (1.0): saves are version 4.** A pending choice keeps its options' ids, eligibility, and gameData, not their prompts; the cursor names the next beat by `beatId` instead of `beatIndex`; and a frame inside a choice's option carries the choice's `choiceId`. Version 3 saves still load (their prompt text is discarded). `capture_flow` writes version 4, and `restore_flow` reads 3 and 4.
 - The Tour demo's bundle is compiled again, so it carries the project's start scene.
 
 ### Removed
 
-- **Breaking (1.0): version 2 saves, and the snake_case shape this addon wrote before 0.11.0, no longer
-  load.** Load one with a 0.x release and save it again to bring it forward.
-- **Breaking (1.0): the deprecated API.** `flow.start()` (use `flow.reset()`), `PatterDebugLink.status()` (use
-  `state()`, `build()`, and `url()`), `PatterBundle.game_data_fields_for` (use `game_data_fields`), and the
-  `PatterAudio` class (use `PatterAudioResolver`).
+- **Breaking (1.0): version 2 saves, and the snake_case shape this addon wrote before 0.11.0, no longer load.** Load one with a 0.x release and save it again to bring it forward.
+- **Breaking (1.0): the deprecated API.** `flow.start()` (use `flow.reset()`), `PatterDebugLink.status()` (use `state()`, `build()`, and `url()`), `PatterBundle.game_data_fields_for` (use `game_data_fields`), and the `PatterAudio` class (use `PatterAudioResolver`).
 
 ### Fixed
 
-- **A saved "" loads as saved on an enum whose default is "".** A host scope's enum declared with default ""
-  (none chosen) had a saved "" reported as drifted when it loaded. It now loads as saved; any other enum still
-  puts a saved "" back to its default. (The shared expression kernel, fixed in every runtime.)
-- **A refused hot swap reports set-up once, and a start block the bundle doesn't have is passed over.** When
-  `hot_swap`'s load is refused, the engine it falls back on no longer repeats the replacement's set-up reports. A
-  hand-edited bundle whose `start` names a block its scene doesn't have now starts at that scene's first block,
-  rather than refusing the flow.
-- **An exported game can `load()` its `.patterc` as a `PatterBundleResource`.** The export plugin put the raw
-  bundle back but left out what `load("res://x.patterc")` needs at runtime, so the imported resource, and any
-  scene holding it, worked in the editor and was missing from an exported build. A build now carries both: the
-  raw file for `FileAccess`, and a small stand-in resource that reads it, so the bundle still ships once. (The
-  shared export plugin, fixed for both Godot addons.)
+- **A saved "" loads as saved on an enum whose default is "".** A host scope's enum declared with default "" (none chosen) had a saved "" reported as drifted when it loaded. It now loads as saved; any other enum still puts a saved "" back to its default. (The shared expression kernel, fixed in every runtime.)
+- **A refused hot swap reports set-up once, and a start block the bundle doesn't have is passed over.** When `hot_swap`'s load is refused, the engine it falls back on no longer repeats the replacement's set-up reports. A hand-edited bundle whose `start` names a block its scene doesn't have now starts at that scene's first block, rather than refusing the flow.
+- **An exported game can `load()` its `.patterc` as a `PatterBundleResource`.** The export plugin put the raw bundle back but left out what `load("res://x.patterc")` needs at runtime, so the imported resource, and any scene holding it, worked in the editor and was missing from an exported build. A build now carries both: the raw file for `FileAccess`, and a small stand-in resource that reads it, so the bundle still ships once. (The shared export plugin, fixed for both Godot addons.)
 
 ## [0.34.0] - 2026-10-21
 
 ### Removed
 
-- `PatterBundle.extension_settings(bundle, extension)`: extension settings named the gameData field a claim
-  presented, and claims and settings are gone from the extensions spec. A bundle an older compiler wrote still
-  loads, its settings ignored. Pinned by the corpus (version 7).
+- `PatterBundle.extension_settings(bundle, extension)`: extension settings named the gameData field a claim presented, and claims and settings are gone from the extensions spec. A bundle an older compiler wrote still loads, its settings ignored. Pinned by the corpus (version 7).
 
 ## [0.33.0] - 2026-10-19
 
 ### Added
 
-- `engine.extensions_for_snippet(snippet_id)` reads a snippet's own Patter extension values, beside the scene and block
-  accessors: raw and sparse, a fresh copy, empty when the snippet has none, the id is unknown, or it names a
-  node that isn't a snippet. A snippet is named by its id, as a beat sequence or a step names it.
+- `engine.extensions_for_snippet(snippet_id)` reads a snippet's own Patter extension values, beside the scene and block accessors: raw and sparse, a fresh copy, empty when the snippet has none, the id is unknown, or it names a node that isn't a snippet. A snippet is named by its id, as a beat sequence or a step names it.
 
 ## [0.32.0] - 2026-10-19
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the JS runtime's: it exports `resolveSceneRef`, the one rule for a scene reference (the address first,
-  then the internal id), which this runtime already resolves by. Nothing in this runtime changed.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the JS runtime's: it exports `resolveSceneRef`, the one rule for a scene reference (the address first, then the internal id), which this runtime already resolves by. Nothing in this runtime changed.
 
 ## [0.31.0] - 2026-10-19
 
 ### Added
 
-- **Action text**: a `"text"` step carries `"action": true` when the beat is action, a direction for whoever
-  stages the scene, never shown to the player. The compiler marks a dialogue scene's text this way when the
-  project doesn't localise it, and puts the source text in every locale. The key is absent on shown text,
-  and a replayed prompt is never action. Pinned by the corpus (version 5).
+- **Action text**: a `"text"` step carries `"action": true` when the beat is action, a direction for whoever stages the scene, never shown to the player. The compiler marks a dialogue scene's text this way when the project doesn't localise it, and puts the source text in every locale. The key is absent on shown text, and a replayed prompt is never action. Pinned by the corpus (version 5).
 
 ## [0.30.0] - 2026-10-18
 
 ### Added
 
-- **An extension's settings**: a bundle now carries each Patter extension's settings, every one its manifest
-  declares, with the project's value or else the setting's default. `PatterBundle.extension_settings(bundle,
-  extension)` reads them as a fresh Dictionary by setting name, so a game can tell which gameData field holds
-  what the extension claims. It's `{}` for an extension the bundle doesn't have or one that declares no
-  settings. Pinned by the corpus (version 4).
+- **An extension's settings**: a bundle now carries each Patter extension's settings, every one its manifest declares, with the project's value or else the setting's default. `PatterBundle.extension_settings(bundle, extension)` reads them as a fresh Dictionary by setting name, so a game can tell which gameData field holds what the extension claims. It's `{}` for an extension the bundle doesn't have or one that declares no settings. Pinned by the corpus (version 4).
 
 ## [0.29.0] - 2026-10-18
 
 ### Added
 
-- **A choice's options have game-data fields of their own**: `option` is a node kind, so a project declares
-  fields for options as for any other node, and the game-data helpers given `"option"` resolves the gameData an option
-  arrives with. Pinned by the corpus.
-- **Patter extension values**: a bundle can carry the values a Patter extension gives each node, and the
-  runtime hands them over where it hands over gameData: `extensions` on a `"line"`, `"text"` and
-  `"gameEvent"` step, a prompt spoken back, a choice's option, and each beat, block and scene of
-  `get_outline()` and `get_beat_sequence()`, by extension id, raw as the bundle wrote them (any JSON: records,
-  maps and lists as well as the seven field types). `engine.extensions_for_scene(scene_ref)` and
-  `engine.extensions_for_block(scene_ref, block_ref)` read a scene's and a block's own.
-  `PatterBundle.extension_decls(bundle, extension, kind)` gives an extension's declarations for a node kind,
-  every default resolved, so `PatterBundle.effective_game_data(PatterBundle.extension_decls(...),
-  step["extensions"].get(id))` fills in what a node leaves out, and `PatterBundle.extensions_of(bundle, kind,
-  address)` reads any node's values: the project, a scene, a block, a snippet, an option or a beat. A saved
-  pending choice doesn't carry them: they're read off the bundle as it loads. Bundles without extensions are
-  unchanged. Pinned by the corpus (version 3).
+- **A choice's options have game-data fields of their own**: `option` is a node kind, so a project declares fields for options as for any other node, and the game-data helpers given `"option"` resolves the gameData an option arrives with. Pinned by the corpus.
+- **Patter extension values**: a bundle can carry the values a Patter extension gives each node, and the runtime hands them over where it hands over gameData: `extensions` on a `"line"`, `"text"` and `"gameEvent"` step, a prompt spoken back, a choice's option, and each beat, block and scene of `get_outline()` and `get_beat_sequence()`, by extension id, raw as the bundle wrote them (any JSON: records, maps and lists as well as the seven field types). `engine.extensions_for_scene(scene_ref)` and `engine.extensions_for_block(scene_ref, block_ref)` read a scene's and a block's own. `PatterBundle.extension_decls(bundle, extension, kind)` gives an extension's declarations for a node kind, every default resolved, so `PatterBundle.effective_game_data(PatterBundle.extension_decls(...), step["extensions"].get(id))` fills in what a node leaves out, and `PatterBundle.extensions_of(bundle, kind, address)` reads any node's values: the project, a scene, a block, a snippet, an option or a beat. A saved pending choice doesn't carry them: they're read off the bundle as it loads. Bundles without extensions are unchanged. Pinned by the corpus (version 3).
 
 
 ## [0.28.0] - 2026-10-18
 
 ### Added
 
-- **Drifted saves are put back, and said.** A saved value its declaration no longer takes (a stage, an
-  enum value or a flag deleted since the save, or a value of another type) goes back to its default as
-  the save loads, instead of reaching the first gate that orders it. Each is reported: `"on_refit"` in the options, a `Callable` taking an Array of `{scope, name, value}`; unset, each is `push_warning`ed. A hot
-  swap onto a game's shared registry refits this engine's values too, as does a hot swap that falls
-  back on a fresh engine. An engine reports only its own scopes' values; the rest of a shared
-  registry's stay for their owners. Every load refits, through the
-  kernel's refitting registry load.
-- **Game data takes flags and quality**, the family's field types: a game-data field's declaration
-  carries `stages` for a quality, and the stage helpers (`PatterExpr.compare_stages(field, a, b)` and its two siblings) take the field Dictionary.
+- **Drifted saves are put back, and said.** A saved value its declaration no longer takes (a stage, an enum value or a flag deleted since the save, or a value of another type) goes back to its default as the save loads, instead of reaching the first gate that orders it. Each is reported: `"on_refit"` in the options, a `Callable` taking an Array of `{scope, name, value}`; unset, each is `push_warning`ed. A hot swap onto a game's shared registry refits this engine's values too, as does a hot swap that falls back on a fresh engine. An engine reports only its own scopes' values; the rest of a shared registry's stay for their owners. Every load refits, through the kernel's refitting registry load.
+- **Game data takes flags and quality**, the family's field types: a game-data field's declaration carries `stages` for a quality, and the stage helpers (`PatterExpr.compare_stages(field, a, b)` and its two siblings) take the field Dictionary.
 
-- Kernel `k1a333a0e`, vendored from `@wildwinter/expr`: the value check, the type defaults (`text` and
-  `multiline` seed `""`) and the refitting load, in every port. The kernel id changes, so the Storylet
-  Engine must ship the same kernel in the same release round.
+- Kernel `k1a333a0e`, vendored from `@wildwinter/expr`: the value check, the type defaults (`text` and `multiline` seed `""`) and the refitting load, in every port. The kernel id changes, so the Storylet Engine must ship the same kernel in the same release round.
 - The test runner refuses a corpus op it does not know, as the C# and C++ hosts do, rather than passing it.
 
 ## [0.27.0] - 2026-10-17
 
 ### Added
 
-- **A quality's stages from game code.** A game holding a quality's value can put it in the story's order
-  without keeping a copy of the ladder: `engine.stage_index(ref, value)`, `engine.compare_stages(ref, a, b)`
-  and `engine.next_stage(ref, value)`, and the same on a flow, which also reaches `@scene`; a refusal is an
-  `EvalError`. They give a stage's position (-1 when the value isn't a stage), how two stages compare (-1, 0
-  or 1, as a condition compares them), and the stage after one, staying on the top rung as `advance()` does.
+- **A quality's stages from game code.** A game holding a quality's value can put it in the story's order without keeping a copy of the ladder: `engine.stage_index(ref, value)`, `engine.compare_stages(ref, a, b)` and `engine.next_stage(ref, value)`, and the same on a flow, which also reaches `@scene`; a refusal is an `EvalError`. They give a stage's position (-1 when the value isn't a stage), how two stages compare (-1, 0 or 1, as a condition compares them), and the stage after one, staying on the top rung as `advance()` does.
 
 ### Changed
 
-- **The shared expression kernel is `k88b76cef`** (from `@wildwinter/expr` 0.5.2), the one the Storylet Engine
-  uses from its next release.
+- **The shared expression kernel is `k88b76cef`** (from `@wildwinter/expr` 0.5.2), the one the Storylet Engine uses from its next release.
 
 ## [0.26.1] - 2026-10-17
 
 ### Changed
 
-- Nothing changes in this plugin. It's released with the other Patterplay runtimes, whose 0.26.1 raises the JS
-  runtime's dependency floors and fixes the Unreal save reader's handling of an escaped emoji.
+- Nothing changes in this plugin. It's released with the other Patterplay runtimes, whose 0.26.1 raises the JS runtime's dependency floors and fixes the Unreal save reader's handling of an escaped emoji.
 
 ## [0.26.0] - 2026-10-14
 
 ### Added
 
-- **`flow.step_for(beat_id)`: the step a flow would deliver for a beat right now.** It's what `advance()`
-  gives for that beat, built by the same function: the text in the active locale, interpolated against the
-  flow's values (unless the project is voiced), closed captions applied, and the speaker's names and label,
-  its pause, Game Data, and tags. It doesn't move the flow, count a visit, or run an effect, and it returns
-  `null` for an id that's neither a beat nor an option's prompt. For a game that keeps lines by id and shows
-  them again, after a load or a language switch. Held across all four runtimes by the conformance corpus.
+- **`flow.step_for(beat_id)`: the step a flow would deliver for a beat right now.** It's what `advance()` gives for that beat, built by the same function: the text in the active locale, interpolated against the flow's values (unless the project is voiced), closed captions applied, and the speaker's names and label, its pause, Game Data, and tags. It doesn't move the flow, count a visit, or run an effect, and it returns `null` for an id that's neither a beat nor an option's prompt. For a game that keeps lines by id and shows them again, after a load or a language switch. Held across all four runtimes by the conformance corpus.
 
 ## [0.25.0] - 2026-10-14
 
 ### Added
 
-- **Speaker labels: a line step carries `speakerLabel`, the name to show for its speaker.** A game can
-  show it alone instead of putting `characterName` and `qualifierName` together, which no single word order
-  or punctuation suits in every language. With a qualifier it is the character's own label for that pair
-  when the project gives one (the `speaker:<NAME>:<qualifier>` string, then the label the bundle carries),
-  else the project's speaker pattern (the `speaker:pattern` string, then the bundle's `speakerPattern`, then
-  `{name} ({qualifier})`) filled with the shown name and the qualifier's shown name; with none, it is the
-  shown name (the token when the cast gives none). Each piece follows the active locale, then the default
-  locale, then the authored value, and a `speaker:` string counts only for a pair the project overrides.
-  Absent with no speaker, on a line closed captions silence, and in an IDs-only build. A line prompt on a
-  choice option, a replayed prompt, a saved choice, and `get_outline` / `get_beat_sequence` (in the source
-  language) carry it too; a save from before it existed works it out again on load, in the current locale.
-  `characterName` and `qualifierName` are unchanged. The demos show the label. Held across all four
-  runtimes by the conformance corpus.
+- **Speaker labels: a line step carries `speakerLabel`, the name to show for its speaker.** A game can show it alone instead of putting `characterName` and `qualifierName` together, which no single word order or punctuation suits in every language. With a qualifier it is the character's own label for that pair when the project gives one (the `speaker:<NAME>:<qualifier>` string, then the label the bundle carries), else the project's speaker pattern (the `speaker:pattern` string, then the bundle's `speakerPattern`, then `{name} ({qualifier})`) filled with the shown name and the qualifier's shown name; with none, it is the shown name (the token when the cast gives none). Each piece follows the active locale, then the default locale, then the authored value, and a `speaker:` string counts only for a pair the project overrides. Absent with no speaker, on a line closed captions silence, and in an IDs-only build. A line prompt on a choice option, a replayed prompt, a saved choice, and `get_outline` / `get_beat_sequence` (in the source language) carry it too; a save from before it existed works it out again on load, in the current locale. `characterName` and `qualifierName` are unchanged. The demos show the label. Held across all four runtimes by the conformance corpus.
 
 ## [0.24.0] - 2026-10-11
 
 ### Added
 
-- **Take a flow out as data and put it back: `capture_flow` and `restore_flow`.** `engine.capture_flow(id)`
-  returns the flow's state as a plain Dictionary: its snapshot as `save_game` writes it (cursor, PRNG, visits,
-  and selectors), a `version`, and its own property values in the sections a version 2 save carried per flow
-  (`scopes.patter` and `sceneBags`), without its id. Values still waiting for a scene the flow hasn't
-  re-entered come too. `engine.restore_flow(id, state)` opens a flow from it, under the same id or another,
-  as `load_game` restores each flow: against an edited bundle it re-finds its place by id. Shared state
-  (shared properties, shared visit counts and selectors) isn't in it, so a restore rewinds nothing else.
-  Anything a load left waiting under the id belonged to a flow that has gone, and is dropped, as when a flow
-  starts. Capturing only reads, so it is allowed inside a checkpoint; restoring is refused there, over an id
-  that is open, for a version a save couldn't have, and for a state with no cursor, returning null with
-  `push_error` and changing nothing. Capture before `close_flow`, which drops the flow's values. Held across
-  all four runtimes by the conformance corpus.
+- **Take a flow out as data and put it back: `capture_flow` and `restore_flow`.** `engine.capture_flow(id)` returns the flow's state as a plain Dictionary: its snapshot as `save_game` writes it (cursor, PRNG, visits, and selectors), a `version`, and its own property values in the sections a version 2 save carried per flow (`scopes.patter` and `sceneBags`), without its id. Values still waiting for a scene the flow hasn't re-entered come too. `engine.restore_flow(id, state)` opens a flow from it, under the same id or another, as `load_game` restores each flow: against an edited bundle it re-finds its place by id. Shared state (shared properties, shared visit counts and selectors) isn't in it, so a restore rewinds nothing else. Anything a load left waiting under the id belonged to a flow that has gone, and is dropped, as when a flow starts. Capturing only reads, so it is allowed inside a checkpoint; restoring is refused there, over an id that is open, for a version a save couldn't have, and for a state with no cursor, returning null with `push_error` and changing nothing. Capture before `close_flow`, which drops the flow's values. Held across all four runtimes by the conformance corpus.
 
 ## [0.23.0] - 2026-10-10
 
 ### Added
 
-- **Line padding: a line or text step carries `padAfter`, the pause after it in seconds.** Positive waits,
-  zero follows at once, and negative starts the next line that long before this one ends (a cut-in). The
-  value is resolved for you: the beat's own `padAfter`, else the nearest `padAfterDefault` above it (its
-  snippet, then each group, innermost first, then its block, then its scene), else the project's, else the
-  built-in 0.6. Only a snippet's last line or text beat is never negative (a negative value there is
-  clamped to zero, since what follows the seam isn't certain); a negative pause before a game event stands,
-  and the event starts as the line ends. An option's spoken prompt resolves through its option and is never
-  clamped. A replayed prompt and a line silenced by closed captions carry it too; a game event carries none.
-  Each choice option's `prompt` carries its pause as `padAfter` too, for a game that voices the prompts
-  itself, and a saved choice keeps it (a save from before it existed works it out again on load).
-  `get_outline` and `get_beat_sequence` give each line and text beat its resolved `padAfter`, and
-  `ownPadAfter` when the beat sets its own. Older bundles load unchanged, every line at 0.6. Held across
-  all four runtimes by the conformance corpus.
+- **Line padding: a line or text step carries `padAfter`, the pause after it in seconds.** Positive waits, zero follows at once, and negative starts the next line that long before this one ends (a cut-in). The value is resolved for you: the beat's own `padAfter`, else the nearest `padAfterDefault` above it (its snippet, then each group, innermost first, then its block, then its scene), else the project's, else the built-in 0.6. Only a snippet's last line or text beat is never negative (a negative value there is clamped to zero, since what follows the seam isn't certain); a negative pause before a game event stands, and the event starts as the line ends. An option's spoken prompt resolves through its option and is never clamped. A replayed prompt and a line silenced by closed captions carry it too; a game event carries none. Each choice option's `prompt` carries its pause as `padAfter` too, for a game that voices the prompts itself, and a saved choice keeps it (a save from before it existed works it out again on load). `get_outline` and `get_beat_sequence` give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the beat sets its own. Older bundles load unchanged, every line at 0.6. Held across all four runtimes by the conformance corpus.
 
 ## [0.22.0] - 2026-10-10
 
 ### Added
 
-- **Speaker qualifiers: a line step carries `qualifier` and `qualifierName`.** A line can say how it is
-  delivered (`TAM (O.S.)`, `PLAYER (V.O.)`, `GUARD (RADIO)`) without changing who says it. `qualifier` is
-  the qualifier's `gameId` (`"os"`), what a game switches on; `qualifierName` is its shown name, resolved
-  as `characterName` is (the `qualifier:<gameId>` string in the active locale, then the default locale,
-  then the name the bundle carries) and left out in an IDs-only build. Both are absent when the line has
-  no qualifier, and dropped with the speaker when closed captions silence a line. A line prompt on a
-  choice option, a replayed prompt, a saved choice, and `get_outline` / `get_beat_sequence` carry them
-  too. Older bundles and saves load unchanged. The demos show the qualifier after the speaker's name.
-  Held across all four runtimes by the conformance corpus.
+- **Speaker qualifiers: a line step carries `qualifier` and `qualifierName`.** A line can say how it is delivered (`TAM (O.S.)`, `PLAYER (V.O.)`, `GUARD (RADIO)`) without changing who says it. `qualifier` is the qualifier's `gameId` (`"os"`), what a game switches on; `qualifierName` is its shown name, resolved as `characterName` is (the `qualifier:<gameId>` string in the active locale, then the default locale, then the name the bundle carries) and left out in an IDs-only build. Both are absent when the line has no qualifier, and dropped with the speaker when closed captions silence a line. A line prompt on a choice option, a replayed prompt, a saved choice, and `get_outline` / `get_beat_sequence` carry them too. Older bundles and saves load unchanged. The demos show the qualifier after the speaker's name. Held across all four runtimes by the conformance corpus.
 
 ## [0.21.0] - 2026-10-07
 
 ### Changed
 
-- **The conformance corpus covers more, and every runtime is held to it**: the outline and beat sequence, the
-  audio resolver's joins, `listProperties`, what a checkpoint refuses while it is open, a save taken inside one,
-  and a block named under another scene.
+- **The conformance corpus covers more, and every runtime is held to it**: the outline and beat sequence, the audio resolver's joins, `listProperties`, what a checkpoint refuses while it is open, a save taken inside one, and a block named under another scene.
 
 ### Removed
 
-- **Two unused helpers on `PatterBundle`**: `split_ref`, superseded by `split_ref_with`, and
-  `host_scope_default`.
+- **Two unused helpers on `PatterBundle`**: `split_ref`, superseded by `split_ref_with`, and `host_scope_default`.
 
 ### Fixed
 
-- **`list_properties` rows carry `values` and `stages` only where the declaration has them**, as every other
-  runtime's rows do. Every row carried both, empty when undeclared; read them with `.get()`.
-- **`get_outline` leaves out a scene's or block's `gameId` when it comes out empty**, as every other runtime
-  does, rather than giving an empty string.
+- **`list_properties` rows carry `values` and `stages` only where the declaration has them**, as every other runtime's rows do. Every row carried both, empty when undeclared; read them with `.get()`.
+- **`get_outline` leaves out a scene's or block's `gameId` when it comes out empty**, as every other runtime does, rather than giving an empty string.
 
 ## [0.20.0] - 2026-10-06
 
 ### Added
 
-- **`PatterFlow.reset()`**, as the other three runtimes have: it forgets the flow's own state and anything
-  waiting to be delivered, and begins again at a scene (the first authored scene by default). A new corpus op,
-  `resetFlow`, holds all four to it.
+- **`PatterFlow.reset()`**, as the other three runtimes have: it forgets the flow's own state and anything waiting to be delivered, and begins again at a scene (the first authored scene by default). A new corpus op, `resetFlow`, holds all four to it.
 - **`PatterBundle.game_data_value`**, as the other runtimes have: one gameData field with its default applied.
-- **`engine.on_trace(handler)`**, as the JS runtime has: each decision as it happens, with the flow it happened
-  in, whether the log is on or off. It returns its own unsubscribe. An earlier entry here described `on_trace`
-  before it existed.
-- **`PatterDebugLink.state()`, `build()`, and `url()`**, the names every other runtime uses for what the link is
-  doing.
-- **`get_visit_counts()` on `PatterEngine` and `PatterFlow`**, as on every runtime: visit counts read without a
-  save.
+- **`engine.on_trace(handler)`**, as the JS runtime has: each decision as it happens, with the flow it happened in, whether the log is on or off. It returns its own unsubscribe. An earlier entry here described `on_trace` before it existed.
+- **`PatterDebugLink.state()`, `build()`, and `url()`**, the names every other runtime uses for what the link is doing.
+- **`get_visit_counts()` on `PatterEngine` and `PatterFlow`**, as on every runtime: visit counts read without a save.
 
 ### Changed
 
-- **The engine and its flows share a typed host rather than a dictionary.** Its fields are named after the JS
-  runtime's, so a change there ports across line for line, and each one has a type, which the busiest paths now
-  use. Nothing a game sees changes.
-- **`PatterDescribe.describe_bundle` uses the same keys as every other runtime** (`structureHash`,
-  `defaultLocale`, `sourceDebug`, `gameId`, `hostScopes`, `gameData`, `hasDefault`, and `gameEvents`), as every
-  other result Dictionary in the addon already did, and carries a gameData field's `purpose`. Code that read the
-  snake_case keys needs the new ones.
-- **The corpus now holds the decision log to the same entries on every runtime.** Godot's already matched the JS
-  runtime's entry for entry; the check makes sure it stays that way.
-- **Absent is null, as on every other runtime.** `PatterAudioResolver.resolve` for a beat with no recording,
-  `scene_address` and `block_address` for an unknown id, and a flow's `current_scene()` before it enters a scene
-  now return null, not `""`. Code that compared them with `""` should compare with null;
-  `PatterDebugLink.observe` takes either.
+- **The engine and its flows share a typed host rather than a dictionary.** Its fields are named after the JS runtime's, so a change there ports across line for line, and each one has a type, which the busiest paths now use. Nothing a game sees changes.
+- **`PatterDescribe.describe_bundle` uses the same keys as every other runtime** (`structureHash`, `defaultLocale`, `sourceDebug`, `gameId`, `hostScopes`, `gameData`, `hasDefault`, and `gameEvents`), as every other result Dictionary in the addon already did, and carries a gameData field's `purpose`. Code that read the snake_case keys needs the new ones.
+- **The corpus now holds the decision log to the same entries on every runtime.** Godot's already matched the JS runtime's entry for entry; the check makes sure it stays that way.
+- **Absent is null, as on every other runtime.** `PatterAudioResolver.resolve` for a beat with no recording, `scene_address` and `block_address` for an unknown id, and a flow's `current_scene()` before it enters a scene now return null, not `""`. Code that compared them with `""` should compare with null; `PatterDebugLink.observe` takes either.
 - **`apply_live_bundle`'s result carries the `bundle` now playing**, as every other runtime's does.
-- **Less work per step.** A decision's log entry is built only while the log is on or something is tracing; a
-  quality's stage ladder is looked up once rather than scanned for on every comparison; and the state logger
-  reads visit counts directly rather than saving the whole game.
+- **Less work per step.** A decision's log entry is built only while the log is on or something is tracing; a quality's stage ladder is looked up once rather than scanned for on every comparison; and the state logger reads visit counts directly rather than saving the whole game.
 
 ### Deprecated
 
-- **`PatterFlow.start()` is deprecated: use `PatterFlow.reset()`.** They were the same call under two names.
-  `PatterFlow.reset()` is the one public name for beginning a flow again on every runtime (opening a flow begins
-  a new one); `PatterFlow.start()` goes in a later release.
-- **Names that differed from every other runtime's now match them; the old names still work, and go in a later
-  release.** `PatterBundle.game_data_fields` (was `game_data_fields_for`) and `PatterAudioResolver` (was
-  `PatterAudio`).
+- **`PatterFlow.start()` is deprecated: use `PatterFlow.reset()`.** They were the same call under two names. `PatterFlow.reset()` is the one public name for beginning a flow again on every runtime (opening a flow begins a new one); `PatterFlow.start()` goes in a later release.
+- **Names that differed from every other runtime's now match them; the old names still work, and go in a later release.** `PatterBundle.game_data_fields` (was `game_data_fields_for`) and `PatterAudioResolver` (was `PatterAudio`).
 - **`PatterDebugLink.status()`: use `state()`, `build()`, and `url()`.** It goes in a later release.
 
 ### Fixed
 
-- **A restart (`start`) no longer replays a prompt from the run it abandoned.** With prompt replay on,
-  `choose()` leaves the chosen option's prompt waiting for the next `advance()`. A restart (`start`) in between
-  cleared only the choice, so the old prompt played as the restarted run's first beat. Every move that leaves
-  the flow's place (a restart, `goto`, `close`) now drops both, through one helper.
-- **The audio resolver keeps a base path that is a root.** It trimmed every trailing slash before adding its
-  own, so a base of `"user://"` or `"res://"` lost its root and a take resolved to `user:/take.wav`. A base that
-  ends in a slash is now joined as it stands.
+- **A restart (`start`) no longer replays a prompt from the run it abandoned.** With prompt replay on, `choose()` leaves the chosen option's prompt waiting for the next `advance()`. A restart (`start`) in between cleared only the choice, so the old prompt played as the restarted run's first beat. Every move that leaves the flow's place (a restart, `goto`, `close`) now drops both, through one helper.
+- **The audio resolver keeps a base path that is a root.** It trimmed every trailing slash before adding its own, so a base of `"user://"` or `"res://"` lost its root and a take resolved to `user:/take.wav`. A base that ends in a slash is now joined as it stands.
 - **`list_properties` reports each property's name as declared**, as every other runtime does, not lower-cased.
-- **`describe_bundle` leaves out a field that isn't set**, as every other runtime's description does: a gameData
-  field's `values` when it has none, a property's `default` when it has none, and the bundle's `version`,
-  `hash`, or `structureHash` when it carries none. The conformance corpus now holds every runtime's description
-  to the same fields.
+- **`describe_bundle` leaves out a field that isn't set**, as every other runtime's description does: a gameData field's `values` when it has none, a property's `default` when it has none, and the bundle's `version`, `hash`, or `structureHash` when it carries none. The conformance corpus now holds every runtime's description to the same fields.
 
 ## [0.19.0] - 2026-10-06
 
 ### Added
 
-- **Content errors are reported through a new `on_error` engine option.** Content can fail at run time in ways the
-  compiler cannot see: a division by zero, a host value of the wrong type, a story write to a read-only `@world`
-  value. The story already played through each one; now it says so. `on_error` is a Callable that receives
-  `{"flow", "kind", "node", "source", "message"}`, where `kind` is `"condition"`, `"effect"`, or `"best-match"`,
-  `node` is the snippet, group, or option whose condition failed (or the snippet or scene owning the effect), and
-  `source` is the expression's text when the bundle carries it. Left unset, each error is a `push_warning`, so a
-  content bug is never silent. With `{"log": true}`, each is also a `diagnostic` entry in the decision log
-  (`kind`, `node`, `source`, `message`), which the state panel shows under its own filter. The same rule holds on
-  all four runtimes.
+- **Content errors are reported through a new `on_error` engine option.** Content can fail at run time in ways the compiler cannot see: a division by zero, a host value of the wrong type, a story write to a read-only `@world` value. The story already played through each one; now it says so. `on_error` is a Callable that receives `{"flow", "kind", "node", "source", "message"}`, where `kind` is `"condition"`, `"effect"`, or `"best-match"`, `node` is the snippet, group, or option whose condition failed (or the snippet or scene owning the effect), and `source` is the expression's text when the bundle carries it. Left unset, each error is a `push_warning`, so a content bug is never silent. With `{"log": true}`, each is also a `diagnostic` entry in the decision log (`kind`, `node`, `source`, `message`), which the state panel shows under its own filter. The same rule holds on all four runtimes.
 
 ### Changed
 
-- **An effect that fails is skipped, with no `write` entry, and the rest of its list still runs.** A story write
-  to a read-only `@world` value now counts as a failed effect too, reported like the others. The log used to
-  record a `write` for an effect that never landed.
-- **A shuffle draws only from bag members that are still eligible.** The bag is filled from the children eligible
-  on the first visit; a child whose condition has since gone false used to be drawn, and the group then played
-  nothing. If none of the bag is eligible, the pass is over, exactly as when the bag is empty. While every bag
-  member is still eligible, a seeded shuffle draws exactly as before.
-- **One address rule for `open_flow`, `goto`, and every lookup by address.** A scene resolves by its gameId first,
-  then by its internal id; `open_flow` used to try the internal id first, so it and `goto` could land in different
-  scenes. A block resolves within its scene only, by that scene's block gameId and then by the internal id of a
-  block in that scene. `tags_for_block`, `game_data_for_block`, and `cast_for_block` follow the same rule.
-- **An option's prompt beat carries tags, like any beat.** Its own tags plus the option group's, outermost first
-  and deduplicated. A replayed prompt (`replay_prompt_on_choose`) and the outline's prompt used to carry none.
-- **A choice whose every remaining option is greyed out runs dry.** It used to be offered with nothing the player
-  could take. It now behaves as a choice with no options: an eligible fallback follows if there is one, otherwise
-  `on_dry_choice` fires and the flow moves on.
-- **`load_game` checks a save before changing anything.** A save whose `flows` is missing or not an object is
-  refused with `malformed save: no flows` and leaves the engine untouched. It used to close every flow and load
-  the registry first, leaving the engine half-loaded. The version must be exactly 2 or 3.
+- **An effect that fails is skipped, with no `write` entry, and the rest of its list still runs.** A story write to a read-only `@world` value now counts as a failed effect too, reported like the others. The log used to record a `write` for an effect that never landed.
+- **A shuffle draws only from bag members that are still eligible.** The bag is filled from the children eligible on the first visit; a child whose condition has since gone false used to be drawn, and the group then played nothing. If none of the bag is eligible, the pass is over, exactly as when the bag is empty. While every bag member is still eligible, a seeded shuffle draws exactly as before.
+- **One address rule for `open_flow`, `goto`, and every lookup by address.** A scene resolves by its gameId first, then by its internal id; `open_flow` used to try the internal id first, so it and `goto` could land in different scenes. A block resolves within its scene only, by that scene's block gameId and then by the internal id of a block in that scene. `tags_for_block`, `game_data_for_block`, and `cast_for_block` follow the same rule.
+- **An option's prompt beat carries tags, like any beat.** Its own tags plus the option group's, outermost first and deduplicated. A replayed prompt (`replay_prompt_on_choose`) and the outline's prompt used to carry none.
+- **A choice whose every remaining option is greyed out runs dry.** It used to be offered with nothing the player could take. It now behaves as a choice with no options: an eligible fallback follows if there is one, otherwise `on_dry_choice` fires and the flow moves on.
+- **`load_game` checks a save before changing anything.** A save whose `flows` is missing or not an object is refused with `malformed save: no flows` and leaves the engine untouched. It used to close every flow and load the registry first, leaving the engine half-loaded. The version must be exactly 2 or 3.
 
 ### Removed
 
-- **A bare snapshot with no `patter/save@0` envelope no longer loads.** `PatterSave.load_state` and
-  `deserialize_state` used to accept a bare version 2 snapshot, from before the envelope existed. They now refuse
-  it, as every other runtime does. A version 2 save inside the envelope still loads.
+- **A bare snapshot with no `patter/save@0` envelope no longer loads.** `PatterSave.load_state` and `deserialize_state` used to accept a bare version 2 snapshot, from before the envelope existed. They now refuse it, as every other runtime does. A version 2 save inside the envelope still loads.
 
 ### Fixed
 
-- **Expression kernel `k492cf234`:** a listener's own error is no longer reported as a read-only refusal, every
-  listener registered when a write starts hears it exactly once (a listener whose object was freed is dropped),
-  and the hot path allocates less, with no leaks.
-- **A greyed-out choice option can no longer be chosen.** `choose()` accepted an option whose condition was
-  false, played its content and used it up. It now reports `choice option is not eligible` and leaves the choice
-  open, as the other three runtimes do.
-- **A rollback after a load keeps a scene's saved `@scene` values.** After a load, a scene the flow is not
-  standing in keeps its saved values waiting until the flow enters it. Entering it inside a checkpoint and then
-  rolling back used to drop those values, so the next real entry found the defaults and the next save left them
-  out. A new corpus case pins this on all four runtimes.
-- **The decision log's `seq` keeps counting after a clear.** The engine's log numbered entries by its length, so
-  after `clear_log()` the numbers started again at 0 and entries read either side of the clear could not be put
-  in order.
-- **The state panel's decision log updates as the game plays.** It was redrawn only when the panel rebuilt,
-  which playing a flow never causes, so new decisions did not appear.
+- **Expression kernel `k492cf234`:** a listener's own error is no longer reported as a read-only refusal, every listener registered when a write starts hears it exactly once (a listener whose object was freed is dropped), and the hot path allocates less, with no leaks.
+- **A greyed-out choice option can no longer be chosen.** `choose()` accepted an option whose condition was false, played its content and used it up. It now reports `choice option is not eligible` and leaves the choice open, as the other three runtimes do.
+- **A rollback after a load keeps a scene's saved `@scene` values.** After a load, a scene the flow is not standing in keeps its saved values waiting until the flow enters it. Entering it inside a checkpoint and then rolling back used to drop those values, so the next real entry found the defaults and the next save left them out. A new corpus case pins this on all four runtimes.
+- **The decision log's `seq` keeps counting after a clear.** The engine's log numbered entries by its length, so after `clear_log()` the numbers started again at 0 and entries read either side of the clear could not be put in order.
+- **The state panel's decision log updates as the game plays.** It was redrawn only when the panel rebuilt, which playing a flow never causes, so new decisions did not appear.
 
 ## [0.18.0] - 2026-10-05
 
 ### Changed
 
-- **The `replay_prompt_on_choose` engine option speaks back only an authored prompt, and exactly what the choice showed.** A game that
-  turns the option on will see the difference, which is why this is a minor release rather than a patch:
-  - An option whose prompt the choice borrowed from its own first content line (a bare-snippet option,
-    or an Option group with no prompt of its own) is no longer spoken back. That line used to play twice
-    in a row, once as the replay and once as content. It now plays once.
-  - The replayed prompt carries the text, `character`, `characterName`, and `direction` the choice
-    displayed, instead of resolving the prompt again when it is delivered. So if choosing runs effects
-    first (an Option group that picks a snippet runs its onEnter at once), or the language changes
-    between `choose()` and the next `advance()`, the replay still says what the player saw. In a voiced
-    project a replayed line prompt is now interpolated, as the choice showed it.
-  - A save taken between `choose()` and the next `advance()` carries that prompt as shown, in a new
-    optional `pendingPrompt` on the flow's cursor, so the replay after a load is the same. Every
-    Patterplay runtime writes and reads it. A save from an earlier version, without it, still loads and
-    resolves the prompt when it is delivered, as before.
+- **The `replay_prompt_on_choose` engine option speaks back only an authored prompt, and exactly what the choice showed.** A game that turns the option on will see the difference, which is why this is a minor release rather than a patch:
+  - An option whose prompt the choice borrowed from its own first content line (a bare-snippet option, or an Option group with no prompt of its own) is no longer spoken back. That line used to play twice in a row, once as the replay and once as content. It now plays once.
+  - The replayed prompt carries the text, `character`, `characterName`, and `direction` the choice displayed, instead of resolving the prompt again when it is delivered. So if choosing runs effects first (an Option group that picks a snippet runs its onEnter at once), or the language changes between `choose()` and the next `advance()`, the replay still says what the player saw. In a voiced project a replayed line prompt is now interpolated, as the choice showed it.
+  - A save taken between `choose()` and the next `advance()` carries that prompt as shown, in a new optional `pendingPrompt` on the flow's cursor, so the replay after a load is the same. Every Patterplay runtime writes and reads it. A save from an earlier version, without it, still loads and resolves the prompt when it is delivered, as before.
 
 ### Fixed
 
-- **A line whose `character` is set to `""` resolves the speaker's name like any other.** Its
-  `characterName` comes from the `cast:` string for that token (active locale, then default), as on the
-  other runtimes; it was always left out. Held across all four runtimes by the conformance corpus, which
-  now also pins empty speaker fields on lines and option prompts, and plays cases with
-  `replay_prompt_on_choose` and `closed_captions` set at construction.
+- **A line whose `character` is set to `""` resolves the speaker's name like any other.** Its `characterName` comes from the `cast:` string for that token (active locale, then default), as on the other runtimes; it was always left out. Held across all four runtimes by the conformance corpus, which now also pins empty speaker fields on lines and option prompts, and plays cases with `replay_prompt_on_choose` and `closed_captions` set at construction.
 
 ## [0.17.0] - 2026-10-05
 
 ### Changed
 
-- **A choice step carries its `groupId`, and each option a structured `prompt`.** The same shape the
-  other three runtimes give: `prompt` is `{ "kind": "line" | "text", "text": ... }`, and a line prompt
-  also carries `character`, `characterName`, and `direction` when set. The flat `"text"` on an option
-  is gone, so read `option["prompt"]["text"]` instead. A save from an earlier version that is waiting
-  at a choice still loads, its options in the new shape. Held across all four runtimes by the
-  conformance corpus.
+- **A choice step carries its `groupId`, and each option a structured `prompt`.** The same shape the other three runtimes give: `prompt` is `{ "kind": "line" | "text", "text": ... }`, and a line prompt also carries `character`, `characterName`, and `direction` when set. The flat `"text"` on an option is gone, so read `option["prompt"]["text"]` instead. A save from an earlier version that is waiting at a choice still loads, its options in the new shape. Held across all four runtimes by the conformance corpus.
 
 ### Fixed
 
-- **`open_flow` at an address that does not resolve opens nothing.** It reported the error and opened
-  the flow anyway, closing any flow already open under that name. It now returns null (with
-  `push_error`) before anything changes. The block must be in the scene you named, as `goto` has
-  always required.
-- **A flow you let go of is freed.** Every flow ever opened stayed in memory with its property bags,
-  closed or not, and Godot reported leaked instances at exit for each one.
+- **`open_flow` at an address that does not resolve opens nothing.** It reported the error and opened the flow anyway, closing any flow already open under that name. It now returns null (with `push_error`) before anything changes. The block must be in the scene you named, as `goto` has always required.
+- **A flow you let go of is freed.** Every flow ever opened stayed in memory with its property bags, closed or not, and Godot reported leaked instances at exit for each one.
 
 ## [0.16.0] - 2026-10-04
 
 ### Added
 
-- **Checkpoints: try something, then undo it.** `engine.checkpoint()` opens a checkpoint; `engine.rollback(checkpoint)` puts the game back exactly
-  as it was then, and `engine.commit(checkpoint)` keeps everything. A rollback undoes every change the story made in between:
-  property values in every scope (a game's own `@world` store is written back through the game), visit
-  counts, shuffle and sequence positions, `@scene` bags made since, and every flow's position and random
-  state; a flow opened since is closed, and its name is free again. `engine.in_checkpoint()` says whether one is open.
-  The use is asking "would this say anything?" without consequences: move a flow to an address, step
-  it, and roll back if it had nothing to give, so the scene's on-entry effects, the visits, and the
-  shuffle draws never happened. Each change records how to undo itself as it happens, so a checkpoint
-  costs what the steps inside it do, not what the game has built up, and the record is let go when it
-  closes. One is open at a time; while it is, the calls a rollback couldn't undo are refused
-  (`reset`, `load_game`, `hot_swap`, `close_flow`, `open_flow` over an open flow, and a flow's own `start` and `restore`, each reported with `push_error`). Held across all four runtimes by the conformance corpus.
+- **Checkpoints: try something, then undo it.** `engine.checkpoint()` opens a checkpoint; `engine.rollback(checkpoint)` puts the game back exactly as it was then, and `engine.commit(checkpoint)` keeps everything. A rollback undoes every change the story made in between: property values in every scope (a game's own `@world` store is written back through the game), visit counts, shuffle and sequence positions, `@scene` bags made since, and every flow's position and random state; a flow opened since is closed, and its name is free again. `engine.in_checkpoint()` says whether one is open. The use is asking "would this say anything?" without consequences: move a flow to an address, step it, and roll back if it had nothing to give, so the scene's on-entry effects, the visits, and the shuffle draws never happened. Each change records how to undo itself as it happens, so a checkpoint costs what the steps inside it do, not what the game has built up, and the record is let go when it closes. One is open at a time; while it is, the calls a rollback couldn't undo are refused (`reset`, `load_game`, `hot_swap`, `close_flow`, `open_flow` over an open flow, and a flow's own `start` and `restore`, each reported with `push_error`). Held across all four runtimes by the conformance corpus.
 
 ### Fixed
 
-- **`flow.restore()` on a running flow keeps that flow's own property values.** It used to drop them back to
-  their defaults, since a snapshot holds a flow's position and memory, not its property values. Loading
-  a save is unchanged.
+- **`flow.restore()` on a running flow keeps that flow's own property values.** It used to drop them back to their defaults, since a snapshot holds a flow's position and memory, not its property values. Loading a save is unchanged.
 
 ## [0.15.0] - 2026-10-03
 
 ### Added
 
-- **Scene and block gameData you can read at runtime.** `engine.game_data_for_scene(scene_ref)` and
-  `engine.game_data_for_block(scene_ref, block_ref)` return the author's own gameData on a scene or a
-  block, with refs resolved like the tag accessors (an internal id or a gameId address). The answer is
-  the RAW sparse overrides, the same rule a beat's step follows: the project's declared defaults are
-  not filled in (merge them with `PatterBundle.effective_game_data` when you want them), a block does
-  not inherit its scene's gameData, and an unknown ref or a node that sets none gives an empty
-  Dictionary. Each call returns a fresh copy. `get_outline()` scene and block entries carry the same
-  `gameData`, omitted when empty. Held across all four runtimes by the conformance corpus.
+- **Scene and block gameData you can read at runtime.** `engine.game_data_for_scene(scene_ref)` and `engine.game_data_for_block(scene_ref, block_ref)` return the author's own gameData on a scene or a block, with refs resolved like the tag accessors (an internal id or a gameId address). The answer is the RAW sparse overrides, the same rule a beat's step follows: the project's declared defaults are not filled in (merge them with `PatterBundle.effective_game_data` when you want them), a block does not inherit its scene's gameData, and an unknown ref or a node that sets none gives an empty Dictionary. Each call returns a fresh copy. `get_outline()` scene and block entries carry the same `gameData`, omitted when empty. Held across all four runtimes by the conformance corpus.
 
 ## [0.14.3] - 2026-09-27
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the JS runtime's zip, whose module builds now work without npm. Nothing in this runtime changed.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the JS runtime's zip, whose module builds now work without npm. Nothing in this runtime changed.
 
 ## [0.14.2] - 2026-09-27
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the JS runtime's: `@wildwinter/scoperegistry` is now a peer dependency, so a game's install holds
-  exactly one copy of the registry. Nothing in this runtime changed.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the JS runtime's: `@wildwinter/scoperegistry` is now a peer dependency, so a game's install holds exactly one copy of the registry. Nothing in this runtime changed.
 
 ## [0.14.1] - 2026-09-27
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the JS runtime's: it accepts any `@wildwinter/scoperegistry` from 0.7.0 up to 1.0, so an install no
-  longer ends up with two copies of the registry. Nothing in this runtime changed.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the JS runtime's: it accepts any `@wildwinter/scoperegistry` from 0.7.0 up to 1.0, so an install no longer ends up with two copies of the registry. Nothing in this runtime changed.
 
 ## [0.14.0] - 2026-09-24
 
 ### Added
 
-- **Other engines' scopes, with no setting.** A Patter line can name another engine's game-wide
-  scope from the family's shared list (`@story.act` in a condition, an effect, or a `{@story.act}`
-  slot) in any project. It is opaque to the compiler, recorded in the bundle (`externalScopes`, which
-  `PatterBundle.load_from_string` checks and `PatterBundle.external_scopes(bundle)` reads), and never
-  self-backed. Content that names one runs only where that engine is on the same registry: without
-  it, `open_flow` and `load_game` refuse before anything changes, checking `externalScopes` in order
-  and refusing on the first token the registry does not have, the way they refuse anything else
-  (`push_error`, then `open_flow` returns null and `load_game` false) with the same message as every
-  runtime: `this content names @story, which no engine on this registry registered: give every
-  engine the game's one registry`. `load_game` checks right after the save version, so a refused
-  load leaves every flow as it was. A write can still meet
-  an unregistered scope when another engine takes its scope away mid-game: it fails in the registry
-  naming the scope (`unknown scope '@story'`) instead of landing in `@patter` as a property called
-  `story.act`.
+- **Other engines' scopes, with no setting.** A Patter line can name another engine's game-wide scope from the family's shared list (`@story.act` in a condition, an effect, or a `{@story.act}` slot) in any project. It is opaque to the compiler, recorded in the bundle (`externalScopes`, which `PatterBundle.load_from_string` checks and `PatterBundle.external_scopes(bundle)` reads), and never self-backed. Content that names one runs only where that engine is on the same registry: without it, `open_flow` and `load_game` refuse before anything changes, checking `externalScopes` in order and refusing on the first token the registry does not have, the way they refuse anything else (`push_error`, then `open_flow` returns null and `load_game` false) with the same message as every runtime: `this content names @story, which no engine on this registry registered: give every engine the game's one registry`. `load_game` checks right after the save version, so a refused load leaves every flow as it was. A write can still meet an unregistered scope when another engine takes its scope away mid-game: it fails in the registry naming the scope (`unknown scope '@story'`) instead of landing in `@patter` as a property called `story.act`.
 
 ### Changed
 
-- **One registry per game.** Every property bag the engine holds now lives in a `PatterScopeRegistry`
-  (the shared registry, vendored from `expr`): `@patter` under `patter`, and each flow's and scene's
-  bag under a key starting `patter/`. A new `registry` option takes the game's own registry, shared
-  with any other engine in the game; without one the engine makes its own and acts as its own game,
-  so a single-engine game needs no change.
-- **The save is version 3.** `save_game()` holds what is not a property (cursors, PRNGs, visit
-  counts, selector cursors). An engine built without a registry also carries that registry's values
-  under `registry`, so one `PatterSave.serialize_state` is still the whole game; an engine given the
-  game's registry leaves them to the game, which saves the registry once (`registry.save()`). Version
-  2 saves still load, their values moving into the registry, and so does the snake_case shape this
-  addon wrote before 0.11.0.
-- **`host_scopes` bindings are registered in the registry.** Each `{"get", "set"}` binding becomes a
-  foreign scope: your game keeps the values, and no Patterplay save holds them. The option's shape is
-  unchanged. A `writable: false` declaration is still refused to the story and never to your game's
-  own `set_property`.
-- **A self-backed `@world` is saved.** When the game binds no `host_scopes` entry, `@world` is a
-  property the engine's registry stores, so it rides in the save. Given the game's registry, the
-  engine self-backs nothing: `@world` is the game's to register there.
-- **Every expression reads every registered scope**, so a condition can test another engine's
-  `@story.act` in a combined game, even one registered after the flow opened, and `get_property`
-  reads it too. A token two engines both want is refused as the second is built: the registry
-  `push_error`s a message naming the first, the new engine's `init_error()` returns it and the engine
-  is inert, and the game's registry is left as it was.
-- `hot_swap` hands every bag to the replacement engine on the same registry. The engine it replaces
-  is released and its flows are closed. If the restore is refused, the fallback engine keeps the
-  shared properties and restarts each flow.
-- `reset()` and a fresh `open_flow` drop values a load left waiting for this engine's keys, and no
-  other engine's. Closing a flow removes its bags from the registry.
-- `load_game()` returns `false` (with `push_error("unsupported save version: N")`) for a save it
-  cannot read, and `PatterSave.load_state` / `deserialize_state` pass that on; both used to report
-  success.
-- `PatterStateLogger.snapshot_state` reads the engine's bags rather than its save. A scene no flow has
-  re-entered since a load appears once it is.
+- **One registry per game.** Every property bag the engine holds now lives in a `PatterScopeRegistry` (the shared registry, vendored from `expr`): `@patter` under `patter`, and each flow's and scene's bag under a key starting `patter/`. A new `registry` option takes the game's own registry, shared with any other engine in the game; without one the engine makes its own and acts as its own game, so a single-engine game needs no change.
+- **The save is version 3.** `save_game()` holds what is not a property (cursors, PRNGs, visit counts, selector cursors). An engine built without a registry also carries that registry's values under `registry`, so one `PatterSave.serialize_state` is still the whole game; an engine given the game's registry leaves them to the game, which saves the registry once (`registry.save()`). Version 2 saves still load, their values moving into the registry, and so does the snake_case shape this addon wrote before 0.11.0.
+- **`host_scopes` bindings are registered in the registry.** Each `{"get", "set"}` binding becomes a foreign scope: your game keeps the values, and no Patterplay save holds them. The option's shape is unchanged. A `writable: false` declaration is still refused to the story and never to your game's own `set_property`.
+- **A self-backed `@world` is saved.** When the game binds no `host_scopes` entry, `@world` is a property the engine's registry stores, so it rides in the save. Given the game's registry, the engine self-backs nothing: `@world` is the game's to register there.
+- **Every expression reads every registered scope**, so a condition can test another engine's `@story.act` in a combined game, even one registered after the flow opened, and `get_property` reads it too. A token two engines both want is refused as the second is built: the registry `push_error`s a message naming the first, the new engine's `init_error()` returns it and the engine is inert, and the game's registry is left as it was.
+- `hot_swap` hands every bag to the replacement engine on the same registry. The engine it replaces is released and its flows are closed. If the restore is refused, the fallback engine keeps the shared properties and restarts each flow.
+- `reset()` and a fresh `open_flow` drop values a load left waiting for this engine's keys, and no other engine's. Closing a flow removes its bags from the registry.
+- `load_game()` returns `false` (with `push_error("unsupported save version: N")`) for a save it cannot read, and `PatterSave.load_state` / `deserialize_state` pass that on; both used to report success.
+- `PatterStateLogger.snapshot_state` reads the engine's bags rather than its save. A scene no flow has re-entered since a load appears once it is.
 
 ### Added
 
-- `PatterEngine.init_error()`: why construction was refused ("" when it was not), for an engine given
-  a registry in which one of its tokens was already taken.
+- `PatterEngine.init_error()`: why construction was refused ("" when it was not), for an engine given a registry in which one of its tokens was already taken.
 - **`PatterScopeRegistry`, the shared scope registry** (2026-09-24). A thin shim over `runtime/expr/scope_registry.gd`, vendored from expr and shared with the Storylet Engine: one registry per game, holding owned scopes (property bags it reads, writes, lists, and saves) and foreign ones (resolved by the game), and building the eval context the shared evaluator reads. It matches `@wildwinter/scoperegistry` 0.7.0 and runs that package's registry corpus: owners named in clash errors and carried on `list_properties()` rows, `remove(token, {"keep": true})`, values loaded for a key nobody has registered parked until it registers, `discard_parked(prefix)`, a `revision` counter, and aliases on `to_eval_context`. A refused call returns its error String ("" on success).
 
 ## [0.13.0] - 2026-09-05
 
 ### Changed
 
-- **A `writable: false` host declaration is the STORY's promise, and only the story's: the game
-  writes it.** The engine's own `set_property` now writes a read-only `@world` property, self-backed or bound;
-  an effect that writes one is refused exactly as before, with the same sentence. Until now every
-  caller was refused alike, so a game could not advance its own clock through the engine. Matches the
-  JS reference and the Storylet Engine (from-storylets/host-writes-to-read-only-world).
+- **A `writable: false` host declaration is the STORY's promise, and only the story's: the game writes it.** The engine's own `set_property` now writes a read-only `@world` property, self-backed or bound; an effect that writes one is refused exactly as before, with the same sentence. Until now every caller was refused alike, so a game could not advance its own clock through the engine. Matches the JS reference and the Storylet Engine (from-storylets/host-writes-to-read-only-world).
 
 ## [0.12.1] - 2026-09-04
 
 ### Changed
 
-- **This addon needs Godot 4.4 or newer, and is verified on 4.7.** The floor was never stated
-  ("Godot 4.x") and never tested: CI gated on 4.3, where the tour demo did not even parse, because it
-  calls `AudioStreamWAV.load_from_file` (4.4+). Godot parses every script in a project when the
-  project OPENS, so on 4.3 that one demo file took the whole project with it - addon, runtime, and
-  the author's own game. Now the floor is stated, the gate is the current stable, and a CI step
-  parses every script in the addon one at a time so the claim cannot drift again. Verified on real
-  4.4 and 4.7 engines; on 4.3 the demo still will not parse, which is what a floor means.
+- **This addon needs Godot 4.4 or newer, and is verified on 4.7.** The floor was never stated ("Godot 4.x") and never tested: CI gated on 4.3, where the tour demo did not even parse, because it calls `AudioStreamWAV.load_from_file` (4.4+). Godot parses every script in a project when the project OPENS, so on 4.3 that one demo file took the whole project with it - addon, runtime, and the author's own game. Now the floor is stated, the gate is the current stable, and a CI step parses every script in the addon one at a time so the claim cannot drift again. Verified on real 4.4 and 4.7 engines; on 4.3 the demo still will not parse, which is what a floor means.
 
 ## [0.12.0] - 2026-09-04
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
-  the JS runtime's: `patterplay.min.js`, the browser drop-in, is now built by `@patterkit/play-helpers`
-  and carries the play helpers (save / load, state logger, inspectors, Live Link) as well as the
-  runtime on the one `Patterplay` global, so a plain web page can write the family's save text with
-  no bundler. This plugin is unchanged; a save it writes still loads there and back.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is the JS runtime's: `patterplay.min.js`, the browser drop-in, is now built by `@patterkit/play-helpers` and carries the play helpers (save / load, state logger, inspectors, Live Link) as well as the runtime on the one `Patterplay` global, so a plain web page can write the family's save text with no bundler. This plugin is unchanged; a save it writes still loads there and back.
 
 ## [0.11.0] - 2026-09-03
 
 ### Fixed
 
-- **A `writable: false` host declaration is refused by the engine, bound or self-backed.** The addon let a
-  bound scope's `set` Callable straight through, so the story's own promise held only for the self-backed
-  bag; now the write is refused with `push_error("'@world.x' is read-only")` and no write from either, as
-  the JS runtime always has. Pinned in `test_corpus.gd` (from-storylets/unreal-wrapper-host-scopes).
+- **A `writable: false` host declaration is refused by the engine, bound or self-backed.** The addon let a bound scope's `set` Callable straight through, so the story's own promise held only for the self-backed bag; now the write is refused with `push_error("'@world.x' is read-only")` and no write from either, as the JS runtime always has. Pinned in `test_corpus.gd` (from-storylets/unreal-wrapper-host-scopes).
 
 ### Changed
 
-- **Saves cross engines.** The addon now writes and reads the family's `patter/save@0` shape - the JS
-  reference's, documented in `@patterkit/model` - so a save written by a web build or by Patterpad loads
-  here, and a save written here loads in Unity or Unreal. Until now it wrote snake_case keys
-  (`shared_visits`, `stage_bags`) with the cursor fields flat, which loaded nowhere else, and a JS save
-  died here on its first key. **A save written by this addon before 0.11.0 still loads** and is written
-  back in the shared shape. `test_save_shape.gd` pins the shape from both sides, and the conformance
-  corpus now carries a save the JS reference wrote, which this addon must load, write back with the same
-  key paths, and continue (from-storylets/save-shape-across-engines).
+- **Saves cross engines.** The addon now writes and reads the family's `patter/save@0` shape - the JS reference's, documented in `@patterkit/model` - so a save written by a web build or by Patterpad loads here, and a save written here loads in Unity or Unreal. Until now it wrote snake_case keys (`shared_visits`, `stage_bags`) with the cursor fields flat, which loaded nowhere else, and a JS save died here on its first key. **A save written by this addon before 0.11.0 still loads** and is written back in the shared shape. `test_save_shape.gd` pins the shape from both sides, and the conformance corpus now carries a save the JS reference wrote, which this addon must load, write back with the same key paths, and continue (from-storylets/save-shape-across-engines).
 
 ## [0.10.0] - 2026-09-02
 
 ### Added
 
-- **`list_bags()` on the engine and on a flow, and `flows()` on the engine.** What a state
-  logger mounts; `flows()` was missing here entirely, where the JS runtime has always had it.
+- **`list_bags()` on the engine and on a flow, and `flows()` on the engine.** What a state logger mounts; `flows()` was missing here entirely, where the JS runtime has always had it.
 
 ### Changed
 
-- **The state logger watches the property bags instead of diffing save snapshots.** A
-  property write is logged when it LANDS, on the bag's audit hook, rather than at the next
-  capture. The visit counts live in no bag, so those are still diffed - which is all this
-  logger used to do for everything. What it buys: a diff can only report the NET change
-  between two captures, so a value that changed and changed back was invisible, and every
-  write was reported late. The core is shared with the Storylet Engine, which has always
-  worked this way.
-- **The `@patter` globals, and a flow's not-shared half, live in a property bag.** They were
-  plain maps here while the JS runtime held them in a bag; a bag is what carries the audit
-  hook the logger pushes from. **The save format is unchanged** - the same flat map, and a
-  load seeds from the declarations before laying saved values over.
+- **The state logger watches the property bags instead of diffing save snapshots.** A property write is logged when it LANDS, on the bag's audit hook, rather than at the next capture. The visit counts live in no bag, so those are still diffed - which is all this logger used to do for everything. What it buys: a diff can only report the NET change between two captures, so a value that changed and changed back was invisible, and every write was reported late. The core is shared with the Storylet Engine, which has always worked this way.
+- **The `@patter` globals, and a flow's not-shared half, live in a property bag.** They were plain maps here while the JS runtime held them in a bag; a bag is what carries the audit hook the logger pushes from. **The save format is unchanged** - the same flat map, and a load seeds from the declarations before laying saved values over.
 
 ### Fixed
 
-- **A declaration with an explicit `null` default seeds the type's default.** Two halves of
-  one rule disagreed: the seeding read the key directly, where `default_for` treats null and
-  absent alike, so a `number` could hold nil. Unreachable from an exported bundle; a
-  hand-written or third-party one could do it.
+- **A declaration with an explicit `null` default seeds the type's default.** Two halves of one rule disagreed: the seeding read the key directly, where `default_for` treats null and absent alike, so a `number` could hold nil. Unreachable from an exported bundle; a hand-written or third-party one could do it.
 
 ## [0.9.0] - 2026-09-02
 
 ### Changed
 
-- **BREAKING: `list_properties()` rows say `"path"` where they said `"ref"`, and now carry `"name"`
-  and `"writable"`.** The shape is `@wildwinter/scoperegistry`'s property row, shared with the
-  Storylet Engine. `"path"` holds exactly what `"ref"` held: the reference `get_property` and
-  `set_property` take. Reading a row's address means `row["path"]` now.
-- **BREAKING: a row's address is the qualified one, `@patter.gold`, not `@gold`.** Both forms
-  have always resolved on input and still do - an unqualified name defaults to the `patter`
-  scope - so `get_property("@gold")` is unaffected. What changed is the address a row REPORTS,
-  which is what a state panel displays and what an inspector writes back through. It matches
-  what `@scene` and the other family's scopes have always looked like.
+- **BREAKING: `list_properties()` rows say `"path"` where they said `"ref"`, and now carry `"name"` and `"writable"`.** The shape is `@wildwinter/scoperegistry`'s property row, shared with the Storylet Engine. `"path"` holds exactly what `"ref"` held: the reference `get_property` and `set_property` take. Reading a row's address means `row["path"]` now.
+- **BREAKING: a row's address is the qualified one, `@patter.gold`, not `@gold`.** Both forms have always resolved on input and still do - an unqualified name defaults to the `patter` scope - so `get_property("@gold")` is unaffected. What changed is the address a row REPORTS, which is what a state panel displays and what an inspector writes back through. It matches what `@scene` and the other family's scopes have always looked like.
 
-- **Scene and stage state is held in the shared property bag.** `@scene` properties lived in
-  hand-rolled maps that duplicated the bag's own seeding, so they missed its guards: two flows
-  entering one scene now never share a mutable flags list, and a `temporary` property's reset on
-  re-entry goes through the bag, which means a state logger sees it. **The save format is
-  unchanged** - a flat name/value map per scene, and a load that seeds from the bundle's
-  declarations before laying saved values over, so a property a save predates keeps its default.
+- **Scene and stage state is held in the shared property bag.** `@scene` properties lived in hand-rolled maps that duplicated the bag's own seeding, so they missed its guards: two flows entering one scene now never share a mutable flags list, and a `temporary` property's reset on re-entry goes through the bag, which means a state logger sees it. **The save format is unchanged** - a flat name/value map per scene, and a load that seeds from the bundle's declarations before laying saved values over, so a property a save predates keeps its default.
 
 ### Added
 
-- **A decision log, and `on_dry_choice`.** Opening a run with `{"log": true}` records what the engine
-  decided and why - each choice with the options it offered, the ones it greyed out and the
-  reason, each jump, each property write with the value it replaced. `log()` is the whole
-  run in order, a `Flow`'s own log is flow-local, and `on_trace` streams entries live rather than
-  retaining them. `on_dry_choice` fires when a choice runs dry - no takeable option, no eligible
-  fallback - so the silent fall-through is observable; it survives alongside the log because it is
-  live feedback, not a record.
+- **A decision log, and `on_dry_choice`.** Opening a run with `{"log": true}` records what the engine decided and why - each choice with the options it offered, the ones it greyed out and the reason, each jump, each property write with the value it replaced. `log()` is the whole run in order, a `Flow`'s own log is flow-local, and `on_trace` streams entries live rather than retaining them. `on_dry_choice` fires when a choice runs dry - no takeable option, no eligible fallback - so the silent fall-through is observable; it survives alongside the log because it is live feedback, not a record.
 
 ### Fixed
 
-- **A quality row carries its ladder.** `stages` was on the row so an examiner could offer the
-  stages instead of a free-text box, and the code that builds rows never filled it in - on this
-  runtime and two others. Every quality row came out without one.
+- **A quality row carries its ladder.** `stages` was on the row so an examiner could offer the stages instead of a free-text box, and the code that builds rows never filled it in - on this runtime and two others. Every quality row came out without one.
 
 ## [0.8.0] - 2026-09-01
 
 ### Removed
 
-- **BREAKING: `Mulberry32` is now `PatterMulberry32`.** It was the one class in
-  this addon without a `Patter` prefix, and `class_name` registers in Godot's
-  PROJECT-WIDE namespace: a bare `Mulberry32` collided with any other addon, or
-  your own code, that wanted the name. If you used `Mulberry32` directly, rename
-  it; nothing else in the addon exposed it.
+- **BREAKING: `Mulberry32` is now `PatterMulberry32`.** It was the one class in this addon without a `Patter` prefix, and `class_name` registers in Godot's PROJECT-WIDE namespace: a bare `Mulberry32` collided with any other addon, or your own code, that wanted the name. If you used `Mulberry32` directly, rename it; nothing else in the addon exposed it.
 
 ### Changed
 
-- **BREAKING: the evaluator now REFUSES a bad expression instead of returning a
-  fallback value.** `PatterExpr.evaluate` previously called `push_error()` and
-  returned `0.0` for a division by zero or a mixed-type `+`, `false` for an
-  unknown operator, and silently coerced any non-number to `0.0` (so `"a" < "b"`
-  answered false). It now returns a `PatterExpr.EvalError`, which callers test
-  with `PatterExpr.is_error(v)`, matching what the JS, Unity and Unreal runtimes
-  have always done.
+- **BREAKING: the evaluator now REFUSES a bad expression instead of returning a fallback value.** `PatterExpr.evaluate` previously called `push_error()` and returned `0.0` for a division by zero or a mixed-type `+`, `false` for an unknown operator, and silently coerced any non-number to `0.0` (so `"a" < "b"` answered false). It now returns a `PatterExpr.EvalError`, which callers test with `PatterExpr.is_error(v)`, matching what the JS, Unity and Unreal runtimes have always done.
 
-  A condition that errors is now ineligible rather than quietly false, and its
-  diagnostic is reported. Content that leant on the old fallbacks will behave
-  differently, and in every case we found the new behaviour is the one the other
-  three runtimes already gave.
+  A condition that errors is now ineligible rather than quietly false, and its diagnostic is reported. Content that leant on the old fallbacks will behave differently, and in every case we found the new behaviour is the one the other three runtimes already gave.
 
 ### Changed
 
-- **Flags compare as a SET.** `==` and `!=` on a flags value now ignore order, so
-  `check_flags` results and stored flag lists that hold the same members are equal
-  however they were built. They are compared as multisets, so a duplicated flag
-  still counts.
+- **Flags compare as a SET.** `==` and `!=` on a flags value now ignore order, so `check_flags` results and stored flag lists that hold the same members are equal however they were built. They are compared as multisets, so a duplicated flag still counts.
 
-  This is a behaviour change to existing content, and it is a fix rather than a
-  preference: a flags value IS a set, and its stored order was an artefact of the
-  order somebody happened to add things in. `set_flags(@f, +red)` then `+blue`
-  compared UNEQUAL to the same two flags added the other way round, a difference
-  no author can see and none intends. An expression that relied on two
-  equal-membered flag values comparing unequal will change answer.
+  This is a behaviour change to existing content, and it is a fix rather than a preference: a flags value IS a set, and its stored order was an artefact of the order somebody happened to add things in. `set_flags(@f, +red)` then `+blue` compared UNEQUAL to the same two flags added the other way round, a difference no author can see and none intends. An expression that relied on two equal-membered flag values comparing unequal will change answer.
 
 ### Added
 
-- **`PatterDialect`**: the built-ins (`random`, `check_flags`, `set_flags`,
-  `visits`, `seen`, `patter_visits`, `patter_seen`) split out of the evaluator, so
-  the evaluator is configured by a dialect rather than fusing one. This is what
-  lets Patterplay and the Storylet Engine run the same evaluator source.
-- **`PatterSpecificity`**: the matched-constraint scorer, previously inline in
-  `flow.gd`.
+- **`PatterDialect`**: the built-ins (`random`, `check_flags`, `set_flags`, `visits`, `seen`, `patter_visits`, `patter_seen`) split out of the evaluator, so the evaluator is configured by a dialect rather than fusing one. This is what lets Patterplay and the Storylet Engine run the same evaluator source.
+- **`PatterSpecificity`**: the matched-constraint scorer, previously inline in `flow.gd`.
 
 ### Fixed
 
-- **The PRNG seed is coerced the way JavaScript coerces it** (ECMA-262 ToUint32),
-  so every runtime lands on the same first draw for every seed. Seeds outside the
-  range of a 64-bit integer (`1e19`, `Infinity`) previously gave a different
-  answer here from the JS runtime.
-- **Numbers render the way JavaScript's `String(n)` renders them.** `js_number`
-  used a 1e15 cutoff and `String.num`'s 14-decimal default, so `0.1 + 0.2` showed
-  as `0.3`, `1e16` as `10000000000000000.0` with a trailing `.0`, and `1/3` lost
-  two digits. `NAN` printed as `nan`. This is visible wherever a number reaches
-  displayed text through `{@ref}` interpolation.
-- **An effect whose value does not evaluate now writes nothing.** It previously
-  stored the evaluator's fallback (`0.0`, or `false`) into the property, which is
-  a corrupted save rather than a caught bug.
-- **`==` between a whole number and a float.** `3` and `3.0` compared unequal;
-  the reference has one number type, so they are the same value.
+- **The PRNG seed is coerced the way JavaScript coerces it** (ECMA-262 ToUint32), so every runtime lands on the same first draw for every seed. Seeds outside the range of a 64-bit integer (`1e19`, `Infinity`) previously gave a different answer here from the JS runtime.
+- **Numbers render the way JavaScript's `String(n)` renders them.** `js_number` used a 1e15 cutoff and `String.num`'s 14-decimal default, so `0.1 + 0.2` showed as `0.3`, `1e16` as `10000000000000000.0` with a trailing `.0`, and `1/3` lost two digits. `NAN` printed as `nan`. This is visible wherever a number reaches displayed text through `{@ref}` interpolation.
+- **An effect whose value does not evaluate now writes nothing.** It previously stored the evaluator's fallback (`0.0`, or `false`) into the property, which is a corrupted save rather than a caught bug.
+- **`==` between a whole number and a float.** `3` and `3.0` compared unequal; the reference has one number type, so they are the same value.
 
 
 ## [0.7.1] - 2026-08-30
 
 ### Added
 
-- **The state panel says whether Patterpad is listening.** A Live Link registered with
-  `PatterDebug.register_link(link)` shows its state (connecting / connected / closed), the address it
-  dials and the build it handshook. From inside a running game, "the editor is not listening" and
-  "I never attached" look identical, and only the game knows which.
+- **The state panel says whether Patterpad is listening.** A Live Link registered with `PatterDebug.register_link(link)` shows its state (connecting / connected / closed), the address it dials and the build it handshook. From inside a running game, "the editor is not listening" and "I never attached" look identical, and only the game knows which.
 
 ### Fixed
 
@@ -1042,212 +540,112 @@ Changes marked **Breaking (1.0)** change what an existing game sees. Pinned by t
 
 ### Fixed
 
-- **A flow you forgot to announce still shows up in Patterpad's debug link.** `flowOpened` was the
-  host's job and nothing could check it, so a game that opened a flow and did not announce it left
-  the editor's follow list short - and the omission outlived a reconnect, because the link's hello
-  carries that list. A flow now announces itself the first time it is observed; `flowOpened` remains
-  worth calling for a flow that exists before it says anything. Reported from the Storylet Studio
-  side, 2026-08-29. (Same fix in all four runtimes.)
+- **A flow you forgot to announce still shows up in Patterpad's debug link.** `flowOpened` was the host's job and nothing could check it, so a game that opened a flow and did not announce it left the editor's follow list short - and the omission outlived a reconnect, because the link's hello carries that list. A flow now announces itself the first time it is observed; `flowOpened` remains worth calling for a flow that exists before it says anything. Reported from the Storylet Studio side, 2026-08-29. (Same fix in all four runtimes.)
 
 ## [0.7.0] - 2026-08-29
 
 ### Changed
 
-- Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is
-  Unreal's: a `UPatterFlow` held across a save load pointed at freed memory, because the core rebuilt
-  its flows underneath the wrapper. GDScript is reference counted and never had that fault.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is Unreal's: a `UPatterFlow` held across a save load pointed at freed memory, because the core rebuilt its flows underneath the wrapper. GDScript is reference counted and never had that fault.
 
 ## [0.6.0] - 2026-08-25
 
 ### Added
 
-- **The `quality` property type: a story stage as an ordered ladder of named stages.** The value is a
-  stage name; ordering operators compare by ladder POSITION, `advance(@q)` steps to the next stage
-  saturating at the last, and a save carries the stage by name - so a stage inserted mid-production
-  shifts nothing. Declared with `stages` on the property; seeds at the first stage. Corpus-locked
-  across all four runtimes (gating, stepping, and the insertion story through a live hot swap).
-  The runtime state inspector edits a quality as a dropdown of its stage ladder, like an enum's
-  values.
+- **The `quality` property type: a story stage as an ordered ladder of named stages.** The value is a stage name; ordering operators compare by ladder POSITION, `advance(@q)` steps to the next stage saturating at the last, and a save carries the stage by name - so a stage inserted mid-production shifts nothing. Declared with `stages` on the property; seeds at the first stage. Corpus-locked across all four runtimes (gating, stepping, and the insertion story through a live hot swap). The runtime state inspector edits a quality as a dropdown of its stage ladder, like an enum's values.
 
 ## [0.5.0] - 2026-08-21
 
 ### Added
 
-- **Cast lists you can query at runtime.** Three static reads answer "who is in this?": the cast the
-  project declares, the speakers of a scene, and the speakers of one block. Scene and block refs take
-  an internal id or a gameId address. The result is the character token a line beat carries, deduped
-  and ordered by first appearance, and it is derived from the AUTHORED structure, so a speaker behind a
-  condition, inside a group, or voicing a choice prompt is included: it answers who *can* speak, not
-  who a given playthrough heard. Held across all four runtimes by the conformance corpus.
-  `engine.get_cast()`, `engine.cast_for_scene(scene_ref)`, `engine.cast_for_block(scene_ref, block_ref)`.
+- **Cast lists you can query at runtime.** Three static reads answer "who is in this?": the cast the project declares, the speakers of a scene, and the speakers of one block. Scene and block refs take an internal id or a gameId address. The result is the character token a line beat carries, deduped and ordered by first appearance, and it is derived from the AUTHORED structure, so a speaker behind a condition, inside a group, or voicing a choice prompt is included: it answers who *can* speak, not who a given playthrough heard. Held across all four runtimes by the conformance corpus. `engine.get_cast()`, `engine.cast_for_scene(scene_ref)`, `engine.cast_for_block(scene_ref, block_ref)`.
 
 ## [0.4.5] - 2026-08-20
 
 ### Added
 
-- **The bundle inspector is back (#45), and this time an exported build is part of the test.** Select a
-  `.patterc` in the FileSystem dock and the Inspector shows what your game code may call: identity and
-  hashes, every scene and block address, the `@world` properties the game must supply (with the ones
-  carrying no default marked), the story's own declarations, gameData fields, and counts.
+- **The bundle inspector is back (#45), and this time an exported build is part of the test.** Select a `.patterc` in the FileSystem dock and the Inspector shows what your game code may call: identity and hashes, every scene and block address, the `@world` properties the game must supply (with the ones carrying no default marked), the story's own declarations, gameData fields, and counts.
 
-  0.4.3 shipped this by importing `.patterc` as a Resource, which stopped the source file reaching an
-  exported build and broke every shipped game; 0.4.4 removed it. What was missing was the other half:
-  an export plugin now puts the raw bundle back at its own path and skips the imported product, so a
-  build carries exactly the bytes it did before any of this, at the same size (measured: a 3.4 MB
-  bundle gives a 3.6 MB pack, the same as 0.4.4, against 7.2 MB when the imported copy also ships).
+  0.4.3 shipped this by importing `.patterc` as a Resource, which stopped the source file reaching an exported build and broke every shipped game; 0.4.4 removed it. What was missing was the other half: an export plugin now puts the raw bundle back at its own path and skips the imported product, so a build carries exactly the bytes it did before any of this, at the same size (measured: a 3.4 MB bundle gives a 3.6 MB pack, the same as 0.4.4, against 7.2 MB when the imported copy also ships).
 
-  Two things worth knowing. `ResourceLoader.load("res://game.patterc")` works in the EDITOR and
-  returns nothing in a build - the resource is an editor convenience, and a running game reads the
-  file, as it always has. And **you no longer need the export-filter setting for your bundle**: the
-  plugin adds it to the export itself, verified through a GUI export with the filter box empty.
-  Leaving `*.patterc` in there is harmless and still covers a disabled plugin. `patteraudio.json`
-  and any other loose runtime files are still yours to add.
+  Two things worth knowing. `ResourceLoader.load("res://game.patterc")` works in the EDITOR and returns nothing in a build - the resource is an editor convenience, and a running game reads the file, as it always has. And **you no longer need the export-filter setting for your bundle**: the plugin adds it to the export itself, verified through a GUI export with the filter box empty. Leaving `*.patterc` in there is harmless and still covers a disabled plugin. `patteraudio.json` and any other loose runtime files are still yours to add.
 
-  `ports/godot/test/export_check.sh` is the gate that was missing: it exports a project and RUNS the
-  pack, in a directory with no project above it, because every other check here runs in the editor
-  where the file is on disk whatever the addon does to it.
+  `ports/godot/test/export_check.sh` is the gate that was missing: it exports a project and RUNS the pack, in a directory with no project above it, because every other check here runs in the editor where the file is on disk whatever the addon does to it.
 
 ### Fixed
 
-- **The plugin removes what it registers.** An `EditorPlugin` with no `_exit_tree` leaves Godot holding
-  freed script instances and it aborts on shutdown. That was mine, found by the export gate.
+- **The plugin removes what it registers.** An `EditorPlugin` with no `_exit_tree` leaves Godot holding freed script instances and it aborts on shutdown. That was mine, found by the export gate.
 
 ## [0.4.4] - 2026-08-20
 
 ### Fixed
 
-- **Exported builds could not find their bundle (#45, thanks @yukonmakesgames).** 0.4.3 registered an
-  importer for `.patterc`, which turned it from a plain file into an imported RESOURCE: Godot then
-  resolved `res://game.patterc` to `.godot/imported/game-<hash>.tres` and stopped shipping the source
-  file, so `FileAccess.get_file_as_string("res://game.patterc")` read nothing in an exported build.
-  Adding `*.patterc` to "filters to export non-resource files" could not help, because the file had
-  stopped being a non-resource. The importer is off again and `.patterc` is a plain file, as it was
-  before 0.4.3.
+- **Exported builds could not find their bundle (#45, thanks @yukonmakesgames).** 0.4.3 registered an importer for `.patterc`, which turned it from a plain file into an imported RESOURCE: Godot then resolved `res://game.patterc` to `.godot/imported/game-<hash>.tres` and stopped shipping the source file, so `FileAccess.get_file_as_string("res://game.patterc")` read nothing in an exported build. Adding `*.patterc` to "filters to export non-resource files" could not help, because the file had stopped being a non-resource. The importer is off again and `.patterc` is a plain file, as it was before 0.4.3.
 
-  **If you opened your project in 0.4.3**, delete the `*.patterc.import` files it left beside your
-  bundles (and any matching entries under `.godot/imported/`). Godot leaves them in place and an
-  export still follows them, so removing them is what actually restores your build.
+  **If you opened your project in 0.4.3**, delete the `*.patterc.import` files it left beside your bundles (and any matching entries under `.godot/imported/`). Godot leaves them in place and an export still follows them, so removing them is what actually restores your build.
 
-  The bundle Inspector added in 0.4.3 goes with it: without the importer there is no asset for it to
-  draw. The code is still in `addons/patterplay/editor/`, unregistered, and comes back when it can be
-  turned on without changing how a bundle ships.
+  The bundle Inspector added in 0.4.3 goes with it: without the importer there is no asset for it to draw. The code is still in `addons/patterplay/editor/`, unregistered, and comes back when it can be turned on without changing how a bundle ships.
 
 ## [0.4.3] - 2026-08-19
 
 ### Added
 
-- **The bundle inspector.** Select an imported `.patterc` and see what your game code may call, read
-  from the asset alone with nothing running: the project's identity and hashes, every scene and block
-  ADDRESS `runFlow` / `goto` accept, the `@world` properties the GAME must supply (with the ones
-  carrying no default marked, because those are the values a story silently reads as a type default
-  if the host forgets them), the story's own declarations, the gameData fields, and counts for "is
-  this the right build?". A source-debug build says NOT SHIPPABLE rather than leaving it to be
-  inferred from `strings: ids`.
+- **The bundle inspector.** Select an imported `.patterc` and see what your game code may call, read from the asset alone with nothing running: the project's identity and hashes, every scene and block ADDRESS `runFlow` / `goto` accept, the `@world` properties the GAME must supply (with the ones carrying no default marked, because those are the values a story silently reads as a type default if the host forgets them), the story's own declarations, the gameData fields, and counts for "is this the right build?". A source-debug build says NOT SHIPPABLE rather than leaving it to be inferred from `strings: ids`.
 
-  The summary itself is available to code as well (`PatterDescribe.describe_bundle`), so a build
-  step or an editor tool can read the   same description the panel draws.
+  The summary itself is available to code as well (`PatterDescribe.describe_bundle`), so a build step or an editor tool can read the   same description the panel draws.
 
-  Godot needed one more thing first: a `.patterc` was a plain file, and an EditorInspectorPlugin can
-  only draw for a Resource. The addon now IMPORTS `.patterc` as a `PatterBundleResource`, so a bundle
-  is a first-class asset in the FileSystem dock and selecting it shows the summary in the Inspector.
-  A broken bundle still imports, carrying its diagnosis.
+  Godot needed one more thing first: a `.patterc` was a plain file, and an EditorInspectorPlugin can only draw for a Resource. The addon now IMPORTS `.patterc` as a `PatterBundleResource`, so a bundle is a first-class asset in the FileSystem dock and selecting it shows the summary in the Inspector. A broken bundle still imports, carrying its diagnosis.
 
-  **Nothing about loading a bundle at runtime has changed**: `FileAccess.get_file_as_string` into
-  `PatterBundle.load_from_string` is still how the demo and the docs do it, and still works with the
-  plugin disabled. The resource is for projects that would rather have the asset.
+  **Nothing about loading a bundle at runtime has changed**: `FileAccess.get_file_as_string` into `PatterBundle.load_from_string` is still how the demo and the docs do it, and still works with the plugin disabled. The resource is for projects that would rather have the asset.
 
 ## [0.4.2] - 2026-08-19
 
 ### Added
 
-- **Declared host scopes (`@world`) are parsed and self-backed.** A project can DECLARE host properties
-  in its bundle (`scopeRegistry`); this port ignored them entirely, so `@world.isNight` resolved to
-  nothing, read as a graceful false, and any branch gated on it was skipped. The same bundle therefore
-  played a different story here than on the JavaScript runtime, with no error anywhere. The registry is
-  now parsed into the bundle model, a scope the embedder binds is theirs, and every other declared scope
-  gets a live bag seeded from its declaration defaults. The shared conformance corpus gates this.
+- **Declared host scopes (`@world`) are parsed and self-backed.** A project can DECLARE host properties in its bundle (`scopeRegistry`); this port ignored them entirely, so `@world.isNight` resolved to nothing, read as a graceful false, and any branch gated on it was skipped. The same bundle therefore played a different story here than on the JavaScript runtime, with no error anywhere. The registry is now parsed into the bundle model, a scope the embedder binds is theirs, and every other declared scope gets a live bag seeded from its declaration defaults. The shared conformance corpus gates this.
 
 ## [0.4.0] - 2026-07-30
 
 ### Added
-- **State logger** (parity: previously JS-only). Watches the mutable runtime state - `@patter`
-  globals, per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed
-  between captures, plus a per-step trace including `gameData`. Built on the engine's save-game, so
-  what the logger sees is exactly what a save persists. Identical flattened-path and line format on
-  every runtime.
-- **`PatterSave`: the tagged `patter/save@0` envelope** (parity with the JS and Unity save
-  helpers): `serialize_state` / `deserialize_state` wrap `save_game()` in a schema-tagged envelope, so
-  a foreign blob is refused instead of corrupting a run. The state panel now writes the envelope;
-  `.patterstate` files written before this release (bare snapshots) still load.
+- **State logger** (parity: previously JS-only). Watches the mutable runtime state - `@patter` globals, per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed between captures, plus a per-step trace including `gameData`. Built on the engine's save-game, so what the logger sees is exactly what a save persists. Identical flattened-path and line format on every runtime.
+- **`PatterSave`: the tagged `patter/save@0` envelope** (parity with the JS and Unity save helpers): `serialize_state` / `deserialize_state` wrap `save_game()` in a schema-tagged envelope, so a foreign blob is refused instead of corrupting a run. The state panel now writes the envelope; `.patterstate` files written before this release (bare snapshots) still load.
 
 ### Fixed
-- The download now includes the **MIT `LICENSE` file**; previously the zip shipped with no licence
-  text at all.
+- The download now includes the **MIT `LICENSE` file**; previously the zip shipped with no licence text at all.
 
 ## [0.3.1] - 2026-07-22
 
 ### Changed
-- Version bump only, to keep the four Patterplay runtimes in lockstep. This release fixes
-  Unreal-only build issues (see the Unreal changelog and #25); the Godot addon is unchanged.
+- Version bump only, to keep the four Patterplay runtimes in lockstep. This release fixes Unreal-only build issues (see the Unreal changelog and #25); the Godot addon is unchanged.
 
 ## [0.3.0] - 2026-07-21
 
 ### Added
-- **Host navigation.** `flow.goto(scene, block)` sends a running flow to a Game ID address, behaving exactly like a jump
-  the writer could have written: the destination scene's on-entry effects run, arriving counts as a
-  visit, and the call stack is replaced. Being a game action rather than a written one it lands
-  immediately (any remaining lines of the snippet being delivered are abandoned, and a pending choice is
-  dropped), and it MOVES the cursor without resetting the flow - variation, visit counts and properties
-  all carry on. Returns false, cursor untouched, on an address that does not resolve.
-- **`engine.run_flow(name, scene, block)`** plays an address in one call: it opens the named flow if it does not exist, moves it if it
-  does, runs to the next stop and returns what played. Reusing the name is the point - a flow owns its
-  selector cursors, so a shuffle keeps its bag and a "once each" list keeps its place from call to call.
-  Use one name per speaker. An empty result means that address has nothing left to give.
-- **`flow.advance_to_stop()`** (parity): advance repeatedly, collecting every beat played, until a choice or the end.
-  Previously only the JS runtime had this.
+- **Host navigation.** `flow.goto(scene, block)` sends a running flow to a Game ID address, behaving exactly like a jump the writer could have written: the destination scene's on-entry effects run, arriving counts as a visit, and the call stack is replaced. Being a game action rather than a written one it lands immediately (any remaining lines of the snippet being delivered are abandoned, and a pending choice is dropped), and it MOVES the cursor without resetting the flow - variation, visit counts and properties all carry on. Returns false, cursor untouched, on an address that does not resolve.
+- **`engine.run_flow(name, scene, block)`** plays an address in one call: it opens the named flow if it does not exist, moves it if it does, runs to the next stop and returns what played. Reusing the name is the point - a flow owns its selector cursors, so a shuffle keeps its bag and a "once each" list keeps its place from call to call. Use one name per speaker. An empty result means that address has nothing left to give.
+- **`flow.advance_to_stop()`** (parity): advance repeatedly, collecting every beat played, until a choice or the end. Previously only the JS runtime had this.
 
 ### Changed
-- Dropping a flow now FINISHES it. Closing a flow, resetting the engine, or re-opening a name all leave
-  the old flow object inert, so a reference a game still holds cannot keep advancing it and quietly move
-  shared state. Re-opening a name still replaces (and so resets) that flow - use `run_flow` when you
-  want a speaker's variation state to carry on instead.
+- Dropping a flow now FINISHES it. Closing a flow, resetting the engine, or re-opening a name all leave the old flow object inert, so a reference a game still holds cannot keep advancing it and quietly move shared state. Re-opening a name still replaces (and so resets) that flow - use `run_flow` when you want a speaker's variation state to carry on instead.
 
 ## [0.2.2] - 2026-07-13
 
 ### Changed
-- Internal: the Best match (`specificity`) selection metric now uses the shared
-  `@wildwinter/expr-specificity` package instead of a per-engine inline copy. Behaviour is
-  unchanged and conformance-verified across all four engines.
+- Internal: the Best match (`specificity`) selection metric now uses the shared `@wildwinter/expr-specificity` package instead of a per-engine inline copy. Behaviour is unchanged and conformance-verified across all four engines.
 
 ## [0.2.0] - 2026-07-07
 
 ### Added
-- **Best match** selection (a new `sequence` order, `specificity`): among the eligible children,
-  play the one whose condition most specifically fits the current state; equally-specific ties break
-  by the seeded shuffle, and a condition-less child is the filler that wins only when nothing more
-  specific applies. Composes with the exhaust axis (re-pickable, or graceful degradation to the
-  filler). Locked by the conformance corpus, so all four runtimes agree.
+- **Best match** selection (a new `sequence` order, `specificity`): among the eligible children, play the one whose condition most specifically fits the current state; equally-specific ties break by the seeded shuffle, and a condition-less child is the filler that wins only when nothing more specific applies. Composes with the exhaust axis (re-pickable, or graceful degradation to the filler). Locked by the conformance corpus, so all four runtimes agree.
 
 ## [0.1.0] - 2026-07-04
 
 ### Added
-- The pure-GDScript Patter runtime: `PatterEngine` + `PatterFlow` over a compiled `.patterc`
-  bundle - scenes, blocks, run/choice/branch/sequence selectors, sticky/fallback options,
-  call-return jumps, conditions + effects, visit counts, `{@ref}` interpolation, game events,
-  tags, gameData merge-at-read, and whole-game save/load (`save_game` / `load_game`). No
-  scene-tree types in the engine, so it also runs headless.
+- The pure-GDScript Patter runtime: `PatterEngine` + `PatterFlow` over a compiled `.patterc` bundle - scenes, blocks, run/choice/branch/sequence selectors, sticky/fallback options, call-return jumps, conditions + effects, visit counts, `{@ref}` interpolation, game events, tags, gameData merge-at-read, and whole-game save/load (`save_game` / `load_game`). No scene-tree types in the engine, so it also runs headless.
 - Bundle loading: `PatterBundle.load_from_string(json)` from any `.patterc`.
-- Localisation: play any locale of an Embedded bundle, switch live with `set_locale`, or ship
-  an IDs-only bundle and localise in your own system. Closed-caption cue stripping via
-  `set_closed_captions`.
-- Audio resolution: `PatterAudio` resolves each line to its winning take from a
-  `patteraudio.json` manifest (it resolves the path; playback stays yours).
-- Live state: `PatterStatePanel`, an in-game overlay that watches and edits a running
-  engine's `@patter` properties (type-aware editors + reset-to-default) and saves / loads
-  the run.
-- Live Link: `PatterDebugLink` streams the story cursor to Patterpad and hot-reloads edited
-  bundles into the running game (`apply_live_bundle`: strings-only or full swap, state kept).
-- Structure introspection: `get_outline()` / `get_beat_sequence()` expose the authored tree
-  (per-beat text, character, gameData, tags) for tooling.
-- Demos in `demo/`: a headless **play-through demo** (the minimal integration) and the
-  **Tour scene** (the interactive Patter tour, with optional audio resolution).
+- Localisation: play any locale of an Embedded bundle, switch live with `set_locale`, or ship an IDs-only bundle and localise in your own system. Closed-caption cue stripping via `set_closed_captions`.
+- Audio resolution: `PatterAudio` resolves each line to its winning take from a `patteraudio.json` manifest (it resolves the path; playback stays yours).
+- Live state: `PatterStatePanel`, an in-game overlay that watches and edits a running engine's `@patter` properties (type-aware editors + reset-to-default) and saves / loads the run.
+- Live Link: `PatterDebugLink` streams the story cursor to Patterpad and hot-reloads edited bundles into the running game (`apply_live_bundle`: strings-only or full swap, state kept).
+- Structure introspection: `get_outline()` / `get_beat_sequence()` expose the authored tree (per-beat text, character, gameData, tags) for tooling.
+- Demos in `demo/`: a headless **play-through demo** (the minimal integration) and the **Tour scene** (the interactive Patter tour, with optional audio resolution).
