@@ -1,5 +1,11 @@
 # @patterkit/play-helpers
 
+## 1.0.8
+
+### Patch Changes
+
+- f3da522: The README reads cleanly as plain text: each paragraph is on one line. Nothing else changes.
+
 ## 1.0.7
 
 ### Patch Changes
