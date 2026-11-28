@@ -48,7 +48,7 @@ from expr's `tooling/`).
 
 ## Runtime ports (bundled with or required by the engine plugins)
 
-- **Json.NET (Newtonsoft.Json)** - the Patterplay Unity package depends on Unity's
+- **Json.NET (Newtonsoft.Json)**: the Patterplay Unity package depends on Unity's
   `com.unity.nuget.newtonsoft-json` (3.2.1) for bundle and save parsing. MIT License,
   © James Newton-King. Full text: <https://github.com/JamesNK/Newtonsoft.Json/blob/master/LICENSE.md>.
   The library itself is delivered by the Unity Package Manager, not inside the Patterplay zip.
@@ -58,15 +58,20 @@ from expr's `tooling/`).
 Patter and Patterpad build on the open-source packages below. All are MIT-licensed unless noted;
 each package's licence ships in its `node_modules` entry and in the packaged app's resources.
 
-- **PDFKit**, **docx**, **ExcelJS** — document export (MIT).
-- **fontkit** — font subsetting for the PDF export (MIT).
+- **PDFKit**, **docx**, **ExcelJS**: document export (MIT).
+- **JSZip**: reading and writing Word files and zip archives (offered as MIT or GPL 3; Patter takes it under MIT).
+- **@xmldom/xmldom**: reading Word files (MIT).
+- **fontkit**: font subsetting for the PDF export (MIT).
 - **ProseMirror** (`prosemirror-model` / `-view` / `-state` / `-transform` / `-history` / `-keymap` /
-  `-commands`) — the Patterpad writing surface (MIT).
-- **nspell** — the spell-check engine (MIT).
-- **Electron**, **electron-vite**, **electron-builder**, **electron-updater** — the desktop app shell
+  `-commands`): the Patterpad writing surface (MIT).
+- **nspell**: the spell-check engine (MIT).
+- **ws**: Patterpad's debug link to a running game (MIT).
+- **JSON5**: bundled into Patterpad's window by one of its libraries (MIT).
+- **Electron**, **electron-vite**, **electron-builder**, **electron-updater**: the desktop app shell
   and packaging (MIT).
-- **Astro** + **Starlight** + **Pagefind** — the documentation website (MIT).
-- **@fontsource/\*** UI fonts (Newsreader, Literata, Source Serif, Inter) — SIL Open Font License 1.1.
+- **Astro**, **Starlight**, and **Pagefind**: the documentation website (MIT).
+
+The fonts are listed under Fonts, above.
 
 This list covers the components redistributed in a build or embedded in the source. The complete,
 resolved dependency tree (with every transitive licence) is in `package-lock.json`; run

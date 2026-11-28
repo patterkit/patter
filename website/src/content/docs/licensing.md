@@ -1,6 +1,6 @@
 ---
 title: Use it, ship it, and if you like? Say so.
-description: Use Patter freely under the MIT licence, and find the optional credit lines, badges, name rules, and bundled third-party notices here.
+description: Use Patter freely under the MIT licence, and find the optional credit lines, badges, and name rules here.
 sidebar:
   label: Licensing
 ---
@@ -10,7 +10,7 @@ it, keep your changes private: no fee, no registration, no royalty, and no oblig
 anyone.
 
 This page covers the part that is a favour (a credit line or a badge), what you can do with the
-Patter name and mark, and info on licenses for the third-party components bundled with the tools.
+Patter name and mark, and where to find the licences of the third-party components bundled with the tools.
 
 ## Why a credit helps
 
@@ -114,24 +114,9 @@ aren't covered by it, so here's the plain-English version.
 Something not covered here, or a use you're not sure about? Ask, and the answer will probably be yes:
 [open a discussion on GitHub](https://github.com/patterkit/patter/discussions).
 
-## Third-party licences
+## Third-party notices
 
-Patter and its tools are MIT-licensed. They also bundle a few third-party components that keep
-their own licences; the notable ones are collected here.
-
-### Json.NET (Unity runtime)
-
-The Patterplay Unity package depends on Unity's `com.unity.nuget.newtonsoft-json` package
-([Json.NET](https://www.newtonsoft.com/json), MIT, © James Newton-King) for bundle and save
-parsing. Unity's Package Manager delivers it; it is not bundled inside the Patterplay download.
-
-### Spell-check dictionaries and engine
-
-The built-in English dictionaries come from [SCOWL / the English Speller
-Database](https://wordlist.aspell.net/), under a permissive BSD/MIT-style licence (attribution
-only). The spell-checking engine is [`nspell`](https://github.com/wooorm/nspell) (MIT). Any
-Hunspell dictionaries you import yourself keep their own licences; that is between you and
-wherever you got them. See [Spell-check](/spell-check/) for how these are used.
+Patter bundles a few components from other people, under their own licences: Electron in Patterpad, the PDF export's fonts, the spell-check dictionaries, and some libraries. [Third-party notices](/third-party-notices/) lists each one, its licence, and which downloads include it.
 
 ---
 
